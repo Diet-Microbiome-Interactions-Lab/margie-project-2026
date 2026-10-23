@@ -8,10 +8,13 @@ relays both ways:
 
   browser -> API  text frames  {"type": "input", "data": "..."}
                                {"type": "resize", "cols": N, "rows": N}
+                               {"type": "ping"}, every 30 s while the site is open
   API -> browser  binary frames, the terminal's own bytes
                   text frames  {"type": "error", "message": "..."} or {"type": "exit"}
 
-A shell nobody has typed in for an hour is closed.
+The shell lasts while the site is open (its pings keep the connection, and the proxy in front,
+from timing out) and closes with the page. A connection silent for an hour, one that died
+without closing, is closed.
 """
 
 import asyncio
@@ -113,6 +116,7 @@ async def terminal(ws: WebSocket):
             elif kind == "resize":
                 c, r = _size(msg)
                 chan.resize_pty(width=c, height=r)
+            # "ping": the page is still open; receiving it is all it is for.
 
     tasks = {asyncio.create_task(to_browser()), asyncio.create_task(to_shell())}
     try:
@@ -122,7 +126,7 @@ async def terminal(ws: WebSocket):
         for t in done:
             exc = t.exception()
             if isinstance(exc, asyncio.TimeoutError):
-                await _say(ws, "error", "Closed after an hour without typing.")
+                await _say(ws, "error", "Closed after an hour without a word from the page.")
             elif exc and not isinstance(exc, WebSocketDisconnect):
                 LOGGER.warning("Terminal for %s ended on an error: %s", user["username"], exc)
     finally:
