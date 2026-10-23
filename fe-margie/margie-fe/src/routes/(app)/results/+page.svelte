@@ -19,10 +19,9 @@
 </div>
 
 <style>
-	/* Window height, so the report scrolls inside itself. */
+	/* At least the window's height; taller with the report, and the page scrolls both ways. */
 	.fill {
-		height: 100%;
-		min-height: 0;
+		min-height: 100%;
 		padding-bottom: 16px;
 	}
 </style>

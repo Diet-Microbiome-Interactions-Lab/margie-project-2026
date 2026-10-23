@@ -2,7 +2,7 @@
 	import Explain from '$lib/workspace/Explain.svelte';
 	import { goto } from '$app/navigation';
 	import { page } from '$app/state';
-	import { Bot, Check, Copy, Download, FileSpreadsheet, FolderOpen } from 'lucide-svelte';
+	import { Bot, Check, Copy, Download, FileSpreadsheet, FolderOpen, Maximize2, Minimize2 } from 'lucide-svelte';
 	import GenomeChat from '$lib/crisp/GenomeChat.svelte';
 	import { chatGet } from '$lib/workspace/chat-api';
 	import { cubicOut } from 'svelte/easing';
@@ -22,6 +22,7 @@
 	import DataGrid from '$lib/workspace/viewers/DataGrid.svelte';
 	import HtmlViewer from '$lib/workspace/viewers/HtmlViewer.svelte';
 	import { backend } from '$lib/workspace/backend.svelte';
+	import { stemOf } from '$lib/crisp/genomes';
 	import ImageViewer from '$lib/workspace/viewers/ImageViewer.svelte';
 
 	/**
@@ -118,6 +119,14 @@
 	async function toggleFull() {
 		if (document.fullscreenElement) await document.exitFullscreen().catch(() => {});
 		else await board?.requestFullscreen().catch(() => {});
+	}
+	/** Any other tab full screen on its own: the table, figures, methods or files, and nothing else. */
+	let pane = $state<HTMLElement | null>(null);
+	let paneFull = $state(false);
+	async function togglePaneFull() {
+		if (tab === 'map') return toggleFull();
+		if (document.fullscreenElement) await document.exitFullscreen().catch(() => {});
+		else await pane?.requestFullscreen().catch(() => {});
 	}
 
 	/** The chat beside the report: open or not, remembered like the list. */
@@ -230,6 +239,33 @@
 	});
 
 	const caller = $derived(summary ? callerName(summary) : '');
+
+	/** Scored against fewer genomes than the operon reference holds now (itself left out). */
+	const stale = $derived.by(() => {
+		const s = summary?.scoredAgainst;
+		const now = summary?.referenceNow;
+		if (!s || typeof now !== 'number') return null;
+		const others = now - (s.left_out_self ? 1 : 0);
+		return others > s.genomes ? { then: s.genomes, now: others } : null;
+	});
+	let rescoring = $state(false);
+	/** Runs the genome again with its own tools: they come back from the database, and scoring and the report are made again. */
+	async function rescore() {
+		const g = summary?.genome;
+		if (!g) return;
+		const file = ws.genomes.find((x) => stemOf(x.name) === g)?.name;
+		if (!file) {
+			ui.notify(`${g} is not in your genomes folder: add its FASTA file there to score it again.`, 'error');
+			return;
+		}
+		const offered = new Set(ws.tools.map((t) => t.name));
+		const tools = (summary?.tools ?? []).filter((t) => offered.has(t));
+		if (!confirm(`Score ${g} again against the whole operon reference? It runs with its own ${tools.length} tools, whose results come back from the database; scoring and the report are made again.`)) return;
+		rescoring = true;
+		const run = await ws.start({ kind: 'annotate', tools: tools.length ? tools : ws.chosenTools, genomes: [file] });
+		rescoring = false;
+		if (run) ui.notify('Scoring it again: follow it on Jobs.', 'ok');
+	}
 	const circular = $derived(summary?.figures.find((f) => /_circular\.png$/i.test(f)));
 	const methods = $derived(summary ? methodsFor(summary) : { text: '', refs: [] as string[] });
 	/** Viewers that scroll and zoom themselves get a tall pane; notes and folders take what they need. */
@@ -296,7 +332,12 @@
 	const ringState = (state: string) => (state === 'running' ? 'running' : state === 'done' ? 'done' : 'pending');
 </script>
 
-<svelte:document onfullscreenchange={() => (full = !!board && document.fullscreenElement === board)} />
+<svelte:document
+	onfullscreenchange={() => {
+		full = !!board && document.fullscreenElement === board;
+		paneFull = !!pane && document.fullscreenElement === pane;
+	}}
+/>
 
 <div class="rb" class:full bind:this={board}>
 	<aside class="rb-side" class:shut={listShut} style="--w: {listShut ? 44 : ui.size('app:results-list', 220)}px">
@@ -365,6 +406,11 @@
 						{#if summary.geneticCode}<li><span>genetic code</span>{summary.geneticCode}</li>{/if}
 						{#if summary.domain && summary.domain !== 'Unknown'}<li><span>domain</span>{summary.domain}</li>{/if}
 						{#if summary.envelope}<li><span>envelope</span>{summary.envelope}</li>{/if}
+						{#if summary.scoredAgainst}
+							<li title="Its operon scores compare it with this many other genomes in the operon reference ({summary.scoredAgainst.scored_at.slice(0, 10)})">
+								<span>scored against</span>{count(summary.scoredAgainst.genomes)} genomes
+							</li>
+						{/if}
 					</ul>
 				</div>
 				<div class="rb-tabs" role="tablist" aria-label="Report" use:thumb>
@@ -375,6 +421,7 @@
 					{/each}
 				</div>
 				<div class="rb-downloads">
+					<button type="button" class="rb-btn" title="Show this tab on the whole screen (Esc to leave)" onclick={togglePaneFull}><Maximize2 size={15} />Full screen</button>
 					<button type="button" class="rb-btn chat" aria-pressed={chatOpen} onclick={() => ui.toggleFold(CHAT, true)}><Bot size={15} />Chat with the genome</button>
 					{#if summary.final.excel}
 						<a class="rb-btn primary" href={uiBase.to(`/view?path=${encodeURIComponent(summary.final.excel)}`)}><FileSpreadsheet size={15} />Open Excel</a>
@@ -384,6 +431,15 @@
 				</div>
 			</header>
 
+			{#if stale}
+				<div class="rb-stale" role="status">
+					<span>
+						Scored against <b>{count(stale.then)}</b> genomes; the operon reference now has <b>{count(stale.now)}</b> others. Scoring it again compares
+						it with all of them.
+					</span>
+					<button type="button" class="mg-btn small" disabled={rescoring} onclick={rescore}>{rescoring ? 'Starting…' : 'Score it again'}</button>
+				</div>
+			{/if}
 			<!-- the numbers in one line; Details opens the ring, the tiers and the tools -->
 			<div class="rb-strip">
 				<span class="rb-strip-n"><b>{count(summary.genes)}</b> genes</span>
@@ -478,7 +534,10 @@
 
 			{/if}
 
-			<div class="rb-pane" class:rb-fill={fills} class:rb-flow={!fills}>
+			<div class="rb-pane" class:rb-fill={fills} class:rb-flow={!fills} bind:this={pane}>
+				{#if paneFull}
+					<button type="button" class="rb-btn rb-pane-exit" onclick={togglePaneFull}><Minimize2 size={15} />Exit full screen | Esc</button>
+				{/if}
 				{#key tab}
 					<div class="rb-body" in:tabIn>
 						{#if tab === 'map'}
@@ -587,12 +646,13 @@
 </div>
 
 <style>
-	/* The whole of what is left of the window (the page is as tall as it). */
+	/* At least the rest of the window; taller when the tab's pane needs it, and the page scrolls
+	   both ways (on a narrow window it keeps its width rather than squeezing the viewers). */
 	.rb {
 		position: relative;
 		flex: 1;
 		display: flex;
-		min-height: 480px;
+		min-height: calc(100vh - 120px);
 		border: 1px solid var(--mg-border);
 		border-radius: var(--mg-r);
 		color: var(--mg-text);
@@ -784,6 +844,20 @@
 	.rb-facts span {
 		color: var(--mg-text-3);
 		font-weight: 400;
+	}
+	.rb-stale {
+		display: flex;
+		flex-wrap: wrap;
+		align-items: center;
+		gap: 8px 14px;
+		padding: 8px 12px;
+		border-left: 3px solid var(--mg-warn);
+		border-radius: var(--mg-r-sm);
+		background: color-mix(in srgb, var(--mg-warn) 8%, transparent);
+		font-size: var(--mg-fs-sm);
+	}
+	.rb-stale span {
+		flex: 1 1 40ch;
 	}
 	.rb-downloads {
 		display: flex;
@@ -1184,12 +1258,35 @@
 		padding: 14px var(--mg-pad) var(--mg-pad);
 		min-width: 0;
 	}
-	/* Viewers that scroll and zoom themselves get a fixed height. */
+	/* Viewers that scroll and zoom themselves get nearly a window of height; the page scrolls to them. */
 	.rb-fill {
-		flex: 1;
-		min-height: 360px;
+		flex: none;
+		height: max(620px, calc(100vh - 110px));
 		display: flex;
 		flex-direction: column;
+	}
+	@media (min-width: 901px) {
+		.rb {
+			min-width: 960px;
+		}
+	}
+	/* One tab on the whole screen. */
+	.rb-pane:fullscreen {
+		position: relative;
+		height: 100vh;
+		/* The top strip is the exit button's, so it covers none of the tab's own controls. */
+		padding: 54px 18px 14px;
+		overflow: auto;
+		background: var(--cr-card, var(--mg-surface));
+	}
+	.rb-pane:fullscreen.rb-fill > .rb-body {
+		flex-grow: 1;
+	}
+	.rb-pane-exit {
+		position: absolute;
+		top: 10px;
+		right: 14px;
+		z-index: 5;
 	}
 	.rb-fill > .rb-body {
 		flex-grow: 1;
@@ -1203,7 +1300,7 @@
 	}
 	.rb-flow {
 		flex-grow: 1;
-		min-height: 0;
+		min-height: 520px;
 		overflow: auto;
 	}
 	.rb-gallery {

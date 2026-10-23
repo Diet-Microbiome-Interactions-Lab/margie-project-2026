@@ -1201,12 +1201,37 @@ async function finalCounts(table: string): Promise<FinalCounts> {
 	return tally.result();
 }
 
+/** A JSON file on the cluster, or null when it is not there or not JSON. */
+async function jsonAt<T>(path: string): Promise<T | null> {
+	try {
+		return JSON.parse((await readText(path)).content) as T;
+	} catch {
+		return null;
+	}
+}
+
+/** What the genome was scored against: scoring/scored-against.json, where the run left it or tidied it to. */
+async function scoredAgainst(folder: string): Promise<GenomeSummary['scoredAgainst']> {
+	return (await jsonAt(`${folder}/${PER_TOOL}/scoring/scored-against.json`)) ?? (await jsonAt(`${folder}/scoring/scored-against.json`));
+}
+
+/** How many genomes the operon reference holds now: the working reference's summary, else the one it was scored with. */
+async function referenceNow(scoredWith: string | undefined): Promise<number | null> {
+	const current = str(dig(await config.get(), 'margie_sb.operon_database.occ_reference_pkl'));
+	for (const ref of [current, scoredWith ?? '']) {
+		const n = ref ? (await jsonAt<{ genomes?: number }>(`${ref}.summary.json`))?.genomes : undefined;
+		if (typeof n === 'number') return n;
+	}
+	return null;
+}
+
 /** Builds a genome's report summary: counts, figures and tools run. */
 async function summary(genome: string): Promise<GenomeSummary> {
 	const r = (await resultList.get()).find((x) => x.organism === genome);
 	if (!r?.final?.table) throw new ApiError(`No finished results for ${genome} on the cluster.`, 404);
 	const final = r.final;
-	const [counts, figures, tools] = await Promise.all([
+	const scored = await scoredAgainst(r.folder as string);
+	const [counts, figures, tools, refNow] = await Promise.all([
 		finalCounts(final.table as string),
 		final.diagrams
 			? browse(final.diagrams)
@@ -1216,7 +1241,8 @@ async function summary(genome: string): Promise<GenomeSummary> {
 		browse(`${r.folder}/${PER_TOOL}`)
 			.catch(() => browse(r.folder as string))
 			.then((d) => [...names(d.entries, 'directory')].filter((n) => !NOT_TOOLS.has(n) && !n.startsWith('.')).sort())
-			.catch(() => [] as string[])
+			.catch(() => [] as string[]),
+		scored ? referenceNow(scored.reference) : Promise.resolve(null)
 	]);
 	return {
 		...counts,
@@ -1227,7 +1253,9 @@ async function summary(genome: string): Promise<GenomeSummary> {
 		geneticCode: '',
 		geneCaller: 'rasttk',
 		tools,
-		figures
+		figures,
+		scoredAgainst: scored,
+		referenceNow: refNow
 	};
 }
 

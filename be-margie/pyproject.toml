@@ -19,6 +19,7 @@ classifiers = [
 ]
 
 dependencies = [
+    "anthropic>=2.2,<3",
     "bio",
     "fastapi",
     "matplotlib",

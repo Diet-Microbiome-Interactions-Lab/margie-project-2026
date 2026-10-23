@@ -650,14 +650,17 @@ DEFAULT_OCC_REFERENCE = Path(os.environ.get("MARGIE_OCC_REFERENCE", "occ_referen
 def load_occ_organisms(occ_reference=DEFAULT_OCC_REFERENCE):
     """Returns the set of organisms in the OCC reference (the pool C3 was scored against).
 
-    Returns None when the reference is unreadable, so callers fall back to the run's organisms."""
+    Returns None when the reference is unreadable, so callers fall back to the run's organisms;
+    that is said in the log, as the figures then compare with far fewer genomes."""
     try:
         import pickle
         with open(occ_reference, "rb") as fh:
             ref = pickle.load(fh)
         orgs = {str(o) for o in (ref.get("organisms_added") or []) if o}
         return orgs or None
-    except Exception:
+    except Exception as exc:
+        print(f"[report_figures] WARNING: the operon reference {occ_reference} could not be read ({exc}); "
+              "the figures compare with this run's genomes only", flush=True)
         return None
 
 

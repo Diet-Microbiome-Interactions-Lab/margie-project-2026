@@ -53,6 +53,52 @@ def _scripts_versioned(step: str) -> str:
         _SCRIPT_VERSIONS[step] = f'{step}@{digest.hexdigest()[:12]}'
     return _SCRIPT_VERSIONS[step]
 
+# Consolidation merges every tool table in a genome's folder, and labeling reads only what it
+# merged: their cache entries are keyed by those tables too, so a different tool set, or a
+# tool's changed output, reruns them instead of bringing back a merge of other tables.
+INPUT_KEYED_STEPS = ('consolidation', 'labeling')
+_CONSOLIDATION_SHARED = None
+
+
+def _consolidation_shared():
+    '''Returns consolidation/_shared.py (a folder of scripts, not a package), loaded once.'''
+    global _CONSOLIDATION_SHARED
+    if _CONSOLIDATION_SHARED is None:
+        import importlib.util
+        spec = importlib.util.spec_from_file_location('_margie_consolidation_shared', Path(__file__).parent / 'consolidation' / '_shared.py')
+        module = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(module)
+        _CONSOLIDATION_SHARED = module
+    return _CONSOLIDATION_SHARED
+
+
+def merged_inputs_fingerprint(genome_dir: str) -> str:
+    '''Returns a hash of what consolidation reads in a genome's folder: each tool table that
+    consolidation/_shared.discover_tool_tables finds, and genome_info/genome_info.tsv.'''
+    root = Path(genome_dir)
+    digest = hashlib.sha256()
+    for name, path in [*_consolidation_shared().discover_tool_tables(root, set()),
+                       ('genome_info', root / 'genome_info' / 'genome_info.tsv')]:
+        if not Path(path).is_file():
+            continue
+        digest.update(f'{name}\0{Path(path).name}\0'.encode())
+        with open(path, 'rb') as fh:
+            for chunk in iter(lambda: fh.read(1 << 20), b''):
+                digest.update(chunk)
+        digest.update(b'\0')
+    return digest.hexdigest()[:16]
+
+
+def input_keyed(key: str) -> bool:
+    return key.split('@')[0] in INPUT_KEYED_STEPS
+
+
+def cache_name(key: str, fingerprint: str) -> str:
+    '''The output-cache name a step is stored under: its cache-map key, plus the merged tables'
+    fingerprint for consolidation and labeling.'''
+    return f'{key}#{fingerprint}' if input_keyed(key) else key
+
+
 # Mirrors margie_sb.smk's INTERPRO_ANALYSIS_TO_BASENAME; the .smk is not importable.
 INTERPRO_DB_BASENAMES = [
     "antifam", "cdd", "coils", "funfam", "gene3d", "hamap", "mobidb", "ncbifam",
@@ -865,9 +911,17 @@ class WorkflowBase(ProgramBase):
             # Restored after rast.faa so mtimes are newer; must precede the skip below.
             if db_path:
                 genome_cache_map_now = cache_map_fn(genome)
-                genome_restored = restore_all(db_path, genome_files[genome], genome_cache_map_now)
+                tools_map = {k: v for k, v in genome_cache_map_now.items() if not input_keyed(k)}
+                genome_restored = restore_all(db_path, genome_files[genome], tools_map)
+                # Consolidation and labeling: only a merge of exactly the tables now in the folder.
+                merged_fp = merged_inputs_fingerprint(get_workflow_prefix_for(genome, smk_config))
+                genome_restored.update(restore_all(
+                    db_path, genome_files[genome],
+                    {cache_name(k, merged_fp): v for k, v in genome_cache_map_now.items() if input_keyed(k)}))
+                # Back under the cache-map keys, for the checks and the report below.
+                genome_restored = {k: genome_restored.get(cache_name(k, merged_fp), False) for k in genome_cache_map_now}
                 restored[genome] = genome_restored
-                LOGGER.info('Phase4+ cache restore for %s: %s', genome, genome_restored)
+                LOGGER.info('Phase4+ cache restore for %s: %s (merged tables %s)', genome, genome_restored, merged_fp)
 
                 # Rewrites restored tables into this run's RASTtk id namespace.
                 rast_ref = f"{get_workflow_prefix_for(genome, smk_config)}rasttk/rast.gff"
@@ -923,7 +977,9 @@ class WorkflowBase(ProgramBase):
             for key, paths in cache_map_fn(genome).items():
                 step = key.split('@')[0]
                 if db_path and genome_restored.get(key):
-                    provenance.set(genome, step, cache_report.RESTORED, SAME_GENOME, when.get(genome, {}).get(key, ''), cache_report.GENOME_LEVEL)
+                    detail = (f'{SAME_GENOME}, merging the same tool tables' if input_keyed(key) else SAME_GENOME)
+                    provenance.set(genome, step, cache_report.RESTORED, detail,
+                                   when.get(genome, {}).get(cache_name(key, merged_fp), ''), cache_report.GENOME_LEVEL)
                 elif off(step):
                     provenance.set(genome, step, cache_report.NOT_RUN, 'not chosen for this run')
                 elif all(Path(p).exists() for p in paths):
@@ -992,7 +1048,9 @@ class WorkflowBase(ProgramBase):
                     if tool in genome_stored or genome_restored.get(tool, False):
                         continue
                     if all(Path(p).exists() for p in paths):
-                        store(db_path, genome_files[genome], tool, paths)
+                        # Consolidation is done, so every table it merged is final.
+                        name = cache_name(tool, merged_inputs_fingerprint(pc_prefix)) if input_keyed(tool) else tool
+                        store(db_path, genome_files[genome], name, paths)
                         genome_stored.add(tool)
                         LOGGER.info('Cached %s for %s as soon as its own db token appeared '
                                     '(Stage 2 still running)', tool, genome)
@@ -1029,7 +1087,8 @@ class WorkflowBase(ProgramBase):
                 tools_to_store = {tool: paths for tool, paths in genome_cache_map.items()
                                   if tool not in genome_stored and not genome_restored.get(tool, False)}
                 if tools_to_store:
-                    store_all(db_path, genome_files[genome], tools_to_store)
+                    merged_fp = merged_inputs_fingerprint(pc_prefix)
+                    store_all(db_path, genome_files[genome], {cache_name(t, merged_fp): p for t, p in tools_to_store.items()})
                 else:
                     LOGGER.info('All outputs were already cached incrementally or were cache hits for %s', genome)
                 log_workflow_run(db_path, run_id, genome_files[genome], key_name,

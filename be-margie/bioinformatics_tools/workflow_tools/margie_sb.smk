@@ -1107,6 +1107,7 @@ rule run_report_figures_one_genome:
         scripts=REPORT_FIGURES_SCRIPTS_DIR,
         outdir=REPORT_FIGURES_ORGANISM_DIR,
         operon_db=REPORT_FIGURES_OPERON_DB,
+        occ_reference=C3_REFERENCE_PKL,
         run_root=_OUTPUT_ROOT
     threads: 1
     resources:
@@ -1117,7 +1118,7 @@ rule run_report_figures_one_genome:
         echo "=== MARGIE_SB: REPORT FIGURES ({wildcards.genome}) ==="
         {LOADER_PYTHON} {params.scripts}/make_organism_report.py \
             --run-root "{params.run_root}" --organism "{wildcards.genome}" \
-            --operon-db "{params.operon_db}" --output-dir "{params.outdir}" \
+            --operon-db "{params.operon_db}" --occ-reference "{params.occ_reference}" --output-dir "{params.outdir}" \
             || echo "[report_figures] organism figures failed (non-fatal)"
         {LOADER_PYTHON} {params.scripts}/verify_report.py \
             --run-root "{params.run_root}" --organism "{wildcards.genome}" \
@@ -1174,6 +1175,7 @@ rule run_full_operon_map_one_genome:
         scripts=REPORT_FIGURES_SCRIPTS_DIR,
         outdir=REPORT_FIGURES_ORGANISM_DIR,
         operon_db=REPORT_FIGURES_OPERON_DB,
+        occ_reference=C3_REFERENCE_PKL,
         run_root=_OUTPUT_ROOT
     threads: 1
     resources:
@@ -1184,7 +1186,7 @@ rule run_full_operon_map_one_genome:
         echo "=== MARGIE_SB: FULL OPERON MAP ({wildcards.genome}) ==="
         {LOADER_PYTHON} {params.scripts}/make_complete_operon_diagrams.py \
             --run-root "{params.run_root}" --organism "{wildcards.genome}" \
-            --operon-db "{params.operon_db}" --output-dir "{params.outdir}" \
+            --operon-db "{params.operon_db}" --occ-reference "{params.occ_reference}" --output-dir "{params.outdir}" \
             || echo "[full_operon_map] atlas failed (non-fatal)"
         echo "full operon map generated for {wildcards.genome}" > {output.tkn}
         """
@@ -1203,6 +1205,7 @@ rule run_report_figures_global:
         scripts=REPORT_FIGURES_SCRIPTS_DIR,
         outdir=REPORT_FIGURES_GLOBAL_DIR,
         operon_db=REPORT_FIGURES_OPERON_DB,
+        occ_reference=C3_REFERENCE_PKL,
         run_root=_OUTPUT_ROOT
     threads: 1
     resources:
@@ -1213,7 +1216,7 @@ rule run_report_figures_global:
         echo "=== MARGIE_SB: REPORT FIGURES (global / pangenome) ==="
         {LOADER_PYTHON} {params.scripts}/make_global_report.py \
             --run-root "{params.run_root}" --operon-db "{params.operon_db}" \
-            --output-dir "{params.outdir}" \
+            --occ-reference "{params.occ_reference}" --output-dir "{params.outdir}" \
             || echo "[report_figures] global figures failed (non-fatal)"
         {LOADER_PYTHON} {params.scripts}/verify_report.py \
             --run-root "{params.run_root}" --figures-dir "{params.outdir}" \

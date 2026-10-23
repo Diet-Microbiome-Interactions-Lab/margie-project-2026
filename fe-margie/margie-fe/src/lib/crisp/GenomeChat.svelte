@@ -3,7 +3,7 @@
 	import { marked } from 'marked';
 	import DOMPurify from 'dompurify';
 	import { Bot, Check, ChevronDown, Copy, Download, ExternalLink, KeyRound, Settings2, ShieldAlert, Trash2, X } from 'lucide-svelte';
-	import { chatAsk, chatAvailable, chatForget, chatGet, chatHpcKey, chatHpcReload, chatSettings, hpcKeysAvailable } from '$lib/workspace/chat-api';
+	import { chatAsk, chatAvailable, chatForget, chatGet, chatHpcKey, chatHpcReload, chatSettings, hpcKeysAvailable, onServer } from '$lib/workspace/chat-api';
 	import { uiBase } from '$lib/workspace/base.svelte';
 	import { ui } from '$lib/workspace/ui.svelte';
 	import { ws } from '$lib/workspace/data.svelte';
@@ -48,7 +48,11 @@
 	}
 	interface Info {
 		settings: Settings;
-		keys: Record<Provider, { saved: boolean; last4?: string; here?: boolean; hpc?: boolean }>;
+		/** cluster and expires: a key the website's server keeps in your cluster account, until that date. */
+		keys: Record<Provider, { saved: boolean; last4?: string; here?: boolean; hpc?: boolean; cluster?: boolean; expires?: string }>;
+		/** On the website: providers whose key expired and was removed since the last look. */
+		expired?: Provider[];
+		keyDays?: number[];
 		providers: Record<Provider, { label: string; base: string; models: string[]; policy: string; keys: string }>;
 		builtin: { ready: boolean; model: string; note: string };
 		history: Turn[];
@@ -63,6 +67,9 @@
 	let asking = $state(false);
 	let askError = $state('');
 	let keyInput = $state('');
+	/** On the website: how many days a saved key is kept before it is refused and removed. */
+	let keyDays = $state(10);
+	const expiresOn = (iso?: string) => (iso ? new Date(iso).toLocaleDateString(undefined, { day: 'numeric', month: 'short', year: 'numeric' }) : '');
 	let saving = $state(false);
 	let list = $state<HTMLElement | null>(null);
 	let copied = $state(-1);
@@ -81,6 +88,7 @@
 			info = d;
 			s = { ...d.settings };
 			turns = d.history;
+			for (const p of d.expired ?? []) ui.notify(`Your ${d.providers[p].label} key expired and was removed. Paste it again, or a new one, to keep chatting.`, 'info');
 			if (!ready) view = 'setup';
 			await scrollDown();
 		} catch (e) {
@@ -329,6 +337,10 @@
 								<span class="gc-saved"><KeyRound size={13} /> saved, ending …{info.keys[p].last4}</span>
 							</div>
 							<div class="gc-row gc-where">
+								{#if info.keys[p].cluster}
+									<span>in your cluster account, encrypted, until {expiresOn(info.keys[p].expires)}</span>
+									<button type="button" class="gc-link" onclick={() => saveSettings({ key: null, keyFor: p })}>Remove</button>
+								{/if}
 								{#if info.keys[p].here}
 									<span>on this computer</span>
 									<button type="button" class="gc-link" onclick={() => saveSettings({ key: null, keyFor: p })}>Remove</button>
@@ -340,9 +352,14 @@
 							</div>
 						{/if}
 						{#if !hasKey || (hpcKeysAvailable() && !(info.keys[p].here && info.keys[p].hpc))}
-							<form class="gc-row" onsubmit={(e) => (e.preventDefault(), keyInput.trim() && saveSettings({ key: keyInput, keyFor: p }))}>
+							<form class="gc-row" onsubmit={(e) => (e.preventDefault(), keyInput.trim() && saveSettings({ key: keyInput, keyFor: p, ...(onServer() ? { keyDays } : {}) }))}>
 								<input class="mg-input" type="password" autocomplete="off" placeholder={p === 'custom' ? 'if the service needs one' : hasKey ? 'paste it again to keep a second copy' : 'paste your key'} bind:value={keyInput} />
-								{#if hpcKeysAvailable()}
+								{#if onServer()}
+									<select class="mg-input gc-days" aria-label="Keep the key for" bind:value={keyDays}>
+										{#each info.keyDays ?? [1, 7, 10, 30] as d (d)}<option value={d}>{d === 1 ? '1 day' : `${d} days`}</option>{/each}
+									</select>
+									<button type="submit" class="gc-btn" disabled={!keyInput.trim() || saving}>Save</button>
+								{:else if hpcKeysAvailable()}
 									<button type="submit" class="gc-btn" disabled={!keyInput.trim() || saving}>On this computer</button>
 									<button type="button" class="gc-btn" disabled={!keyInput.trim() || saving} onclick={() => hpcKey(keyInput)}>In my HPC home</button>
 								{:else}
@@ -359,10 +376,21 @@
 								keys there.
 							</span>
 						{/if}
-						<span class="gc-small">
-							On this computer it is kept in your MARGIE settings folder, readable by you alone. Wherever it is kept, it is sent only to {meta?.label}.
-							{#if meta?.keys}<a href={meta.keys} target="_blank" rel="noreferrer">Get a key</a>{/if}
-						</span>
+						{#if onServer()}
+							<span class="gc-small">
+								It is kept in your cluster account (<code>~/.config/bioinformatics-tools/secrets/</code>, readable by you alone), encrypted with a key
+								only the MARGIE server has, so the file alone is of no use to anyone who gets into your account. It is removed after the days you
+								choose; then paste it again. It is sent only to {meta?.label}, from the MARGIE server, when you ask a question.
+								<b>Renew your keys regularly</b>, give them a spending limit, and if one may have leaked, revoke it with {meta?.label}: removing
+								it here does not cancel it there.
+								{#if meta?.keys}<a href={meta.keys} target="_blank" rel="noreferrer">Get or revoke a key</a>{/if}
+							</span>
+						{:else}
+							<span class="gc-small">
+								On this computer it is kept in your MARGIE settings folder, readable by you alone. Wherever it is kept, it is sent only to {meta?.label}.
+								{#if meta?.keys}<a href={meta.keys} target="_blank" rel="noreferrer">Get a key</a>{/if}
+							</span>
+						{/if}
 					</div>
 				{/if}
 			</section>
@@ -396,7 +424,7 @@
 					<ul>
 						<li>your question and this conversation so far;</li>
 						<li>the parts of {genome}'s results the model chooses to read: file names, table rows (gene ids, sequences, names, scores), tool logs and the commands in them;</li>
-						<li>nothing else on this computer, and no other genome.</li>
+						<li>nothing else {onServer() ? 'in your account' : 'on this computer'}, and no other genome.</li>
 					</ul>
 					<p>
 						<b>Free and paid plans differ.</b> Paid API use is usually not used to train models and is kept for a limited time (often 30 days,
@@ -659,6 +687,10 @@
 		display: flex;
 		align-items: center;
 		gap: 8px;
+	}
+	.gc-days {
+		flex: 0 0 auto !important;
+		width: auto;
 	}
 	.gc-row .mg-input {
 		flex: 1;

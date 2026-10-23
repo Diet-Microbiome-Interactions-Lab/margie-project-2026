@@ -23,8 +23,10 @@ Usage:
 """
 import argparse
 import csv
+import json
 import math
 import sys
+from datetime import datetime, timezone
 from pathlib import Path
 
 # c3_occ and c3_lib sit next to this script and match how the reference was built.
@@ -375,6 +377,19 @@ def _breakdown_and_formula(info, raw_operon_id):
     return reason, formula
 
 
+SCORED_AGAINST = "scored-against.json"
+
+
+def write_scored_against(path, reference, compared, left_out_self):
+    """Writes how many genomes of the OCC reference this genome was scored against (itself left out)."""
+    Path(path).write_text(json.dumps({
+        "reference": str(Path(reference).resolve()),
+        "genomes": compared,
+        "left_out_self": left_out_self,
+        "scored_at": datetime.now(timezone.utc).isoformat(timespec="seconds"),
+    }, indent=1) + "\n")
+
+
 def main():
     """Loads the OCC reference (optionally leave-one-out), scores the organism and writes the C3 table with csv."""
     ap = argparse.ArgumentParser(
@@ -429,6 +444,7 @@ def main():
     print(f"  genes: {len(genes)}")
 
     # Leave-one-out: drops this genome from the reference by fingerprint, else by name.
+    left_out = False
     if args.leave_one_out:
         run_root = Path(args.genes_file).resolve().parents[2]
         fp = L.genome_fingerprint(genes["aa_hash"])
@@ -439,6 +455,7 @@ def main():
         if token is not None:
             n_before = len(ref["organisms_added"])
             ref = c3_occ.leave_one_out(ref, genes, run_root, organism, token=token)
+            left_out = True
             how = "fingerprint" if (fp and members.get(fp) == token) else "name"
             print(f"[c3-scorer] leave-one-out: removed this genome "
                   f"(matched by {how} as '{token}') from the reference "
@@ -447,6 +464,11 @@ def main():
         else:
             print("[c3-scorer] leave-one-out: this genome is not in the reference "
                   "-> scoring against the full reference (already out-of-sample)")
+
+    # What this genome was compared with, beside its scores: Results says when the reference has
+    # grown since, so it can be scored again against the larger reference.
+    write_scored_against(Path(args.output).parent / SCORED_AGAINST, args.reference,
+                         compared=len(ref.get("organisms_added", ())), left_out_self=left_out)
 
     pmap = load_pairwise_probs(args.operon_results)
     print(f"  UniOP per-pair probabilities: {len(pmap)}")

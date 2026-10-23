@@ -104,6 +104,10 @@ export interface GenomeSummary {
 	columns: string[];
 	/** The genome's genes around a ring, by confidence tier (see GLYPH_TIERS on the server). */
 	glyph: { length: number; contigs: number; plus: number[]; minus: number[] } | null;
+	/** How many genomes of the operon reference it was scored against (itself left out), and when (scoring's scored-against.json). */
+	scoredAgainst?: { genomes: number; reference: string; left_out_self: boolean; scored_at: string } | null;
+	/** How many genomes the operon reference holds now (<reference>.summary.json), when known. */
+	referenceNow?: number | null;
 }
 
 export type Tone = 'ok' | 'warn' | 'danger' | 'neutral';

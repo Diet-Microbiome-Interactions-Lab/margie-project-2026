@@ -25,7 +25,7 @@ from fastapi.responses import JSONResponse
 import uvicorn
 
 from bioinformatics_tools.api.database import init_db
-from bioinformatics_tools.api.routers import auth, dane, fasta, license, llm, ssh, terminal, workflows
+from bioinformatics_tools.api.routers import auth, chat, dane, fasta, license, llm, ssh, terminal, workflows
 
 # Configure logging
 logging.basicConfig(
@@ -122,6 +122,7 @@ app.include_router(workflows.router)
 app.include_router(license.router)
 app.include_router(llm.router)
 app.include_router(terminal.router)
+app.include_router(chat.router)
 
 # Root endpoint
 @app.get("/")

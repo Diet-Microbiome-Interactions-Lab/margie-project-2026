@@ -321,6 +321,8 @@ def main() -> None:
     ap = argparse.ArgumentParser(description=__doc__)
     ap.add_argument("--run-root", required=True)
     ap.add_argument("--operon-db", default=str(L.DEFAULT_OPERON_DB))
+    ap.add_argument("--occ-reference", default=str(L.DEFAULT_OCC_REFERENCE),
+                    help="the OCC reference scoring used (its genomes are the comparison pool)")
     ap.add_argument("--output-dir", default=None,
                     help="default: <run>/scoring/figures/global")
     args = ap.parse_args()
@@ -336,12 +338,12 @@ def main() -> None:
     organisms = L.discover_organisms(run_root)
     genes = L.load_all_genes(run_root, organisms)
     # Recurrence and the caption use the OCC organisms, else this run's organisms.
-    occ_pool = L.load_occ_organisms() or set(organisms)
+    occ_pool = L.load_occ_organisms(Path(args.occ_reference)) or set(organisms)
     recurrence = L.load_operon_recurrence(Path(args.operon_db), restrict_to=occ_pool)
     # Whole pool, no leave-one-out; tallies from the OCC genome-stats sidecar.
     pool_list = sorted(occ_pool)
     n_org = len(pool_list)
-    pstats = L.aggregate_pool_stats(L.load_pool_stats(), pool_list)
+    pstats = L.aggregate_pool_stats(L.load_pool_stats(Path(args.occ_reference)), pool_list)
     L.set_provenance(L.provenance_text(n_org, pstats))
 
     jobs = [
@@ -360,7 +362,7 @@ def main() -> None:
             failures.append(name)
             print(f"[make_global_report] {name} FAILED:\n{traceback.format_exc()}",
                   file=sys.stderr)
-    L.write_sources_manifest(outdir, run_root, organisms, Path(args.operon_db))
+    L.write_sources_manifest(outdir, run_root, organisms, Path(args.operon_db), Path(args.occ_reference))
     print(f"[make_global_report] {n_org} genomes: {len(jobs) - len(failures)}/{len(jobs)} "
           f"figures ok → {outdir}")
     if failures:

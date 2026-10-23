@@ -9,7 +9,9 @@ from __future__ import annotations
 import argparse
 import csv
 import fcntl
+import json
 import sys
+from datetime import datetime, timezone
 from pathlib import Path
 
 _THIS_DIR = Path(__file__).resolve().parent
@@ -103,6 +105,9 @@ def main() -> None:
                                  L.genome_pool_stats(genes))
 
         after = len(ref.get("organisms_added", set()))
+        # The reference's size now, for Results (a genome scored against fewer can be scored again).
+        Path(str(reference_path) + ".summary.json").write_text(json.dumps({
+            "genomes": after, "updated_at": datetime.now(timezone.utc).isoformat(timespec="seconds")}) + "\n")
         added = after - before
         status = "already_present" if already_present else ("added" if added > 0 else "no_change")
         msg = (

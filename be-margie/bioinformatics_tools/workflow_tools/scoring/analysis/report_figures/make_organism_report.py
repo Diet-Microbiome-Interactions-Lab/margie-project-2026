@@ -428,6 +428,8 @@ def main() -> None:
     ap.add_argument("--run-root", required=True)
     ap.add_argument("--organism", required=True)
     ap.add_argument("--operon-db", default=str(L.DEFAULT_OPERON_DB))
+    ap.add_argument("--occ-reference", default=str(L.DEFAULT_OCC_REFERENCE),
+                    help="the OCC reference scoring used (its genomes are the comparison pool)")
     ap.add_argument("--output-dir", default=None,
                     help="default: <run>/<organism>/scoring/figures")
     args = ap.parse_args()
@@ -444,14 +446,14 @@ def main() -> None:
     genes = L.load_organism_genes(run_root, args.organism)
     operons = L.build_operons(genes)
     # Falls back to this run's organisms when the OCC reference is unreadable.
-    restrict = L.load_occ_organisms() or set(L.discover_organisms(run_root))
+    restrict = L.load_occ_organisms(Path(args.occ_reference)) or set(L.discover_organisms(run_root))
     # Leave-one-out: the pool excludes this organism, as in its C3 scoring.
     restrict = set(restrict)
     restrict.discard(org_label)
     recurrence = L.load_operon_recurrence(Path(args.operon_db), restrict_to=restrict)
     # Provenance line: pool size and tallies from the OCC genome-stats sidecar.
     pool_list = sorted(restrict)
-    pstats = L.aggregate_pool_stats(L.load_pool_stats(), pool_list)
+    pstats = L.aggregate_pool_stats(L.load_pool_stats(Path(args.occ_reference)), pool_list)
     L.set_provenance(L.provenance_text(len(pool_list), pstats, leave_one_out=True))
 
     jobs = [
@@ -471,7 +473,7 @@ def main() -> None:
             failures.append(name)
             print(f"[make_organism_report] {name} FAILED:\n{traceback.format_exc()}",
                   file=sys.stderr)
-    L.write_sources_manifest(outdir, run_root, [args.organism], Path(args.operon_db))
+    L.write_sources_manifest(outdir, run_root, [args.organism], Path(args.operon_db), Path(args.occ_reference))
     print(f"[make_organism_report] {args.organism}: {len(jobs) - len(failures)}/{len(jobs)} "
           f"figure groups ok → {outdir}")
     if failures:

@@ -99,6 +99,8 @@ def main() -> None:
     ap.add_argument("--run-root", required=True)
     ap.add_argument("--organism", required=True)
     ap.add_argument("--operon-db", default=str(L.DEFAULT_OPERON_DB))
+    ap.add_argument("--occ-reference", default=str(L.DEFAULT_OCC_REFERENCE),
+                    help="the OCC reference scoring used (its genomes are the comparison pool)")
     ap.add_argument("--output-dir", default=None,
                     help="defaults to <run>/<organism>/scoring/figures")
     args = ap.parse_args()
@@ -116,12 +118,12 @@ def main() -> None:
     operons = L.build_operons(genes)
 
     # Leave-one-out pool: OCC organisms minus this one, as in the standard reports.
-    restrict = L.load_occ_organisms() or set(L.discover_organisms(run_root))
+    restrict = L.load_occ_organisms(Path(args.occ_reference)) or set(L.discover_organisms(run_root))
     restrict = set(restrict)
     restrict.discard(org_label)
     recurrence = L.load_operon_recurrence(Path(args.operon_db), restrict_to=restrict)
     pool_list = sorted(restrict)
-    pstats = L.aggregate_pool_stats(L.load_pool_stats(), pool_list)
+    pstats = L.aggregate_pool_stats(L.load_pool_stats(Path(args.occ_reference)), pool_list)
     L.set_provenance(L.provenance_text(len(pool_list), pstats, leave_one_out=True))
 
     ops = operons.copy()
