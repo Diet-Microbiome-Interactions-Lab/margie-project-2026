@@ -12,6 +12,7 @@ hits the correct cluster and account.
 import asyncio
 import json
 import logging
+import os
 from pathlib import PurePosixPath
 import re
 import threading
@@ -25,7 +26,9 @@ from bioinformatics_tools.api.services.job_store import job_store
 LOGGER = logging.getLogger(__name__)
 
 # Thread pool for background SSH tasks
-executor = ThreadPoolExecutor(max_workers=4)
+# One thread watches each run for as long as it goes (hours, days), for every user at once,
+# so the pool is sized for many runs; a watcher ends with its run, or when it is cancelled.
+executor = ThreadPoolExecutor(max_workers=int(os.environ.get('BSP_MAX_WATCHED_RUNS', '64')))
 
 # Regex patterns for parsing Snakemake/SLURM log output
 # Grouped rules capture only the group's short name (see margie_sb.smk).
@@ -119,16 +122,24 @@ def run_ssh_task(job_id: str, command: str, connection: SSHConnection,
         # job_id names the log/sentinel files so a reconnect can replay them.
         detached = False
         launched = False
+        ended_unfinished = False
         for line in ssh_slurm.submit_ssh_job(cmd=command, connection=connection,
                                              job_id=job_id, reattach=reattach,
                                              in_slurm=in_slurm,
                                              driver_account=driver_account,
                                              driver_partition=driver_partition,
-                                             driver_time=driver_time):
+                                             driver_time=driver_time,
+                                             # A cancelled run stops being watched, freeing its thread.
+                                             stop=lambda: job_store.get_status(job_id) == "cancelled"):
             # Run is live on the cluster; later errors only affect watching it.
             if line == "__LAUNCHED__":
                 launched = True
                 continue
+
+            # The driver's SLURM job has gone without finishing (cancelled on the cluster, out of time).
+            if line == "__ENDED_UNFINISHED__":
+                ended_unfinished = True
+                break
 
             # Watching stopped, not the run; job state is left unchanged.
             if line == "__DETACHED__":
@@ -228,8 +239,17 @@ def run_ssh_task(job_id: str, command: str, connection: SSHConnection,
             if "snakemake" in line.lower():
                 job_store.update(job_id, phase="Running Snakemake")
 
+        # Cancelled from MARGIE: the cancel has said so already; watching just stops.
+        if job_store.get_status(job_id) == "cancelled":
+            LOGGER.info("Stopped watching job %s: it was cancelled", job_id)
+        elif ended_unfinished:
+            job_store.append_log(
+                job_id,
+                "\n\n=== The run's SLURM job ended before the run finished (cancelled on the "
+                "cluster, or out of time). ===")
+            job_store.finalize(job_id, status="failed", phase="Ended before finishing")
         # Detached stops watching only; exit_code 0 must not mark it completed.
-        if detached:
+        elif detached:
             job_store.append_log(
                 job_id,
                 "\n\n=== Stopped streaming output. The run continues on the "

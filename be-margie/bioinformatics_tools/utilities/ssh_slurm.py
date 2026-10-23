@@ -223,6 +223,7 @@ def submit_ssh_job(
     driver_account: str | None = None,
     driver_partition: str | None = None,
     driver_time: str | None = None,
+    stop=None,
 ):
     '''Runs a workflow command detached and streams its log.
 
@@ -231,7 +232,10 @@ def submit_ssh_job(
     never stops the run. reattach=True skips the launch (cmd is ignored) and
     replays the existing log from line 1.
 
-    Yields each output line as it arrives, then a final __EXIT_CODE__: line.
+    Yields each output line as it arrives, then a final __EXIT_CODE__: line. Watching ends
+    early, with __DETACHED__, once stop() says so (the run was cancelled), and with
+    __ENDED_UNFINISHED__ when the driver's SLURM job has gone without writing its exit code
+    (cancelled on the cluster, or out of time), so a watcher never outlives its run.
     '''
     # pooled=False: held for the whole run, outside the shared pool.
     ssh = connection.connect(pooled=False)
@@ -317,6 +321,28 @@ def submit_ssh_job(
 
     # SFTP does not expand $HOME, so the sentinel path is home-relative.
     rcf_sftp = rcf[len('$HOME/'):] if rcf.startswith('$HOME/') else rcf
+    jobid_sftp = jobidf[len('$HOME/'):] if jobidf.startswith('$HOME/') else jobidf
+
+    def _driver_job() -> str:
+        """Returns the driver's SLURM job id (written beside the log), or '' when there is none."""
+        if sftp is None:
+            return ''
+        try:
+            with sftp.open(jobid_sftp, 'r') as fh:
+                got = fh.read().decode('utf-8', 'replace').strip().split()
+            return got[0] if got and got[0].isdigit() else ''
+        except Exception:
+            return ''
+
+    def _driver_gone(job: str) -> bool:
+        """Returns True when SLURM no longer lists the driver job (squeue answered, and not with it)."""
+        try:
+            _i, o, _e = ssh.exec_command(f'squeue -h -j {job} -o %i 2>/dev/null; echo __END__')
+            o.channel.settimeout(30)
+            text = o.read().decode('utf-8', 'replace')
+        except Exception:
+            return False
+        return '__END__' in text and job not in text.split()
 
     def _finished():
         """Returns the exit code if the run has finished, else None."""
@@ -346,6 +372,11 @@ def submit_ssh_job(
             seen[0] = True
         return False
     CHECK_EVERY = 5.0                         # the sentinel is not urgent
+    DRIVER_EVERY = 60.0                       # nor whether the driver job is still there
+    last_driver = time.time()
+    driver_job = None                         # read once, when it is first needed
+    gone_twice = 0                            # two looks in a row, so a slow squeue is not taken for an end
+    ended_unfinished = False
     try:
         while True:
             try:
@@ -369,7 +400,21 @@ def submit_ssh_job(
             if now - last_check < CHECK_EVERY:
                 continue
             last_check = now
+            if stop is not None and stop():
+                break
             got = _finished()
+            if not got and in_slurm and now - last_driver >= DRIVER_EVERY:
+                last_driver = now
+                if driver_job is None:
+                    driver_job = _driver_job()
+                if driver_job and _driver_gone(driver_job):
+                    gone_twice += 1
+                    got = _finished()          # it may have written its exit code just now
+                    if not got and gone_twice >= 2:
+                        ended_unfinished = True
+                        break
+                else:
+                    gone_twice = 0
             if got:
                 # Drains whatever the tail has not delivered yet.
                 try:
@@ -398,8 +443,11 @@ def submit_ssh_job(
             except Exception:
                 pass
 
-    if exit_code is None:
-        # No sentinel after the tail ended: the run continues, so no exit code.
+    if ended_unfinished:
+        LOGGER.info('Run %s: its SLURM driver job ended without an exit code', safe)
+        yield '__ENDED_UNFINISHED__'
+    elif exit_code is None:
+        # No sentinel after the tail ended (or watching was stopped): the run continues, so no exit code.
         LOGGER.info('Detached from run %s; it continues in the background', safe)
         yield '__DETACHED__'
     else:

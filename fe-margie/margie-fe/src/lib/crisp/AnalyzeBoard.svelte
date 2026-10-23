@@ -254,8 +254,9 @@
 				</div>
 			</div>
 		{/if}
-		<RunAction />
 	{/if}
+	<!-- Another run can start beside one that is going (each has its own folder). -->
+	<RunAction />
 </section>
 
 <!-- ------------------------------------------------ genomes and progress: once there is a run to show -->

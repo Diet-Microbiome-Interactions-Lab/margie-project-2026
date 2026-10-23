@@ -20,10 +20,6 @@
 	const blocker = $derived.by((): { text: string; fix?: { label: string; run: () => void }; href?: string } | null => {
 		if (!n) return { text: backend.cluster ? 'No genomes in the input folder on the cluster yet.' : 'No genomes to annotate yet.', href: '#genomes' };
 		if (!ws.tools.length) return { text: 'Still reading which tools are available.' };
-		if (ws.running.length) {
-			const r = ws.running[0];
-			return { text: `${r.label.replace(/ with .*$/, '')} is still going.`, href: uiBase.to(`/jobs/${r.id}`) };
-		}
 		if (!runtimeReady) return { text: backend.cluster ? 'The cluster cannot be reached.' : 'The container app is not running.', href: uiBase.to('/install') };
 		// Backend-reported rows (cluster): the first not ready, and where to fix it.
 		const unready = ws.setup.find((r) => r.required && r.tone !== 'ok' && r.href);
@@ -52,6 +48,8 @@
 	);
 	const outputDir = $derived(ws.resultRoots.outputRoot.split('/').filter(Boolean).at(-1) ?? 'output');
 	const onCluster = $derived(backend.cluster ? ' on the cluster' : '');
+	/** Runs going now: this one starts beside them, in a folder of its own. */
+	const going = $derived(ws.running.filter((r) => r.kind === 'annotate').length);
 	const under = $derived(
 		tools
 			? `the gene caller first, then the annotation tools | results to ${outputDir}/${onCluster}`
@@ -87,6 +85,9 @@
 		/>
 	</div>
 {/if}
+{#if going && !blocker}
+	<p class="also mg-note">{going === 1 ? 'A run is going' : `${going} runs are going`}; this starts another beside it, with its own results folder.</p>
+{/if}
 <button type="button" class="go mg-btn primary" disabled={!!blocker || starting || copying} onclick={start}>
 	{starting ? 'Starting…' : copying ? 'Starts when your databases are ready' : sentence}
 </button>
@@ -106,6 +107,10 @@
 {/if}
 
 <style>
+	.also {
+		margin: 0 0 8px;
+		text-align: center;
+	}
 	.go {
 		/* Styled explicitly so other .mg-btn rules cannot change it. */
 		display: inline-flex;
