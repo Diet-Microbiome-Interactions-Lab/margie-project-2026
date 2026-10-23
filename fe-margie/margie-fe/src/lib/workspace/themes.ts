@@ -141,6 +141,31 @@ const HAND_MADE: Preset[] = [
 		light: { bg: '#FFFFFF', surface: '#FFFFFF', surface2: '#EDEDED', border: '#6E6E6E', borderStrong: '#1A1A1A', text: '#000000', text2: '#1A1A1A', text3: '#383838' },
 		dark: { bg: '#000000', surface: '#000000', surface2: '#161616', border: '#9A9A9A', borderStrong: '#E6E6E6', text: '#FFFFFF', text2: '#F0F0F0', text3: '#D0D0D0' },
 		status: { light: ['#1B5E20', '#7A4A00', '#A50E0E'], dark: ['#7CE0A0', '#FFD166', '#FF8A80'] }
+	},
+	// Three with a character of their own beyond colour (crisp/theme-effects.css, by data-palette).
+	{
+		id: 'glow',
+		accent: 'cyan',
+		name: 'Bioluminescence',
+		note: 'The deep sea at night, glowing like Vibrio',
+		light: { bg: '#EEF8F9', surface: '#FFFFFF', surface2: '#E4F3F5', border: '#CDE5E9', borderStrong: '#A5CDD4', text: '#04212A', text2: '#285560', text3: '#456B75' },
+		dark: { bg: '#030F16', surface: '#081A23', surface2: '#0D232E', border: '#153340', borderStrong: '#23495A', text: '#E2F7FA', text2: '#A4CCD5', text3: '#80AAB5' }
+	},
+	{
+		id: 'gram',
+		accent: 'crystal',
+		name: 'Gram stain',
+		note: 'Crystal violet and safranin',
+		light: { bg: '#FBF7FC', surface: '#FFFFFF', surface2: '#F4EDF7', border: '#E8DDEE', borderStrong: '#CBB9D5', text: '#1C1122', text2: '#4C3B57', text3: '#695873' },
+		dark: { bg: '#110916', surface: '#190F1F', surface2: '#221629', border: '#33243D', borderStrong: '#4B3757', text: '#F4EAF8', text2: '#CAB6D4', text3: '#A592AF' }
+	},
+	{
+		id: 'agar',
+		accent: 'coral',
+		name: 'Agar',
+		note: 'A warm plate, colonies growing',
+		light: { bg: '#FAF2E1', surface: '#FFFCF5', surface2: '#F5EAD3', border: '#EADBBC', borderStrong: '#D5C095', text: '#2A1D0B', text2: '#5A4426', text3: '#735E3D' },
+		dark: { bg: '#14100A', surface: '#1C170F', surface2: '#252015', border: '#3A311F', borderStrong: '#54472D', text: '#F6EDDC', text2: '#D0C1A3', text3: '#AA9B7D' }
 	}
 ];
 

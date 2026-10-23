@@ -129,7 +129,11 @@ export const ACCENTS = [
 	{ id: 'green', name: 'Green', light: '#2E7D32', dark: '#66BB6A' },
 	{ id: 'amber', name: 'Amber', light: '#A15C07', dark: '#E7A63A' },
 	{ id: 'rose', name: 'Rose', light: '#B4234A', dark: '#F07896' },
-	{ id: 'graphite', name: 'Graphite', light: '#30343B', dark: '#C9CDD4' }
+	{ id: 'graphite', name: 'Graphite', light: '#30343B', dark: '#C9CDD4' },
+	// The accents of the Bioluminescence, Gram stain and Agar themes.
+	{ id: 'cyan', name: 'Glow', light: '#0A7487', dark: '#3FE0F0' },
+	{ id: 'crystal', name: 'Crystal violet', light: '#6A1B9A', dark: '#C38BFA' },
+	{ id: 'coral', name: 'Coral', light: '#B23A0E', dark: '#FF9A5C' }
 ] as const;
 
 export const DEFAULT_PREFS: UiPrefs = {

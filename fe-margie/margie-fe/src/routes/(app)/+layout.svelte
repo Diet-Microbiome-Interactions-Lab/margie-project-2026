@@ -10,6 +10,7 @@
 	import '$lib/workspace/motion/motion.css';
 	import '$lib/crisp/crisp.css';
 	import '$lib/crisp/skeleton-look.css';
+	import '$lib/crisp/theme-effects.css';
 	import { onMount } from 'svelte';
 	import AppShell from '$lib/crisp/AppShell.svelte';
 	import { ws } from '$lib/workspace/data.svelte';

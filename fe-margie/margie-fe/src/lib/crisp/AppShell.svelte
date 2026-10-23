@@ -142,7 +142,7 @@
 		})}; ${ui.motionStyle}`
 	);
 	/** The palettes offered in the top bar's menu; all the others are in Customize → Colours. */
-	const QUICK = ['crisp', 'skeleton', 'paper', 'mint', 'slate', 'contrast'];
+	const QUICK = ['crisp', 'glow', 'gram', 'agar', 'skeleton', 'paper', 'mint', 'slate', 'contrast'];
 	const quickPresets = $derived(QUICK.map((id) => PRESETS.find((p) => p.id === id)).filter((p) => !!p));
 	const palette = $derived(ui.prefs.palette || 'crisp');
 
