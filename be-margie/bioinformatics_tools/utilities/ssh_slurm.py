@@ -196,6 +196,10 @@ def build_driver_launch(cmd: str, base: str, safe: str, log: str, rcf: str,
         f"cat > {driversh} <<'MARGIE_WORKFLOW_EOF'\n"
         f'#!/bin/bash\n'
         f'export PATH=$HOME/.local/bin:$PATH\n'
+        # The coordinator runs as this SLURM job so a run outlives the session; the job's own
+        # SLURM_* settings must not reach the steps it submits (Snakemake warns of running in
+        # "a SLURM job context" and asks for the login node otherwise).
+        f'for v in $(compgen -e | grep "^SLURM_"); do unset "$v"; done\n'
         f'{cmd}\n'
         f'MARGIE_WORKFLOW_EOF\n'
         f'chmod +x {driversh}\n'

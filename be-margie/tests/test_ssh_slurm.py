@@ -204,6 +204,19 @@ class TestDriverInSlurm:
     def test_nohup_is_used(self):
         assert "nohup bash " in self._launch()
 
+    def test_the_pipeline_does_not_inherit_the_jobs_slurm_settings(self, tmp_path):
+        """Runs the written driver script with SLURM settings set, as inside the job: the
+        workflow command must see none (else Snakemake warns of a SLURM job context)."""
+        import os
+        import subprocess
+
+        s = self._launch(cmd='env | grep -c "^SLURM_" || true; echo "keep=$KEEP"')
+        script = s.split("<<'MARGIE_WORKFLOW_EOF'\n", 1)[1].split("\nMARGIE_WORKFLOW_EOF\n", 1)[0]
+        (tmp_path / "driver.sh").write_text(script)
+        env = {**os.environ, "SLURM_JOB_ID": "42", "SLURM_CPUS_PER_TASK": "4", "KEEP": "yes"}
+        out = subprocess.run(["bash", str(tmp_path / "driver.sh")], capture_output=True, text=True, env=env).stdout.split()
+        assert out == ["0", "keep=yes"]
+
     def test_a_command_containing_quotes_survives(self):
         """Checks a command with single quotes is written verbatim via a quoted heredoc."""
         cmd = "MARGIE_LICENSE_ACCEPTED='2026-07-31' MARGIE_USAGE_TYPE='academic' dane_wf margie sb"
