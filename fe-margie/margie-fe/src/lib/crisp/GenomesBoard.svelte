@@ -87,8 +87,8 @@
 	<!-- Where genomes come from and results go: one line, the fields behind Change folders. -->
 	<div class="gb-where">
 		<span>
-			From <b class="mg-mono" title={folder}>{folder ? last(folder) : 'no folder yet'}</b> · results to
-			<b class="mg-mono" title={output}>{output ? last(output) : 'your home folder'}</b>{#if backend.cluster}{' · '}databases in
+			From <b class="mg-mono" title={folder}>{folder ? last(folder) : 'no folder yet'}</b> | results to
+			<b class="mg-mono" title={output}>{output ? last(output) : 'your home folder'}</b>{#if backend.cluster}{' | '}databases in
 				<b class="mg-mono" title={working}>{working ? last(working) : 'margie-databases'}</b>{/if}
 		</span>
 		{#if folder}<button type="button" class="mg-link quiet" aria-expanded={foldersOpen} onclick={() => (foldersOpen = !foldersOpen)}>{foldersOpen ? 'Done' : 'Change folders'}</button>{/if}
