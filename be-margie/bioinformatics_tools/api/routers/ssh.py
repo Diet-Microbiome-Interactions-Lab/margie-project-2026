@@ -2375,12 +2375,18 @@ def clear_job_history(current_user: dict = Depends(get_current_user)):
     if not main_db:
         return {"backup": "", "removed": 0, "kept": 0}
     root = _stores_call(user_stores.scratch_root, conn, user_config)
+    # The history is cleared by the account's own copy of MARGIE, brought up to the deployed version first.
+    try:
+        sync_remote_dane_wf(conn)
+    except Exception as exc:
+        LOGGER.warning("dane_wf version-sync before clearing the history failed, using the clone as it is: %s", exc)
     stamp = datetime.now(timezone.utc).strftime("%Y-%m-%d-%H%M%S")
     result = job_history_client.clear_jobs(
         conn, main_db, f"{root}/job-history-backups/job-history-{stamp}.db",
         owner_username=current_user["username"], owner_cluster_username=current_user["cluster_username"])
     if result is None:
-        raise HTTPException(status_code=500, detail="Could not clear the job history; nothing was removed.")
+        raise HTTPException(status_code=500, detail="Could not clear the job history; nothing was removed. "
+                                                    "Your copy of MARGIE on the cluster may be older than the site (it updates before each run).")
     read_cache.drop(current_user["user_id"], "jobs")
     return result
 
