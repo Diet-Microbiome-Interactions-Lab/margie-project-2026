@@ -1296,6 +1296,9 @@ export async function clusterApi<T = any>(path: string, init: RequestInit = {}):
 				return listTools();
 			case 'GET /overview':
 				return overview();
+			// SLURM as the user sees it: accounts and limits, jobs, partitions (Cluster: Resources).
+			case 'GET /cluster/resources':
+				return get('/v1/ssh/cluster_resources');
 			case 'GET /check':
 				return { rows: await installed.get() };
 			case 'GET /settings':

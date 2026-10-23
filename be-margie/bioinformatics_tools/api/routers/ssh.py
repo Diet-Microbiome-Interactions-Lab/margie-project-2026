@@ -944,6 +944,172 @@ def health_check():
     return {"status": "success"}
 
 
+# What the cluster offers the user, from standard SLURM commands, in one round trip: where the
+# site's commands run, the user's accounts and their limits (the account's own association,
+# e.g. GrpTRES), what the account's running jobs hold, the QOS limits, the user's jobs, and
+# every partition with its nodes.
+CLUSTER_SCRIPT = r"""
+echo '@@host'; hostname -f 2>/dev/null || hostname
+echo '@@assoc'; sacctmgr -nP show assoc user="$USER" format=Account,Partition,QOS,MaxJobs,MaxSubmit 2>/dev/null
+accts=$(sacctmgr -nP show assoc user="$USER" format=Account 2>/dev/null | sort -u)
+echo '@@accounts'; for a in $accts; do sacctmgr -nP show assoc account="$a" format=Account,User,GrpTRES,GrpJobs 2>/dev/null | awk -F'|' '$2==""'; done
+echo '@@qos'; for q in $(sacctmgr -nP show assoc user="$USER" format=QOS 2>/dev/null | tr ',' '\n' | sort -u); do sacctmgr -nP show qos "$q" format=Name,GrpTRES,MaxTRESPU,MaxJobsPU,MaxWall 2>/dev/null; done
+echo '@@usage'; for a in $accts; do squeue -h -A "$a" -t R -O 'UserName:40,tres-alloc:400' 2>/dev/null | awk -v a="$a" '{print a "|" $1 "|" $2}'; done
+echo '@@jobs'; squeue -h -u "$USER" -o '%i|%j|%P|%T|%M|%l|%D|%C|%N|%r|%a|%o' 2>/dev/null
+echo '@@nodes'; sinfo -h -N -o '%P|%n|%T|%C|%m|%e|%G' 2>/dev/null
+echo '@@partitions'; sinfo -h -o '%P|%a|%l|%D|%C|%m|%G' 2>/dev/null
+echo '@@end'
+"""
+
+# Job names and commands that mean a shell on a compute node (sinteractive, srun --pty bash, ...);
+# not "(null)", which batch jobs (sbatch --wrap) show as their command too.
+_INTERACTIVE = {"interactive", "sinteractive", "bash", "sh", "zsh", "/bin/bash", "/bin/sh", "/bin/zsh", "jupyter", "rstudio"}
+
+
+def _tres(text: str) -> dict[str, float]:
+    """Parses a TRES list ('cpu=8,mem=32G,node=1,gres/gpu=1') into numbers; memory in MB."""
+    out: dict[str, float] = {}
+    for part in (text or "").split(","):
+        key, _, value = part.strip().partition("=")
+        if not key or not value:
+            continue
+        unit = value[-1].upper() if value[-1].isalpha() else ""
+        try:
+            number = float(value[:-1] if unit else value)
+        except ValueError:
+            continue
+        if key == "mem" or unit in "KMGT" and unit:
+            number *= {"K": 1 / 1024, "M": 1, "G": 1024, "T": 1024 * 1024, "": 1}.get(unit, 1)
+        out[key] = out.get(key, 0) + number
+    return out
+
+
+def _cpus(field: str) -> dict[str, int]:
+    """Parses sinfo's CPUs as allocated/idle/other/total."""
+    parts = (field.split("/") + ["0"] * 4)[:4]
+    nums = [int(p) if p.isdigit() else 0 for p in parts]
+    return dict(zip(("allocated", "idle", "other", "total"), nums))
+
+
+def parse_cluster(out: str, user: str) -> dict:
+    """Turns CLUSTER_SCRIPT's output into the Cluster page's figures."""
+    sections: dict[str, list[str]] = {}
+    name = ""
+    for line in out.splitlines():
+        if line.startswith("@@"):
+            name = line[2:].strip()
+            sections.setdefault(name, [])
+        elif name and line.strip():
+            sections[name].append(line.rstrip())
+    rows = lambda key: [line.split("|") for line in sections.get(key, [])]  # noqa: E731
+
+    host = (sections.get("host") or [""])[0].strip()
+    jobs = []
+    for f in rows("jobs"):
+        if len(f) < 12:
+            continue
+        job = dict(zip(("id", "name", "partition", "state", "time", "limit", "nodes", "cpus", "nodelist", "reason", "account", "command"), f))
+        job["interactive"] = job["name"].strip().lower() in _INTERACTIVE or job["command"].strip().lower() in _INTERACTIVE
+        jobs.append(job)
+
+    usage: dict[str, dict] = {}
+    for f in rows("usage"):
+        if len(f) < 3:
+            continue
+        acct, who, tres = f[0], f[1].strip(), _tres(f[2])
+        u = usage.setdefault(acct, {"all": {}, "mine": {}, "jobs": 0, "my_jobs": 0})
+        u["jobs"] += 1
+        for k, v in tres.items():
+            u["all"][k] = u["all"].get(k, 0) + v
+        if who == user:
+            u["my_jobs"] += 1
+            for k, v in tres.items():
+                u["mine"][k] = u["mine"].get(k, 0) + v
+    limits = {f[0]: {"tres": _tres(f[2]) if len(f) > 2 else {}, "jobs": f[3] if len(f) > 3 else ""} for f in rows("accounts") if f and f[0]}
+    assoc: dict[str, dict] = {}
+    for f in rows("assoc"):
+        if not f or not f[0]:
+            continue
+        a = assoc.setdefault(f[0], {"partitions": set(), "qos": set(), "max_jobs": "", "max_submit": ""})
+        if len(f) > 1 and f[1]:
+            a["partitions"].add(f[1])
+        if len(f) > 2:
+            a["qos"].update(q for q in f[2].split(",") if q)
+        if len(f) > 4:
+            a["max_jobs"], a["max_submit"] = f[3], f[4]
+    accounts = []
+    for acct in sorted(assoc):
+        a, lim, use = assoc[acct], limits.get(acct, {}), usage.get(acct, {"all": {}, "mine": {}, "jobs": 0, "my_jobs": 0})
+        accounts.append({
+            "name": acct,
+            "partitions": sorted(a["partitions"]),  # empty: every partition
+            "qos": sorted(a["qos"]),
+            "max_jobs": a["max_jobs"], "max_submit": a["max_submit"],
+            "limits": lim.get("tres", {}), "group_jobs": lim.get("jobs", ""),
+            "in_use": use["all"], "mine": use["mine"], "running": use["jobs"], "my_running": use["my_jobs"],
+        })
+    qos = [dict(zip(("name", "group", "per_user", "jobs_per_user", "max_wall"), (f + [""] * 5)[:5])) for f in rows("qos") if f and f[0]]
+
+    by_part: dict[str, dict] = {}
+    for f in rows("nodes"):
+        if len(f) < 6:
+            continue
+        part = f[0].rstrip("*")
+        state = f[2].rstrip("*~#!%$@^-").lower()
+        p = by_part.setdefault(part, {"states": {}, "mem_free_mb": 0, "mem_total_mb": 0, "cpus_idle": 0})
+        p["states"][state] = p["states"].get(state, 0) + 1
+        usable = state in ("idle", "mixed", "mix", "allocated", "alloc", "completing")
+        mem = float(f[4]) if f[4].isdigit() else 0
+        free = float(f[5]) if f[5].isdigit() else 0
+        if usable:
+            p["mem_total_mb"] += mem
+            if state in ("idle", "mixed", "mix"):
+                p["mem_free_mb"] += free
+                p["cpus_idle"] += _cpus(f[3])["idle"]
+    partitions = []
+    for f in rows("partitions"):
+        if len(f) < 7:
+            continue
+        name = f[0].rstrip("*")
+        nodes = by_part.get(name, {})
+        partitions.append({
+            "name": name, "default": f[0].endswith("*"), "up": f[1] == "up", "time_limit": f[2],
+            "nodes": int(f[3]) if f[3].isdigit() else 0, "cpus": _cpus(f[4]),
+            "mem_per_node_mb": int(f[5].rstrip("+")) if f[5].rstrip("+").isdigit() else 0,
+            "gres": "" if f[6] == "(null)" else f[6],
+            "node_states": nodes.get("states", {}),
+            "cpus_ready": nodes.get("cpus_idle", 0),
+            "mem_free_mb": nodes.get("mem_free_mb", 0), "mem_total_mb": nodes.get("mem_total_mb", 0),
+        })
+    return {
+        "host": host,
+        "on_login_node": "login" in host.split(".")[0].lower() or not host,
+        "jobs": jobs,
+        "interactive": [j for j in jobs if j["interactive"] and j["state"] == "RUNNING"],
+        "accounts": accounts,
+        "qos": qos,
+        "partitions": partitions,
+        "complete": "end" in sections,
+    }
+
+
+@router.get("/cluster_resources")
+def cluster_resources(current_user: dict = Depends(get_current_user)):
+    """The user's SLURM picture: accounts with their limits and what is in use, QOS limits, the
+    user's jobs (and any interactive session, with its node), and each partition's free CPUs and
+    memory. Reused for 20 seconds (read_cache)."""
+    conn = _build_connection(current_user)
+
+    def ask():
+        _, out = _run_remote_check(conn, CLUSTER_SCRIPT)
+        result = parse_cluster(out, current_user["cluster_username"])
+        if not result["complete"] and not result["partitions"]:
+            raise HTTPException(status_code=502, detail="The cluster did not answer the SLURM questions; is SLURM there?")
+        return result
+
+    return read_cache.get((current_user["user_id"], "cluster"), ask, fresh=20, stale=90)
+
+
 @router.get("/status")
 def ssh_status(current_user: dict = Depends(get_current_user)):
     """Checks whether the server can reach the user's cluster over SSH.

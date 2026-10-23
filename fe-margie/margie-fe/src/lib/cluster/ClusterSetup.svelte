@@ -331,10 +331,6 @@
 			{#if ws.check && lacking && !opBusy}
 				<div class="assets-ask">
 					{#if !plan}
-						<p>
-							Not all of them are where your config points. MARGIE can set up the missing ones on the cluster: copied from the lab's folder
-							when it has them, pulled from a container registry if one is set, or built with margie-build. Nothing already there is replaced.
-						</p>
 						<div class="assets-opts">
 							{#if buildPass}
 								<label><input type="checkbox" bind:checked={builds} /> Build what cannot be copied (downloads; hours)</label>

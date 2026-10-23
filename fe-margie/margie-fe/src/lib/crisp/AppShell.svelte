@@ -10,7 +10,7 @@
 	import { cubicOut } from 'svelte/easing';
 	import { fade, fly } from 'svelte/transition';
 	import { page } from '$app/state';
-	import { BookOpen, ChartPie, Eye, FlaskConical, FolderOpen, HeartHandshake, House, ListChecks, LogOut, Menu, MonitorDown, Package, Palette, Play, SlidersHorizontal, SquareTerminal, UserRound, Users, X } from 'lucide-svelte';
+	import { BookOpen, ChartPie, Eye, FlaskConical, FolderOpen, Gauge, HeartHandshake, House, ListChecks, LogOut, Menu, MonitorDown, Package, Palette, Play, SlidersHorizontal, SquareTerminal, UserRound, Users, X } from 'lucide-svelte';
 	import { DESKTOP_URL } from './about';
 	import { AppBar } from '@skeletonlabs/skeleton-svelte';
 	import avatar from '$lib/assets/neuromancer.jpg';
@@ -66,6 +66,7 @@
 		{
 			name: 'Cluster',
 			items: [
+				{ href: '/cluster', label: 'Resources', icon: Gauge, note: 'SLURM: your accounts, jobs, partitions and memory' },
 				{ href: '/terminal', label: 'Terminal', icon: SquareTerminal, note: 'A shell on your cluster account' },
 				{ href: '/install', label: 'Install', icon: Package, note: 'Tools, databases and the licence' }
 			]
