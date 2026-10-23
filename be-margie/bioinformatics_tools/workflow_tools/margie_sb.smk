@@ -1967,23 +1967,26 @@ rule run_rasttk:
             exit 1
         fi
 
-        # 1x, not 2x: SLURM itself already guarantees no real holder can
-        # still be running past its own walltime allocation, so any lock
-        # older than that is a hard-killed holder whose EXIT trap never ran.
-        STALE_SECONDS=$(( {resources.runtime} * 60 ))
+        # The holder writes alive_at every minute. A cancelled job is killed
+        # before its EXIT trap runs and leaves the lock behind, so a lock with
+        # no sign of life for STALE_SECONDS is taken over. Locks from older
+        # runs carry only acquired_at; the newest time found counts.
+        STALE_SECONDS=600
         while ! mkdir "{params.lock}" 2>/dev/null; do
-            if [[ -f "{params.lock}/acquired_at" ]]; then
-                AGE=$(( $(date +%s) - $(cat "{params.lock}/acquired_at" 2>/dev/null || echo 0) ))
-                if [[ $AGE -gt $STALE_SECONDS ]]; then
-                    echo "WARNING: stale RASTtk/BV-BRC lock (age ${{AGE}}s) -- assuming the holder was killed, taking over" >&2
-                    rm -rf "{params.lock}"
-                    continue
-                fi
+            SEEN=$(cat "{params.lock}/alive_at" "{params.lock}/acquired_at" 2>/dev/null | sort -n | tail -1 || true)
+            [[ -n "$SEEN" ]] || SEEN=$(stat -c %Y "{params.lock}" 2>/dev/null || date +%s)
+            QUIET=$(( $(date +%s) - SEEN ))
+            if [[ $QUIET -gt $STALE_SECONDS ]]; then
+                echo "WARNING: RASTtk/BV-BRC lock quiet for ${{QUIET}}s -- its holder has stopped, taking over" >&2
+                rm -rf "{params.lock}"
+                continue
             fi
             sleep 10
         done
         date +%s > "{params.lock}/acquired_at"
-        trap 'rm -rf "{params.lock}"' EXIT
+        ( while sleep 60; do date +%s > "{params.lock}/alive_at" || exit 0; done ) >/dev/null 2>&1 &
+        HEARTBEAT=$!
+        trap 'kill $HEARTBEAT 2>/dev/null; rm -rf "{params.lock}"' EXIT
 
         /usr/local/bin/run -i {input.fasta} -o {params.output_dir} -t {threads} -d {params.db} --scientific {wildcards.genome} --domain "$DOMAIN" --genetic-code "$GCODE"
         cp $(find {params.output_dir} -path "*/processed/rast*.tsv") {output.results}
