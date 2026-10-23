@@ -1126,7 +1126,14 @@ async function readGenome(dir: string): Promise<OrganismResult & { jobDir: strin
 		if (inside.has(EXCEL_NAME)) final.excel = `${dir}/scoring/${EXCEL_NAME}`;
 		if (names(scoring.entries, 'directory').has('figures')) final.diagrams = `${dir}/scoring/figures`;
 	}
-	return { organism, tools: [], folder: dir, final: final.table ? final : undefined, jobDir: dir.slice(0, dir.lastIndexOf('/')) };
+	// Its tools: their folders (run or brought back from the cache), beside the report or tidied under per-tool-phased-output.
+	// Done once the report is in; until then a folder only says the tool started.
+	const toolDir = dirs.has(PER_TOOL) ? `${dir}/${PER_TOOL}` : dir;
+	const toolNames = dirs.has(PER_TOOL) ? names((await browse(toolDir).catch(() => ({ entries: [] as Entry[] }))).entries, 'directory') : dirs;
+	const tools = [...toolNames]
+		.filter((n) => !NOT_TOOLS.has(n) && !n.startsWith('.'))
+		.map((tool) => ({ tool, path: `${toolDir}/${tool}`, processed: !!final.table }));
+	return { organism, tools, folder: dir, final: final.table ? final : undefined, jobDir: dir.slice(0, dir.lastIndexOf('/')) };
 }
 
 /** Genome result folders across the latest runs, cached for 20 s. */

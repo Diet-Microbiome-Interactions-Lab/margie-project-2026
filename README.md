@@ -141,6 +141,92 @@ A desktop app, for running MARGIE on your own computer, is coming soon.
 
 **[margie.geddes.rcac.purdue.edu](https://margie.geddes.rcac.purdue.edu)**
 
+## How scoring works
+
+Every gene in the final table, `FINAL_ANNOTATION_WITH_CONFIDENCE.tsv`, carries one label, a confidence between 0 and 1, a tier and a review flag. They come from two steps that run after the tools have finished and their results have been merged into one row per gene.
+
+```mermaid
+flowchart LR
+    T["Tool results<br/>one row per gene"] --> L["Labeling<br/>one label per gene"]
+    L --> R["Operon reference<br/>this genome is added"]
+    R --> C["Four measures<br/>C1 · C2 · C3 · C4"]
+    C --> F["Confidence 0–1<br/>tier · review flag"]
+```
+
+### 1. Labeling: one name per gene
+
+Each tool's best hit for a gene is the one with the lowest e-value, taken only if its description says something (not "hypothetical protein", a bare DUF, or "uncharacterized" without a function word). The label then comes from the first tool in this order whose best hit qualifies:
+
+> **PGAP → NCBIfam → TIGRFAM → HAMAP → PIRSF → UniProt** (identity of at least 40%) **→ KEGG → eggNOG → RASTtk → Pfam → CDD → COG**
+
+If no tool qualifies, the gene keeps the first description any tool gave, or "No DB hits". MEROPS, TCDB and dbCAN check the label (a shared word marks agreement) but do not set it. Labeling also gathers each gene's EC numbers into a consensus (full, majority, single source, or conflicting), records its operon from UniOP, and checks whether TIGRFAM, PGAP and NCBIfam, and eggNOG and COG, point the same way.
+
+### 2. Scoring: four measures
+
+| | Question it answers | How |
+|---|---|---|
+| **C1** tool coverage | How many independent sources describe this gene? | Sources with an informative hit ÷ 7 (RASTtk, COG, Pfam, KEGG, eggNOG, UniProt, and one shared slot for TIGRFAM, PGAP and NCBIfam) |
+| **C2** operon probability | How sure is UniOP that the gene shares an operon with its neighbours? | Mean of its upstream and downstream pair probabilities; 0.5 outside an operon |
+| **C3** operon context | Do these neighbours sit together in other genomes too? | The Bayesian estimate below, one value per operon |
+| **C4** EC agreement | Do the tools that give an EC number agree? | 1 − (share of tool pairs whose EC numbers conflict, weighted by how many tools gave one) |
+
+#### C3: learning from other genomes
+
+C3 asks a simple question of every pair of neighbouring genes in an operon: *when two genomes both have these two functions, how often do they sit side by side?* MARGIE keeps the answer in its operon reference, built from every genome scored so far.
+
+Think of each pair of functions as a coin whose bias we want to know. Each reference genome that has both functions is one toss, and "side by side" is heads. Starting from a Jeffreys prior, Beta(½, ½), a pair seen side by side in *k* of *n* genomes has the posterior Beta(*k* + ½, *n* − *k* + ½), and C3 uses its mean, (*k* + ½) / (*n* + 1). Few observations leave room for doubt, which the 5th percentile of the same posterior shows (written to the table as `c3_lowerbound`):
+
+| Side by side in | Posterior mean | 95% lower bound |
+|---|---|---|
+| 1 of 1 genomes | 0.75 | 0.23 |
+| 5 of 5 | 0.92 | 0.69 |
+| 5 of 10 | 0.50 | 0.26 |
+| 28 of 28 | 0.98 | 0.93 |
+
+Functions that sit next to almost anything would look conserved by chance, so each pair is weighted by how much more often it is adjacent than its partners' overall numbers of neighbours predict: with *lift* = observed ÷ expected, the weight is *lift* / (*lift* + 1). A pair seen at chance level keeps half its value; one seen nine times more often than chance keeps 90%.
+
+An operon's C3 is the geometric mean of its adjacent pairs, so one poorly supported link pulls the whole operon down. Single genes and operons made only of hypothetical proteins get 0.5, and an operon whose pairs have no support in the reference gets 0.
+
+The genome being scored is added to the reference first and then left out of its own comparison, so each genome is compared with all the *others*. The reference grows with every new genome, so a genome scored early was compared with fewer; each records how many in `scoring/scored-against.json`, and Results offers to score it again once the reference has grown.
+
+### 3. The confidence score
+
+```text
+preliminary = C1 × C4
+context     = C2 × C3   for genes in an operon (two or more members), else 0
+confidence  = preliminary + context, kept between 0 and 1
+```
+
+Operon context can only raise a score. Two genes as examples:
+
+- 6 of 7 sources and agreeing EC numbers: 0.86 × 1 = **0.86 (high)**. In a well supported operon (C2 0.9, C3 0.8) it gains 0.72 and reaches **1.0 (highest)**.
+- 2 of 7 sources: **0.29 (low)** on its own; in an operon with C2 0.85 and C3 0.6 it gains 0.51 and reaches **0.80 (high)**, the case where neighbours lend support to a thinly annotated gene.
+
+| Tier | highest | high | medium | fair | low |
+|---|---|---|---|---|---|
+| Confidence | above 0.9 | above 0.7 | above 0.5 | above 0.3 | 0.3 or less |
+
+A gene is flagged for review (`NEEDS_REVIEW?`, with the reason beside it) when its EC numbers conflict, its confidence is below 0.5, it sits in an operon that UniOP gives less than 0.5, or its operon is ambiguous and gave it no boost.
+
+### Where it happens
+
+| Step | Script |
+|---|---|
+| Choose the label | [`be-margie/bioinformatics_tools/workflow_tools/labeling/assign-canonical-label.py`](be-margie/bioinformatics_tools/workflow_tools/labeling/assign-canonical-label.py) |
+| EC consensus | [`be-margie/bioinformatics_tools/workflow_tools/labeling/add-ec-consensus.py`](be-margie/bioinformatics_tools/workflow_tools/labeling/add-ec-consensus.py) |
+| Operon of each gene | [`be-margie/bioinformatics_tools/workflow_tools/labeling/add-operon-info.py`](be-margie/bioinformatics_tools/workflow_tools/labeling/add-operon-info.py) |
+| TIGRFAM/PGAP/NCBIfam and eggNOG/COG checks | [`be-margie/bioinformatics_tools/workflow_tools/labeling/add-cluster-agreement.py`](be-margie/bioinformatics_tools/workflow_tools/labeling/add-cluster-agreement.py) |
+| Add the genome to the operon reference | [`be-margie/bioinformatics_tools/workflow_tools/scoring/update-occ-reference-depot.py`](be-margie/bioinformatics_tools/workflow_tools/scoring/update-occ-reference-depot.py) |
+| C1 | [`be-margie/bioinformatics_tools/workflow_tools/scoring/score-c1-tool-coverage.py`](be-margie/bioinformatics_tools/workflow_tools/scoring/score-c1-tool-coverage.py) |
+| C2 | [`be-margie/bioinformatics_tools/workflow_tools/scoring/score-c2-operon-probability.py`](be-margie/bioinformatics_tools/workflow_tools/scoring/score-c2-operon-probability.py) |
+| C3 and the operon reference | [`be-margie/bioinformatics_tools/workflow_tools/scoring/c3_score_organism.py`](be-margie/bioinformatics_tools/workflow_tools/scoring/c3_score_organism.py), [`be-margie/bioinformatics_tools/workflow_tools/scoring/c3_occ.py`](be-margie/bioinformatics_tools/workflow_tools/scoring/c3_occ.py), [`be-margie/bioinformatics_tools/workflow_tools/scoring/c3_lib.py`](be-margie/bioinformatics_tools/workflow_tools/scoring/c3_lib.py) |
+| C4 | [`be-margie/bioinformatics_tools/workflow_tools/scoring/score-c4-ec-agreement.py`](be-margie/bioinformatics_tools/workflow_tools/scoring/score-c4-ec-agreement.py) |
+| Confidence, tier and review flag | [`be-margie/bioinformatics_tools/workflow_tools/scoring/score-confidence-final.py`](be-margie/bioinformatics_tools/workflow_tools/scoring/score-confidence-final.py) |
+| The final table | [`be-margie/bioinformatics_tools/workflow_tools/scoring/make-final-annotation-with-confidence.py`](be-margie/bioinformatics_tools/workflow_tools/scoring/make-final-annotation-with-confidence.py) |
+| The order they run in | rules `run_labeling`, `update_c3_occ_reference_depot` and `run_scoring` in [`be-margie/bioinformatics_tools/workflow_tools/margie_sb.smk`](be-margie/bioinformatics_tools/workflow_tools/margie_sb.smk) |
+
+The source's trust level (`score-hierarchy-tier.py`) and an integer EC tier (`score-confidence-tier.py`) are also written to the table, for reference; they do not enter the 0–1 confidence.
+
 ## Acknowledgements
 
 I (Sajal) gratefully acknowledge Dane Deemer ([wintermutant](https://github.com/wintermutant)) for his mentoring, and the design and development of the engine and GUI orchestration platform on which the MARGIE(SB) workflow was built.

@@ -1,6 +1,7 @@
 <script lang="ts">
 	import { Lock, Upload } from 'lucide-svelte';
 	import { backend } from '$lib/workspace/backend.svelte';
+	import { uiBase } from '$lib/workspace/base.svelte';
 	import { ws } from '$lib/workspace/data.svelte';
 	import GenomesPanel from '$lib/workspace/panels/GenomesPanel.svelte';
 	import { ui } from '$lib/workspace/ui.svelte';
@@ -58,12 +59,30 @@
 		<FolderField label="Genomes folder" key="USER_INPUT_DIR" value={folder} placeholder="/path/to/genomes" />
 		<FolderField label="Results folder" key="OUTPUT_ROOT" value={output} placeholder="/path/to/results" />
 		{#if backend.cluster}
-			<FolderField label="Databases folder" key="margie_sb.stores_root" value={working} placeholder="/scratch/cluster/you/margie/margie-databases" />
+			<FolderField label="MARGIE-generated databases" key="margie_sb.stores_root" value={working} placeholder="/scratch/cluster/you/margie/margie-databases">
+				{#snippet help()}
+					<p>
+						These are not the reference databases the annotation tools search (Pfam, KEGG, COG and the others, set up on Install). They are the
+						databases MARGIE builds from your own runs and adds to with every genome: the MARGIE database (SQLite: results, cached tool outputs
+						and job history), the operon reference, the fingerprint databases and the genome pool. You can back them up to depot from
+						<a class="mg-link" href={uiBase.to('/settings#databases')}>Settings</a>.
+					</p>
+					<p>
+						They live in this working folder on the cluster, and runs need them; change the path here to use another folder. When none are found
+						here, the first run copies the lab's base databases from the group's folder on depot and works from those, unless you set up fresh,
+						empty ones in <a class="mg-link" href={uiBase.to('/settings#databases')}>Settings → Databases</a>.
+					</p>
+					<p>
+						Scoring compares each genome with what the SQLite database, the operon reference and the fingerprint databases already hold. Starting
+						from the base databases gives it reference genomes to compare with from the first run, so that is the recommended start.
+					</p>
+				{/snippet}
+			</FolderField>
 		{/if}
 	</div>
 	<p class="gb-note mg-explain">
 		Genomes are read from the first folder and results written to the second.{backend.cluster
-			? " The third holds your own copies of MARGIE's databases (the MARGIE database, operon reference, fingerprint databases and genome pool), which every run reads and adds to; a first run fills it from the lab's prebuilt ones."
+			? ' The third holds the databases MARGIE generates from your runs (not the tools\' reference databases); its ? says more.'
 			: ''}
 	</p>
 </section>

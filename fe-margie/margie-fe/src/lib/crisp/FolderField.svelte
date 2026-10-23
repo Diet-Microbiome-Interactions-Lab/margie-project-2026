@@ -1,6 +1,6 @@
 <script lang="ts">
-	import { untrack } from 'svelte';
-	import { FolderOpen } from 'lucide-svelte';
+	import { untrack, type Snippet } from 'svelte';
+	import { CircleHelp, FolderOpen } from 'lucide-svelte';
 	import { uiBase } from '$lib/workspace/base.svelte';
 	import { ws } from '$lib/workspace/data.svelte';
 	import { pathComplete } from '$lib/workspace/path-complete';
@@ -9,15 +9,17 @@
 	/**
 	 * A folder setting edited in place (Analyze's folders): the same setting Settings shows, saved
 	 * on Enter or on leaving the field, Escape undoing; Tab completes the path, and the folder
-	 * opens in Files.
+	 * opens in Files. With `help`, a ? beside the label opens a few lines on what the folder is.
 	 */
 	let {
 		label,
 		key,
 		value,
 		placeholder = '/path/to/a/folder',
-		onsaved
-	}: { label: string; key: string; value: string; placeholder?: string; onsaved?: () => void } = $props();
+		onsaved,
+		help
+	}: { label: string; key: string; value: string; placeholder?: string; onsaved?: () => void; help?: Snippet } = $props();
+	let helpOpen = $state(false);
 
 	let typed = $state('');
 	let saving = $state(false);
@@ -47,6 +49,11 @@
 	<span class="ff-lbl">
 		{label}
 		{#if value}<a class="ff-open" href={uiBase.to(`/files?path=${encodeURIComponent(value)}`)} title="Open {value} in Files" aria-label="Open {label} in Files"><FolderOpen size={13} /></a>{/if}
+		{#if help}
+			<button type="button" class="ff-q" aria-expanded={helpOpen} aria-label="What is this folder?" title="What is this folder?" onclick={(e) => (e.preventDefault(), (helpOpen = !helpOpen))}
+				><CircleHelp size={14} /></button
+			>
+		{/if}
 	</span>
 	<input
 		class="mg-input mg-mono"
@@ -67,8 +74,43 @@
 		}}
 	/>
 </label>
+{#if help && helpOpen}
+	<div class="ff-help" role="note">{@render help()}</div>
+{/if}
 
 <style>
+	.ff-q {
+		display: inline-grid;
+		place-items: center;
+		width: 20px;
+		height: 20px;
+		padding: 0;
+		border: none;
+		border-radius: 50%;
+		background: transparent;
+		color: var(--mg-text-3);
+		cursor: pointer;
+	}
+	.ff-q:hover,
+	.ff-q[aria-expanded='true'] {
+		color: var(--mg-accent-ink, var(--mg-accent));
+	}
+	.ff-help {
+		grid-column: 1 / -1;
+		margin-top: 6px;
+		padding: 10px 12px;
+		border-left: 3px solid var(--mg-accent);
+		border-radius: var(--mg-r-sm);
+		background: color-mix(in srgb, var(--mg-accent) 6%, transparent);
+		font-size: var(--mg-fs-sm);
+		color: var(--mg-text-2);
+	}
+	.ff-help :global(p) {
+		margin: 0 0 6px;
+	}
+	.ff-help :global(p:last-child) {
+		margin-bottom: 0;
+	}
 	.ff {
 		display: flex;
 		flex-direction: column;

@@ -742,8 +742,8 @@ rule update_c3_occ_reference_depot:
 rule run_scoring:
     """Phase11: computes per-gene tiers, C1-C4 and the blended confidence_score.
 
-    C3 is the geometric mean of UniOP pair probability x adjacency reliability
-    against the OCC reference. Host-side scripts, run in dependency order.
+    C3 is the geometric mean of the operon's adjacency reliabilities in the OCC reference
+    (conservation only; UniOP's probability enters as C2). Host-side scripts, run in dependency order.
     """
     input:
         merged=CONSOLIDATION_MERGED,

@@ -96,8 +96,12 @@
 	});
 	/** Its log and clock, once they are the ones read. */
 	const mine = $derived(!!shown && ws.logOf === shown.id);
+	/** The run whose cache report the grid shows: the one in view, else the latest that finished. */
+	const reportRun = $derived(
+		shown ?? ws.runs.filter((r) => r.kind === 'annotate' && r.status === 'completed').sort((a, b) => b.started.localeCompare(a.started))[0] ?? null
+	);
 	/** Its cache report (fresh or restored, per step): read when the run changes, every 30 s while it goes. */
-	const reportKey = $derived(shown?.outputDir ? `${shown.id}\n${shown.outputDir}\n${shown.status}` : '');
+	const reportKey = $derived(reportRun?.outputDir ? `${reportRun.id}\n${reportRun.outputDir}\n${reportRun.status}` : '');
 	let sources = $state<{ id: string; rows: SourceRow[] | null } | null>(null);
 	$effect(() => {
 		const key = reportKey;
@@ -134,6 +138,16 @@
 		return () => clearInterval(t);
 	});
 
+	/** The report's rows for the run in view (null: none read, or a run from before reports were kept). */
+	const srcRows = $derived(sources && reportRun && sources.id === reportRun.id ? sources.rows : null);
+	const srcLine = $derived.by(() => {
+		if (!srcRows) return '';
+		const on = srcRows.filter((r) => r.source !== 'not run');
+		const restored = on.filter((r) => r.source === 'restored').length;
+		const partly = on.filter((r) => r.source === 'partly restored').length;
+		const fresh = on.filter((r) => r.source === 'fresh').length;
+		return [restored && `${restored} restored from the database`, partly && `${partly} partly restored`, fresh && `${fresh} run fresh`].filter(Boolean).join(', ');
+	});
 	/** The grid, from the model the Jobs page reads too (lib/crisp/progress-model.ts). */
 	const prog = $derived(
 		buildProgress({
@@ -150,7 +164,7 @@
 			setting,
 			outputRoot: ws.resultRoots.outputRoot,
 			current: run && p?.current ? { genome: p.current, tool: p.detail } : null,
-			sources: sources && shown && sources.id === shown.id ? sources.rows : null
+			sources: srcRows
 		})
 	);
 	const phases = $derived(prog.phases);
@@ -262,7 +276,7 @@
 <section class="card gridcard" class:folded={ui.isFolded(GRID, true)}>
 	<header class="ghead">
 		<FoldTitle id={GRID} closed>Genomes and progress</FoldTitle>
-		<span class="count">{rows.length ? `${rows.length} genome${rows.length === 1 ? '' : 's'}` : ''}{counts.all ? ` | ${counts.done} of ${counts.all} steps done` : ''}</span>
+		<span class="count">{rows.length ? `${rows.length} genome${rows.length === 1 ? '' : 's'}` : ''}{counts.all ? ` | ${counts.done} of ${counts.all} steps done` : ''}{srcLine ? ` | ${srcLine}` : ''}</span>
 		<span class="mg-grow"></span>
 		{#if !ui.isFolded(GRID, true)}
 		<ul class="key" aria-label="Key">
@@ -387,6 +401,9 @@
 						<dt>Database</dt>
 						<dd class="mg-mono pop-db" title={c.src.database}>{c.src.database}</dd>
 					{/if}
+				{:else if c.state === 'done' && reportRun && !srcRows}
+					<dt>Results</dt>
+					<dd>Run in this job or brought back from the database: runs started before 23 Oct 2026 did not record which.</dd>
 				{/if}
 				{#if c.so !== undefined}
 					<dt>Time so far</dt>

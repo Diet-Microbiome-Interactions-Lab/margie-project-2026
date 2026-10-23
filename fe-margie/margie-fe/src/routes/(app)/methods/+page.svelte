@@ -97,7 +97,7 @@
 				<h2>Labeling: one label per gene</h2>
 				<p>
 					Each gene's label comes from the first tool, in this order, whose best hit is informative and passes its threshold. MEROPS, TCDB
-					and dbCAN confirm a label but never set it.
+					and dbCAN confirm a label but do not set it.
 				</p>
 				<table class="ab-table">
 					<thead><tr><th>Tier</th><th>Tools</th><th></th></tr></thead>
@@ -121,7 +121,7 @@
 				<h3>C3, operon context</h3>
 				<p>
 					How often the gene's operon neighbourhood recurs across the reference genomes, as a Bayesian estimate per adjacency; 0.5 for
-					single genes and operons of hypothetical proteins.
+					single genes and operons of hypothetical proteins, and 0 for an operon whose neighbours have no support in the reference.
 				</p>
 				<h3>C4, EC agreement</h3>
 				<p>Whether the tools that give an EC number agree; conflicts lower the score.</p>
@@ -135,6 +135,38 @@
 				Operon context only raises a score. The confidence sets the tier: <b>highest</b> above 0.9, <b>high</b> above 0.7, <b>medium</b>
 				above 0.5, <b>fair</b> above 0.3, and <b>low</b> otherwise. A gene is flagged for review when its tools' EC numbers conflict, its
 				confidence is below 0.5, it sits in an operon with C2 below 0.5, or its operon is ambiguous and gave no boost.
+			</p>
+		</section>
+
+		<section class="ab-box">
+			<h2>Caching and restoration</h2>
+			<p>
+				The MARGIE database keeps what earlier runs found, at two levels, so a genome or a protein seen before is not worked out again. Each run
+				writes <b>cache-report.tsv</b> in its folder, saying for every genome and step whether it ran or came back, and from which level; Jobs
+				shows it under the progress, and the progress grid marks restored steps.
+			</p>
+			<h3>Genome level</h3>
+			<p>
+				A genome is recognised by a SHA-256 hash of its records' names and bases, so a copy with different line breaks or file name is still the
+				same genome. For each step it has finished (GTDB-Tk, RASTtk's gene calls, every annotation tool, the operons, the location tools,
+				consolidation and labeling) its output files are stored under that hash. When the genome is run again, each step's files come back before
+				the step would start, and the step is skipped; restored tables are rewritten onto this run's RASTtk gene ids. Consolidation and labeling
+				come back only when the tool tables they merge are exactly the same as before, so a different set of tools, or a tool with new results,
+				merges again.
+			</p>
+			<h3>Protein level</h3>
+			<p>
+				After gene calling, a tool whose answer depends on the protein alone (COG, KEGG, eggNOG, UniProt, Pfam, PGAP, TIGRFAM, InterPro, MEROPS,
+				TCDB, dbCAN, Phobius, TMbed and SignalP 6) is given only the proteins it has not seen. Each protein is recognised by a SHA-256 hash of its
+				sequence, together with a key for the tool's container, database and settings; the rows for known proteins are merged back in under this
+				genome's gene ids. A new database release or changed settings change the key, and those proteins are annotated again. This is what speeds
+				up a new genome that shares many proteins with genomes already run.
+			</p>
+			<h3>Which applies when</h3>
+			<p>
+				The genome level is tried first; a tool it does not cover for this genome then uses the protein level. Genomes whose genes Prodigal calls
+				are not cached at either level. Scoring, the fingerprints and the comparisons with other genomes always run, as they depend on every
+				genome in the database at the time.
 			</p>
 		</section>
 

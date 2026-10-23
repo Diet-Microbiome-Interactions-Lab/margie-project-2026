@@ -362,11 +362,15 @@ def _breakdown_and_formula(info, raw_operon_id):
     if info.get("c3_mode") == "hybrid":
         if c3 <= 0.0:
             return ("operon member, no conserved adjacency or co-member partnership "
-                    "(novel context, neutral)", f"max(rho_adj, rho_op) = {c3:.4f}")
+                    "(novel context, no support from other genomes)", f"max(rho_adj, rho_op) = {c3:.4f}")
         return ("operon context (hybrid): strongest of this gene's adjacency and "
                 "co-membership partnerships across genomes",
                 f"max(best rho_adj, best rho_op) = {c3:.4f}")
     if info["n_pairs_used"] == 0:
+        # 0.5 when there was nothing to judge; 0 when informative neighbours had no support in the reference.
+        if c3 <= 0.0:
+            return ("operon member, no informative adjacency supported in the reference genomes",
+                    f"no supported adjacency = {c3:.4f}")
         return ("operon member, no UniOP-linked informative adjacency (neutral)",
                 f"neutral = {c3:.4f}")
     reason = (f"operon context: {info['n_supported']}/{info['n_pairs_used']} "
