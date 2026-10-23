@@ -10,6 +10,7 @@
 
 import type { Run } from '$lib/api';
 import { COMPARE_TOOLS, RESULT_STAGES, logSteps } from '$lib/crisp/steps';
+import { columnOf, sourceSay, type SourceRow } from '$lib/crisp/cache-report';
 import { uiBase } from '$lib/workspace/base.svelte';
 import type { Genome, OrganismResult, ToolClock } from '$lib/workspace/data.svelte';
 
@@ -27,7 +28,8 @@ export interface Cell {
 	/** Seconds the step still needs; null when there is nothing to estimate from. */
 	left: number | null;
 }
-export type GridCell = Cell & { t: string; href?: string };
+/** src: where its results came from (the run's cache report), when the run has one. */
+export type GridCell = Cell & { t: string; href?: string; src?: SourceRow };
 
 export interface RowProgress {
 	g: string;
@@ -89,6 +91,8 @@ export interface ProgressInput {
 	outputRoot: string;
 	/** The genome and tool the run's own log names as running now (this computer). */
 	current?: { genome: string; tool: string } | null;
+	/** The run's cache report (lib/crisp/cache-report.ts): restored, fresh or partly, per step. */
+	sources?: SourceRow[] | null;
 }
 
 /* Every step a genome goes through, by phase. Steps this setup does not run are shown
@@ -151,6 +155,7 @@ export function buildProgress(i: ProgressInput): Progress {
 	const typical = i.clock?.typical ?? {};
 	const usualOf = (col: string) => (col === 'genes' ? (typical.rasttk ?? typical.prodigal) : typical[col]);
 	const now = i.current ?? null;
+	const sourceOf = new Map((i.sources ?? []).map((r) => [`${columnOf(r.step)}\t${r.genome}`, r]));
 
 	const mins = span;
 	const NA = (say: string): Cell => ({ state: 'na', pct: null, say, left: 0 });
@@ -260,7 +265,10 @@ export function buildProgress(i: ProgressInput): Progress {
 	const rows: RowProgress[] = i.genomes.map((g) => {
 		const cs: GridCell[] = cols.map((t) => {
 			const c = cell(t, g);
-			return { t, ...c, href: hrefOf(t, g, c) };
+			const src = sourceOf.get(`${t}\t${g}`);
+			// The tooltip says where a step's results came from too, once the report has it.
+			const say = src && src.source !== 'not run' && c.state !== 'na' ? `${c.say}; ${sourceSay(src)}` : c.say;
+			return { t, ...c, say, href: hrefOf(t, g, c), src };
 		});
 		const on = cs.filter((c) => c.state !== 'na');
 		const pct = Math.round(avg(cs) ?? 0);

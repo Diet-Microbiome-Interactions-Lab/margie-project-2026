@@ -20,11 +20,11 @@ from bioinformatics_tools.workflow_tools.bapptainer import (
     CacheSifError, cache_sif_files, locate_local_sif_files)
 from bioinformatics_tools.workflow_tools.models import WorkflowKey
 from bioinformatics_tools.workflow_tools.output_cache import (
-    cached_tools, current_rast_genome_id, log_workflow_run, realign_rast_genome_id,
+    cached_tools, cached_when, current_rast_genome_id, log_workflow_run, realign_rast_genome_id,
     restore, restore_all, store, store_all,
 )
 from bioinformatics_tools.workflow_tools.load_to_db import is_already_processed, PIPELINE_VERSION, fasta_hashes
-from bioinformatics_tools.workflow_tools import protein_cache
+from bioinformatics_tools.workflow_tools import cache_report, protein_cache
 from bioinformatics_tools.workflow_tools.programs import ProgramBase
 from bioinformatics_tools.workflow_tools.workflow_helpers import (
     discover_genomes, get_workflow_prefix_for, WORKFLOW_PATH_DEFAULTS, genome_calls)
@@ -731,6 +731,32 @@ class WorkflowBase(ProgramBase):
             LOGGER.info('GTDB-Tk batch cache hit: %s. RASTtk per-genome cache restore results: %s',
                         gtdbtk_batch_hit, rasttk_restored)
 
+        # Where each step's results come from (cache_report.py), written as the run goes.
+        provenance = cache_report.CacheReport(smk_config.get('output_dir') or '', db_path or '')
+        when = {g: cached_when(db_path, f) for g, f in genome_files.items()} if db_path else {}
+        # A genome-level hit: the same genome sequence was run before, and its whole output comes back.
+        SAME_GENOME = 'whole output from a run on the same genome sequence'
+        for g in genome_files:
+            prefix = get_workflow_prefix_for(g, smk_config)
+            on_disk = lambda paths: all(Path(p).exists() for p in paths)
+            if not run_gtdbtk_enabled:
+                provenance.set(g, 'gtdbtk', cache_report.NOT_RUN, 'switched off')
+            elif gtdbtk_batch_hit:
+                provenance.set(g, 'gtdbtk', cache_report.RESTORED, SAME_GENOME, when.get(g, {}).get('gtdbtk', ''), cache_report.GENOME_LEVEL)
+            elif on_disk(self._gtdbtk_split_paths(g, smk_config)):
+                provenance.set(g, 'gtdbtk', cache_report.KEPT, "already in this run's folder (an earlier attempt)")
+            else:
+                provenance.set(g, 'gtdbtk', cache_report.FRESH, 'run with this batch' if db_path else 'no MARGIE database set')
+            if g in prodigal_genomes:
+                provenance.set(g, 'prodigal', cache_report.FRESH, 'Prodigal gene calls are never cached')
+            elif rasttk_restored.get(g):
+                provenance.set(g, 'rasttk', cache_report.RESTORED, SAME_GENOME, when.get(g, {}).get('rasttk', ''), cache_report.GENOME_LEVEL)
+            elif Path(f"{prefix}rasttk/rasttk_db.tkn").exists():
+                provenance.set(g, 'rasttk', cache_report.KEPT, "already in this run's folder (an earlier attempt)")
+            else:
+                provenance.set(g, 'rasttk', cache_report.FRESH, '' if db_path else 'no MARGIE database set')
+        provenance.write()
+
         # Stage 1: phases 1-3 in waves with --jobs=1, one BV-BRC submission at a time.
         def _stage1_targets(genome: str) -> list[str]:
             '''Returns the files rule rasttk_all asks for, for one genome: the
@@ -864,6 +890,8 @@ class WorkflowBase(ProgramBase):
             pc_faa_path = f"{pc_prefix}rasttk/rast.faa"
             pc_tools: list[str] = []
             pc_stored: set[str] = set()
+            # {tool: (proteins from the protein cache, proteins to annotate)} for this genome's report.
+            pc_counts: dict[str, tuple[int, int]] = {}
             if pc_on and Path(pc_faa_path).exists():
                 pc_tools = [t for t in protein_cache.TOOLS
                             if smk_config.get(f'run_{t}', True) not in (False, 'false', '0', 'no')]
@@ -873,6 +901,7 @@ class WorkflowBase(ProgramBase):
                         protein_cache.clear(pc_prefix, t)
                 try:
                     counts = protein_cache.split(db_path, pc_faa_path, pc_prefix, genome, to_split, pc_cfg)
+                    pc_counts = counts
                     served = {t: c for t, c in counts.items() if c[0]}
                     LOGGER.info('Protein cache for %s: %s', genome,
                                 ', '.join(f'{t} {c}/{c + n} cached' for t, (c, n) in counts.items()) or 'no tool to split')
@@ -882,6 +911,30 @@ class WorkflowBase(ProgramBase):
                     LOGGER.warning('Protein cache split failed for %s (tools run on every protein): %s', genome, exc)
                     for t in to_split:
                         protein_cache.clear(pc_prefix, t)
+
+            # The genome's steps after gene calling in the cache report: restored (genome or protein
+            # level), partly restored, kept from an earlier attempt, or fresh.
+            off = lambda step: smk_config.get(f'run_{step}', True) in (False, 'false', '0', 'no')
+            if genome in prodigal_genomes:
+                # Prodigal's feature ids differ from RASTtk's, so neither cache serves it.
+                for t in MARGIE_SB_PHASED_TOOLS:
+                    if t.get('key') and 4 <= t.get('phase', 0) <= 10 and not off(t['key']):
+                        provenance.set(genome, t['key'], cache_report.FRESH, 'Prodigal genomes are never cached')
+            for key, paths in cache_map_fn(genome).items():
+                step = key.split('@')[0]
+                if db_path and genome_restored.get(key):
+                    provenance.set(genome, step, cache_report.RESTORED, SAME_GENOME, when.get(genome, {}).get(key, ''), cache_report.GENOME_LEVEL)
+                elif off(step):
+                    provenance.set(genome, step, cache_report.NOT_RUN, 'not chosen for this run')
+                elif all(Path(p).exists() for p in paths):
+                    provenance.set(genome, step, cache_report.KEPT, "already in this run's folder (an earlier attempt)")
+                elif step in pc_counts:
+                    provenance.set(genome, step, **cache_report.proteins(*pc_counts[step]))
+                else:
+                    provenance.set(genome, step, cache_report.FRESH, '' if db_path else 'no MARGIE database set')
+            if smk_config.get('run_scoring', True) not in (False, 'false', '0', 'no'):
+                provenance.set(genome, 'scoring', cache_report.FRESH, 'always run: the operon reference grows with every genome')
+            provenance.write()
 
             # Skips Stage 2 only at PIPELINE_VERSION with every selected step restored.
             if db_path:
@@ -898,6 +951,7 @@ class WorkflowBase(ProgramBase):
                         and not missing_selected and not scoring_always_recomputes):
                     LOGGER.info('Genome %s already at pipeline version %s — skipping Stage 2 compute (all selected outputs restored from cache)',
                                 genome, PIPELINE_VERSION)
+                    LOGGER.info(provenance.summary(genome))
                     log_workflow_run(db_path, run_id, genome_files[genome], key_name, 0,
                                      status='success')
                     continue
@@ -962,6 +1016,9 @@ class WorkflowBase(ProgramBase):
                              genome, rc)
                 result = (self._build_result(key_name, proc) if proc else
                           {'workflow': key_name, 'returncode': rc, 'rules_summary': {}, 'stdout_tail': '', 'stderr_tail': ''})
+                provenance.unfinished(genome)
+                provenance.write()
+                LOGGER.info(provenance.summary(genome))
                 if db_path:
                     log_workflow_run(db_path, run_id, genome_files[genome], key_name,
                                      result['rules_summary'].get('completed', 0), status='failed')
@@ -977,6 +1034,7 @@ class WorkflowBase(ProgramBase):
                     LOGGER.info('All outputs were already cached incrementally or were cache hits for %s', genome)
                 log_workflow_run(db_path, run_id, genome_files[genome], key_name,
                                  self._build_result(key_name, proc)['rules_summary'].get('completed', 0), status='success')
+            LOGGER.info(provenance.summary(genome))
 
         # Stage 3: LLM for all genomes at once; --keep-going lets one failure pass.
         if run_llm_enabled and processed > 0:

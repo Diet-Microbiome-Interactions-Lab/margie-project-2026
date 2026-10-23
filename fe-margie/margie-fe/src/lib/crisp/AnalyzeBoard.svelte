@@ -16,6 +16,7 @@
 	import RunAction from '$lib/workspace/blocks/RunAction.svelte';
 	import Licence from '$lib/cluster/Licence.svelte';
 	import RunSteps from './RunSteps.svelte';
+	import { readCacheReport, sourceSay, type SourceRow } from '$lib/crisp/cache-report';
 
 	/**
 	 * The Analyze page, in the order a run is set up: 1 the genomes (folder, files, table),
@@ -95,6 +96,26 @@
 	});
 	/** Its log and clock, once they are the ones read. */
 	const mine = $derived(!!shown && ws.logOf === shown.id);
+	/** Its cache report (fresh or restored, per step): read when the run changes, every 30 s while it goes. */
+	const reportKey = $derived(shown?.outputDir ? `${shown.id}\n${shown.outputDir}\n${shown.status}` : '');
+	let sources = $state<{ id: string; rows: SourceRow[] | null } | null>(null);
+	$effect(() => {
+		const key = reportKey;
+		if (!key) return;
+		const [id, dir, status] = key.split('\n');
+		let stop = false;
+		const read = () =>
+			readCacheReport(dir).then((rows) => {
+				if (!stop) sources = { id, rows };
+			});
+		untrack(read);
+		if (status !== 'running') return () => (stop = true);
+		const t = setInterval(read, 30_000);
+		return () => {
+			stop = true;
+			clearInterval(t);
+		};
+	});
 
 	/** The run's genomes while one goes; otherwise those in the input folder, by name. */
 	const rows = $derived(
@@ -128,7 +149,8 @@
 			meta,
 			setting,
 			outputRoot: ws.resultRoots.outputRoot,
-			current: run && p?.current ? { genome: p.current, tool: p.detail } : null
+			current: run && p?.current ? { genome: p.current, tool: p.detail } : null,
+			sources: sources && shown && sources.id === shown.id ? sources.rows : null
 		})
 	);
 	const phases = $derived(prog.phases);
@@ -249,6 +271,7 @@
 			<li><span class="pie failed"><X size={9} strokeWidth={3.5} /></span>failed</li>
 			<li><span class="pie none"></span>not started</li>
 			<li><span class="pie na"></span>not used</li>
+			<li title="Its results came from the MARGIE database: the whole output (genome level) or every protein (protein level); a paler dot, only some proteins"><span class="pie done fromdb" style="--p: 100"><Check size={9} strokeWidth={3.5} /></span>restored</li>
 		</ul>
 		{/if}
 		<FoldToggle id={GRID} closed />
@@ -318,7 +341,7 @@
 												aria-expanded={pick?.g === row.g && pick?.t === c.t}
 												onclick={(e) => openPop(row.g, c.t, e)}
 											>
-												<span class="pie {c.state}" style="--p: {c.pct ?? 0}">
+												<span class="pie {c.state}" class:fromdb={c.src?.source === 'restored'} class:partdb={c.src?.source === 'partly restored'} style="--p: {c.pct ?? 0}">
 													{#if mark === 'tick'}<Check size={9} strokeWidth={3.5} />{:else if mark === 'cross'}<X size={9} strokeWidth={3.5} />{/if}
 												</span>
 											</button>
@@ -357,6 +380,14 @@
 			<dl class="pop-rows">
 				<dt>This step</dt>
 				<dd>{STATE_WORD[c.state] ?? c.state}{c.state === 'run' && c.pct !== null ? `, ${Math.round(c.pct)}%` : ''}</dd>
+				{#if c.src && c.src.source !== 'not run'}
+					<dt>Results</dt>
+					<dd>{sourceSay(c.src)}{c.src.stage ? ` (${c.src.stage})` : ''}</dd>
+					{#if c.src.database}
+						<dt>Database</dt>
+						<dd class="mg-mono pop-db" title={c.src.database}>{c.src.database}</dd>
+					{/if}
+				{/if}
 				{#if c.so !== undefined}
 					<dt>Time so far</dt>
 					<dd>{span(c.so)}{c.usual ? ` of about ${span(c.usual)}` : ''}</dd>
@@ -681,6 +712,30 @@
 	}
 	.pie.hurt {
 		border-color: var(--mg-danger, #c0392b);
+	}
+	/* Restored from the database: a small dot on the pie's corner (paler when only partly). */
+	.pie.fromdb,
+	.pie.partdb {
+		position: relative;
+	}
+	.pie.fromdb::after,
+	.pie.partdb::after {
+		content: '';
+		position: absolute;
+		right: -3px;
+		bottom: -3px;
+		width: 7px;
+		height: 7px;
+		border: 1.5px solid var(--cr-card, var(--mg-surface));
+		border-radius: 50%;
+		background: var(--mg-accent-ink, var(--mg-accent));
+	}
+	.pie.partdb::after {
+		background: color-mix(in srgb, var(--mg-accent) 45%, var(--mg-surface));
+	}
+	.pop-db {
+		overflow-wrap: anywhere;
+		font-size: var(--mg-fs-xs);
 	}
 	.cellink {
 		display: inline-grid;

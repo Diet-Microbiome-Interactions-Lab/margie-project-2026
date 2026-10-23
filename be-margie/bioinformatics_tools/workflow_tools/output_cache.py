@@ -300,6 +300,28 @@ def cached_tools(db_path: str, input_file: str) -> set:
         return set()
 
 
+def cached_when(db_path: str, input_file: str) -> dict[str, str]:
+    """Returns {tool: when its outputs for *input_file* were cached (UTC, ISO)}, the newest per tool.
+
+    Read-only and never raises (empty on any problem). For the run's cache report."""
+    try:
+        if not db_path or not Path(db_path).expanduser().exists():
+            return {}
+        current, legacy = _input_hashes(input_file)
+        conn = _get_connection(str(Path(db_path).expanduser()))
+        try:
+            _ensure_table(conn)
+            rows = conn.execute(
+                "SELECT tool, MAX(cached_at) FROM output_cache WHERE input_hash IN (?, ?) GROUP BY tool",
+                (current, legacy),
+            ).fetchall()
+        finally:
+            conn.close()
+        return {tool: when for tool, when in rows if when}
+    except Exception:
+        return {}
+
+
 def store(db_path: str, input_file: str, tool_name: str,
           output_paths: list[str]) -> None:
     """Read each output file and INSERT OR REPLACE into output_cache.

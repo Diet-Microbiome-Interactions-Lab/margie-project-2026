@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { Check, ChevronRight, Copy, ExternalLink, FolderOpen, PanelLeftClose, PanelLeftOpen, RotateCcw, RotateCw, Square, X } from 'lucide-svelte';
+	import { Check, ChevronRight, Copy, Database, ExternalLink, FolderOpen, PanelLeftClose, PanelLeftOpen, RotateCcw, RotateCw, Square, X } from 'lucide-svelte';
 	import Resizer from '$lib/workspace/motion/Resizer.svelte';
 	import JobCommand from '$lib/crisp/JobCommand.svelte';
 	import { ui } from '$lib/workspace/ui.svelte';
@@ -13,6 +13,8 @@
 	import { uiBase } from '$lib/workspace/base.svelte';
 	import { ws } from '$lib/workspace/data.svelte';
 	import { ago, duration } from '$lib/workspace/format';
+	import { cachedOn, countsByGenome, readCacheReport, type SourceRow } from '$lib/crisp/cache-report';
+	import { untrack } from 'svelte';
 
 	/**
 	 * The Jobs page: a narrow list of jobs, one line each (name | id | status), beside the
@@ -80,6 +82,38 @@
 		if (term) term.scrollTop = term.scrollHeight;
 	});
 
+	// ------------------------------------------------ fresh or restored: the run's cache report
+	/** Read again only when the run, its folder or its status changes (and every 30 s while it goes). */
+	const reportKey = $derived(shown?.kind === 'annotate' && shown.outputDir ? `${shown.id}\n${shown.outputDir}\n${shown.status}` : '');
+	let sources = $state<{ id: string; rows: SourceRow[] | null } | null>(null);
+	$effect(() => {
+		const key = reportKey;
+		if (!key) return;
+		const [id, dir, status] = key.split('\n');
+		let stop = false;
+		const read = () =>
+			readCacheReport(dir).then((rows) => {
+				if (!stop) sources = { id, rows };
+			});
+		untrack(read);
+		if (status !== 'running') return () => (stop = true);
+		const t = setInterval(read, 30_000);
+		return () => {
+			stop = true;
+			clearInterval(t);
+		};
+	});
+	const srcRows = $derived(sources && shown && sources.id === shown.id ? sources.rows : null);
+	/** The rows that say something (a step the run did not run is left out). */
+	const srcShown = $derived((srcRows ?? []).filter((r) => r.source !== 'not run'));
+	const srcDb = $derived(srcShown.find((r) => r.database)?.database ?? '');
+	const srcTotals = $derived.by(() => {
+		const t = { restoredGenome: 0, restoredProtein: 0, partly: 0, fresh: 0, kept: 0 };
+		for (const c of countsByGenome(srcShown).values()) for (const k of Object.keys(t) as (keyof typeof t)[]) t[k] += c[k];
+		return t;
+	});
+	const SOURCE_WORD: Record<string, string> = { restored: 'restored', fresh: 'run fresh', 'partly restored': 'partly restored', kept: 'kept' };
+
 	// ------------------------------------------------ the job's progress, beside its log
 	const going = $derived(shown?.status === 'running');
 	const clock = $derived(live ? (ws.logOf === shown?.id ? ws.clock : null) : (fetched && shown && fetched.id === shown.id ? (fetched.clock ?? null) : null));
@@ -110,7 +144,8 @@
 					results: ws.results,
 					meta: new Map(ws.genomes.map((g) => [stemOf(g.name), g])),
 					setting,
-					outputRoot: ws.resultRoots.outputRoot
+					outputRoot: ws.resultRoots.outputRoot,
+					sources: srcRows
 				})
 			: null
 	);
@@ -262,11 +297,12 @@
 																<span class="ph-name">{ph.label}</span>
 																<span class="ph-steps">
 																	{#each cs as c (c.t)}
-																		<span class="step" title="{c.t}: {c.say}">
+																		<span class="step" class:fromdb={c.src?.source === 'restored'} class:partdb={c.src?.source === 'partly restored'} title="{c.t}: {c.say}">
 																			<span class="pie {c.state}" style="--p: {c.pct ?? 0}">
 																				{#if c.state === 'done'}<Check size={8} strokeWidth={3.5} />{:else if c.state === 'failed'}<X size={8} strokeWidth={3.5} />{/if}
 																			</span>
 																			<span>{c.t}{c.state === 'run' && c.pct !== null ? ` ${Math.round(c.pct)}%` : ''}</span>
+																			{#if c.src?.source === 'restored' || c.src?.source === 'partly restored'}<Database size={10} class="db-mark" aria-label={c.src.source} />{/if}
 																		</span>
 																	{/each}
 																</span>
@@ -288,6 +324,44 @@
 
 		</div>
 		</div>
+		{#if srcShown.length && shown}
+			<details class="fr">
+				<summary>
+					<span class="fr-t"><Database size={14} /> Fresh or restored</span>
+					<span class="fr-sum">
+						{#if srcTotals.restoredGenome + srcTotals.restoredProtein}<span class="chip restored">{srcTotals.restoredGenome + srcTotals.restoredProtein} restored</span>{/if}
+						{#if srcTotals.restoredGenome}<span class="fr-n">{srcTotals.restoredGenome} genome level</span>{/if}
+						{#if srcTotals.restoredProtein}<span class="fr-n">{srcTotals.restoredProtein} protein level</span>{/if}
+						{#if srcTotals.partly}<span class="chip partly">{srcTotals.partly} partly restored</span>{/if}
+						{#if srcTotals.fresh}<span class="chip fresh">{srcTotals.fresh} run fresh</span>{/if}
+						{#if srcTotals.kept}<span class="chip kept">{srcTotals.kept} kept</span>{/if}
+					</span>
+					{#if srcDb}<span class="fr-db mg-mono" title="The MARGIE database the run's caches are in: {srcDb}"><span dir="ltr">{srcDb}</span></span>{/if}
+				</summary>
+				<p class="fr-note">
+					<b>Genome level</b>: the whole output of a step for a genome whose sequence was run before. <b>Protein level</b>: a tool's rows
+					for proteins seen before, after gene calling, so it annotates only the new ones.
+				</p>
+				<div class="fr-wrap">
+					<table class="fr-table">
+						<thead><tr><th>Genome</th><th>Step</th><th>Stage</th><th>Results</th><th>Cache</th><th>Detail</th><th>Cached</th></tr></thead>
+						<tbody>
+							{#each srcShown as r (`${r.genome}\t${r.step}`)}
+								<tr>
+									<td class="mg-mono">{r.genome}</td>
+									<td>{r.step}</td>
+									<td class="fr-dim">{r.stage}</td>
+									<td><span class="chip {r.source === 'partly restored' ? 'partly' : r.source}">{SOURCE_WORD[r.source] ?? r.source}</span></td>
+									<td>{r.level ? `${r.level} level` : ''}</td>
+									<td class="fr-dim">{r.detail}</td>
+									<td class="fr-dim" title={r.cached_at}>{cachedOn(r.cached_at)}</td>
+								</tr>
+							{/each}
+						</tbody>
+					</table>
+				</div>
+			</details>
+		{/if}
 		<div class="term-wrap" style="height: {logHeight}px">
 		<aside class="term" aria-label="Log of {shown ? title(shown) : 'the job'}">
 			<div class="term-head">
@@ -670,6 +744,113 @@
 		display: inline-flex;
 		align-items: center;
 		gap: 5px;
+	}
+	/* Restored from the database (or partly): a small cylinder after the name. */
+	.step :global(.db-mark) {
+		color: var(--mg-accent-ink, var(--mg-accent));
+	}
+	.step.partdb :global(.db-mark) {
+		opacity: 0.55;
+	}
+
+	/* ---- fresh or restored: the run's cache report, folded to one line ---- */
+	.fr {
+		border-radius: var(--mg-r);
+		background: var(--cr-card, var(--mg-surface));
+		font-size: var(--mg-fs-sm);
+	}
+	.fr summary {
+		display: flex;
+		flex-wrap: wrap;
+		align-items: center;
+		gap: 6px 12px;
+		padding: 10px 14px;
+		cursor: pointer;
+	}
+	.fr-t {
+		display: inline-flex;
+		align-items: center;
+		gap: 6px;
+		font-weight: 650;
+	}
+	.fr-sum {
+		display: inline-flex;
+		flex-wrap: wrap;
+		align-items: center;
+		gap: 4px 8px;
+	}
+	.fr-n {
+		font-size: var(--mg-fs-xs);
+		color: var(--mg-text-3);
+	}
+	.fr-db {
+		flex: 1 1 18ch;
+		min-width: 0;
+		overflow: hidden;
+		text-overflow: ellipsis;
+		white-space: nowrap;
+		direction: rtl;
+		text-align: right;
+		font-size: var(--mg-fs-xs);
+		color: var(--mg-text-3);
+	}
+	.fr-note {
+		margin: 0;
+		padding: 0 14px 8px;
+		font-size: var(--mg-fs-xs);
+		color: var(--mg-text-2);
+	}
+	.fr-wrap {
+		max-height: 360px;
+		overflow: auto;
+		border-top: 1px solid var(--mg-border);
+	}
+	.fr-table {
+		width: 100%;
+		border-collapse: collapse;
+		font-size: var(--mg-fs-xs);
+	}
+	.fr-table th {
+		position: sticky;
+		top: 0;
+		padding: 6px 10px;
+		background: var(--cr-card, var(--mg-surface));
+		text-align: left;
+		font-weight: 600;
+		color: var(--mg-text-2);
+		white-space: nowrap;
+	}
+	.fr-table td {
+		padding: 5px 10px;
+		border-top: 1px solid color-mix(in srgb, var(--mg-border) 60%, transparent);
+		vertical-align: top;
+	}
+	.fr-dim {
+		color: var(--mg-text-3);
+	}
+	.chip {
+		display: inline-block;
+		padding: 1px 8px;
+		border-radius: 999px;
+		font-size: var(--mg-fs-xs);
+		font-weight: 600;
+		white-space: nowrap;
+	}
+	.chip.restored {
+		background: color-mix(in srgb, var(--mg-accent) 15%, transparent);
+		color: var(--mg-accent-ink, var(--mg-accent));
+	}
+	.chip.partly {
+		background: color-mix(in srgb, var(--mg-accent) 8%, transparent);
+		color: var(--mg-accent-ink, var(--mg-accent));
+	}
+	.chip.fresh {
+		background: color-mix(in srgb, var(--mg-ok) 14%, transparent);
+		color: var(--mg-ok);
+	}
+	.chip.kept {
+		background: color-mix(in srgb, var(--mg-text) 8%, transparent);
+		color: var(--mg-text-2);
 	}
 	.st-empty {
 		color: var(--mg-text-3);
