@@ -17,6 +17,10 @@ def test_the_shared_slot_lights_its_three_databases():
     assert viewer.c1_counted(reasoning) == ['Pfam', 'PGAP', 'TIGRFAM', 'NCBIfam']
 
 
+def test_the_member_that_counted_is_lit_alone():
+    assert viewer.c1_counted("2/7 ...: PFAM;TIGRFAM_CLUSTER(PGAP)") == ["Pfam", "PGAP"]
+
+
 def test_nothing_counted_or_no_reasoning():
     assert viewer.c1_counted('0/7 independent databases gave an informative hit (of RAST/COG): ') == []
     assert viewer.c1_counted('') == []

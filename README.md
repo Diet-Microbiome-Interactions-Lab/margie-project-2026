@@ -165,7 +165,7 @@ If no tool qualifies, the gene keeps the first description any tool gave, or "No
 
 | | Question it answers | How |
 |---|---|---|
-| **C1** tool coverage | How many independent sources describe this gene? | Sources with an informative hit ÷ 7 (RASTtk, COG, Pfam, KEGG, eggNOG, UniProt, and one shared slot for TIGRFAM, PGAP and NCBIfam) |
+| **C1** tool coverage | How many independent sources describe this gene? | Sources with an informative hit ÷ 7 (RASTtk, COG, Pfam, KEGG, eggNOG, UniProt, and one shared slot for TIGRFAM, PGAP and NCBIfam, which counts when the first of them with an informative name has one). Names that give no function, such as "hypothetical protein", "uncharacterized …" or a UPF or DUF family, are not counted |
 | **C2** operon probability | How sure is UniOP that the gene shares an operon with its neighbours? | Mean of its upstream and downstream pair probabilities; 0.5 outside an operon |
 | **C3** operon context | Do these neighbours sit together in other genomes too? | The Bayesian estimate below, one value per operon |
 | **C4** EC agreement | Do the tools that give an EC number agree? | 1 − (share of tool pairs whose EC numbers conflict, weighted by how many tools gave one) |

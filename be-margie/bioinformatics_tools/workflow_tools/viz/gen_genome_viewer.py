@@ -69,7 +69,15 @@ def c1_counted(reasoning: str) -> list[str]:
     if ":" not in (reasoning or ""):
         return []
     tail = reasoning.rsplit(":", 1)[1]
-    return [name for slot in tail.split(";") for name in C1_SLOT_TOOLS.get(slot.strip().upper(), [])]
+    out = []
+    for slot in (x.strip() for x in tail.split(";") if x.strip()):
+        # "TIGRFAM_CLUSTER(PGAP)": the member that counted; a bare slot (older tables) lights all three.
+        member = re.fullmatch(r"TIGRFAM_CLUSTER\((\w+)\)", slot, re.I)
+        if member:
+            out.append({"TIGRFAM": "TIGRFAM", "PGAP": "PGAP", "NCBIFAM": "NCBIfam"}.get(member.group(1).upper(), member.group(1)))
+        else:
+            out += C1_SLOT_TOOLS.get(slot.upper(), [])
+    return out
 
 
 def viewer_version() -> str:
