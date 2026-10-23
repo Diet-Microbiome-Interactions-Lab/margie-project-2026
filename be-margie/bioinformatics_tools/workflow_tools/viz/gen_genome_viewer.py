@@ -59,6 +59,19 @@ IDENTITY_COL = {"UniProt": "UNIPROT_percent_identity", "COG": "COG_identity",
                 "MEROPS": "MEROPS_percent_identity", "TCDB": "TCDB_percent_identity"}
 
 
+# The evidence trail's names for C1's slots; its shared slot covers three databases.
+C1_SLOT_TOOLS = {"RAST": ["RAST"], "COG": ["COG"], "PFAM": ["Pfam"], "KEGG": ["KEGG"], "EGGNOG": ["eggNOG"],
+                 "UNIPROT": ["UniProt"], "TIGRFAM_CLUSTER": ["PGAP", "TIGRFAM", "NCBIfam"]}
+
+
+def c1_counted(reasoning: str) -> list[str]:
+    """Returns the evidence-trail names C1 counted, from its reasoning ("k/7 ... : PFAM;TIGRFAM_CLUSTER")."""
+    if ":" not in (reasoning or ""):
+        return []
+    tail = reasoning.rsplit(":", 1)[1]
+    return [name for slot in tail.split(";") for name in C1_SLOT_TOOLS.get(slot.strip().upper(), [])]
+
+
 def fmt_pid(v):
     """Formats a fraction or percentage as "NN% id", empty when not numeric."""
     try:
@@ -143,7 +156,9 @@ def load_fingerprints(final_path):
     Parses "pattern hash: X || label: Y || fingerprint: F1: v | F2: v ..."; empty fields are dropped.
     """
     base = Path(final_path).resolve().parent
-    for rel in ("../fingerprint/labeled-genes-fingerprint-full.tsv", "fingerprint/labeled-genes-fingerprint-full.tsv"):
+    # Beside the scoring folder during a run, or under per-tool-phased-output once the run has tidied its folder.
+    for rel in ("../fingerprint/labeled-genes-fingerprint-full.tsv", "fingerprint/labeled-genes-fingerprint-full.tsv",
+                "per-tool-phased-output/fingerprint/labeled-genes-fingerprint-full.tsv"):
         p = (base / rel).resolve()
         if p.is_file():
             break
@@ -288,6 +303,7 @@ def main():
             "op": opid if in_op else None,
             "pr": num(col(r, "UniOP_operon_probability")),
             "c1": num(col(r, "C1_score_database_coverage")),
+            "c1t": c1_counted(col(r, "C1_reasoning")),
             "c2": num(col(r, "C2_score_pairwise_genes_UniOP_probability")),
             "c3": num(col(r, "C3_score_operon_context")),
             "c3h": num(col(r, "C3_score_operon_context_hybrid")),
@@ -458,8 +474,13 @@ TEMPLATE = r"""<!doctype html>
   .trail h4{font-size:12px;margin:0 0 2px;color:var(--muted);font-weight:normal;letter-spacing:.5px;text-transform:uppercase}
   .trail .cnt{color:var(--muted);font-size:12px;margin-bottom:4px}
   .grp{font-size:11.5px;color:var(--muted);margin:9px 0 2px;font-style:italic}
-  .erow{display:grid;grid-template-columns:88px 1fr;gap:8px;font-size:11.5px;padding:1.5px 0;line-height:1.3}
+  .erow{display:grid;grid-template-columns:minmax(88px,max-content) minmax(0,1fr);gap:8px;font-size:11.5px;padding:1.5px 0;line-height:1.3}
   .erow .etool{color:var(--muted);white-space:nowrap}
+  .erow .edesc{overflow-wrap:anywhere}
+  .ehint{font-size:11px;font-style:italic}
+  .fpgrid{display:grid;grid-template-columns:max-content minmax(0,1fr);gap:1.5px 10px;font-size:11.5px;line-height:1.3}
+  .fpk{color:var(--muted);white-space:nowrap}
+  .fpv{overflow-wrap:anywhere}
   .erow.win .etool{color:var(--operon);font-weight:bold}
   .erow.win .edesc{font-weight:bold}
   .chosen{display:inline-block;font-size:9.5px;color:#fff;background:var(--operon);border-radius:2px;padding:1px 7px;margin-left:7px;vertical-align:1px}
@@ -808,7 +829,9 @@ function fingerprintBox(g){
   if(!fp) return "";
   let h=`<div class="trail"><h4>fingerprint</h4>`;
   if(fp.l) h+=`<div class="cnt">label: <b>${esc(fp.l)}</b></div>`;
-  (fp.f||[]).forEach(([k,v])=>{ h+=`<div class="erow"><span class="etool">${esc(k.replace(/_/g," "))}</span><span class="edesc">${esc(v)}</span></div>`; });
+  h+=`<div class="fpgrid">`;
+  (fp.f||[]).forEach(([k,v])=>{ h+=`<span class="fpk">${esc(k.replace(/_/g," "))}</span><span class="fpv">${esc(v)}</span>`; });
+  h+=`</div>`;
   if(fp.h) h+=`<div class="cnt fphash">pattern hash ${esc(fp.h)}</div>`;
   return h+`</div>`;
 }
@@ -918,16 +941,19 @@ async function downloadGene(i){
   setTimeout(()=>URL.revokeObjectURL(a.href),1500);
 }
 document.addEventListener("click",e=>{ const b=e.target.closest("[data-gene-dl]"); if(b) downloadGene(+b.dataset.geneDl); });
-const GRP_LABEL={decision:"decision databases (set C1)",domain:"domain / family signatures",special:"specialised callers"};
+const GRP_LABEL={decision:"decision databases (C1)",domain:"domain / family signatures (not in C1)",special:"specialised callers (not in C1)"};
 function isWin(name,src){ if(!src)return false; const a=name.toUpperCase().replace(/[^A-Z]/g,""),b=src.toUpperCase().replace(/[^A-Z]/g,"");
   return a&&b&&(b.indexOf(a)>=0||a.indexOf(b)>=0); }
 function evidenceTrail(g){
   const ev=g.ev||[];
   if(!ev.length) return `<div class="trail"><h4>evidence trail</h4><div class="cnt">no per-tool record for this feature.</div></div>`;
-  const infN=ev.filter(r=>r[3]).length;
+  // As C1 counts: 7 slots (TIGRFAM, PGAP and NCBIfam share one), and only the databases C1 counted are bright.
+  const counted=new Set(g.c1t||[]);
+  const k=g.c1!=null?Math.round(g.c1*7):null;
   let h=`<div class="trail"><h4>evidence trail</h4>`
-       +`<div class="cnt">${infN} of ${ev.length} databases returned an informative name`
-       +`${g.src?` | chosen: <b>${esc(g.src)}</b>`:""}</div>`;
+       +`<div class="cnt">${k!=null?`C1 counts <b>${k} of 7</b> databases (TIGRFAM, PGAP and NCBIfam share one)`:"evidence"}`
+       +`${g.src?` | chosen: <b>${esc(g.src)}</b>`:""}</div>`
+       +`<div class="cnt ehint">dimmed: not counted in C1 (no function in the name, such as hypothetical, uncharacterized or a UPF or DUF family)</div>`;
   if(g.c4!=null && g.c4<1)
     h+=`<div class="ecflag">⚑ EC conflict: C4 = ${pct(g.c4)}${g.ecs?" ("+esc(g.ecs)+")":""}. `
       +`${esc(g.c4r||"tools disagree on the EC number; compare the [EC:…] tags below.")}</div>`;
@@ -937,7 +963,9 @@ function evidenceTrail(g){
     const grp=D.evGroups[ti], name=D.evNames[ti];
     if(grp!==last){ h+=`<div class="grp">${GRP_LABEL[grp]||grp}</div>`; last=grp; }
     const win=isWin(name,g.src);
-    h+=`<div class="erow${win?" win":""}${inf?"":" uninf"}"><span class="etool">${esc(name)}`
+    // A decision database is bright when C1 counted it; the others keep their own informative mark.
+    const lit=grp==="decision"&&g.c1t?counted.has(name):inf;
+    h+=`<div class="erow${win?" win":""}${lit?"":" uninf"}"><span class="etool">${esc(name)}`
       +`${metric?` <span class="emetric">${esc(metric)}</span>`:""}</span>`
       +`<span class="edesc">${esc(desc)}${win?`<span class="chosen">chosen</span>`:""}</span></div>`;
   });

@@ -1607,6 +1607,11 @@ def refresh_genome_viewer(body: dict | None = None, current_user: dict = Depends
         raise HTTPException(status_code=400, detail="Which genome folder?")
     folder = _resolve_browse_path(folder, current_user)
     conn = _build_connection(current_user)
+    # The map is made with the account's own clone, brought up to the deployed version first.
+    try:
+        sync_remote_dane_wf(conn)
+    except Exception as exc:
+        LOGGER.warning("dane_wf version-sync before a map refresh failed, using the clone as it is: %s", exc)
     q = shlex.quote
     home = current_user["home_dir"]
     repo = f"{home}/bioinformatics-tools"
