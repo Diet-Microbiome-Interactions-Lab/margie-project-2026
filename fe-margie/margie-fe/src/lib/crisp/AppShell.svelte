@@ -10,7 +10,7 @@
 	import { cubicOut } from 'svelte/easing';
 	import { fade, fly } from 'svelte/transition';
 	import { page } from '$app/state';
-	import { BookOpen, ChartPie, Eye, FlaskConical, FolderOpen, Gauge, HeartHandshake, House, ListChecks, LogOut, Menu, MonitorDown, Package, Palette, Play, SlidersHorizontal, SquareTerminal, UserRound, Users, X } from 'lucide-svelte';
+	import { BookOpen, ChartPie, Check, Eye, FlaskConical, FolderOpen, Gauge, HeartHandshake, House, ListChecks, LogOut, Menu, Monitor, MonitorDown, Moon, Package, Palette, Play, SlidersHorizontal, SquareTerminal, Sun, UserRound, Users, X } from 'lucide-svelte';
 	import { DESKTOP_URL } from './about';
 	import { AppBar } from '@skeletonlabs/skeleton-svelte';
 	import avatar from '$lib/assets/neuromancer.jpg';
@@ -20,10 +20,8 @@
 	import Field from '$lib/workspace/Field.svelte';
 	import Seg from '$lib/workspace/Seg.svelte';
 	import AppearanceControls from '$lib/workspace/AppearanceControls.svelte';
-	import { SHADE_NAMES, SHADE_ORDER } from '$lib/workspace/shades';
-	import Switch from '$lib/workspace/Switch.svelte';
 	import ThemeEditor from '$lib/workspace/ThemeEditor.svelte';
-	import { presetChange, PRESETS } from '$lib/workspace/themes';
+	import { FEATURED, presetChange, PRESETS } from '$lib/workspace/themes';
 	import VisionControls from '$lib/workspace/VisionControls.svelte';
 	import VisionFilters from '$lib/workspace/VisionFilters.svelte';
 	import Resizer from '$lib/workspace/motion/Resizer.svelte';
@@ -34,7 +32,7 @@
 	import { pageMotion } from '$lib/workspace/motion/page';
 	import { thumb } from '$lib/workspace/motion/thumb';
 	import { preview, visionAttrs } from '$lib/workspace/preview.svelte';
-	import { styleString, type UiPrefs } from '$lib/workspace/prefs';
+	import { ACCENTS, styleString, type UiPrefs } from '$lib/workspace/prefs';
 	import { ui } from '$lib/workspace/ui.svelte';
 	import { visionInfo } from '$lib/workspace/vision';
 	import { crispVars } from './theme';
@@ -138,8 +136,7 @@
 		})}; ${ui.motionStyle}`
 	);
 	/** The palettes offered in the top bar's menu; all the others are in Customize → Colours. */
-	const QUICK = ['crisp', 'glow', 'gram', 'agar', 'skeleton', 'paper', 'mint', 'slate', 'contrast'];
-	const quickPresets = $derived(QUICK.map((id) => PRESETS.find((p) => p.id === id)).filter((p) => !!p));
+	const quickPresets = $derived(FEATURED.map((id) => PRESETS.find((p) => p.id === id)).filter((p) => !!p));
 	const palette = $derived(ui.prefs.palette || 'crisp');
 
 	/** One line about the run going on, if any. */
@@ -163,11 +160,16 @@
 		menuOpen = false;
 		themeOpen = false;
 	});
-	const LIGHTS: [UiPrefs['theme'], string][] = [
-		['light', 'Light'],
-		['dark', 'Dark'],
-		['system', 'System']
+	const LIGHTS: [UiPrefs['theme'], string, typeof Sun][] = [
+		['light', 'Light', Sun],
+		['dark', 'Dark', Moon],
+		['system', 'System', Monitor]
 	];
+	/** A palette's own accent in the current light or dark, for its tile in the menu. */
+	const presetAccent = (pr: (typeof PRESETS)[number]) => {
+		const a = ACCENTS.find((x) => x.id === pr.accent);
+		return a ? (ui.dark ? a.dark : a.light) : 'var(--color-primary-500)';
+	};
 
 	// ------------------------------------------------ Customize
 	let drawer = $state(false);
@@ -180,11 +182,11 @@
 		await ui.setDefault();
 		settingDefault = false;
 	}
-	let tab = $state<'look' | 'colours' | 'vision'>('look');
+	let tab = $state<'colours' | 'layout' | 'vision'>('colours');
 	const TABS = [
-		{ id: 'look', label: 'Look' },
 		{ id: 'colours', label: 'Colours' },
-		{ id: 'vision', label: 'Colour vision deficiency' }
+		{ id: 'layout', label: 'Type and layout' },
+		{ id: 'vision', label: 'Colour vision' }
 	] as const;
 	function open(to: typeof tab) {
 		tab = to;
@@ -273,48 +275,46 @@
 					</button>
 					{#if themeOpen}
 						<button type="button" class="fixed inset-0 z-40 cursor-default" aria-label="Close the theme menu" onclick={() => (themeOpen = false)}></button>
-						<div class="mg-theme card bg-surface-50-950 border border-surface-200-800 shadow-xl absolute right-0 top-full z-50 mt-2 w-72 p-4 space-y-4" role="dialog" aria-label="Theme" transition:fly={{ y: -6, duration: ui.ms(140) }}>
-							<div class="space-y-2">
-								<p class="text-xs font-bold uppercase tracking-wider opacity-60">Light or dark</p>
-								<div class="grid grid-cols-3 gap-1">
-									{#each LIGHTS as [value, label] (value)}
-										<button type="button" class="btn btn-sm {ui.prefs.theme === value ? 'preset-filled-primary-500' : 'preset-tonal'}" aria-pressed={ui.prefs.theme === value} onclick={() => ui.update({ theme: value })}>{label}</button>
-									{/each}
-								</div>
+						<div class="mg-theme card bg-surface-50-950 border border-surface-200-800 shadow-xl absolute right-0 top-full z-50 mt-2 p-3" role="dialog" aria-label="Theme" transition:fly={{ y: -6, duration: ui.ms(140) }}>
+							<div class="mg-theme-modes" role="radiogroup" aria-label="Light or dark">
+								{#each LIGHTS as [value, label, Icon] (value)}
+									<button type="button" role="radio" aria-checked={ui.prefs.theme === value} onclick={() => ui.update({ theme: value })}><Icon size={15} />{label}</button>
+								{/each}
 							</div>
-							<div class="space-y-1">
-								<p class="text-xs font-bold uppercase tracking-wider opacity-60">Colours</p>
+							<p class="mg-theme-h">Colours</p>
+							<div class="mg-theme-list">
 								{#each quickPresets as pr (pr.id)}
-									<button type="button" class="w-full flex items-center gap-3 rounded-base px-2 py-1.5 text-left {palette === pr.id ? 'preset-tonal-primary' : 'hover:preset-tonal'}" aria-pressed={palette === pr.id} onclick={() => ui.update(presetChange(ui.prefs.colours, pr.id === 'crisp' ? '' : pr.id))}>
-										<span class="mg-swatch" aria-hidden="true" style="--a: {pr.light.bg}; --b: {pr.light.surface2}; --c: {pr.light.borderStrong}"></span>
-										<span class="flex-1 font-medium">{pr.name}</span>
-										<span class="text-xs opacity-60 truncate max-w-32">{pr.note}</span>
+									{@const n = ui.dark ? pr.dark : pr.light}
+									<button type="button" class="mg-theme-row" aria-pressed={palette === pr.id} onclick={() => ui.update(presetChange(ui.prefs.colours, pr.id === 'crisp' ? '' : pr.id))}>
+										<span class="mg-tile" aria-hidden="true" style="--bg: {n.bg}; --card: {n.surface}; --edge: {n.border}; --ink: {n.text3}; --acc: {presetAccent(pr)}"><i></i></span>
+										<span class="mg-theme-txt"><b>{pr.name}</b><small>{pr.note}</small></span>
+										{#if palette === pr.id}<Check size={16} class="mg-theme-on" />{/if}
 									</button>
 								{/each}
 							</div>
 							{#if original}
-							<div class="space-y-1">
-								<p class="text-xs font-bold uppercase tracking-wider opacity-60">Original's theme</p>
-								{#each SKINS as s (s.id)}
-									<button type="button" class="w-full flex items-center gap-3 rounded-base px-2 py-2 text-left {skin.id === s.id ? 'preset-tonal-primary' : 'hover:preset-tonal'}" aria-pressed={skin.id === s.id} onclick={() => skin.set(s.id)}>
-										<span class="flex gap-1" data-theme={s.id} aria-hidden="true">
-											<span class="size-3.5 rounded-full bg-primary-500"></span>
-											<span class="size-3.5 rounded-full bg-secondary-500"></span>
-											<span class="size-3.5 rounded-full bg-tertiary-500"></span>
-										</span>
-										<span class="flex-1 font-medium">{s.name}</span>
-										{#if 'note' in s}<span class="text-xs opacity-60">{s.note}</span>{/if}
-									</button>
-								{/each}
-							</div>
+								<p class="mg-theme-h">Original's theme</p>
+								<div class="mg-theme-list">
+									{#each SKINS as s (s.id)}
+										<button type="button" class="mg-theme-row" aria-pressed={skin.id === s.id} onclick={() => skin.set(s.id)}>
+											<span class="mg-dots" data-theme={s.id} aria-hidden="true">
+												<span class="bg-primary-500"></span>
+												<span class="bg-secondary-500"></span>
+												<span class="bg-tertiary-500"></span>
+											</span>
+											<span class="mg-theme-txt"><b>{s.name}</b>{#if 'note' in s}<small>{s.note}</small>{/if}</span>
+											{#if skin.id === s.id}<Check size={16} class="mg-theme-on" />{/if}
+										</button>
+									{/each}
+								</div>
 							{/if}
 							<button
 								type="button"
-								class="btn btn-sm preset-tonal w-full"
+								class="mg-theme-more"
 								onclick={() => {
 									themeOpen = false;
 									open('colours');
-								}}>All colours, type and corners</button
+								}}><SlidersHorizontal size={14} /> More colours, type and layout</button
 							>
 						</div>
 					{/if}
@@ -378,7 +378,7 @@
 							class="btn btn-sm preset-tonal"
 							onclick={() => {
 								menuOpen = false;
-								open('look');
+								open('colours');
 							}}><SlidersHorizontal size={16} /> Customize</button
 						>
 						<button type="button" class="btn btn-sm preset-tonal-error" onclick={() => backend.signOut()}><LogOut size={16} /> Sign out</button>
@@ -444,36 +444,18 @@
 			</div>
 			<div class="drawer-body" role="tabpanel">
 				{#if original && tab !== 'vision'}
-					<p class="note">Original wears the Skeleton theme's own colours, type and corners. Choose another palette under Colours to set your own.</p>
+					<p class="note">Original wears the Skeleton theme's own colours, type and corners. Choose another preset under Colours to set your own.</p>
 				{/if}
-				{#if tab === 'look'}
-					<AppearanceControls />
-					<section class="cr-group">
-						<h3 class="cr-group-title">Page</h3>
-						<Field title="Backdrop">
-							<Seg label="Backdrop" value={ui.prefs.backdrop} onpick={(backdrop) => ui.update({ backdrop })} options={[{ value: 'glow', label: 'Glow' }, { value: 'plain', label: 'Plain' }]} />
-						</Field>
-						<Field title="Colour">
-							<Seg label="Colour" value={ui.prefs.tint} onpick={(tint) => ui.update({ tint })} options={[{ value: 'plain', label: 'Plain' }, { value: 'soft', label: 'Soft' }, { value: 'strong', label: 'Strong' }]} />
-						</Field>
-						<Field title="Shades">
-							<Seg label="Shades" value={ui.prefs.shades} onpick={(shades) => ui.update({ shades })} options={SHADE_ORDER.map((v) => ({ value: v, label: SHADE_NAMES[v] }))} />
-						</Field>
-						<Field title="Contrast">
-							<Seg label="Contrast" value={ui.prefs.contrast} onpick={(contrast) => ui.update({ contrast })} options={[{ value: 'normal', label: 'Normal' }, { value: 'more', label: 'More' }, { value: 'high', label: 'High' }]} />
-						</Field>
-						<Field title="Page width">
-							<Seg label="Page width" value={ui.prefs.pageWidth} onpick={(pageWidth) => ui.update({ pageWidth })} options={[{ value: 'narrow', label: 'Narrow' }, { value: 'wide', label: 'Wide' }, { value: 'full', label: 'Full' }]} />
-						</Field>
-						<Field title="Tables">
-							<div class="line-switch">
-								<span class="note">Shade every other row of long tables.</span>
-								<Switch label="Shade every other row" checked={ui.prefs.stripes} onchange={(stripes) => ui.update({ stripes })} />
-							</div>
-						</Field>
-					</section>
-				{:else if tab === 'colours'}
-					<ThemeEditor base="crisp" />
+				{#if tab === 'colours'}
+					<!-- The drawer covers the bar's theme menu, so light or dark is here too, for editing either. -->
+					<Field title="Light or dark">
+						<Seg label="Light or dark" value={ui.prefs.theme} onpick={(theme) => ui.update({ theme })} options={LIGHTS.map(([value, label]) => ({ value, label }))} />
+					</Field>
+					<ThemeEditor base="crisp">
+						<AppearanceControls part="colours" />
+					</ThemeEditor>
+				{:else if tab === 'layout'}
+					<AppearanceControls part="layout" />
 				{:else}
 					<VisionControls base="crisp" />
 				{/if}
@@ -507,6 +489,8 @@
 		z-index: 6;
 		flex-shrink: 0;
 		padding-left: 11px;
+		border-bottom: 1px solid var(--cr-frame-edge);
+		background: var(--cr-frame);
 	}
 	.mg-menu {
 		width: 18px;
@@ -626,7 +610,7 @@
 		min-width: 0;
 		min-height: 0;
 	}
-	/* The sidebar: the bar's grey continued down the left, the pages in their groups. */
+	/* The sidebar: the bar's colour continued down the left, the pages in their groups. */
 	.mg-side {
 		display: flex;
 		flex-direction: column;
@@ -635,7 +619,8 @@
 		width: 196px;
 		padding: 10px 10px 12px;
 		overflow-y: auto;
-		background: var(--color-surface-100-900);
+		border-right: 1px solid var(--cr-frame-edge);
+		background: var(--cr-frame);
 		scrollbar-width: none;
 		transition: width var(--mo-1, 160ms) ease;
 	}
@@ -784,14 +769,156 @@
 			var(--mg-bg);
 		background-attachment: local;
 	}
-	/* A palette in the menu: its page, panel and line colours side by side. */
-	.mg-swatch {
+	/* The theme menu: light or dark on top, then each palette as a small picture of itself. */
+	.mg-theme {
+		width: min(320px, calc(100vw - 24px));
+		max-height: min(78vh, 640px);
+		overflow-y: auto;
+	}
+	.mg-theme-modes {
+		display: grid;
+		grid-template-columns: repeat(3, 1fr);
+		gap: 2px;
+		padding: 3px;
+		border-radius: calc(var(--radius-base) + 3px);
+		background: color-mix(in oklab, var(--mg-text) 7%, transparent);
+	}
+	.mg-theme-modes button {
+		display: inline-flex;
+		align-items: center;
+		justify-content: center;
+		gap: 6px;
+		height: 30px;
+		border-radius: var(--radius-base);
+		font-size: 0.85rem;
+		font-weight: 500;
+		color: var(--mg-text-2);
+	}
+	.mg-theme-modes button:hover {
+		color: var(--mg-text);
+	}
+	.mg-theme-modes button[aria-checked='true'] {
+		background: var(--mg-surface);
+		box-shadow: 0 1px 2px rgb(0 0 0 / 0.12);
+		color: var(--mg-text);
+		font-weight: 600;
+	}
+	.mg-theme-h {
+		margin: 14px 4px 6px;
+		font-size: 11px;
+		font-weight: 700;
+		letter-spacing: 0.06em;
+		text-transform: uppercase;
+		opacity: 0.6;
+	}
+	.mg-theme-list {
+		display: flex;
+		flex-direction: column;
+		gap: 2px;
+	}
+	.mg-theme-row {
+		display: flex;
+		align-items: center;
+		gap: 12px;
+		width: 100%;
+		padding: 7px 8px;
+		border-radius: var(--radius-base);
+		text-align: left;
+	}
+	.mg-theme-row:hover {
+		background: color-mix(in oklab, var(--mg-text) 6%, transparent);
+	}
+	.mg-theme-row[aria-pressed='true'] {
+		background: color-mix(in srgb, var(--mg-accent) 11%, transparent);
+	}
+	.mg-theme-txt {
+		display: flex;
+		flex: 1;
+		flex-direction: column;
+		min-width: 0;
+		line-height: 1.3;
+	}
+	.mg-theme-txt b {
+		font-size: 0.9rem;
+		font-weight: 600;
+	}
+	.mg-theme-txt small {
+		font-size: 0.78rem;
+		color: var(--mg-text-3);
+	}
+	.mg-theme-row :global(.mg-theme-on) {
 		flex: none;
-		width: 30px;
-		height: 16px;
-		border: 1px solid var(--mg-border);
-		border-radius: 4px;
-		background: linear-gradient(90deg, var(--a) 0 34%, var(--b) 34% 67%, var(--c) 67%);
+		color: var(--mg-accent);
+	}
+	/* A tiny window in the palette's colours: its page, a box on it with a line of text, and its accent. */
+	.mg-tile {
+		position: relative;
+		flex: none;
+		width: 44px;
+		height: 32px;
+		overflow: hidden;
+		border: 1px solid color-mix(in srgb, var(--mg-text) 14%, transparent);
+		border-radius: 6px;
+		background: var(--bg);
+	}
+	.mg-tile::before {
+		content: '';
+		position: absolute;
+		inset: 7px 6px 0 6px;
+		border: 1px solid var(--edge);
+		border-bottom: 0;
+		border-radius: 3px 3px 0 0;
+		background: var(--card);
+	}
+	.mg-tile::after {
+		content: '';
+		position: absolute;
+		left: 11px;
+		top: 13px;
+		width: 14px;
+		height: 3px;
+		border-radius: 2px;
+		background: var(--acc);
+	}
+	.mg-tile i {
+		position: absolute;
+		left: 11px;
+		top: 20px;
+		width: 22px;
+		height: 2px;
+		border-radius: 2px;
+		background: var(--ink);
+		opacity: 0.7;
+	}
+	.mg-dots {
+		display: flex;
+		flex: none;
+		gap: 4px;
+		width: 44px;
+		justify-content: center;
+	}
+	.mg-dots span {
+		width: 12px;
+		height: 12px;
+		border-radius: 50%;
+	}
+	.mg-theme-more {
+		display: flex;
+		align-items: center;
+		justify-content: center;
+		gap: 8px;
+		width: 100%;
+		height: 34px;
+		margin-top: 12px;
+		border-top: 1px solid var(--mg-border);
+		padding-top: 2px;
+		font-size: 0.85rem;
+		font-weight: 500;
+		color: var(--color-primary-600-400);
+	}
+	.mg-theme-more:hover {
+		text-decoration: underline;
+		text-underline-offset: 3px;
 	}
 
 	/* ------------------------------------------------ Customize */
@@ -921,12 +1048,6 @@
 		font-size: var(--cr-fs-micro);
 		color: var(--mg-text-3);
 		line-height: 1.45;
-	}
-	.line-switch {
-		display: flex;
-		align-items: center;
-		justify-content: space-between;
-		gap: 14px;
 	}
 
 	/* ------------------------------------------------ notices */

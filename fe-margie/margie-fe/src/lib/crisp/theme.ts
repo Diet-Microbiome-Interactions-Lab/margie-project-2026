@@ -29,13 +29,14 @@ export function crispVars(p: UiPrefs, dark: boolean): Record<string, string> {
 	// Shared parts read --mg-fs*, so pointing them at this scale makes them grow with the page.
 	const dens = p.density === 'compact' ? { pad: 10, padY: 6, gap: 10, ctl: 28, ctlSm: 26, row: 30 } : { pad: 14, padY: 8, gap: 14, ctl: 32, ctlSm: 30, row: 36 };
 	const ink = base['--mg-text'];
-	// Light mode, default look (Modern, no hand-picked colours): pure white with the faintest greys.
-	// A chosen preset or hand-picked colours keep their own backgrounds, as in dark mode.
+	// Light mode, default look (Modern, no hand-picked colours): white boxes and bars on the
+	// faintest cool grey, so each box stands clear of the page. A chosen preset or hand-picked
+	// colours keep their own backgrounds, as in dark mode.
 	const own = p.colours?.light ?? {};
 	const plainLight = !dark && (!p.palette || p.palette === 'crisp');
 	const pure = plainLight && !['bg', 'surface', 'surface2', 'border', 'borderStrong'].some((k) => k in own);
 	const WHITE: [string, string, string][] = [
-		['--mg-bg', 'bg', '#FFFFFF'],
+		['--mg-bg', 'bg', '#F5F6F8'],
 		['--mg-surface', 'surface', '#FFFFFF'],
 		['--mg-surface-2', 'surface2', '#F5F6F7'],
 		['--mg-border', 'border', '#E3E5E8'],
@@ -58,9 +59,13 @@ export function crispVars(p: UiPrefs, dark: boolean): Record<string, string> {
 		'--mg-r': `${radius(p)}px`,
 		'--mg-r-sm': `${Math.max(2, radius(p) - 2)}px`,
 		'--mg-shadow-sm': dark ? '0 1px 2px rgba(0, 0, 0, 0.4)' : '0 1px 2px rgba(16, 24, 40, 0.06)',
+		// The top bar and the sidebar: white over the grey page in the default look; in dark mode
+		// a step below the page, so the boxes are the brightest part and the frame the quietest.
+		'--cr-frame': dark ? `color-mix(in srgb, #000 24%, ${base['--mg-bg']})` : pure ? '#FFFFFF' : 'var(--color-surface-100-900)',
+		'--cr-frame-edge': dark ? `color-mix(in srgb, ${ink} 8%, transparent)` : pure ? '#E4E7EB' : 'transparent',
 		'--mg-shadow-lg': dark ? '0 8px 24px rgba(0, 0, 0, 0.5)' : '0 8px 24px rgba(16, 24, 40, 0.12)',
-		// Cards lie flat on the page, as the classic pages' panels do.
-		'--cr-card-shadow': 'none',
+		// Boxes sit just off the page: a hairline and the softest shadow.
+		'--cr-card-shadow': dark ? '0 1px 2px rgba(0, 0, 0, 0.35)' : '0 1px 2px rgba(16, 24, 40, 0.05), 0 1px 3px rgba(16, 24, 40, 0.04)',
 		// Only what floats over the page (a menu, a drawer, a notice) casts one.
 		'--cr-pop-shadow': dark ? '0 8px 24px rgba(0, 0, 0, 0.5)' : '0 8px 24px rgba(16, 24, 40, 0.14)',
 		// One scale, relative to the text size the user picked.
@@ -81,8 +86,8 @@ export function crispVars(p: UiPrefs, dark: boolean): Record<string, string> {
 		// A section is a grey panel on the page, as in the classic pages; what
 		// is typed or picked inside it sits on white (--mg-surface).
 		// White boxes with a hairline edge in light mode, whatever the palette.
-		'--cr-card': dark ? `color-mix(in srgb, ${ink} 5%, ${base['--mg-bg']})` : base['--mg-surface'],
-		'--cr-card-edge': dark ? `color-mix(in srgb, ${ink} 6%, transparent)` : pure ? '#E6E8EB' : base['--mg-border'],
+		'--cr-card': dark ? `color-mix(in srgb, ${ink} 6.5%, ${base['--mg-bg']})` : base['--mg-surface'],
+		'--cr-card-edge': dark ? `color-mix(in srgb, ${ink} 10%, transparent)` : pure ? '#E3E6EA' : base['--mg-border'],
 		'--cr-card-inner': base['--mg-surface-2'],
 		// Headers -- a block's, a table's, the top bar -- sit on grey.
 		'--cr-head-bg': dark ? `color-mix(in srgb, ${ink} 7%, ${base['--mg-surface']})` : pure ? '#F5F6F7' : base['--mg-surface-2'],

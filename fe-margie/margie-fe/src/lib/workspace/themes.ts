@@ -97,9 +97,9 @@ const HAND_MADE: Preset[] = [
 		id: 'crisp',
 		accent: 'blue',
 		name: 'Modern',
-		note: 'Clean white, cool greys',
-		light: { bg: '#FFFFFF', surface: '#FFFFFF', surface2: '#F4F5F7', border: '#E2E4E8', borderStrong: '#C4C8CE', text: '#15181D', text2: '#454C57', text3: '#646B76' },
-		dark: { bg: '#0E1013', surface: '#14171C', surface2: '#1B1F26', border: '#272C34', borderStrong: '#3B424D', text: '#ECEEF1', text2: '#B7BDC6', text3: '#8E95A0' }
+		note: 'White boxes on cool grey',
+		light: { bg: '#F5F6F8', surface: '#FFFFFF', surface2: '#F4F5F7', border: '#E2E4E8', borderStrong: '#C4C8CE', text: '#15181D', text2: '#454C57', text3: '#646B76' },
+		dark: { bg: '#121418', surface: '#191C22', surface2: '#20242B', border: '#2C3139', borderStrong: '#424955', text: '#ECEEF1', text2: '#B7BDC6', text3: '#959CA7' }
 	},
 	{
 		// Dane's pages as they were: the Skeleton theme's grey cards and colours (AppShell applies them).
@@ -185,6 +185,9 @@ export const PRESETS: Preset[] = [
 	...HAND_MADE,
 	...GENERATED.map(([id, name, note, h, s]): Preset => ({ id, name, note, accent: accentFor(h, s), ...ramp(h, s) }))
 ];
+
+/** The main palettes, first in the theme menu and in Customize; the rest are one hue each. */
+export const FEATURED = ['crisp', 'glow', 'gram', 'agar', 'skeleton', 'paper', 'mint', 'slate', 'contrast'];
 
 /** Returns the change that switches to preset `id`, dropping hand-edited page and text colours. */
 export function presetChange(colours: UiPrefs['colours'], id: string): Pick<UiPrefs, 'palette' | 'colours'> & Partial<Pick<UiPrefs, 'accent'>> {

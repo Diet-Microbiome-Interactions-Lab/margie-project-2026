@@ -1,15 +1,22 @@
 <script lang="ts">
-	import { RotateCcw } from 'lucide-svelte';
-	import { accentColor, resolveColours, sanitizePrefs } from './prefs';
-	import { checkColours, presetChange, PRESETS, TOKENS } from './themes';
+	import type { Snippet } from 'svelte';
+	import { ChevronRight, RotateCcw } from 'lucide-svelte';
+	import { ACCENTS, accentColor, resolveColours, sanitizePrefs } from './prefs';
+	import { checkColours, FEATURED, presetChange, PRESETS, TOKENS } from './themes';
 	import { ui } from './ui.svelte';
 	import { contrast, HEX, visionInfo } from './vision';
 
 	/**
-	 * Theme editor: a neutrals preset, then every interface colour with its contrast and checks.
+	 * Theme editor: a neutrals preset, what the caller adds under it (`children`: the accent and
+	 * the page's tint), then every interface colour, folded, with its contrast and checks.
 	 * Edits apply live to the current light or dark mode; `base` is the interface's preset.
 	 */
-	let { base = 'paper' }: { base?: string } = $props();
+	let { base = 'paper', children }: { base?: string; children?: Snippet } = $props();
+	/** A preset's own accent, which choosing it brings along. */
+	const accentOf = (id?: string) => {
+		const a = ACCENTS.find((x) => x.id === id);
+		return a ? (ui.dark ? a.dark : a.light) : accentColor(ui.prefs, ui.dark);
+	};
 
 	const mode = $derived(ui.dark ? 'dark' : 'light');
 	const chosen = $derived(ui.prefs.palette || base);
@@ -43,6 +50,8 @@
 		ui.update({ colours: { ...ui.prefs.colours, [mode]: side } });
 	}
 	const pickPreset = (id: string) => ui.update(presetChange(ui.prefs.colours, id));
+	const main = FEATURED.map((id) => PRESETS.find((p) => p.id === id)).filter((p) => !!p);
+	const more = PRESETS.filter((p) => !FEATURED.includes(p.id));
 
 	// ---- sharing a theme ----
 	let pasting = $state(false);
@@ -72,98 +81,98 @@
 	}
 </script>
 
+{#snippet tile(p: (typeof PRESETS)[number])}
+	{@const n = p[mode]}
+	<button
+		type="button"
+		role="radio"
+		class="preset"
+		aria-checked={chosen === p.id}
+		title="{p.note}{p.id === base ? ' (the default)' : ''}"
+		onclick={() => pickPreset(p.id)}
+		style="--p-bg: {n.bg}; --p-sf: {n.surface}; --p-sf2: {n.surface2}; --p-bd: {n.border}; --p-t: {n.text}; --p-t3: {n.text3}; --p-ac: {accentOf(p.accent)}"
+	>
+		<span class="mini" aria-hidden="true">
+			<span class="card">
+				<span class="band"></span>
+				<span class="l1"></span>
+				<span class="l2"></span>
+				<span class="dot"></span>
+			</span>
+		</span>
+		<span class="pname">{p.name}</span>
+	</button>
+{/snippet}
+
 <div class="editor">
 	<section class="cr-group">
 		<h3 class="cr-group-title">Preset</h3>
 		<div class="presets" role="radiogroup" aria-label="Theme preset">
-			{#each PRESETS as p (p.id)}
-				{@const n = p[mode]}
-				<button
-					type="button"
-					role="radio"
-					class="preset"
-					aria-checked={chosen === p.id}
-					onclick={() => pickPreset(p.id)}
-					style="--p-bg: {n.bg}; --p-sf: {n.surface}; --p-sf2: {n.surface2}; --p-bd: {n.border}; --p-t: {n.text}; --p-t3: {n.text3}; --p-ac: {accentColor(ui.prefs, ui.dark)}"
-				>
-					<span class="mini" aria-hidden="true">
-						<span class="card">
-							<span class="band"></span>
-							<span class="l1"></span>
-							<span class="l2"></span>
-							<span class="dot"></span>
-						</span>
-					</span>
-					<span class="pname">{p.name}{p.id === base ? ' | default' : ''}</span>
-					<span class="pnote">{p.note}</span>
-				</button>
+			{#each main as p (p.id)}{@render tile(p)}{/each}
+		</div>
+		<details class="more" open={more.some((p) => p.id === chosen)}>
+			<summary><ChevronRight size={14} class="fine-chev" /> {more.length} more, one hue each</summary>
+			<div class="presets" role="radiogroup" aria-label="More presets">
+				{#each more as p (p.id)}{@render tile(p)}{/each}
+			</div>
+		</details>
+	</section>
+
+	{@render children?.()}
+
+	<details class="fine" open={editedCount > 0}>
+		<summary>
+			<ChevronRight size={15} class="fine-chev" />
+			<span class="fine-title">Fine-tune each colour</span>
+			<span class="fine-note">{editedCount ? `${editedCount} changed` : 'page, text, states, sections and tiers'}</span>
+		</summary>
+		<div class="fine-body">
+			<p class="mg-note which"><span class="which-dot" aria-hidden="true"></span>Editing {mode}-mode colours. Switch to {ui.dark ? 'light' : 'dark'} mode to edit those.</p>
+
+			{#each GROUPS as g (g.id)}
+				<section class="cr-group">
+					<h3 class="cr-group-title">{g.id}</h3>
+					{#if g.note}<p class="mg-note">{g.note}</p>{/if}
+					<ul class="rows">
+						{#each TOKENS.filter((t) => t.group === g.id) as t (t.key)}
+							{@const value = colours[t.key]}
+							{@const need = t.group === 'Sections' ? 3 : 4.5}
+							{@const r = t.text ? contrast(value, colours.surface) : 0}
+							<li class="row" class:flag={flagged.has(t.key)}>
+								<label class="well" style="--c: {value}">
+									<input type="color" {value} oninput={(e) => set(t.key, e.currentTarget.value)} aria-label={t.label} />
+								</label>
+								<span class="what">
+									<span class="label" style={t.text ? `color: ${value}` : undefined}>{t.label}</span>
+									{#if t.hint}<span class="hint">{t.hint}</span>{/if}
+								</span>
+								<input
+									class="mg-input mono hex"
+									{value}
+									spellcheck="false"
+									aria-label="{t.label} as hex"
+									onchange={(e) => set(t.key, e.currentTarget.value)}
+									onkeydown={(e) => e.key === 'Enter' && set(t.key, e.currentTarget.value)}
+								/>
+								{#if t.text}
+									<span class="ratio" class:low={r < need} title="Contrast on the cards; {need}:1 is enough">{r.toFixed(1)}</span>
+								{:else}
+									<span class="ratio"></span>
+								{/if}
+								<span class="reset-slot">
+									{#if edited[t.key]}
+										<button type="button" class="mg-icon-btn" title="Back to {plain[t.key]}" aria-label="Reset {t.label}" onclick={() => reset(t.key)}>
+											<RotateCcw size={13} />
+										</button>
+									{/if}
+								</span>
+							</li>
+						{/each}
+					</ul>
+				</section>
 			{/each}
 		</div>
-	</section>
-
-	<p class="mg-note which"><span class="which-dot" aria-hidden="true"></span>Editing {mode}-mode colours. Switch to {ui.dark ? 'light' : 'dark'} mode to edit those.</p>
-
-	<section class="cr-group">
-		<h3 class="cr-group-title">Accent</h3>
-		<div class="row accent">
-			<label class="well" style="--c: {accentColor(ui.prefs, ui.dark)}">
-				<input type="color" value={accentColor(ui.prefs, ui.dark)} oninput={(e) => ui.update({ accent: e.currentTarget.value.toUpperCase() })} aria-label="Accent" />
-			</label>
-			<span class="what"><span class="label">Accent</span><span class="hint">buttons, links, focus</span></span>
-			<input
-				class="mg-input mono hex"
-				value={accentColor(ui.prefs, ui.dark)}
-				spellcheck="false"
-				aria-label="Accent as hex"
-				onchange={(e) => HEX.test(e.currentTarget.value.trim()) && ui.update({ accent: e.currentTarget.value.trim().toUpperCase() })}
-			/>
-			<span class="ratio">{contrast(accentColor(ui.prefs, ui.dark), colours.surface).toFixed(1)}</span>
-			<span class="reset-slot"></span>
-		</div>
-	</section>
-
-	{#each GROUPS as g (g.id)}
-		<section class="cr-group">
-			<h3 class="cr-group-title">{g.id}</h3>
-			{#if g.note}<p class="mg-note">{g.note}</p>{/if}
-			<ul class="rows">
-				{#each TOKENS.filter((t) => t.group === g.id) as t (t.key)}
-					{@const value = colours[t.key]}
-					{@const need = t.group === 'Sections' ? 3 : 4.5}
-					{@const r = t.text ? contrast(value, colours.surface) : 0}
-					<li class="row" class:flag={flagged.has(t.key)}>
-						<label class="well" style="--c: {value}">
-							<input type="color" {value} oninput={(e) => set(t.key, e.currentTarget.value)} aria-label={t.label} />
-						</label>
-						<span class="what">
-							<span class="label" style={t.text ? `color: ${value}` : undefined}>{t.label}</span>
-							{#if t.hint}<span class="hint">{t.hint}</span>{/if}
-						</span>
-						<input
-							class="mg-input mono hex"
-							{value}
-							spellcheck="false"
-							aria-label="{t.label} as hex"
-							onchange={(e) => set(t.key, e.currentTarget.value)}
-							onkeydown={(e) => e.key === 'Enter' && set(t.key, e.currentTarget.value)}
-						/>
-						{#if t.text}
-							<span class="ratio" class:low={r < need} title="Contrast on the cards; {need}:1 is enough">{r.toFixed(1)}</span>
-						{:else}
-							<span class="ratio"></span>
-						{/if}
-						<span class="reset-slot">
-							{#if edited[t.key]}
-								<button type="button" class="mg-icon-btn" title="Back to {plain[t.key]}" aria-label="Reset {t.label}" onclick={() => reset(t.key)}>
-									<RotateCcw size={13} />
-								</button>
-							{/if}
-						</span>
-					</li>
-				{/each}
-			</ul>
-		</section>
-	{/each}
+	</details>
 
 	<section class="cr-group checks" class:ok={!checks.length}>
 		<h3 class="cr-group-title">Checks</h3>
@@ -211,10 +220,68 @@
 	section {
 		gap: 10px;
 	}
+	.more summary {
+		display: flex;
+		align-items: center;
+		gap: 6px;
+		margin-top: 2px;
+		font-size: var(--mg-fs-sm);
+		color: var(--color-primary-600-400, var(--mg-accent));
+		cursor: pointer;
+		list-style: none;
+	}
+	.more summary::-webkit-details-marker {
+		display: none;
+	}
+	.more[open] :global(.fine-chev) {
+		transform: rotate(90deg);
+	}
+	.more .presets {
+		margin-top: 8px;
+	}
+	.fine summary {
+		display: flex;
+		align-items: center;
+		gap: 8px;
+		padding: 10px 12px;
+		border: 1px solid var(--mg-border);
+		border-radius: var(--mg-r);
+		background: var(--mg-surface);
+		cursor: pointer;
+		list-style: none;
+	}
+	.fine summary::-webkit-details-marker {
+		display: none;
+	}
+	.fine summary:hover {
+		border-color: color-mix(in srgb, var(--mg-accent) 45%, var(--mg-border));
+	}
+	.fine :global(.fine-chev) {
+		flex: none;
+		color: var(--mg-text-3);
+		transition: transform var(--mo-1) var(--mo-ease);
+	}
+	.fine[open] :global(.fine-chev) {
+		transform: rotate(90deg);
+	}
+	.fine-title {
+		font-weight: 600;
+	}
+	.fine-note {
+		margin-left: auto;
+		font-size: var(--mg-fs-xs);
+		color: var(--mg-text-3);
+	}
+	.fine-body {
+		display: flex;
+		flex-direction: column;
+		gap: 16px;
+		margin-top: 12px;
+	}
 	.presets {
 		display: grid;
-		grid-template-columns: repeat(auto-fill, minmax(112px, 1fr));
-		gap: 8px;
+		grid-template-columns: repeat(auto-fill, minmax(104px, 1fr));
+		gap: 6px;
 	}
 	.preset {
 		display: flex;
@@ -248,9 +315,9 @@
 	}
 	.mini {
 		display: block;
-		height: 54px;
-		margin-bottom: 4px;
-		padding: 8px;
+		height: 40px;
+		margin-bottom: 3px;
+		padding: 6px;
 		border-radius: calc(var(--mg-r) - 3px);
 		background: var(--p-bg);
 		box-shadow: inset 0 0 0 1px var(--p-bd);
@@ -298,13 +365,11 @@
 		background: var(--p-ac);
 	}
 	.pname {
-		font-size: var(--mg-fs-sm);
-		font-weight: 600;
-	}
-	.pnote {
+		overflow: hidden;
 		font-size: var(--mg-fs-xs);
-		color: var(--mg-text-3);
-		line-height: 1.35;
+		font-weight: 600;
+		text-overflow: ellipsis;
+		white-space: nowrap;
 	}
 	.which {
 		display: flex;

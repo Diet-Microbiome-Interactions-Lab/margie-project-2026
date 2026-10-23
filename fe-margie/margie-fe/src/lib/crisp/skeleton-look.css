@@ -92,6 +92,14 @@
 	background: var(--color-error-500);
 	color: var(--color-error-contrast-500);
 }
+/* A button that cannot be pressed yet looks switched off (grey, quiet text) rather than a faded
+   version of itself, so it does not read as a button that is about to work. */
+.crisp .mg-btn:disabled {
+	opacity: 1;
+	background: color-mix(in oklab, var(--mg-text) 7%, transparent);
+	color: color-mix(in oklab, var(--mg-text) 42%, transparent);
+	cursor: not-allowed;
+}
 
 /* Fields: white, a thin grey line, the theme's corners. */
 .crisp .mg-input,
