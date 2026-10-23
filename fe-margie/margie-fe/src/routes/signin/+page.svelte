@@ -32,6 +32,8 @@
 	let privateKey = $state('');
 	let busy = $state(false);
 	let problem = $state('');
+	/** The clusters this MARGIE accepts accounts on (GET /v1/auth/policy); empty: any. */
+	let clusters = $state<string[]>([]);
 
 	onMount(() => {
 		if (isLoggedIn()) {
@@ -40,6 +42,10 @@
 			return;
 		}
 		ui.restore();
+		fetch(`${getApiUrl()}/v1/auth/policy`)
+			.then((r) => (r.ok ? r.json() : { clusters: [] }))
+			.then((d) => (clusters = Array.isArray(d?.clusters) ? d.clusters : []))
+			.catch(() => {});
 		const dark = matchMedia('(prefers-color-scheme: dark)');
 		ui.systemDark = dark.matches;
 		const onDark = (e: MediaQueryListEvent) => (ui.systemDark = e.matches);
@@ -216,7 +222,8 @@
 								<p class="hint span">This is your MARGIE login. Jobs run on the cluster under the cluster account below.</p>
 								<label class="field">
 									<span class="label">Cluster address</span>
-									<input class="mg-input" bind:value={clusterHost} placeholder="login.cluster.example.edu" spellcheck="false" required />
+									<input class="mg-input" bind:value={clusterHost} placeholder={clusters[0]?.replace('*', 'login') || 'login.cluster.example.edu'} spellcheck="false" required />
+									{#if clusters.length}<span class="hint">Accounts on {clusters.join(', ')} only.</span>{/if}
 								</label>
 								<label class="field">
 									<span class="label">Cluster username</span>

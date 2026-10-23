@@ -4,6 +4,7 @@ Authentication endpoints for the BSP API.
 POST /v1/auth/register  — create a new user account
 POST /v1/auth/login     — exchange credentials for a JWT
 GET  /v1/auth/me        — return the current user's profile (requires token)
+GET  /v1/auth/policy    — which clusters accounts may be on (public)
 """
 import io
 import logging
@@ -11,7 +12,9 @@ import re
 from datetime import datetime, timezone
 
 import paramiko
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, Request, status
+
+from bioinformatics_tools.api import access
 
 from bioinformatics_tools.api.auth import (
     create_access_token,
@@ -63,8 +66,14 @@ def _validate_private_key(key_str: str) -> None:
     )
 
 
+@router.get('/policy')
+def policy():
+    """Which clusters accounts may be on (MARGIE_ALLOWED_CLUSTERS); empty: any. Public, for the sign-in page."""
+    return {'clusters': access.allowed_clusters()}
+
+
 @router.post('/register', status_code=status.HTTP_201_CREATED)
-def register(body: UserRegister):
+def register(body: UserRegister, request: Request):
     """
     Create a new BSP user account.
 
@@ -82,6 +91,14 @@ def register(body: UserRegister):
             status_code=status.HTTP_400_BAD_REQUEST,
             detail='Cluster host, cluster username, and SSH private key are required.'
         )
+    # Only the clusters this MARGIE serves; and not too many tries from one address, since
+    # each makes the server log in to a cluster.
+    access.check_cluster(body.cluster_host)
+    address = access.client_address(request)
+    wait = access.SIGNUP_BY_ADDRESS.wait(address)
+    if wait:
+        raise access.too_many(wait, 'new accounts from here')
+    access.SIGNUP_BY_ADDRESS.count(address)
 
     _validate_private_key(body.private_key)
 
@@ -160,26 +177,38 @@ def _store_user(body: UserRegister, *, cluster_host: str, cluster_username: str,
 
 
 @router.post('/login', response_model=TokenResponse)
-def login(body: UserLogin):
+def login(body: UserLogin, request: Request):
     """
     Exchange username + password for a JWT access token.
 
     Returns a generic error on any failure — never reveals whether the
-    username exists.
+    username exists. Too many failures lock the username, and the address,
+    for a while (api/access.py); an account on a cluster this MARGIE no
+    longer accepts cannot sign in.
     """
     _invalid = HTTPException(
         status_code=status.HTTP_401_UNAUTHORIZED,
         detail='Invalid credentials'
     )
+    name = body.username.strip().lower()
+    address = access.client_address(request)
+    wait = max(access.SIGNIN_BY_NAME.wait(name), access.SIGNIN_BY_ADDRESS.wait(address))
+    if wait:
+        raise access.too_many(wait, 'failed sign-ins')
 
     with get_db() as db:
         row = db.execute(
-            'SELECT id, username, password_hash FROM users WHERE username = ?',
+            'SELECT id, username, password_hash, cluster_host FROM users WHERE username = ?',
             (body.username,)
         ).fetchone()
 
     if row is None or not verify_password(body.password, row['password_hash']):
+        access.SIGNIN_BY_NAME.count(name)
+        access.SIGNIN_BY_ADDRESS.count(address)
         raise _invalid
+    if not is_local_mode():
+        access.check_cluster(row['cluster_host'])
+    access.SIGNIN_BY_NAME.clear(name)
 
     token = create_access_token(user_id=row['id'], username=row['username'])
     LOGGER.info('User logged in: %s', body.username)
@@ -276,6 +305,8 @@ def update_credentials(body: UpdateClusterCredentials, current_user: dict = Depe
     # Build the effective credentials (new values override old)
     from bioinformatics_tools.api.auth import decrypt_private_key
 
+    if body.cluster_host:
+        access.check_cluster(body.cluster_host)
     new_host = body.cluster_host or row['cluster_host']
     new_username = body.cluster_username or row['cluster_username']
     new_key = body.private_key if body.private_key else decrypt_private_key(row['private_key_encrypted'])

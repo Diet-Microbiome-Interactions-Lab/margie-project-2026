@@ -128,3 +128,14 @@ def _fresh_reads():
     read_cache._answers.clear()
     yield
     read_cache._answers.clear()
+
+
+@pytest.fixture(autouse=True)
+def _fresh_access(monkeypatch):
+    """Every test starts with no sign-in lockouts and any cluster accepted (api/access.py)."""
+    from bioinformatics_tools.api import access
+
+    monkeypatch.delenv(access.ENV, raising=False)
+    for guard in (access.SIGNIN_BY_NAME, access.SIGNIN_BY_ADDRESS, access.SIGNUP_BY_ADDRESS):
+        guard.reset()
+    yield
