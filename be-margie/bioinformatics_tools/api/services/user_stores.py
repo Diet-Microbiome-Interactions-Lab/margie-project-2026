@@ -496,7 +496,7 @@ def _op_from(sections: dict, root: str) -> dict:
     if op.get('state') == 'queued' and not job:
         # Queued with no SLURM job behind it: the submission was refused (as an older version left it).
         op['state'] = 'failed'
-        op['message'] = op.get('message') or 'The copy job never reached SLURM; start it again.'
+        op['message'] = op.get('message') or 'This copy has no SLURM job behind it; start it again.'
     if op.get('state') in ('queued', 'running') and job:
         # A SLURM job missing from squeue has ended.
         if not slurm_state:

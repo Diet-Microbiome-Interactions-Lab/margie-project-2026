@@ -245,7 +245,7 @@ def _target(conn, path: str, home: str) -> str:
     if not p.startswith('/'):
         raise StoreError(f'{path}: give the whole path, from /.', 400)
     if _in_lab(p):
-        raise StoreError(f"{p} is in the lab's depot folder, which setup never writes to; choose another folder.", 409)
+        raise StoreError(f"{p} is in the lab's shared depot folder; choose a folder of your own for setup to write to.", 409)
     _, out = _run(conn, _PROBE + f'\nwritable {shlex.quote(p)}')
     if (out.split() or ['r'])[-1] != 'w':
         raise StoreError(f'Your account cannot write to {p} (or to the folder it would be made in).', 409)

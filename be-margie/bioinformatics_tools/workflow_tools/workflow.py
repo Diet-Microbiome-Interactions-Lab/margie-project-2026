@@ -797,9 +797,9 @@ class WorkflowBase(ProgramBase):
             else:
                 provenance.set(g, 'gtdbtk', cache_report.FRESH, 'run with this batch' if db_path else 'no MARGIE database set')
             if run_quast_enabled:
-                provenance.set(g, 'quast', cache_report.FRESH, "measured on each run; an assembly's quality is never cached")
+                provenance.set(g, 'quast', cache_report.FRESH, "measured fresh on this run's assembly")
             if g in prodigal_genomes:
-                provenance.set(g, 'prodigal', cache_report.FRESH, 'Prodigal gene calls are never cached')
+                provenance.set(g, 'prodigal', cache_report.FRESH, 'genes called fresh by Prodigal')
             elif rasttk_restored.get(g):
                 provenance.set(g, 'rasttk', cache_report.RESTORED, SAME_GENOME, when.get(g, {}).get('rasttk', ''), cache_report.GENOME_LEVEL)
             elif Path(f"{prefix}rasttk/rasttk_db.tkn").exists():
@@ -981,7 +981,7 @@ class WorkflowBase(ProgramBase):
                 # Prodigal's feature ids differ from RASTtk's, so neither cache serves it.
                 for t in MARGIE_SB_PHASED_TOOLS:
                     if t.get('key') and 4 <= t.get('phase', 0) <= 10 and not off(t['key']):
-                        provenance.set(genome, t['key'], cache_report.FRESH, 'Prodigal genomes are never cached')
+                        provenance.set(genome, t['key'], cache_report.FRESH, 'run fresh on a Prodigal genome')
             for key, paths in cache_map_fn(genome).items():
                 step = key.split('@')[0]
                 if db_path and genome_restored.get(key):
@@ -997,7 +997,7 @@ class WorkflowBase(ProgramBase):
                 else:
                     provenance.set(genome, step, cache_report.FRESH, '' if db_path else 'no MARGIE database set')
             if smk_config.get('run_scoring', True) not in (False, 'false', '0', 'no'):
-                provenance.set(genome, 'scoring', cache_report.FRESH, 'always run: the operon reference grows with every genome')
+                provenance.set(genome, 'scoring', cache_report.FRESH, 'run fresh: the operon reference grows with each genome')
             provenance.write()
 
             # Skips Stage 2 only at PIPELINE_VERSION with every selected step restored.
@@ -1023,7 +1023,7 @@ class WorkflowBase(ProgramBase):
                     LOGGER.info('Genome %s at version %s but selected steps not in cache: %s — running Stage 2 to compute them',
                                 genome, PIPELINE_VERSION, missing_selected)
                 elif scoring_always_recomputes and is_already_processed(db_path, fasta_hash, PIPELINE_VERSION):
-                    LOGGER.info('Genome %s already at version %s, but scoring is never cached — running Stage 2 to RE-SCORE (only scoring + fingerprint recompute; all other phases restore from cache)',
+                    LOGGER.info('Genome %s already at version %s, and scoring runs fresh — running Stage 2 to RE-SCORE (only scoring + fingerprint recompute; all other phases restore from cache)',
                                 genome, PIPELINE_VERSION)
 
             stage2_config = {**smk_config, 'target_genome': genome}
@@ -1126,7 +1126,7 @@ class WorkflowBase(ProgramBase):
             LOGGER.warning('Stage 1 (rasttk_all) exited with rc=%s after Stage 2/3 finished draining', stage1.poll())
 
         if skipped:
-            LOGGER.warning('%d genome(s) skipped (RASTtk/GTDB-Tk never completed): %s', len(skipped), sorted(skipped))
+            LOGGER.warning('%d genome(s) skipped (RASTtk/GTDB-Tk did not finish): %s', len(skipped), sorted(skipped))
 
         run_scoring_enabled = smk_config.get('run_scoring', True) not in (False, 'false', '0', 'no')
         queue_sqlite_backup_enabled = smk_config.get('run_sqlite_snapshot_queue', True) not in (False, 'false', '0', 'no')

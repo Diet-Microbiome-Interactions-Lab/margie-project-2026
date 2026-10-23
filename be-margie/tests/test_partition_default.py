@@ -34,7 +34,7 @@ def test_an_empty_setting_is_filled_and_a_chosen_one_kept():
 
 def test_a_wait_with_no_slurm_job_behind_it_reads_as_failed():
     op = us._op_from({"status": ["state=queued", "op=setup", "label=Waiting for a SLURM slot"]}, "/r")
-    assert op["state"] == "failed" and "never reached SLURM" in op["message"]
+    assert op["state"] == "failed" and "no SLURM job behind it" in op["message"]
 
 
 def test_a_refused_copy_job_is_said_on_the_page():

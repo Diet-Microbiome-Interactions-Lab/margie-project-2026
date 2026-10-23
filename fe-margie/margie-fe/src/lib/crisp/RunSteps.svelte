@@ -212,15 +212,15 @@
 	{#if !ui.isFolded(TOOLS, true)}
 	<p class="mg-note mg-explain">
 		{#if anyRequired}
-			COG, KEGG, eggNOG, UniProt, Pfam, TIGRFAM, PGAP, InterPro and dbCAN run every time: labeling and the confidence score read them,
+			COG, KEGG, eggNOG, UniProt, Pfam, TIGRFAM, PGAP, InterPro and dbCAN are part of every run: labeling and the confidence score read them,
 			so every run's scores mean the same. MEROPS, TCDB and GenProp are yours to add: MEROPS and TCDB add peptidase and transporter
 			calls, and need their licence terms accepted. KEGG uses only the public KOfam data. Gene calling, operons, consolidation,
-			labeling, fingerprints and scoring always run.
+			labeling, fingerprints and scoring are part of every run.
 		{:else}
 			Recommended runs the phase 4 tools, which the envelope stage and scoring read. MEROPS and TCDB are not used in scoring but add
 			peptidase and transporter calls. Tools with licence terms (MEROPS, Phobius, SignalP and others) stay off until you accept their
 			terms; add them yourself. KEGG uses only the public KOfam data. Gene calling, operons, consolidation, labeling, fingerprints and
-			scoring always run.
+			scoring are part of every run.
 		{/if}
 	</p>
 
@@ -245,7 +245,7 @@
 								aria-pressed={on}
 								disabled={!t.licensed || t.required}
 								title={t.required
-									? 'Runs every time: labeling and the confidence score read it'
+									? 'Part of every run: labeling and the confidence score read it'
 									: t.licensed
 										? t.gated
 											? 'Licence accepted'
@@ -259,7 +259,7 @@
 									{#if BLURB[t.name]}<small>{BLURB[t.name]}</small>{/if}
 								</span>
 								{#if t.required && t.licensed}
-									<span class="rs-always">always</span>
+									<span class="rs-required">required</span>
 								{:else if !t.licensed}
 									<span class="rs-lic need"><Lock size={11} /></span>
 								{:else if t.gated}
@@ -509,7 +509,7 @@
 		color: var(--mg-text);
 		cursor: default;
 	}
-	.rs-always {
+	.rs-required {
 		flex: none;
 		padding: 1px 6px;
 		border-radius: var(--mg-r-sm);

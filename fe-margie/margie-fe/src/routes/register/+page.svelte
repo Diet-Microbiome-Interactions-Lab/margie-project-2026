@@ -177,7 +177,7 @@
 								</div>
 
 								<p class="text-surface-500 dark:text-surface-400 text-xs border-t border-surface-300 dark:border-surface-600 pt-3">
-									Your private key is AES-256 encrypted before storage and is never returned by the API or written to disk on the server. BSP decrypts it in memory only when making a connection on your behalf.
+									Your private key is stored AES-256 encrypted. BSP decrypts it in memory only to make a connection on your behalf.
 								</p>
 							</div>
 

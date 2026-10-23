@@ -61,8 +61,8 @@
 		<div class="box">
 			<header><span class="ic" aria-hidden="true"><Database size={15} /></span><b>The lab's prebuilt databases</b><span class="tag">default</span></header>
 			<p class="mg-note">
-				A first run copies them into your databases folder, each into its own folder, and runs grow the copies. The prebuilt ones are
-				never written to, so every new user starts from the same place.
+				A first run copies them into your databases folder, each into its own folder, and runs grow the copies. The prebuilt ones stay as
+				they are, so every new user starts from the same place.
 			</p>
 			{#if prebuilt}
 				<a class="path mg-mono" href={uiBase.to(`/files?path=${encodeURIComponent(prebuilt)}`)} title="Open in Files">{prebuilt}</a>

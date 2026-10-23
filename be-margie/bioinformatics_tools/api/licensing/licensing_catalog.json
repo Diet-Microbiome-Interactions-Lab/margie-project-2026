@@ -243,7 +243,7 @@
       "commercial_use": "public KOfam subset free; full KEGG commercial requires license",
       "academic_use": "Free for academic / non-profit use",
       "research_use": "Free for academic / non-profit use",
-      "user_action": "None. MARGIE uses only publicly downloadable KEGG data: the KOfam profiles and ko_list from genome.jp/ftp/db/kofam, searched with KofamScan; it never calls the KEGG REST API or KEGG's subscription FTP. Using other KEGG data commercially needs a KEGG license.",
+      "user_action": "None. MARGIE uses only publicly downloadable KEGG data: the KOfam profiles and ko_list from genome.jp/ftp/db/kofam, searched with KofamScan. Using other KEGG data commercially needs a KEGG license.",
       "tier": "commercial_restricted",
       "obtain_url": "https://www.kegg.jp/kegg/legal.html",
       "allowed": [

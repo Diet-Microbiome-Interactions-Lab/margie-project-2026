@@ -23,7 +23,7 @@
 			n: '4',
 			step: 'Function',
 			tools: 'COG, KEGG (KofamScan), eggNOG, UniProt Swiss-Prot, Pfam, TIGRFAM, PGAP, InterPro and dbCAN in every run; Genome Properties, MEROPS and TCDB when chosen',
-			does: 'Each tool annotates the predicted proteins on its own. The ones labeling and scoring read always run, so scores compare across runs. Results are kept per protein, so a protein annotated in an earlier run is not searched again.'
+			does: 'Each tool annotates the predicted proteins on its own. The ones labeling and scoring read are part of every run, so scores compare across runs. Results are kept per protein, so a protein annotated in an earlier run is not searched again.'
 		},
 		{ n: '5', step: 'Operons', tools: 'UniOP', does: 'Pairwise operon probabilities between neighbouring genes, from intergenic distance, grouping genes into operons.' },
 		{ n: '6', step: 'Membrane topology', tools: 'Phobius, TMbed, SignalP 6 (when licensed)', does: 'Transmembrane helices and signal peptides.' },
@@ -165,7 +165,7 @@
 			<h3>Which applies when</h3>
 			<p>
 				The genome level is tried first; a tool it does not cover for this genome then uses the protein level. Genomes whose genes Prodigal calls
-				are not cached at either level. Scoring, the fingerprints and the comparisons with other genomes always run, as they depend on every
+				run each step fresh. Scoring, the fingerprints and the comparisons with other genomes run fresh in each run, as they depend on every
 				genome in the database at the time.
 			</p>
 		</section>

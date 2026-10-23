@@ -1,6 +1,6 @@
 """QUAST runs when it is selected: the sequential driver never asks for rule all, which was the only
 place QUAST's token was requested, so Stage 1 (and rule rasttk_all) ask for it beside GTDB-Tk's.
-It is never cached: it measures the assembly submitted, which differs between assemblies of a strain."""
+It runs fresh each run: it measures the assembly submitted, which differs between assemblies of a strain."""
 
 import re
 from pathlib import Path

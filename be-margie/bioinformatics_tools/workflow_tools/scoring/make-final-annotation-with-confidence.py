@@ -195,8 +195,7 @@ def _c2_reasoning(
         + "; ".join(details)
         + f"; mean pairwise probability = {c2_score_text or '0.5000'}. Here C2 IS this raw "
         "UniOP operon probability (reported unchanged in the UniOP_operon_probability column); "
-        "the 0.5 floor is never invoked because UniOP within-operon probabilities are always "
-        ">= 0.5."
+        "UniOP within-operon probabilities are 0.5 or more, so C2 takes them as they are."
     )
 
 

@@ -170,7 +170,7 @@
 			<h2 id="ib-use">What a run can use</h2>
 			<span class="mg-note">{ws.tools.length ? `${ws.tools.length} tools in ${phases.length} phase${phases.length === 1 ? '' : 's'}` : ''}</span>
 		</header>
-		<p class="mg-note mg-explain">The tools Analyze can add to a run, by the phase they run in. Gene calling and scoring always run.</p>
+		<p class="mg-note mg-explain">The tools Analyze can add to a run, by the phase they run in. Gene calling and scoring are part of every run.</p>
 		<ol class="ib-phases mg-even" use:even={170}>
 			{#each phases as [n, tools] (n)}
 				<li>

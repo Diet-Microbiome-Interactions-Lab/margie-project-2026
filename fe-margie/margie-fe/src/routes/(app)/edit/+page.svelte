@@ -103,7 +103,7 @@
 			| The settings MARGIE reads; Settings edits the same file. It must stay valid YAML, or it is not saved.
 		{:else if workflow}
 			| The workflow in your copy of MARGIE on the cluster (~/margie-project-2026): your edits apply to your runs. While it differs from
-			MARGIE's, MARGIE does not update your copy (it never overwrites your edits).
+			MARGIE's, your copy keeps your edits, and MARGIE's updates reach it once it matches MARGIE's again.
 		{/if}
 		Each save keeps the version it replaces beside it, as <span class="mg-mono">{name}.bak-&lt;date-time&gt;</span>.
 		{#if lastBackup}<span class="kept">Last kept: <span class="mg-mono">{lastBackup.split('/').at(-1)}</span></span>{/if}

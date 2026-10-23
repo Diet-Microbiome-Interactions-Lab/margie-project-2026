@@ -288,7 +288,7 @@
 											<td class="o-now" title={r.running.join(', ')}>{r.running.length ? r.running.join(', ') : ROW_WORD[r.state]}</td>
 											<td class="o-steps">{r.done}/{r.of}</td>
 											<td class="o-el">{elapsedOf(r.g)}</td>
-											<td class="o-left" title={r.unknown ? 'Some steps have never run here, so this is a lower bound' : ''}>{going && r.state !== 'done' ? leftText(r.left, r.unknown).replace(/ left$/, '') : ''}</td>
+											<td class="o-left" title={r.unknown ? 'Some steps have no timing from earlier runs here, so this is a lower bound' : ''}>{going && r.state !== 'done' ? leftText(r.left, r.unknown).replace(/ left$/, '') : ''}</td>
 										</tr>
 										{#if expanded.has(r.g)}
 											<tr class="o-detail">
