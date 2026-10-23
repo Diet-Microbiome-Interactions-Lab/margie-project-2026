@@ -33,6 +33,76 @@ _BACKEND_DIR = 'be-margie'
 # Branch the clones track (BSP_MARGIE_SB_REF).
 _MARGIE_SB_REF = os.getenv('BSP_MARGIE_SB_REF', 'main')
 
+# ---- What a user's shell start-up prints never reaches MARGIE ----
+# sshd runs every command through the user's own shell, which first reads their start-up files
+# (~/.bashrc): one that prints, or fails ("... not activated"), would add lines to what MARGIE
+# reads back (a job id, a path, JSON). Each command therefore prints this line first, on its
+# output and on its errors, and everything before it is dropped.
+OUTPUT_MARK = '__margie_command_output__'
+
+
+def marked(command: str) -> str:
+    """The command, printing OUTPUT_MARK on stdout and stderr before it runs."""
+    return f"printf '%s\\n' {OUTPUT_MARK}; printf '%s\\n' {OUTPUT_MARK} >&2; {command}"
+
+
+class AfterMark:
+    """A command's stdout or stderr from OUTPUT_MARK on. Lines before it (the user's shell
+    start-up) are dropped; with no mark at all (the shell never ran the command), nothing is,
+    since those lines say why. read() gives bytes and readline() text, as paramiko's files do."""
+
+    def __init__(self, f):
+        self._f = f
+        self.channel = f.channel
+        self._held: list = []
+        self._looked = False
+
+    def _look(self) -> None:
+        if self._looked:
+            return
+        self._looked = True
+        while True:
+            line = self._f.readline()
+            if not line:
+                return
+            text = line.decode(errors='replace') if isinstance(line, bytes) else line
+            if text.rstrip('\r\n') == OUTPUT_MARK:
+                self._held = []
+                return
+            self._held.append(text)
+
+    def readline(self, *args):
+        self._look()
+        return self._held.pop(0) if self._held else self._f.readline(*args)
+
+    def read(self, *args) -> bytes:
+        self._look()
+        head = ''.join(self._held).encode()
+        self._held = []
+        return head + self._f.read(*args)
+
+    def readlines(self):
+        return list(self)
+
+    def __iter__(self):
+        self._look()
+        while self._held:
+            yield self._held.pop(0)
+        yield from self._f
+
+    def __getattr__(self, name):
+        return getattr(self._f, name)
+
+
+def _clean_exec(exec_command):
+    """Wraps a client's exec_command: the command marked, its stdout and stderr after the mark."""
+    def run(command, *args, **kwargs):
+        stdin, stdout, stderr = exec_command(marked(command), *args, **kwargs)
+        return stdin, AfterMark(stdout), AfterMark(stderr)
+    run.__wrapped__ = exec_command
+    return run
+
+
 # ---- Connection pool: clients reused per (host, username, key) ----
 _POOL: dict = {}
 _POOL_LOCK = threading.Lock()
@@ -121,6 +191,8 @@ class SSHConnection:
             connect_kwargs['key_filename'] = self.key_filename
         # If neither is set, paramiko falls back to the system SSH agent (CLI default)
         ssh.connect(self.host, **connect_kwargs)
+        # Every command it runs is read from OUTPUT_MARK on (see above).
+        ssh.exec_command = _clean_exec(ssh.exec_command)
         transport = ssh.get_transport()
         if transport is not None:
             transport.set_keepalive(_KEEPALIVE_SECONDS)

@@ -1678,6 +1678,14 @@ def run_store_copy_here(current_user: dict = Depends(get_current_user)):
     return {"op": _stores_call(user_stores.run_here, conn, user_config)}
 
 
+@router.post("/stores/stop")
+def stop_store_copy(current_user: dict = Depends(get_current_user)):
+    """Stops the copy under way (databases, backups, tool setup), queued or running; see user_stores.stop."""
+    conn = _build_connection(current_user)
+    user_config = _stores_user_config(current_user, conn)
+    return {"op": _stores_call(user_stores.stop, conn, user_config)}
+
+
 @router.post("/stores/{store_id}/backup")
 def backup_store(store_id: str, current_user: dict = Depends(get_current_user)):
     """Copies one database's working version to depot; the working copy moves to

@@ -13,7 +13,7 @@ import time
 import re
 import shlex
 
-from bioinformatics_tools.utilities.ssh_connection import SSHConnection
+from bioinformatics_tools.utilities.ssh_connection import OUTPUT_MARK, SSHConnection
 
 LOGGER = logging.getLogger(__name__)
 
@@ -334,6 +334,17 @@ def submit_ssh_job(
     exit_code = None
     buf = ''
     last_check = 0.0
+    # The tail is read from its channel directly, so its lines are kept from OUTPUT_MARK on
+    # (what the user's shell start-up printed before it is dropped; see ssh_connection), when
+    # the client marks its commands (MARGIE's own clients do).
+    seen = [not hasattr(ssh.exec_command, '__wrapped__')]
+
+    def _keep(line: str) -> bool:
+        if seen[0]:
+            return True
+        if line.strip() == OUTPUT_MARK:
+            seen[0] = True
+        return False
     CHECK_EVERY = 5.0                         # the sentinel is not urgent
     try:
         while True:
@@ -344,6 +355,8 @@ def submit_ssh_job(
                 buf += data.decode('utf-8', 'replace')
                 while '\n' in buf:
                     line, buf = buf.split('\n', 1)
+                    if not _keep(line):
+                        continue
                     LOGGER.debug('[remote] %s', line.rstrip())
                     yield line.rstrip()
                 continue                       # more may be waiting; drain first
@@ -369,7 +382,7 @@ def submit_ssh_job(
                 except Exception:
                     pass
                 for line in buf.split('\n'):
-                    if line.strip():
+                    if line.strip() and _keep(line):
                         yield line.rstrip()
                 try:
                     exit_code = int(got.split()[0])

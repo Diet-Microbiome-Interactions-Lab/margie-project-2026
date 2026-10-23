@@ -640,6 +640,41 @@ def run_here(conn, cfg: dict) -> dict | None:
     return _read_op(conn, root) or None
 
 
+def stop(conn, cfg: dict) -> dict | None:
+    """Stops the copy under way, queued or running: its SLURM job cancelled, or its script (and the
+    rsync it runs) ended on the login node it runs on, and waited for, so it cannot write its state
+    after this. Only the half-copied items (<destination>.partial) are removed: what it finished
+    stays, nothing is applied to the settings, and starting it again begins cleanly."""
+    root = scratch_root(conn, cfg)
+    op = _read_op(conn, root)
+    if not _busy(op):
+        raise StoreError('There is no copy under way to stop.', 409)
+    state = f'{root}/{STATE_DIR}'
+    q = shlex.quote
+    if op.get('job'):
+        job = q(op['job'])
+        _run(conn, f'scancel {job}; for i in $(seq 1 30); do squeue -h -j {job} 2>/dev/null | grep -q . || exit 0; sleep 1; done',
+             timeout=60)
+    elif str(op.get('pid', '')).isdigit():
+        pid = int(op['pid'])
+        # The script runs in its own process group (setsid): ending the group ends its rsync too.
+        kill = (f'kill -TERM -- -{pid} 2>/dev/null || kill -TERM {pid} 2>/dev/null; '
+                f'for i in $(seq 1 20); do kill -0 {pid} 2>/dev/null || exit 0; sleep 0.5; done; '
+                f'kill -KILL -- -{pid} 2>/dev/null; true')
+        host = op.get('host') or ''
+        _run(conn, f'if [ -z {q(host)} ] || [ "$(hostname)" = {q(host)} ]; then {kill}; '
+                   f'else ssh -o BatchMode=yes -o ConnectTimeout=10 {q(host)} {q(kill)}; fi', timeout=60)
+    # The plan's destinations are its 4th column (copy, files, pull); their .partial is what was in hand.
+    _run(conn, f"cd {q(state)} && awk -F'\\t' '$1==\"copy\"||$1==\"files\"||$1==\"pull\"{{print $4}}' op.plan "
+               f'| while IFS= read -r d; do [ -n "$d" ] && rm -rf -- "$d.partial"; done; rm -f op.after.json op.jobid; '
+               f'echo "== stopped" >> op.log')
+    ssh_sftp.write_remote_text_file(
+        f'{state}/op.status',
+        f"state=stopped\nop={op.get('op', '')}\nlabel=Stopped\nmessage=Stopped. What was copied stays; start it again whenever you like.\n",
+        connection=conn)
+    return _read_op(conn, root) or None
+
+
 def _busy(op: dict | None) -> bool:
     """Returns True while a copy is queued or running."""
     return bool(op) and op.get('state') in ('queued', 'running')
