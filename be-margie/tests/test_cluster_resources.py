@@ -20,6 +20,9 @@ standby||||04:00:00
 @@usage
 mylab|u1|cpu=4,mem=8000M,node=1,billing=4,gres/hp_cpu=2
 mylab|u2|cpu=64,mem=450G,node=1,billing=64,gres/hp_cpu=8,gres/gpu=1
+@@waiting
+mylab|u3|16
+mylab|u1|8
 @@jobs
 101|margie-run|cpu|RUNNING|8:37|3-00:00:00|1|4|a010|None|mylab|/home/u1/run.sh
 102|interactive|cpu|RUNNING|1:02|4:00:00|1|8|a020|None|mylab|(null)
@@ -82,3 +85,12 @@ def test_no_slurm_is_reported(authed_client):  # noqa: F811
     with patch(f"{SSH}._build_connection"), patch(f"{SSH}._run_remote_check", return_value=(127, "sinfo: command not found")):
         r = authed_client.get("/v1/ssh/cluster_resources")
     assert r.status_code == 502
+
+
+def test_each_account_says_who_is_using_it():
+    users = parse_cluster(OUT, "u1")["accounts"][0]["users"]
+    assert [u["user"] for u in users] == ["u2", "u1", "u3"]
+    u2, u1, u3 = users
+    assert (u2["running"], u2["cpu"], u2["gpu"], u2["me"]) == (1, 64, 1, False)
+    assert (u1["running"], u1["cpu"], u1["waiting"], u1["waiting_cpu"], u1["me"]) == (1, 4, 1, 8, True)
+    assert (u3["running"], u3["waiting"], u3["waiting_cpu"]) == (0, 1, 16)

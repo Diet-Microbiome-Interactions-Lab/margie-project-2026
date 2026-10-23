@@ -37,6 +37,8 @@
 		mine: Tres;
 		running: number;
 		my_running: number;
+		/** Who is using the account now: running jobs and what they hold, and jobs waiting. */
+		users?: { user: string; me: boolean; running: number; cpu: number; mem: number; gpu: number; waiting: number; waiting_cpu: number }[];
 	}
 	interface Partition {
 		name: string;
@@ -186,6 +188,25 @@
 					{:else}
 						<p class="mg-note">No group limit is set for this account; the partitions' own limits apply.</p>
 					{/each}
+					{#if a.users?.length}
+						<div class="cb-who">
+							<span class="cb-who-h">Using it now</span>
+							<ul>
+								{#each a.users as u (u.user)}
+									<li class:me={u.me}>
+										<b class="mg-mono">{u.user}</b>{#if u.me}<span class="mg-note">you</span>{/if}
+										<span class="cb-who-what">
+											{u.running
+												? `${u.running} running | ${amount('cpu', u.cpu)} CPUs | ${mem(u.mem)}${u.gpu ? ` | ${u.gpu} GPU${u.gpu === 1 ? '' : 's'}` : ''}`
+												: 'nothing running'}{u.waiting ? ` | ${u.waiting} waiting (${amount('cpu', u.waiting_cpu)} CPUs)` : ''}
+										</span>
+									</li>
+								{/each}
+							</ul>
+						</div>
+					{:else}
+						<p class="mg-note">Nobody has a job running or waiting in this account right now.</p>
+					{/if}
 					{#if !Object.keys(a.limits).includes('cpu') || !Object.keys(a.limits).includes('mem')}
 						<div class="cb-inuse">
 							<span>In use now: <b>{amount('cpu', a.in_use.cpu ?? 0)}</b> CPUs, <b>{mem(a.in_use.mem ?? 0)}</b> memory{a.in_use['gres/gpu'] ? `, ${a.in_use['gres/gpu']} GPUs` : ''}</span>
@@ -304,6 +325,41 @@
 	.cb-counts b {
 		color: var(--mg-text);
 		font-size: 1.15em;
+	}
+	.cb-who {
+		display: flex;
+		flex-direction: column;
+		gap: 6px;
+	}
+	.cb-who-h {
+		font-size: var(--mg-fs-xs);
+		font-weight: 700;
+		letter-spacing: 0.04em;
+		text-transform: uppercase;
+		color: var(--mg-text-3);
+	}
+	.cb-who ul {
+		display: flex;
+		flex-direction: column;
+		gap: 2px;
+		padding: 0;
+		list-style: none;
+	}
+	.cb-who li {
+		display: flex;
+		flex-wrap: wrap;
+		align-items: baseline;
+		gap: 4px 10px;
+		padding: 5px 8px;
+		border-radius: var(--mg-r-sm);
+	}
+	.cb-who li.me {
+		background: color-mix(in srgb, var(--mg-accent) 8%, transparent);
+	}
+	.cb-who-what {
+		color: var(--mg-text-2);
+		font-size: var(--mg-fs-sm);
+		font-variant-numeric: tabular-nums;
 	}
 	.cb-card {
 		border: 1px solid var(--cr-card-edge, var(--mg-border));

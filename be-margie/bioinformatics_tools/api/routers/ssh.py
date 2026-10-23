@@ -957,6 +957,7 @@ accts=$(sacctmgr -nP show assoc user="$USER" format=Account 2>/dev/null | sort -
 echo '@@accounts'; for a in $accts; do sacctmgr -nP show assoc account="$a" format=Account,User,GrpTRES,GrpJobs 2>/dev/null | awk -F'|' '$2==""'; done
 echo '@@qos'; for q in $(sacctmgr -nP show assoc user="$USER" format=QOS 2>/dev/null | tr ',' '\n' | sort -u); do sacctmgr -nP show qos "$q" format=Name,GrpTRES,MaxTRESPU,MaxJobsPU,MaxWall 2>/dev/null; done
 echo '@@usage'; for a in $accts; do squeue -h -A "$a" -t R -O 'UserName:40,tres-alloc:400' 2>/dev/null | awk -v a="$a" '{print a "|" $1 "|" $2}'; done
+echo '@@waiting'; for a in $accts; do squeue -h -A "$a" -t PD -o '%u|%C' 2>/dev/null | awk -v a="$a" '{print a "|" $0}'; done
 echo '@@jobs'; squeue -h -u "$USER" -o '%i|%j|%P|%T|%M|%l|%D|%C|%N|%r|%a|%o' 2>/dev/null
 echo '@@nodes'; sinfo -h -N -o '%P|%n|%T|%C|%m|%e|%G' 2>/dev/null
 echo '@@partitions'; sinfo -h -o '%P|%a|%l|%D|%C|%m|%G' 2>/dev/null
@@ -1015,18 +1016,36 @@ def parse_cluster(out: str, user: str) -> dict:
         jobs.append(job)
 
     usage: dict[str, dict] = {}
+    # Who is using each account now: running jobs and what they hold, and jobs waiting.
+    people: dict[str, dict[str, dict]] = {}
+
+    def person(acct: str, who: str) -> dict:
+        return people.setdefault(acct, {}).setdefault(
+            who, {"user": who, "me": who == user, "running": 0, "cpu": 0.0, "mem": 0.0, "gpu": 0.0, "waiting": 0, "waiting_cpu": 0.0})
+
     for f in rows("usage"):
         if len(f) < 3:
             continue
         acct, who, tres = f[0], f[1].strip(), _tres(f[2])
         u = usage.setdefault(acct, {"all": {}, "mine": {}, "jobs": 0, "my_jobs": 0})
         u["jobs"] += 1
+        pr = person(acct, who)
+        pr["running"] += 1
+        pr["cpu"] += tres.get("cpu", 0)
+        pr["mem"] += tres.get("mem", 0)
+        pr["gpu"] += tres.get("gres/gpu", 0)
         for k, v in tres.items():
             u["all"][k] = u["all"].get(k, 0) + v
         if who == user:
             u["my_jobs"] += 1
             for k, v in tres.items():
                 u["mine"][k] = u["mine"].get(k, 0) + v
+    for f in rows("waiting"):
+        if len(f) < 3 or not f[1].strip():
+            continue
+        pr = person(f[0], f[1].strip())
+        pr["waiting"] += 1
+        pr["waiting_cpu"] += float(f[2]) if f[2].strip().isdigit() else 0
     limits = {f[0]: {"tres": _tres(f[2]) if len(f) > 2 else {}, "jobs": f[3] if len(f) > 3 else ""} for f in rows("accounts") if f and f[0]}
     assoc: dict[str, dict] = {}
     for f in rows("assoc"):
@@ -1049,6 +1068,8 @@ def parse_cluster(out: str, user: str) -> dict:
             "max_jobs": a["max_jobs"], "max_submit": a["max_submit"],
             "limits": lim.get("tres", {}), "group_jobs": lim.get("jobs", ""),
             "in_use": use["all"], "mine": use["mine"], "running": use["jobs"], "my_running": use["my_jobs"],
+            # Most CPUs first; you are named as such.
+            "users": sorted(people.get(acct, {}).values(), key=lambda x: (-x["cpu"], -x["waiting"], x["user"])),
         })
     qos = [dict(zip(("name", "group", "per_user", "jobs_per_user", "max_wall"), (f + [""] * 5)[:5])) for f in rows("qos") if f and f[0]]
 
