@@ -7,6 +7,7 @@
 	import { INSTALL_STATEMENT } from '$lib/workspace/install-statement';
 	import { fetchTerms, NOT_YET, type TermsPayload } from '$lib/license';
 	import Markdown from '$lib/workspace/viewers/Markdown.svelte';
+	import StoresCheck from '$lib/cluster/StoresCheck.svelte';
 
 	/** Install page, locked until the install statement is typed for this computer or cluster account. */
 	$effect(() => {
@@ -132,10 +133,26 @@
 			</div>
 			{#if wrong}<p class="lock-wrong" role="alert">{wrong}</p>{/if}
 		</form>
+		{#if backend.cluster}
+			<!-- MARGIE's own databases need no statement: what is in your working folder, and what is still to copy. -->
+			<section class="mg-card lock-dbs" id="databases" aria-labelledby="lock-dbs-h">
+				<h2 id="lock-dbs-h">Your databases</h2>
+				<StoresCheck />
+			</section>
+		{/if}
 	{/if}
 </div>
 
 <style>
+	.lock-dbs {
+		margin-top: var(--cr-gutter, 20px);
+	}
+	.lock-dbs h2 {
+		margin: 0;
+		padding: var(--mg-pad) var(--mg-pad) 10px;
+		font-size: var(--mg-fs-lg);
+		font-weight: 650;
+	}
 	.lock-statement {
 		margin: 0;
 		padding: 10px 14px;

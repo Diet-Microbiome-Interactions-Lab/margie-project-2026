@@ -144,14 +144,14 @@ def genome_stem(name: str) -> str:
 
 
 def default_store_root() -> str:
-    """Returns the default store root, /scratch/<cluster>/<user>/margie-2026.
+    """Returns the default store root, /scratch/<cluster>/<user>/margie/margie-databases.
 
     A fallback for runs started outside the app, which always names the stores
     (api/services/user_stores.py); depot base copies are never written."""
     import os
     import socket
     cluster = (socket.getfqdn().split('.') + ['', ''])[1] or 'cluster'
-    return f"/scratch/{cluster}/{os.environ.get('USER', 'user')}/margie-2026"
+    return f"/scratch/{cluster}/{os.environ.get('USER', 'user')}/margie/margie-databases"
 
 
 def genome_calls(genomes: dict[str, str], config) -> dict[str, dict[str, str]]:

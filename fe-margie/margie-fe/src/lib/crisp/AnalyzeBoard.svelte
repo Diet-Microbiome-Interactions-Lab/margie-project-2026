@@ -34,6 +34,13 @@
 		if (backend.cluster) ws.loadStores();
 	});
 	const firstCopy = $derived(!!backend.cluster && !!ws.stores && !ws.stores.ready);
+	/** Databases already put in the working folder by hand, which setting up uses as they are. */
+	const ownCopies = $derived(
+		(ws.stores?.stores ?? [])
+			.filter((s) => !s.version && s.found?.ready)
+			.map((s) => s.label)
+			.join(', ')
+	);
 
 	/** On the cluster, the licence terms are accepted once, here, before a first run. */
 	const needsTerms = $derived(!!backend.cluster && ws.setup.some((r) => r.id === 'terms' && r.tone !== 'ok'));
@@ -157,6 +164,8 @@
 </script>
 
 <div class="analyze">
+<!-- The steps in one card, one row each (an-steps), the run under them. -->
+<div class="an-steps">
 <!-- ------------------------------------------------ 1. the genomes: their folder, files added here, the table -->
 <section id="genomes" class="genomes" aria-label="Genomes">
 	<GenomesBoard foldId={GENOME_TABLE} step={1} />
@@ -178,6 +187,7 @@
 		{#if !ui.isFolded(LICENCE, true)}<Licence />{/if}
 	</section>
 {/if}
+</div>
 
 <!-- ------------------------------------------------ the run -->
 <section class="card runcard" id="run">
@@ -214,14 +224,12 @@
 				</div>
 			</div>
 		{/if}
-		{#if firstCopy}
+		{#if firstCopy && !ws.storesBusy}
 			<p class="first" role="status">
-				{#if ws.storesBusy}
-					<b>Copying your databases</b> to {ws.stores?.root}; a run can start when it finishes.
-				{:else}
-					<b>First run:</b> your databases are copied into your databases folder first, once.
-					<button type="button" class="mg-link" onclick={() => ws.setupStores()}>Set them up now</button>
-				{/if}
+				<b>First run:</b>
+				{#if ownCopies}your own {ownCopies} in the databases folder {ownCopies.includes(',') ? 'are' : 'is'} used as is; the rest {:else}your databases
+				{/if}are copied there once first.
+				<button type="button" class="mg-link" onclick={() => ws.setupStores()}>Set them up now</button>
 			</p>
 		{/if}
 		<RunAction />
@@ -234,6 +242,7 @@
 		<FoldTitle id={GRID} closed>Genomes and progress</FoldTitle>
 		<span class="count">{rows.length ? `${rows.length} genome${rows.length === 1 ? '' : 's'}` : ''}{counts.all ? ` | ${counts.done} of ${counts.all} steps done` : ''}</span>
 		<span class="mg-grow"></span>
+		{#if !ui.isFolded(GRID, true)}
 		<ul class="key" aria-label="Key">
 			<li><span class="pie done" style="--p: 100"><Check size={9} strokeWidth={3.5} /></span>done</li>
 			<li><span class="pie run" style="--p: 40"></span>running</li>
@@ -241,6 +250,7 @@
 			<li><span class="pie none"></span>not started</li>
 			<li><span class="pie na"></span>not used</li>
 		</ul>
+		{/if}
 		<FoldToggle id={GRID} closed />
 	</header>
 	<Fold id={GRID} closed>
@@ -386,11 +396,50 @@
 		box-shadow: var(--cr-card-shadow, none);
 	}
 
-	/* The folders and the genomes: two boxes, a gutter apart like the rest. */
+	/* The steps: one card, a hairline between them, instead of a box each. */
+	.an-steps {
+		display: flex;
+		flex-direction: column;
+		overflow: hidden;
+		border: 1px solid var(--cr-card-edge, var(--mg-border));
+		border-radius: var(--mg-r);
+		background: var(--cr-card, var(--mg-surface));
+		box-shadow: var(--cr-card-shadow, none);
+	}
 	.genomes {
 		display: flex;
 		flex-direction: column;
-		gap: var(--cr-gutter, 16px);
+	}
+	.an-steps :global(:is(.gb-board, .rs-box)),
+	.an-steps .licbox {
+		border: none;
+		border-radius: 0;
+		background: transparent;
+		box-shadow: none;
+	}
+	.an-steps :global(.gb-board + .gb-board),
+	.an-steps > :global(.rs-box),
+	.an-steps > .licbox {
+		border-top: 1px solid var(--mg-border);
+	}
+	/* On a phone, a step's summary goes under its title, so its Show stays on the title's line. */
+	@media (max-width: 640px) {
+		.an-steps :global(:is(.gb-top, .rs-head)),
+		.lichead {
+			flex-wrap: wrap;
+			row-gap: 2px;
+		}
+		.an-steps :global(:is(.gb-sum, .rs-sum)),
+		.lic-need {
+			order: 10;
+			flex-basis: 100%;
+			padding-left: 32px;
+		}
+	}
+	/* Files dragged over the genomes: their row lights, not a box. */
+	.an-steps :global(.gb-board.over) {
+		background: color-mix(in srgb, var(--mg-accent) 6%, transparent);
+		box-shadow: inset 3px 0 0 var(--mg-accent);
 	}
 
 	/* ---------------------------------------- the licence terms, once */
@@ -440,11 +489,8 @@
 
 	.first {
 		margin: 0;
-		padding: 8px 12px;
-		border: 1px solid color-mix(in srgb, var(--mg-accent) 35%, var(--mg-border));
-		border-radius: var(--mg-r-sm);
-		background: color-mix(in srgb, var(--mg-accent) 6%, transparent);
 		font-size: var(--mg-fs-sm);
+		color: var(--mg-text-2);
 	}
 	.first b {
 		font-weight: 600;

@@ -1,8 +1,9 @@
 """
 Manages each user's working copies of MARGIE's growing databases on scratch and their backups on depot.
 Base copies on depot are only read; a user's first run copies the base (or newest backup) to
-<scratch>/margie-2026/<store>/<user>-<name>-vN, and "Back up" copies vN to depot and renames the working copy to vN+1.
+<scratch>/margie/margie-databases/<store>/<user>-<name>-vN, and "Back up" copies vN to depot and renames the working copy to vN+1.
 Copies run as a SLURM job (or detached on the login node) driven by a plan file; nothing is ever deleted.
+A copy the user already put in the working folder is used where it is instead (own_copy, adopt).
 """
 
 from __future__ import annotations
@@ -65,8 +66,14 @@ def resolve_base(conn, store: dict, cfg: dict | None) -> str:
 
 # Where the backend checkout keeps the starter operon reference (scoring/reference/operon-db.manifest.txt).
 STARTER_OCC = 'bioinformatics-tools/bioinformatics_tools/workflow_tools/scoring/reference/operon-db.pkl'
-# Folder under the user's scratch that holds every store and run output folder.
-ROOT_NAME = 'margie-2026'
+# The user's MARGIE folder on scratch, and the folders in it used when Settings names none:
+# <scratch>/margie/margie-databases (every store and run archive), margie-input and margie-output.
+HOME_NAME = 'margie'
+ROOT_NAME = 'margie-databases'
+INPUT_NAME = 'margie-input'
+OUTPUT_NAME = 'margie-output'
+# The genomes and results folders a config leaves empty, and their folder under HOME_NAME.
+DEFAULT_FOLDERS = {'margie_sb.input_path': INPUT_NAME, 'margie_sb.output_path': OUTPUT_NAME}
 # Bookkeeping folder inside it: the store manifest and the copy under way.
 STATE_DIR = '.margie'
 
@@ -204,18 +211,39 @@ def _cfg_set(cfg: dict, dotted: str, value) -> None:
     cur[parts[-1]] = value
 
 
-def scratch_root(conn, cfg: dict) -> str:
-    """Returns margie_sb.stores_root if set, else /scratch/<cluster>/<user>/margie-2026.
-    The cluster short name comes from the login node's domain (login01.mycluster.example.edu -> mycluster).
-    """
-    chosen = _cfg_get(cfg, 'margie_sb.stores_root')
-    if isinstance(chosen, str) and chosen.strip():
-        return chosen.strip().rstrip('/')
+def _scratch(conn) -> str:
+    """Returns /scratch/<cluster>/<user>. The cluster short name comes from the login node's domain
+    (login01.mycluster.example.edu -> mycluster)."""
     code, out = _run(conn, 'printf "%s %s" "$(hostname -d 2>/dev/null | cut -d. -f1)" "$USER"')
     cluster, _, user = out.strip().partition(' ')
     if code != 0 or not cluster or not user:
         raise StoreError('Could not work out your scratch folder on the cluster. Set margie_sb.stores_root in Settings.')
-    return f'/scratch/{cluster}/{user}/{ROOT_NAME}'
+    return f'/scratch/{cluster}/{user}'
+
+
+def scratch_root(conn, cfg: dict) -> str:
+    """Returns margie_sb.stores_root if set (every finished setup saves it), else
+    /scratch/<cluster>/<user>/margie/margie-databases."""
+    chosen = _cfg_get(cfg, 'margie_sb.stores_root')
+    if isinstance(chosen, str) and chosen.strip():
+        return chosen.strip().rstrip('/')
+    return f'{_scratch(conn)}/{HOME_NAME}/{ROOT_NAME}'
+
+
+def fill_default_folders(conn, cfg: dict) -> bool:
+    """Sets the genomes and results folders a config leaves empty to margie-input and margie-output
+    in <scratch>/margie, and makes them (with the databases folder) so files can go straight in.
+    A folder chosen in Settings is never changed. Returns True when the config changed."""
+    empty = [k for k in DEFAULT_FOLDERS if not str(_cfg_get(cfg, k) or '').strip()]
+    if not empty:
+        return False
+    scratch = _scratch(conn)
+    made = [f'{scratch}/{HOME_NAME}/{DEFAULT_FOLDERS[k]}' for k in empty]
+    for k, path in zip(empty, made):
+        _cfg_set(cfg, k, path)
+    made.append(scratch_root(conn, cfg))
+    _run(conn, 'mkdir -p -- ' + ' '.join(shlex.quote(p) for p in made))
+    return True
 
 
 # ---- Names ----
@@ -292,6 +320,10 @@ def _probe(conn, root: str, user: str, cfg: dict | None = None) -> dict:
              f'echo "@@logage"; echo $(( $(date +%s) - $(stat -c %Y {shlex.quote(log_path)} 2>/dev/null || echo 0) ))']
     for st in STORES:
         parts.append(f'echo "@@depot {st["id"]}"; ls -1p {shlex.quote(backup_dir(st, cfg))} 2>/dev/null | grep "^{user}-{st["name"]}-v"')
+    # What is in the working folder, for copies put there by hand (own_copy).
+    parts.append(f'echo "@@here"; ls -1pA {shlex.quote(root)} 2>/dev/null')
+    for sub in sorted({st['sub'] for st in STORES}):
+        parts.append(f'echo "@@here {sub}"; ls -1pA {shlex.quote(root + "/" + sub)} 2>/dev/null')
     code, out = _run(conn, '; '.join(parts), timeout=60)
     sections: dict[str, list[str]] = {}
     current = None
@@ -329,8 +361,103 @@ def _probe(conn, root: str, user: str, cfg: dict | None = None) -> dict:
         'wanted': wanted,
         'present': present,
         'backups': backups,
+        'here': {sub: sections.get(f'here {sub}', []) for sub in {st['sub'] for st in STORES}} | {'': sections.get('here', [])},
         'op': _op_from(sections, root),
     }
+
+
+# ---- Copies the user put in the working folder themselves ----
+
+def own_copy(store: dict, user: str, root: str, top: list[str], inside: list[str]) -> dict | None:
+    """Finds a copy of the store already in the working folder that MARGIE has no record of, from
+    `ls -1p` of the folder (top) and of the store's subfolder (inside): one under MARGIE's own name
+    (<user>-<name>-vN, the newest), the base's own name at either level (a file store), or the base
+    folder's files laid straight into the subfolder (a folder store). None when there is none."""
+    sub = f"{root}/{store['sub']}"
+    is_dir = store['kind'] == 'dir'
+    listed = lambda names: {(n.rstrip('/'), n.endswith('/')) for n in names if n.strip()}
+    top, inside = listed(top), listed(inside)
+    named = [(v, n) for n, d in inside if d == is_dir and (v := _version_of(store, user, n)) is not None]
+    if named:
+        v, n = max(named)
+        return {'path': f'{sub}/{n}', 'how': 'named', 'version': v}
+    base = posixpath.basename(store['base_rel'])
+    if not is_dir:
+        for where, names in ((sub, inside), (root, top)):
+            if (base, False) in names:
+                return {'path': f'{where}/{base}', 'how': 'base', 'version': 1}
+        return None
+    need = store.get('base_files') or []
+    if need and all(any(n == f for n, _ in inside) for f in need):
+        return {'path': sub, 'how': 'flat', 'version': 1}
+    return None
+
+
+# A file changed this recently may still be being copied.
+SETTLE_SECONDS = 120
+
+
+def _check_own(conn, found: dict, bases: dict) -> None:
+    """Marks each found copy ready, or says why not: a file still changing, or not the size of the
+    group's copy it was made from. found: {store id: own_copy()}; bases: {store id: base path}."""
+    files = {sid: f for sid, f in found.items() if STORE_BY_ID[sid]['kind'] == 'file'}
+    for f in found.values():
+        f['ready'], f['note'] = True, ''
+    if not files:
+        return
+    q = shlex.quote
+    cmd = ['date +%s']
+    for sid, f in files.items():
+        cmd.append(f'printf "%s " {sid}; stat -c "%s %Y" {q(f["path"])} 2>/dev/null || echo')
+        cmd.append(f'printf "%s " {sid}.base; stat -c "%s" {q(bases.get(sid) or "/nonexistent")} 2>/dev/null || echo')
+    _, out = _run(conn, '; '.join(cmd))
+    lines = out.splitlines()
+    now = int(lines[0]) if lines and lines[0].strip().isdigit() else 0
+    seen = {k: v.split() for k, _, v in (l.partition(' ') for l in lines[1:])}
+    for sid, f in files.items():
+        size_age = seen.get(sid) or []
+        base = seen.get(f'{sid}.base') or []
+        if len(size_age) != 2:
+            f['ready'], f['note'] = False, 'could not be read'
+            continue
+        size, mtime = int(size_age[0]), int(size_age[1])
+        f['bytes'] = size
+        if now and now - mtime < SETTLE_SECONDS:
+            f['ready'], f['note'] = False, 'still changing (being copied?); look again in a few minutes'
+        elif f['how'] == 'base' and base and int(base[0]) != size:
+            f['ready'], f['note'] = False, (f'not the size of the group\'s copy ({_gb(size)} of {_gb(int(base[0]))}); '
+                                            'still being copied?')
+
+
+def _gb(n: int) -> str:
+    for unit, size in (('GB', 1024 ** 3), ('MB', 1024 ** 2), ('KB', 1024)):
+        if n >= size:
+            return f'{n / size:.1f} {unit}'
+    return f'{n} bytes'
+
+
+def adopt(conn, store: dict, found: dict, root: str, user: str) -> int:
+    """Takes a found copy as the store's working copy, where it is: renamed to MARGIE's name in the
+    store's subfolder (companions too), or a base folder's files moved into one. Nothing is copied
+    or overwritten. Returns its version."""
+    if found['how'] == 'named':
+        return found['version']
+    dst = working_path(store, root, user, 1)
+    q = shlex.quote
+    if found['how'] == 'base':
+        src = found['path']
+        # Never onto something already there (test ! -e first: mv onto a folder would move into it).
+        steps = [f'mkdir -p {q(posixpath.dirname(dst))}', f'test ! -e {q(dst)}', f'mv -n -- {q(src)} {q(dst)}', f'test -e {q(dst)}']
+        steps += [f'{{ ! test -e {q(src + c)} || {{ test ! -e {q(dst + c)} && mv -n -- {q(src + c)} {q(dst + c)}; }}; }}'
+                  for c in store.get('companions', [])]
+    else:
+        names = ' '.join(q(f"{found['path']}/{n}") for n in store.get('base_files') or [])
+        steps = [f'test ! -e {q(dst)}', f'mkdir {q(dst + ".partial")}', f'mv -n -- {names} {q(dst + ".partial")}/',
+                 f'mv -- {q(dst + ".partial")} {q(dst)}']
+    code, out = _run(conn, ' && '.join(steps))
+    if code != 0:
+        raise StoreError(f"Could not use your copy of {store['label']} ({found['path']}): {out.strip()}")
+    return 1
 
 
 def _op_from(sections: dict, root: str) -> dict:
@@ -593,6 +720,10 @@ def status(conn, cfg: dict, user: str) -> dict:
     op = _settle_pid(conn, probe['op'])
     stores = []
     ready = True
+    bases = {s['id']: resolve_base(conn, s, cfg) for s in STORES}
+    found = {s['id']: f for s in STORES if s['id'] not in probe['present']
+             and (f := own_copy(s, user, root, probe['here'][''], probe['here'].get(s['sub'], [])))}
+    _check_own(conn, found, bases)
     for s in STORES:
         v, path = probe['wanted'].get(s['id'], (None, ''))
         present = s['id'] in probe['present']
@@ -604,7 +735,9 @@ def status(conn, cfg: dict, user: str) -> dict:
             'note': s['note'],
             'version': v if present else None,
             'path': path if present else '',
-            'base': resolve_base(conn, s, cfg),
+            # A copy of it in the working folder that the next setup uses instead of copying.
+            'found': found.get(s['id']),
+            'base': bases[s['id']],
             'backup': ({'version': backups[-1],
                         'path': posixpath.join(backup_dir(s, cfg), versioned(s, user, backups[-1]))}
                        if backups else None),
@@ -691,7 +824,19 @@ def start_setup(conn, cfg: dict, user: str, fresh: bool = False) -> dict:
     root = st['root']
     plan: list[list] = [['mkdir', f'{root}/{sub}'] for sub in OUTPUT_DIRS.values()]
     after: dict = {'kind': 'setup', 'versions': {}}
+    state = f'{root}/{STATE_DIR}'
+    # Copies already in the working folder are used where they are.
+    own = {s['id']: info['found'] for s, info in zip(STORES, st['stores'])
+           if not fresh and not info['version'] and (info.get('found') or {}).get('ready')}
+    if own:
+        _run(conn, f'mkdir -p {shlex.quote(state)} && chmod 700 {shlex.quote(state)}')
+        manifest = read_manifest(conn, root)
+        for sid, found in own.items():
+            manifest[sid] = {'version': adopt(conn, STORE_BY_ID[sid], found, root, user)}
+        _write_manifest(conn, root, manifest)
     for s, info in zip(STORES, st['stores']):
+        if s['id'] in own:
+            continue
         if fresh:
             version = (info['version'] or 0) + 1
             dst = working_path(s, root, user, version)
@@ -742,6 +887,13 @@ def start_setup(conn, cfg: dict, user: str, fresh: bool = False) -> dict:
         else:
             plan.append(['copy', label, src, dst, _size(conn, [src])])
         after['versions'][s['id']] = version
+    if all(step[0] == 'mkdir' for step in plan):
+        # Nothing to copy: the folders are made here, and the setup is done (apply_finished points the config).
+        _run(conn, 'mkdir -p -- ' + ' '.join(shlex.quote(step[1]) for step in plan) + f' {shlex.quote(state)} '
+                   f'&& rm -f {shlex.quote(state)}/op.after.json {shlex.quote(state)}/op.jobid')
+        ssh_sftp.write_remote_text_file(f'{state}/op.status', 'state=done\nop=setup\nlabel=Finished\n', connection=conn)
+        ssh_sftp.write_remote_text_file(f'{state}/op.log', '== your own copies are used where they are\n== finished\n', connection=conn)
+        return status(conn, cfg, user)
     _start(conn, root, 'setup', plan, after, cfg)
     return status(conn, cfg, user)
 

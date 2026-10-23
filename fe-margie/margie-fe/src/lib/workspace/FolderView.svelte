@@ -12,13 +12,14 @@
 	import './viewers/tools.css';
 	import { uiBase } from './base.svelte';
 	import { untrack } from 'svelte';
-	import { ArrowUp, ChevronLeft, ChevronRight, ClipboardPaste, Copy, CornerDownLeft, Download, File, FileArchive, FileCode, FileImage, FilePlus, FileSpreadsheet, FileText, Folder, FolderOpen, FolderPlus, RefreshCw, Scissors, Trash2, X } from 'lucide-svelte';
+	import { ArrowUp, Check, ChevronLeft, ChevronRight, ClipboardCopy, ClipboardPaste, Copy, CornerDownLeft, Download, File, FileArchive, FileCode, FileImage, FilePlus, FileSpreadsheet, FileText, Folder, FolderOpen, FolderPlus, RefreshCw, Scissors, Trash2, X } from 'lucide-svelte';
 	import { ApiError, api, fileUrl, formatBytes, post } from '$lib/api';
 	import { ui } from './ui.svelte';
 	import { pathComplete } from './path-complete';
 	import { backend } from './backend.svelte';
 	import { ws } from './data.svelte';
 	import { ago } from './format';
+	import { copyText } from './clipboard';
 
 	/**
 	 * File browser drawn as a tree with back, forward, up and a path box; polls while a run writes.
@@ -241,6 +242,19 @@
 
 	// ------------------------------------------------ copy, cut and paste (cluster)
 	const nameOf = (p: string) => p.split('/').filter(Boolean).at(-1) ?? p;
+	/** Puts a path on the system clipboard (to paste into a terminal, a script or Settings); its button shows a tick for a moment. */
+	let copiedPath = $state('');
+	let copiedTimer: ReturnType<typeof setTimeout> | undefined;
+	async function copyPath(p: string) {
+		if (!(await copyText(p))) {
+			ui.notify('Could not reach the clipboard', 'error');
+			return;
+		}
+		copiedPath = p;
+		clearTimeout(copiedTimer);
+		copiedTimer = setTimeout(() => (copiedPath = ''), 1400);
+	}
+
 	/** Puts a path on the clipboard to copy or move; the same path again takes it off. */
 	function take(op: 'copy' | 'move', path: string) {
 		if (clip.op !== op) {
@@ -437,7 +451,14 @@
 			<button type="button" class="vw-pill icon" title="New folder here" aria-label="New folder here" aria-pressed={making === 'folder'} onclick={() => startMaking('folder')}><FolderPlus size={15} /></button>
 			<button type="button" class="vw-pill icon" title="New text file here" aria-label="New text file here" aria-pressed={making === 'file'} onclick={() => startMaking('file')}><FilePlus size={15} /></button>
 		{/if}
-		<button type="button" class="vw-pill icon" class:spin={spinning} title="Refresh" aria-label="Refresh" onclick={refresh}><RefreshCw size={15} /></button>
+		{#if current && !missing}
+			<button type="button" class="vw-pill icon" title="Copy this folder's path" aria-label="Copy this folder's path" onclick={() => current && copyPath(current.path)}>
+				{#if copiedPath === current.path}<Check size={15} />{:else}<ClipboardCopy size={15} />{/if}
+			</button>
+		{/if}
+		<button type="button" class="vw-pill fv-refresh" class:spin={spinning} title="Read this folder again" aria-label="Refresh" onclick={refresh}
+			><RefreshCw size={15} /><span class="fv-lbl">Refresh</span></button
+		>
 	</div>
 
 	{#if backend.cluster && clip.paths.length}
@@ -530,6 +551,9 @@
 					<li class="fv-row fv-place" style="--d: {inner}">
 						<button type="button" class="fv-name dir" title={r.label} onclick={() => (at = { root: r, path: r.path })}><Folder size={16} /><span>{r.label}</span></button>
 						<span class="fv-path" title={r.path}>{shortPath(r.path)}</span>
+						<button type="button" class="fv-pcopy" class:done={copiedPath === r.path} title="Copy the path of {r.label}" aria-label="Copy the path of {r.label}" onclick={() => copyPath(r.path)}>
+							{#if copiedPath === r.path}<Check size={14} />{:else}<ClipboardCopy size={14} />{/if}
+						</button>
 					</li>
 				{:else}
 					<li class="fv-row fv-note" style="--d: {inner}">{empty}</li>
@@ -594,6 +618,9 @@
 						<span class="fv-size">{e.type === 'directory' ? '' : formatBytes(e.size)}</span>
 						<span class="fv-when" class:fresh={fresh(e)} title={new Date(e.mtime).toLocaleString()}>{ago(e.mtime)}</span>
 						<span class="fv-acts">
+							<button type="button" class="fv-dl" class:done={copiedPath === p} title="Copy the path of {e.name}" aria-label="Copy the path of {e.name}" onclick={() => copyPath(p)}>
+								{#if copiedPath === p}<Check size={14} />{:else}<ClipboardCopy size={14} />{/if}
+							</button>
 							{#if backend.cluster}
 								<button type="button" class="fv-dl" class:on={clip.op === 'copy' && clip.paths.includes(p)} title="Copy {e.name}" aria-label="Copy {e.name}" onclick={() => take('copy', p)}><Copy size={14} /></button>
 								<button type="button" class="fv-dl" class:on={clip.op === 'move' && clip.paths.includes(p)} title="Cut {e.name}, to move it" aria-label="Cut {e.name}" onclick={() => take('move', p)}><Scissors size={14} /></button>
@@ -666,6 +693,22 @@
 	/* ---- toolbar ---- */
 	.fv-bar {
 		flex-wrap: nowrap;
+	}
+	.fv-refresh {
+		flex: none;
+		gap: 6px;
+	}
+	@container (max-width: 560px) {
+		.fv-bar {
+			flex-wrap: wrap;
+		}
+		.fv-where {
+			order: 10;
+			flex-basis: 100%;
+		}
+		.fv-bar > :global(.vw-group) {
+			margin-right: auto;
+		}
 	}
 	.fv-where {
 		flex: 1 1 auto;
@@ -741,7 +784,32 @@
 		grid-template-columns: minmax(0, 1fr);
 	}
 	.fv-place {
-		grid-template-columns: minmax(0, 1fr) minmax(0, 1.2fr);
+		grid-template-columns: minmax(0, 1fr) minmax(0, 1.2fr) auto;
+	}
+	.fv-pcopy {
+		display: grid;
+		place-items: center;
+		width: 28px;
+		height: 28px;
+		padding: 0;
+		border: none;
+		border-radius: var(--mg-r-sm);
+		background: transparent;
+		color: var(--mg-text-3);
+		cursor: pointer;
+		opacity: 0.55;
+	}
+	.fv-row:hover .fv-pcopy,
+	.fv-pcopy:focus-visible {
+		opacity: 1;
+	}
+	.fv-pcopy:hover {
+		background: color-mix(in srgb, var(--mg-text) 8%, transparent);
+		color: var(--mg-text);
+	}
+	.fv-pcopy.done {
+		opacity: 1;
+		color: var(--mg-ok);
 	}
 	/* Vertical guide line per level. */
 	.fv-row:not(.fv-crumb) {
@@ -850,20 +918,24 @@
 		background: var(--mg-surface);
 		cursor: pointer;
 	}
-	button.fv-dl:first-child {
-		right: 90px;
+	/* Counted from the end: Copy path, then (on a cluster) Copy, Cut and Delete, left of Download. */
+	button.fv-dl:nth-last-of-type(1) {
+		right: 30px;
 	}
-	button.fv-dl:nth-child(2) {
+	button.fv-dl:nth-last-of-type(2) {
 		right: 60px;
 	}
-	button.fv-dl:nth-child(3) {
-		right: 30px;
+	button.fv-dl:nth-last-of-type(3) {
+		right: 90px;
+	}
+	button.fv-dl:nth-last-of-type(4) {
+		right: 120px;
 	}
 	button.fv-del:hover {
 		background: color-mix(in srgb, var(--mg-danger) 14%, transparent);
 		color: var(--mg-danger);
 	}
-	.fv-row button.fv-dl:not(.on) {
+	.fv-row button.fv-dl:not(.on, .done) {
 		opacity: 0;
 		pointer-events: none;
 	}
@@ -872,6 +944,9 @@
 	}
 	.fv-row:is(:hover, :focus-within, .picked) :is(a, button).fv-dl {
 		opacity: 1;
+	}
+	.fv-dl.done {
+		color: var(--mg-ok);
 	}
 	.fv-dl.on {
 		opacity: 1;
@@ -1109,7 +1184,7 @@
 			display: none;
 		}
 		.fv-place {
-			grid-template-columns: minmax(0, 1fr);
+			grid-template-columns: minmax(0, 1fr) auto;
 		}
 		.fv-path {
 			display: none;

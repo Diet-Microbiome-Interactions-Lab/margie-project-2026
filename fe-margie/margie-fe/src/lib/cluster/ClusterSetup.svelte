@@ -12,6 +12,7 @@
 	import { forget } from './backend';
 	import { call, get } from './http';
 	import Licence from './Licence.svelte';
+	import StoresCheck from './StoresCheck.svelte';
 
 	/**
 	 * Cluster Install page: connection, SLURM account, licence terms, containers
@@ -253,6 +254,16 @@
 		return () => (watching = false);
 	});
 
+	/** One line on your databases: all in the working folder, or what is found and what is still to copy. */
+	const storesMeta = $derived.by(() => {
+		const st = ws.stores;
+		if (!st) return 'looking';
+		if (st.ready) return 'all in your working folder';
+		const todo = st.stores.filter((s) => !s.version);
+		const mine = todo.filter((s) => s.found?.ready).length;
+		return [mine && `${mine} of yours found`, todo.length - mine && `${todo.length - mine} to copy`].filter(Boolean).join(', ');
+	});
+
 	const probeLines = $derived((probe?.job?.logs ?? '').trimEnd().split('\n').slice(-8).join('\n'));
 	const probeOk = $derived(['completed', 'success'].includes((probe?.job?.status ?? '').toLowerCase()));
 	const seconds = $derived(probe ? Math.round((Date.now() - probe.started) / 1000) : 0);
@@ -275,6 +286,11 @@
 		<Fold id="setup:terms"><Licence /></Fold>
 	</section>
 
+	<section class="mg-card cs-wide" id="databases" data-shade="folders">
+		{@render head('databases', 'Your databases', storesMeta)}
+		<Fold id="setup:databases"><StoresCheck /></Fold>
+	</section>
+
 	<section class="mg-card cs-wide" id="installed" data-shade="tools">
 		{@render head('installed', 'Tools and reference data', ws.check ? shelves.map((s) => `${s.title.toLowerCase()} ${counted(s.rows)}`).join(' | ') : 'looking')}
 		<Fold id="setup:installed">
@@ -293,6 +309,10 @@
 						label={op.state === 'queued' ? 'Waiting for a SLURM slot' : `Setting up${op.label && op.label !== 'Starting' ? `: ${op.label}` : ''}`}
 						detail={op.state === 'failed' ? op.message || 'The setup did not finish.' : op.job ? `SLURM job ${op.job}` : ''}
 						log={[...(op.log ?? []), ...(op.slurm_out ?? [])]}
+						onstop={async () => {
+							await ws.stopStores();
+							if (ws.storesOp?.op === 'assets') op = ws.storesOp;
+						}}
 					/>
 					<QueueWait {op} onchange={(o) => (op = o)} />
 				</div>

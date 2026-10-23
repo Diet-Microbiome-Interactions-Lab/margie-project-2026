@@ -58,7 +58,7 @@
 		<FolderField label="Genomes folder" key="USER_INPUT_DIR" value={folder} placeholder="/path/to/genomes" />
 		<FolderField label="Results folder" key="OUTPUT_ROOT" value={output} placeholder="/path/to/results" />
 		{#if backend.cluster}
-			<FolderField label="Databases folder" key="margie_sb.stores_root" value={working} placeholder="/scratch/cluster/you/margie-databases" />
+			<FolderField label="Databases folder" key="margie_sb.stores_root" value={working} placeholder="/scratch/cluster/you/margie/margie-databases" />
 		{/if}
 	</div>
 	<p class="gb-note mg-explain">

@@ -144,13 +144,15 @@ export interface StoreInfo {
 	path: string;
 	/** The copy every user starts from. */
 	base: string;
+	/** A copy already in the working folder (put there by hand), used as is by the next setup once ready. */
+	found: { path: string; how: 'named' | 'base' | 'flat'; version: number; ready: boolean; note: string; bytes?: number } | null;
 	backup: { version: number; path: string } | null;
 	backups: number;
 }
 
 /** A copy under way, or the last one: setting up, or backing up. */
 export interface StoreOp {
-	state: 'queued' | 'running' | 'done' | 'failed';
+	state: 'queued' | 'running' | 'done' | 'failed' | 'stopped';
 	op?: string;
 	label?: string;
 	percent: number;
@@ -683,9 +685,16 @@ class Workspace {
 			if (!confirm(`Create fresh, empty databases${where}? The MARGIE database, operon reference, fingerprint databases and genome pool start empty, as new versions; your current copies stay where they are, and runs use the new ones.`)) return;
 		} else {
 			// MARGIE's own databases, not licensed tools: a plain yes or no, saying what is copied where.
-			const missing = (this.stores?.stores ?? []).filter((x) => !x.version).map((x) => x.label);
-			const what = missing.length ? missing.join(', ') : 'your databases';
-			if (!confirm(`Set up your databases? A one-time copy of ${what} from your group's folder${where.replace(' in ', ' into ')}. It runs as a short SLURM job; nothing is overwritten.`)) {
+			// Read again first: a copy put in the working folder since counts.
+			await this.loadStores();
+			const todo = (this.stores?.stores ?? []).filter((x) => !x.version);
+			const mine = todo.filter((x) => x.found?.ready).map((x) => x.label);
+			const missing = todo.filter((x) => !x.found?.ready).map((x) => x.label);
+			const said = [
+				mine.length && `Your own ${mine.join(', ')}${where} ${mine.length === 1 ? 'is' : 'are'} used where ${mine.length === 1 ? 'it is' : 'they are'} (given MARGIE's names; nothing copied).`,
+				missing.length && `A one-time copy of ${missing.join(', ')} from your group's folder${where.replace(' in ', ' into ')}, as a short SLURM job.`
+			].filter(Boolean);
+			if (!confirm(`Set up your databases? ${said.join(' ') || 'Nothing needs copying.'} Nothing is overwritten.`)) {
 				this.#runAfterSetup = null;
 				return;
 			}
@@ -714,6 +723,21 @@ class Workspace {
 		} catch (e) {
 			ui.notify(message(e), 'error');
 			return false;
+		}
+	}
+
+	/** Stops the copy under way (asked first): what it finished stays, the half-copied item is removed. */
+	async stopStores() {
+		const what = this.storesOp?.op?.startsWith('backup:') ? 'backup' : 'copy';
+		if (!confirm(`Stop the ${what}? What it has finished stays; the item in hand is removed, and nothing changes in your settings. You can start it again later.`)) return;
+		try {
+			const { op } = await post<{ op: StoreOp | null }>('/stores/stop', {});
+			this.#runAfterSetup = null;
+			this.storesOp = op;
+			await Promise.all([this.loadStores(), this.loadSettings()]);
+			ui.notify(`The ${what} is stopped.`, 'ok');
+		} catch (e) {
+			ui.notify(message(e), 'error');
 		}
 	}
 

@@ -1278,6 +1278,8 @@ export async function clusterApi<T = any>(path: string, init: RequestInit = {}):
 				return call('POST', '/v1/ssh/genome-viewer/refresh', { folder: String((body as { folder?: string })?.folder ?? '') });
 			case 'POST /stores/run-here':
 				return call('POST', '/v1/ssh/stores/run-here');
+			case 'POST /stores/stop':
+				return storesAnswer(call('POST', '/v1/ssh/stores/stop'));
 			case 'POST /stores/setup':
 				// {fresh, build_password}: every database starts empty (a new lab's own).
 				return storesAnswer(call('POST', '/v1/ssh/stores/setup', body ?? {}));

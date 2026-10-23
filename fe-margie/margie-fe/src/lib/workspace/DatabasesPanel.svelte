@@ -79,6 +79,7 @@
 							? `SLURM job ${op.job}`
 							: ''}
 					log={[...(op.log ?? []), ...(op.slurm_out ?? [])]}
+					onstop={() => ws.stopStores()}
 				/>
 				<QueueWait {op} onchange={(o) => (ws.storesOp = o)} />
 			{/if}
@@ -102,6 +103,9 @@
 								{#if s.version}
 									<span>Working copy <b class="ver">v{s.version}</b></span>
 									<span class="mg-mono path" title={s.path}>{s.path}</span>
+								{:else if s.found}
+									<span>Your copy is in the working folder{s.found.ready ? '' : `, ${s.found.note}`}</span>
+									<span class="mg-mono path" title={s.found.path}>{s.found.path}</span>
 								{:else}
 									<span class="mg-note">Not set up yet</span>
 								{/if}

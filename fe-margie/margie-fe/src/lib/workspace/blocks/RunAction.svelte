@@ -83,9 +83,13 @@
 				? ws.storesOp.message || 'The copy did not finish.'
 				: 'A one-time copy of the base databases to your databases folder. The run starts by itself when it finishes.'}
 			log={[...(ws.storesOp.log ?? []), ...(ws.storesOp.slurm_out ?? [])]}
+			onstop={() => ws.stopStores()}
 		/>
 	</div>
 {/if}
+<button type="button" class="go mg-btn primary" disabled={!!blocker || starting || copying} onclick={start}>
+	{starting ? 'Starting…' : copying ? 'Starts when your databases are ready' : sentence}
+</button>
 {#if blocker}
 	<div class="blocked" role="status">
 		<span class="b-icon" aria-hidden="true"><CircleAlert size={15} strokeWidth={2.3} /></span>
@@ -98,9 +102,6 @@
 		{/if}
 	</div>
 {:else}
-	<button type="button" class="go mg-btn primary" disabled={starting || copying} onclick={start}>
-		{starting ? 'Starting…' : copying ? 'Starts when your databases are ready' : sentence}
-	</button>
 	<p class="under mg-note">{under}</p>
 {/if}
 
@@ -147,11 +148,16 @@
 		text-align: center;
 	}
 	/* What stops a run: one line in the warning colour, with its fix (the bell lists it too). */
+	.blocked p {
+		margin: 0;
+	}
 	.blocked {
 		display: flex;
 		flex-wrap: wrap;
 		align-items: center;
+		justify-content: center;
 		gap: 6px 10px;
+		margin-top: 8px;
 		padding: 0;
 		color: var(--mg-text);
 		font-size: var(--mg-fs-sm);

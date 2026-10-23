@@ -1156,8 +1156,19 @@ def get_config(current_user: dict = Depends(get_current_user)):
     """Read the user's ~/.config/bioinformatics-tools/config.yaml from their cluster via SFTP."""
     conn = _build_connection(current_user)
     path = _config_path(current_user["home_dir"])
+
+    def read():
+        config = ssh_sftp.read_remote_yaml(path, connection=conn)
+        try:
+            # Genomes and results folders left empty get their defaults on scratch (user_stores.DEFAULT_FOLDERS).
+            if isinstance(config, dict) and user_stores.fill_default_folders(conn, config):
+                ssh_sftp.write_remote_yaml(path, config, connection=conn)
+        except Exception as exc:
+            LOGGER.warning("Could not fill the default folders for %s: %s", current_user["username"], exc)
+        return config
+
     try:
-        return read_cache.get((current_user["user_id"], "config"), lambda: ssh_sftp.read_remote_yaml(path, connection=conn))
+        return read_cache.get((current_user["user_id"], "config"), read)
     except Exception as exc:
         LOGGER.error("Failed to read remote config for %s: %s", current_user["username"], exc)
         raise HTTPException(status_code=500, detail=f"Failed to read remote config: {exc}")
@@ -1579,7 +1590,11 @@ def setup_stores(body: dict | None = None, current_user: dict = Depends(get_curr
     conn = _build_connection(current_user)
     user_config = _stores_user_config(current_user, conn)
     _stores_settle(current_user, conn, user_config)
-    return _stores_call(user_stores.start_setup, conn, user_config, current_user["cluster_username"], fresh)
+    st = _stores_call(user_stores.start_setup, conn, user_config, current_user["cluster_username"], fresh)
+    if (st.get("op") or {}).get("state") == "done":
+        # Only the user's own copies were needed: nothing to wait for.
+        _stores_settle(current_user, conn, user_config)
+    return st
 
 
 # ---- Genome viewer refresh (rebuilt beside the old file, then moved over) ----

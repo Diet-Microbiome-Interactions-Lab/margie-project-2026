@@ -1,27 +1,47 @@
 <script lang="ts">
-	/** Progress bar for a long copy: percentage, current step in words, and a folded log. */
+	import { Square } from 'lucide-svelte';
+
+	/** Progress bar for a long copy: percentage, current step in words, and a folded log; with onstop, a Stop button while it goes. */
 	let {
 		percent = 0,
-		state = 'running',
+		state: phase = 'running',
 		label = '',
 		detail = '',
-		log = []
+		log = [],
+		onstop
 	}: {
 		percent?: number;
-		state?: 'queued' | 'running' | 'done' | 'failed';
+		state?: 'queued' | 'running' | 'done' | 'failed' | 'stopped';
 		label?: string;
 		detail?: string;
 		log?: string[];
+		onstop?: () => Promise<void> | void;
 	} = $props();
 
 	const pct = $derived(Math.max(0, Math.min(100, Math.round(percent))));
-	const waiting = $derived(state === 'queued');
+	const waiting = $derived(phase === 'queued');
+	let stopping = $state(false);
+
+	async function stop() {
+		stopping = true;
+		try {
+			await onstop?.();
+		} finally {
+			stopping = false;
+		}
+	}
 </script>
 
-<div class="pb" class:failed={state === 'failed'} class:done={state === 'done'}>
+<div class="pb" class:failed={phase === 'failed'} class:done={phase === 'done'}>
 	<div class="pb-head">
 		<span class="pb-label">{label}</span>
 		<span class="pb-pct" aria-hidden="true">{waiting ? 'waiting' : `${pct}%`}</span>
+		{#if onstop && (phase === 'queued' || phase === 'running')}
+			<button type="button" class="pb-stop" disabled={stopping} onclick={stop}>
+				<Square size={11} strokeWidth={2.5} />
+				{stopping ? 'Stopping…' : 'Stop'}
+			</button>
+		{/if}
 	</div>
 	<div
 		class="pb-track"
@@ -63,6 +83,32 @@
 		text-overflow: ellipsis;
 		white-space: nowrap;
 		font-weight: 600;
+	}
+	.pb-stop {
+		display: inline-flex;
+		flex: none;
+		align-items: center;
+		gap: 5px;
+		height: 24px;
+		padding: 0 10px;
+		border: 1px solid color-mix(in srgb, var(--mg-danger) 55%, var(--mg-border));
+		border-radius: var(--mg-r-sm);
+		background: transparent;
+		color: var(--mg-danger);
+		font: inherit;
+		font-size: var(--mg-fs-xs);
+		font-weight: 600;
+		cursor: pointer;
+	}
+	.pb-stop:hover:not(:disabled) {
+		background: color-mix(in srgb, var(--mg-danger) 10%, transparent);
+	}
+	.pb-stop:disabled {
+		opacity: 0.6;
+		cursor: default;
+	}
+	.pb-head {
+		align-items: center;
 	}
 	.pb-pct {
 		font-variant-numeric: tabular-nums;

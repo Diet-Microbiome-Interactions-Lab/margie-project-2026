@@ -512,11 +512,11 @@ WORKFLOWS: dict[str, WorkflowKey] = {
                 'description': 'Default runtime limit in minutes for MARGIE(SB) tools unless overridden per tool',
                 'type': 'int'
             },
-            # Per-user stores; empty: /scratch/<cluster>/<user>/margie-2026.
+            # Per-user stores; empty: /scratch/<cluster>/<user>/margie/margie-databases.
             {
                 'param': 'margie_sb.stores_root',
                 'default': '',
-                'description': 'Working folder for your databases and run archives (empty: margie-2026 in your scratch)',
+                'description': 'Working folder for your databases and run archives (empty: margie/margie-databases in your scratch)',
                 'type': 'path'
             },
             {

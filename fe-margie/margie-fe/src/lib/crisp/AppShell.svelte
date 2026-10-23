@@ -260,6 +260,8 @@
 					</a>
 				{/if}
 				<Notices />
+				<!-- On a phone these move into the menu (mg-drawer-you), so the bar fits. -->
+				<div class="mg-tools">
 				<div class="mg-mode" role="radiogroup" aria-label="Help">
 					<button type="button" role="radio" aria-checked={!ui.guided} class="btn btn-sm {!ui.guided ? 'preset-filled-primary-500' : 'hover:preset-tonal'}" title="The pages alone, without help text" onclick={() => setMode('clean')}>Simple</button>
 					<button type="button" role="radio" aria-checked={ui.guided} class="btn btn-sm {ui.guided ? 'preset-filled-primary-500' : 'hover:preset-tonal'}" title="Steps across the top, a tip for each page, and all the help text" onclick={() => setMode('guided')}>Guided</button>
@@ -331,6 +333,7 @@
 				<button type="button" class="btn-icon btn-icon-lg hover:preset-tonal" title="Sign out" aria-label="Sign out" onclick={() => backend.signOut()}>
 					<LogOut />
 				</button>
+				</div>
 			</AppBar.Trail>
 		</AppBar.Toolbar>
 	</AppBar>
@@ -341,7 +344,7 @@
 		<nav id="mg-pages" class="mg-drawer fixed top-0 left-0 z-50 h-full w-72 overflow-y-auto bg-surface-100-900 shadow-xl" aria-label="Pages" transition:fly={{ x: -24, duration: ui.ms(180), easing: cubicOut }}>
 			<div class="p-4 space-y-4">
 				<div class="flex items-center justify-between">
-					<h2 class="text-2xl font-bold">Menu</h2>
+					<h2 class="text-2xl font-bold">Menu <span class="mg-beta mg-beta-menu">Early beta</span></h2>
 					<button type="button" class="btn-icon hover:preset-tonal" aria-label="Close the menu" onclick={() => (menuOpen = false)}><X /></button>
 				</div>
 				<a href="/" class="mg-drawer-item" aria-current={current('/') ? 'page' : undefined}>
@@ -359,6 +362,33 @@
 						{/each}
 					</div>
 				{/each}
+				<!-- On a phone: what the bar has no room for (mg-tools), with Sign out. -->
+				<div class="mg-drawer-you border-t border-surface-300-700 pt-3 space-y-2">
+					<p class="px-3 text-xs font-bold uppercase tracking-wider opacity-60">You</p>
+					<p class="mg-you-who"><img src={avatar} alt="" class="size-6 rounded-full object-cover" /><span>{who}</span></p>
+					<div class="mg-you-row">
+						<div class="mg-mode" role="radiogroup" aria-label="Help">
+							<button type="button" role="radio" aria-checked={!ui.guided} class="btn btn-sm {!ui.guided ? 'preset-filled-primary-500' : 'hover:preset-tonal'}" onclick={() => setMode('clean')}>Simple</button>
+							<button type="button" role="radio" aria-checked={ui.guided} class="btn btn-sm {ui.guided ? 'preset-filled-primary-500' : 'hover:preset-tonal'}" onclick={() => setMode('guided')}>Guided</button>
+						</div>
+						<div class="mg-mode" role="radiogroup" aria-label="Light or dark">
+							{#each LIGHTS as [value, label] (value)}
+								<button type="button" role="radio" aria-checked={ui.prefs.theme === value} class="btn btn-sm {ui.prefs.theme === value ? 'preset-filled-primary-500' : 'hover:preset-tonal'}" onclick={() => ui.update({ theme: value })}>{label}</button>
+							{/each}
+						</div>
+					</div>
+					<div class="mg-you-row">
+						<button
+							type="button"
+							class="btn btn-sm preset-tonal"
+							onclick={() => {
+								menuOpen = false;
+								open('look');
+							}}><SlidersHorizontal size={16} /> Customize</button
+						>
+						<button type="button" class="btn btn-sm preset-tonal-error" onclick={() => backend.signOut()}><LogOut size={16} /> Sign out</button>
+					</div>
+				</div>
 				<div class="border-t border-surface-300-700 pt-3 space-y-1">
 					<p class="px-3 text-xs font-bold uppercase tracking-wider opacity-60">About</p>
 					{#each ABOUT as n (n.href)}
@@ -674,6 +704,45 @@
 		.mg-home-sub {
 			display: none;
 		}
+	}
+	/* The bar's own tools sit in it on a wide window; on a phone they are in the menu instead. */
+	.mg-tools {
+		display: contents;
+	}
+	.mg-drawer-you,
+	.mg-beta-menu {
+		display: none;
+	}
+	@media (max-width: 640px) {
+		.mg-tools,
+		.mg-beta:not(.mg-beta-menu) {
+			display: none;
+		}
+		.mg-drawer-you {
+			display: block;
+		}
+		.mg-beta-menu {
+			display: inline-flex;
+			font-size: 11px;
+		}
+		:global(.crisp .mg-appbar) {
+			padding-right: 6px;
+		}
+	}
+	.mg-you-who {
+		display: flex;
+		align-items: center;
+		gap: 10px;
+		margin: 0;
+		padding: 0 12px;
+		font-size: 0.85rem;
+		opacity: 0.8;
+	}
+	.mg-you-row {
+		display: flex;
+		flex-wrap: wrap;
+		gap: 8px;
+		padding: 0 12px;
 	}
 	/* The drawer's pages: Dane's large rows, with a line on what each page is for. */
 	.mg-drawer :global(.mg-drawer-item) {

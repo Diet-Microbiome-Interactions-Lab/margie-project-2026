@@ -66,7 +66,7 @@
 		<span class="an-text">{status.text}</span>
 		{#if status.action}<a class="mg-link" href={status.action.href}>{status.action.label}</a>{/if}
 		<span class="mg-grow"></span>
-		{#if n}<span class="an-meta">{plural(n, 'genome')}{done.length ? `, ${done.length} annotated` : ''}</span>{/if}
+		{#if done.length && waiting.length}<span class="an-meta">{done.length} annotated</span>{/if}
 		{#if backend.cluster && backend.user}
 			<span class="an-meta">runs as <b class="mg-mono">{backend.user}@{backend.host.split('.')[0]}</b>{account ? `, account ${account}` : ''}</span>
 		{/if}
@@ -81,11 +81,8 @@
 		flex-wrap: wrap;
 		align-items: center;
 		gap: 4px 12px;
-		margin: 0 0 var(--cr-gutter, 16px);
-		padding: 6px 12px;
-		border: 1px solid var(--cr-card-edge, var(--mg-border));
-		border-radius: var(--mg-r-sm);
-		background: var(--cr-card, var(--mg-surface));
+		margin: -4px 0 0;
+		padding: 0 2px;
 		font-size: var(--mg-fs-sm);
 		color: var(--mg-text-2);
 	}
