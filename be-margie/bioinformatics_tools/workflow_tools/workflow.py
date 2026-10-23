@@ -1312,8 +1312,9 @@ class WorkflowBase(ProgramBase):
                 self.failed('SLURM account configuration is required for cluster execution')
                 return 1
 
-        # Recursive: synteny-input/<genome>/ references also run as primary genomes.
-        genomes = discover_genomes(input_path_value, recursive=True)
+        # The genomes directly in the folder, as margie_sb.smk and the website see them: one
+        # in a subfolder would be sent to GTDB-Tk and then have no rule (MissingInputException).
+        genomes = discover_genomes(input_path_value)
         if not genomes:
             LOGGER.error('No genome files found at %s', input_path_value)
             self.failed(f'No genome files found at {input_path_value}')

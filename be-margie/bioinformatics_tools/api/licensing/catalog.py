@@ -206,6 +206,12 @@ def revoke_current_acceptance(username: str) -> int:
         return cur.rowcount
 
 
+def record_subdir(username: str, timestamp: str) -> str:
+    """Where one acceptance goes under a records folder: <timestamp>/<operator>/<username>."""
+    safe_user = re.sub(r"[^A-Za-z0-9._-]", "_", username) or "user"
+    return "/".join(p for p in (timestamp, _operator(), safe_user) if p)
+
+
 def _write_record_file(
     *, username: str, record: dict, terms_text: str, timestamp: str,
     base_dir: Path | None = None,
@@ -214,9 +220,7 @@ def _write_record_file(
 
     Returns the directory path; raises on failure so the caller decides what to do.
     """
-    operator = _operator()
-    safe_user = re.sub(r"[^A-Za-z0-9._-]", "_", username) or "user"
-    dest = (base_dir or _records_dir()) / timestamp / operator / safe_user
+    dest = (base_dir or _records_dir()) / record_subdir(username, timestamp)
     dest.mkdir(parents=True, exist_ok=True)
     (dest / "terms.txt").write_text(terms_text, encoding="utf-8")
     (dest / "record.json").write_text(
@@ -233,9 +237,13 @@ def record_acceptance(
     user_agent: str | None,
     usage_type: str,
     licensed_tools: list[str] | None = None,
+    save=None,
 ) -> dict:
     """Validates and stores an acceptance; returns its version, time and depot record path.
 
+    `save(username=, record=, terms_text=, timestamp=)` writes the record copy and returns
+    where; by default into LICENSE_RECORDS_DIR on this machine. An API that is not on the
+    cluster passes one that writes onto the cluster (routers/license.py).
     Raises ValueError when an acknowledgment is missing or usage_type is unknown.
     """
     if not _REQUIRED_ACK_IDS.issubset(set(accepted_items)):
@@ -270,7 +278,7 @@ def record_acceptance(
     depot_path = None
     depot_error = None
     try:
-        depot_path = _write_record_file(
+        depot_path = (save or _write_record_file)(
             username=username, record=record, terms_text=terms["text"],
             timestamp=timestamp_dir,
         )

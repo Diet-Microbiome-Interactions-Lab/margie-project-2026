@@ -3,14 +3,23 @@
 A user accepts the current terms once per terms version before running a workflow;
 acceptance goes to the app database plus a copy with the client IP in the depot.
 Routes: GET /terms, GET /status, POST /accept, POST /revoke.
+
+The copy is written on the user's cluster, as the user, over SSH: in LICENSE_RECORDS_DIR
+(the group's records folder) when it can be written there, else in the user's own
+~/.local/share/bioinformatics-tools/licensing-records. The API itself need not see that
+folder (it may run elsewhere, as on a hosting platform).
 """
+import json
 import logging
+import os
 
 from fastapi import APIRouter, Depends, HTTPException, Request, status
 from pydantic import BaseModel
 
 from bioinformatics_tools.api.auth import get_current_user
 from bioinformatics_tools.api import licensing
+from bioinformatics_tools.api.licensing.catalog import record_subdir
+from bioinformatics_tools.api.local_mode import is_local_mode
 
 LOGGER = logging.getLogger(__name__)
 
@@ -77,6 +86,31 @@ def revoke_terms(current_user: dict = Depends(get_current_user)):
     return {"revoked": True, "rows_removed": removed, "current_terms_version": terms["version"]}
 
 
+def _save_on_cluster(current_user: dict):
+    """Returns a record saver (see licensing.record_acceptance) that writes on the user's cluster."""
+    from bioinformatics_tools.api.routers.ssh import _build_connection
+    from bioinformatics_tools.utilities import ssh_sftp
+
+    def save(*, username: str, record: dict, terms_text: str, timestamp: str) -> str:
+        conn = _build_connection(current_user)
+        home = current_user["home_dir"].rstrip("/")
+        roots = [r for r in (os.getenv("LICENSE_RECORDS_DIR", "").rstrip("/"),
+                             f"{home}/.local/share/bioinformatics-tools/licensing-records") if r]
+        last: Exception | None = None
+        for root in roots:
+            dest = f"{root}/{record_subdir(username, timestamp)}"
+            try:
+                ssh_sftp.write_remote_text_file(f"{dest}/terms.txt", terms_text, connection=conn)
+                ssh_sftp.write_remote_text_file(f"{dest}/record.json", json.dumps(record, indent=2, ensure_ascii=False), connection=conn)
+                return dest
+            except Exception as exc:  # noqa: BLE001 — the next folder is tried
+                LOGGER.warning("Could not write the licence record in %s: %s", root, exc)
+                last = exc
+        raise last or RuntimeError("no folder for licence records")
+
+    return save
+
+
 @router.post("/accept")
 def accept_terms(
     body: LicenseAccept,
@@ -111,6 +145,7 @@ def accept_terms(
             user_agent=user_agent,
             usage_type=body.usage_type,
             licensed_tools=body.licensed_tools,
+            save=None if is_local_mode() else _save_on_cluster(current_user),
         )
     except ValueError as exc:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc))
