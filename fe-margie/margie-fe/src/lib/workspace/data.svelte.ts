@@ -108,6 +108,8 @@ export interface GenomeSummary {
 	scoredAgainst?: { genomes: number; reference: string; left_out_self: boolean; scored_at: string } | null;
 	/** How many genomes the operon reference holds now (<reference>.summary.json), when known. */
 	referenceNow?: number | null;
+	/** False when its map was drawn by an older version of the map script than the one deployed. */
+	mapCurrent?: boolean;
 }
 
 export type Tone = 'ok' | 'warn' | 'danger' | 'neutral';

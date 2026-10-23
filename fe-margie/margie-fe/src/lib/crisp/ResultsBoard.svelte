@@ -542,10 +542,9 @@
 					<div class="rb-body" in:tabIn>
 						{#if tab === 'map'}
 							{#if summary.final.viewer}
-								{#if backend.cluster}
+								{#if backend.cluster && summary.mapCurrent === false && !mapVersion}
 									<p class="rb-remake">
-										<span>This map was made on the cluster when the run finished. One from an earlier run lacks what has been added since (the gene report,
-											operon map downloads, the contig and two-strand views).</span>
+										<span>This map was drawn by an earlier version of MARGIE; making it again brings in what has been added since.</span>
 										<button type="button" class="rb-btn" disabled={remaking} onclick={() => remakeMap(summary!.final.viewer!)}>
 											{remaking ? 'Making it again…' : 'Make this map again'}
 										</button>

@@ -72,6 +72,12 @@ def c1_counted(reasoning: str) -> list[str]:
     return [name for slot in tail.split(";") for name in C1_SLOT_TOOLS.get(slot.strip().upper(), [])]
 
 
+def viewer_version() -> str:
+    """A short hash of this script: the same script always draws the same kind of map."""
+    import hashlib
+    return hashlib.sha256(Path(__file__).read_bytes()).hexdigest()[:12]
+
+
 def fmt_pid(v):
     """Formats a fraction or percentage as "NN% id", empty when not numeric."""
     try:
@@ -347,6 +353,9 @@ def main():
         html = (f"<title>{short} genome — MARGIE confidence viewer</title>\n"
                 f"{style}\n{inner}")
 
+    # Which version of this script drew the map, first in the file: Results offers to make a map again
+    # only when it was drawn by an older one (see viewer_version()).
+    html = html.replace("<!doctype html>", f"<!doctype html>\n<!-- margie-viewer {viewer_version()} -->", 1)
     out = Path(out); out.parent.mkdir(parents=True, exist_ok=True)
     out.write_text(html)
     print(f"wrote {out}  ({short}: {len(genes)} genes, {len(order)} replicons, "

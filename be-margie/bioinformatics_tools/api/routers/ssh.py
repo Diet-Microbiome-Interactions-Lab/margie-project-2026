@@ -2899,12 +2899,20 @@ def final_summary(path: str, current_user: dict = Depends(get_current_user)):
 _VIEW_MAX_BYTES = 1_000_000
 
 
+@router.get("/genome-viewer/version")
+def genome_viewer_version(current_user: dict = Depends(get_current_user)):
+    """The version of the deployed map script; a map whose first line names another was drawn by an older one."""
+    from bioinformatics_tools.workflow_tools.viz.gen_genome_viewer import viewer_version
+    return {"version": viewer_version()}
+
+
 @router.get("/browse_view")
-def browse_view(path: str, current_user: dict = Depends(get_current_user)):
+def browse_view(path: str, limit: int = _VIEW_MAX_BYTES, current_user: dict = Depends(get_current_user)):
     """Returns the head of a text file on the cluster for the explorer's View button.
 
-    Reads at most _VIEW_MAX_BYTES and refuses binary files (a NUL byte).
+    Reads at most _VIEW_MAX_BYTES (or `limit`, when smaller) and refuses binary files (a NUL byte).
     """
+    limit = max(1, min(int(limit), _VIEW_MAX_BYTES))
     conn = _build_connection(current_user)
     path = _resolve_browse_path(path, current_user)
 
@@ -2924,9 +2932,9 @@ def browse_view(path: str, current_user: dict = Depends(get_current_user)):
         for chunk in ssh_sftp.stream_remote_file(path, connection=conn):
             chunks.append(chunk)
             total += len(chunk)
-            if total >= _VIEW_MAX_BYTES:
+            if total >= limit:
                 break
-        raw = b"".join(chunks)[:_VIEW_MAX_BYTES]
+        raw = b"".join(chunks)[:limit]
     except FileNotFoundError:
         raise HTTPException(status_code=404, detail="File not found on remote")
     except Exception as exc:
@@ -2945,7 +2953,7 @@ def browse_view(path: str, current_user: dict = Depends(get_current_user)):
     return {
         "path": path,
         "binary": False,
-        "truncated": total >= _VIEW_MAX_BYTES,
+        "truncated": total >= limit,
         "content": raw.decode("utf-8", errors="replace"),
     }
 

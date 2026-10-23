@@ -1232,13 +1232,29 @@ async function referenceNow(scoredWith: string | undefined): Promise<number | nu
 	return null;
 }
 
+/** The deployed map script's version, read once (the server answers for its own copy). */
+let viewerVersion: Promise<string | null> | null = null;
+/** Whether a map was drawn by the deployed map script: its first lines name the version that drew it. */
+async function mapCurrent(viewer: string | undefined): Promise<boolean | undefined> {
+	if (!viewer) return undefined;
+	viewerVersion ??= get<{ version: string }>('/v1/ssh/genome-viewer/version')
+		.then((d) => d.version)
+		.catch(() => null);
+	const [now, head] = await Promise.all([
+		viewerVersion,
+		get<{ content: string }>(`/v1/ssh/browse_view?path=${q(viewer)}&limit=400`).catch(() => null)
+	]);
+	if (!now || !head) return undefined;
+	return (/<!-- margie-viewer (\w+) -->/.exec(head.content)?.[1] ?? '') === now;
+}
+
 /** Builds a genome's report summary: counts, figures and tools run. */
 async function summary(genome: string): Promise<GenomeSummary> {
 	const r = (await resultList.get()).find((x) => x.organism === genome);
 	if (!r?.final?.table) throw new ApiError(`No finished results for ${genome} on the cluster.`, 404);
 	const final = r.final;
 	const scored = await scoredAgainst(r.folder as string);
-	const [counts, figures, tools, refNow] = await Promise.all([
+	const [counts, figures, tools, refNow, current] = await Promise.all([
 		finalCounts(final.table as string),
 		final.diagrams
 			? browse(final.diagrams)
@@ -1249,7 +1265,8 @@ async function summary(genome: string): Promise<GenomeSummary> {
 			.catch(() => browse(r.folder as string))
 			.then((d) => [...names(d.entries, 'directory')].filter((n) => !NOT_TOOLS.has(n) && !n.startsWith('.')).sort())
 			.catch(() => [] as string[]),
-		scored ? referenceNow(scored.reference) : Promise.resolve(null)
+		scored ? referenceNow(scored.reference) : Promise.resolve(null),
+		mapCurrent(final.viewer)
 	]);
 	return {
 		...counts,
@@ -1262,7 +1279,8 @@ async function summary(genome: string): Promise<GenomeSummary> {
 		tools,
 		figures,
 		scoredAgainst: scored,
-		referenceNow: refNow
+		referenceNow: refNow,
+		mapCurrent: current
 	};
 }
 
