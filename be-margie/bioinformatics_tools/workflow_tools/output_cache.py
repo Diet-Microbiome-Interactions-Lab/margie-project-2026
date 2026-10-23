@@ -42,6 +42,17 @@ CREATE TABLE IF NOT EXISTS output_cache (
 );
 """
 
+# When each genome's outputs for a tool were cached, apart from the files: cached_at sits after the
+# file's content in output_cache, so reading it there walks the whole stored file. For the cache report.
+CREATE_OUTPUT_CACHE_WHEN_SQL = """
+CREATE TABLE IF NOT EXISTS output_cache_when (
+    input_hash TEXT NOT NULL,
+    tool TEXT NOT NULL,
+    cached_at TEXT NOT NULL,
+    PRIMARY KEY (input_hash, tool)
+);
+"""
+
 
 def _get_connection(db_path: str, timeout: float = 30.0) -> sqlite3.Connection:
     """Create a SQLite connection configured for network filesystems.
@@ -120,6 +131,7 @@ def _input_hashes(input_file: str) -> tuple[str, str]:
 
 def _ensure_table(conn: sqlite3.Connection) -> None:
     conn.execute(CREATE_OUTPUT_CACHE_SQL)
+    conn.execute(CREATE_OUTPUT_CACHE_WHEN_SQL)
 
 
 # ───────────────────────── single-tool helpers ───────────────────────── #
@@ -303,7 +315,9 @@ def cached_tools(db_path: str, input_file: str) -> set:
 def cached_when(db_path: str, input_file: str) -> dict[str, str]:
     """Returns {tool: when its outputs for *input_file* were cached (UTC, ISO)}, the newest per tool.
 
-    Read-only and never raises (empty on any problem). For the run's cache report."""
+    Reads output_cache_when only, never the stored files, so it stays quick on a large database;
+    outputs cached before that table existed have no date. Never raises (empty on any problem).
+    For the run's cache report."""
     try:
         if not db_path or not Path(db_path).expanduser().exists():
             return {}
@@ -312,7 +326,7 @@ def cached_when(db_path: str, input_file: str) -> dict[str, str]:
         try:
             _ensure_table(conn)
             rows = conn.execute(
-                "SELECT tool, MAX(cached_at) FROM output_cache WHERE input_hash IN (?, ?) GROUP BY tool",
+                "SELECT tool, MAX(cached_at) FROM output_cache_when WHERE input_hash IN (?, ?) GROUP BY tool",
                 (current, legacy),
             ).fetchall()
         finally:
@@ -356,6 +370,8 @@ def store(db_path: str, input_file: str, tool_name: str,
             )
             if size_mb > 1:
                 LOGGER.info("  ✓ Stored %s", p.name)
+        conn.execute("INSERT OR REPLACE INTO output_cache_when (input_hash, tool, cached_at) VALUES (?, ?, ?)",
+                     (input_hash, tool_name, now))
         conn.commit()
     finally:
         conn.close()
