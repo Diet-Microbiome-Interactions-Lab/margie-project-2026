@@ -205,6 +205,8 @@ def login(body: UserLogin, request: Request):
     if row is None or not verify_password(body.password, row['password_hash']):
         access.SIGNIN_BY_NAME.count(name)
         access.SIGNIN_BY_ADDRESS.count(address)
+        LOGGER.warning('Failed sign-in for %r from %s (connection from %s)', name, address,
+                       request.client.host if request.client else '?')
         raise _invalid
     if not is_local_mode():
         access.check_cluster(row['cluster_host'])
