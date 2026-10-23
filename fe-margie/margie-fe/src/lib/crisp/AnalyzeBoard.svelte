@@ -16,7 +16,7 @@
 	import RunAction from '$lib/workspace/blocks/RunAction.svelte';
 	import Licence from '$lib/cluster/Licence.svelte';
 	import RunSteps from './RunSteps.svelte';
-	import { readCacheReport, sourceSay, type SourceRow } from '$lib/crisp/cache-report';
+	import { readSources, sourceSay, type SourceRow } from '$lib/crisp/cache-report';
 
 	/**
 	 * The Analyze page, in the order a run is set up: 1 the genomes (folder, files, table),
@@ -94,15 +94,15 @@
 	);
 	/** Its cache report (fresh or restored, per step): read when the run changes, every 30 s while it goes. */
 	const reportKey = $derived(reportRun?.outputDir ? `${reportRun.id}\n${reportRun.outputDir}\n${reportRun.status}` : '');
-	let sources = $state<{ id: string; rows: SourceRow[] | null } | null>(null);
+	let sources = $state<{ id: string; rows: SourceRow[] | null; fromLog: boolean } | null>(null);
 	$effect(() => {
 		const key = reportKey;
 		if (!key) return;
 		const [id, dir, status] = key.split('\n');
 		let stop = false;
 		const read = () =>
-			readCacheReport(dir).then((rows) => {
-				if (!stop) sources = { id, rows };
+			readSources(dir, id).then((d) => {
+				if (!stop) sources = { id, rows: d?.rows ?? null, fromLog: !!d?.fromLog };
 			});
 		untrack(read);
 		if (status !== 'running') return () => (stop = true);
@@ -132,6 +132,8 @@
 
 	/** The report's rows for the run in view (null: none read, or a run from before reports were kept). */
 	const srcRows = $derived(sources && reportRun && sources.id === reportRun.id ? sources.rows : null);
+	/** Rebuilt from the job log (a run from before reports): it names restores only, so a finished step it leaves out ran in the job. */
+	const srcFromLog = $derived(!!srcRows && !!sources?.fromLog);
 	const srcLine = $derived.by(() => {
 		if (!srcRows) return '';
 		const on = srcRows.filter((r) => r.source !== 'not run');
@@ -387,9 +389,13 @@
 						<dt>Database</dt>
 						<dd class="mg-mono pop-db" title={c.src.database}>{c.src.database}</dd>
 					{/if}
-				{:else if c.state === 'done' && reportRun && !srcRows}
+				{:else if c.state === 'done' && reportRun && (srcFromLog || !srcRows)}
 					<dt>Results</dt>
-					<dd>Run in this job or brought back from the database: runs started before 23 Oct 2026 did not record which.</dd>
+					<dd>
+						{srcFromLog
+							? 'Run in this job: its log shows no restore from the database for this step.'
+							: 'This run kept no record, in a report or its log, of whether this ran here or came back from the database.'}
+					</dd>
 				{/if}
 				{#if c.so !== undefined}
 					<dt>Time so far</dt>

@@ -962,7 +962,9 @@ async function places() {
 		{ label: 'Depot', path: depot },
 		{ label: 'Genomes in', path: at('input_path') },
 		{ label: 'Results', path: at('output_path') },
-		{ label: 'Databases', path: at('db_root') },
+		// MARGIE's own databases (the working folder) and the tools' reference databases.
+		{ label: 'MARGIE databases', path: at('stores_root') },
+		{ label: 'Reference databases', path: at('db_root') },
 		{ label: 'Containers', path: at('sif_path') },
 		{ label: 'The cluster', path: '/' }
 	];
@@ -1217,17 +1219,37 @@ async function jsonAt<T>(path: string): Promise<T | null> {
 	}
 }
 
-/** What the genome was scored against: scoring/scored-against.json, where the run left it or tidied it to. */
+/**
+ * What the genome was scored against: scoring/scored-against.json, where the run left it or tidied it to.
+ * A run from before that file reads its reference-update token instead: the reference's size just after
+ * this genome went in, less the genome itself, which scoring leaves out (estimated: true).
+ */
 async function scoredAgainst(folder: string): Promise<GenomeSummary['scoredAgainst']> {
-	return (await jsonAt(`${folder}/${PER_TOOL}/scoring/scored-against.json`)) ?? (await jsonAt(`${folder}/scoring/scored-against.json`));
+	const recorded = (await jsonAt<NonNullable<GenomeSummary['scoredAgainst']>>(`${folder}/${PER_TOOL}/scoring/scored-against.json`)) ??
+		(await jsonAt<NonNullable<GenomeSummary['scoredAgainst']>>(`${folder}/scoring/scored-against.json`));
+	if (recorded) return recorded;
+	for (const dir of [`${folder}/${PER_TOOL}/scoring`, `${folder}/scoring`]) {
+		const token = await readText(`${dir}/occ_reference_updated.tkn`).then((d) => d.content).catch(() => '');
+		const n = Number(/organisms_in_reference=(\d+)/.exec(token)?.[1]);
+		if (!n) continue;
+		const inside = /status=(added|already_present)/.test(token);
+		return { genomes: inside ? n - 1 : n, reference: /(?:^|; )reference=(\S+)/.exec(token)?.[1] ?? '', left_out_self: inside, scored_at: '', estimated: true };
+	}
+	return null;
 }
 
-/** How many genomes the operon reference holds now: the working reference's summary, else the one it was scored with. */
+/**
+ * How many genomes the operon reference holds now: the working reference's summary, else the one it was
+ * scored with; a reference from before summaries is counted from its genome_stats.tsv (one row a genome).
+ */
 async function referenceNow(scoredWith: string | undefined): Promise<number | null> {
 	const current = str(dig(await config.get(), 'margie_sb.operon_database.occ_reference_pkl'));
-	for (const ref of [current, scoredWith ?? '']) {
-		const n = ref ? (await jsonAt<{ genomes?: number }>(`${ref}.summary.json`))?.genomes : undefined;
+	for (const ref of [current, scoredWith ?? ''].filter(Boolean)) {
+		const n = (await jsonAt<{ genomes?: number }>(`${ref}.summary.json`))?.genomes;
 		if (typeof n === 'number') return n;
+		const stats = await readText(`${ref}.genome_stats.tsv`).then((d) => d.content).catch(() => '');
+		const rows = stats.split('\n').slice(1).filter((l) => l.trim()).length;
+		if (rows) return rows;
 	}
 	return null;
 }
@@ -1298,12 +1320,14 @@ export async function clusterApi<T = any>(path: string, init: RequestInit = {}):
 	const body = typeof init.body === 'string' ? JSON.parse(init.body || '{}') : init.body ? {} : undefined;
 	const form = init.body instanceof FormData ? init.body : null;
 	const answer = (async (): Promise<unknown> => {
-		const run = route.match(/^\/runs\/([^/]+)(?:\/(stop|resume|restart|command))?$/);
+		const run = route.match(/^\/runs\/([^/]+)(?:\/(stop|resume|restart|command|sources))?$/);
 		if (run) {
 			const id = decodeURIComponent(run[1]);
 			if (run[2] === 'stop') return stopRun(id);
 			// The command it ran, as a script to run again from a shell on the cluster.
 			if (run[2] === 'command') return get(`/v1/ssh/job_command/${q(id)}`);
+			// Where each step's results came from: the run's cache report, or its job log for an older run.
+			if (run[2] === 'sources') return get(`/v1/ssh/job_sources/${q(id)}`);
 			if (run[2] === 'resume' || run[2] === 'restart') return relaunchRun(id, run[2]);
 			return runDetail(id, params);
 		}
@@ -1317,8 +1341,9 @@ export async function clusterApi<T = any>(path: string, init: RequestInit = {}):
 				return listRuns();
 			case 'POST /runs':
 				return startRun(body ?? {});
+			// Backs up the finished jobs to the working folder, then clears them from the list.
 			case 'DELETE /runs':
-				return notHere('The cluster keeps its own job history; it is not cleared from here.');
+				return call('POST', '/v1/ssh/job_history/clear');
 			case 'GET /genomes':
 				return listGenomes();
 			// Your databases on scratch, their backups on depot, and the copy under way.

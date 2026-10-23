@@ -337,14 +337,14 @@ def main() -> None:
     L.apply_style()
     organisms = L.discover_organisms(run_root)
     genes = L.load_all_genes(run_root, organisms)
-    # Recurrence and the caption use the OCC organisms, else this run's organisms.
-    occ_pool = L.load_occ_organisms(Path(args.occ_reference)) or set(organisms)
+    # Recurrence and the caption use the OCC organisms (the fingerprint database's, said so, without it).
+    occ_pool, missing = L.comparison_pool(args.occ_reference, args.operon_db)
     recurrence = L.load_operon_recurrence(Path(args.operon_db), restrict_to=occ_pool)
     # Whole pool, no leave-one-out; tallies from the OCC genome-stats sidecar.
     pool_list = sorted(occ_pool)
     n_org = len(pool_list)
-    pstats = L.aggregate_pool_stats(L.load_pool_stats(Path(args.occ_reference)), pool_list)
-    L.set_provenance(L.provenance_text(n_org, pstats))
+    pstats = L.aggregate_pool_stats(L.load_pool_stats(Path(args.occ_reference)), pool_list) if not missing else None
+    L.set_provenance(L.provenance_text(n_org, pstats, missing=missing))
 
     jobs = [
         ("fig01", lambda: fig01(genes, outdir, n_org)),

@@ -34,12 +34,28 @@ export function parseCacheReport(text: string): SourceRow[] {
 	});
 }
 
-/** A run's report, or null when it has none (a run from before reports, or one not started). */
+/** A run's report file, or null when it has none (a run from before reports, or one not started). */
 export async function readCacheReport(dir: string): Promise<SourceRow[] | null> {
 	if (!dir) return null;
 	try {
 		const d = await api<{ content: string; binary: boolean }>(`/files/text?path=${encodeURIComponent(`${dir.replace(/\/$/, '')}/${REPORT_FILE}`)}`);
 		return d.binary ? null : parseCacheReport(d.content);
+	} catch {
+		return null;
+	}
+}
+
+/**
+ * A run's sources: its report file, or, for a run started before reports were written, the rows
+ * rebuilt from its job log (fromLog: only what the log names, restores; a finished step it does not
+ * name ran in the job). Null when neither says anything.
+ */
+export async function readSources(dir: string, runId: string): Promise<{ rows: SourceRow[]; fromLog: boolean } | null> {
+	const rows = await readCacheReport(dir);
+	if (rows) return { rows, fromLog: false };
+	try {
+		const d = await api<{ rows: SourceRow[]; from: string | null }>(`/runs/${encodeURIComponent(runId)}/sources`);
+		return d.from === 'log' && d.rows.length ? { rows: d.rows, fromLog: true } : null;
 	} catch {
 		return null;
 	}

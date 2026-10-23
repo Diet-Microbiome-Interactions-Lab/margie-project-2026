@@ -299,6 +299,48 @@ def count_jobs(db_path: str, workflow: str | None = None,
         return 0
 
 
+# A job still going stays in the list when the history is cleared.
+_GOING = ("pending", "queued", "running")
+
+
+def clear_jobs(db_path: str, backup_path: str, owner_username: str | None = None,
+               owner_cluster_username: str | None = None) -> dict:
+    """Copies the owner's finished jobs into a new SQLite file at backup_path (table api_jobs), then
+    removes them from the history; a job still going stays. Nothing is removed unless every row is in
+    the backup. Returns {backup, removed, kept}."""
+    ensure_table(db_path)
+    ownership, owner_params = _ownership_where(owner_username, owner_cluster_username)
+    where = f"status NOT IN ({', '.join('?' * len(_GOING))})" + (f" AND {ownership}" if ownership else "")
+    params = [*_GOING, *owner_params]
+    backup = os.path.expanduser(backup_path)
+    if os.path.exists(backup):
+        raise ValueError(f"backup already exists: {backup_path}")
+    Path(backup).parent.mkdir(parents=True, exist_ok=True)
+    conn = _get_connection(db_path)
+    try:
+        conn.execute("ATTACH DATABASE ? AS b", (backup,))
+        n = conn.execute(f"SELECT count(*) FROM main.api_jobs WHERE {where}", params).fetchone()[0]
+        if not n:
+            conn.execute("DETACH DATABASE b")
+            if os.path.exists(backup):
+                os.remove(backup)
+            return {"backup": "", "removed": 0, "kept": _count_going(conn, ownership, owner_params)}
+        conn.execute(f"CREATE TABLE b.api_jobs AS SELECT * FROM main.api_jobs WHERE {where}", params)
+        conn.commit()
+        if conn.execute("SELECT count(*) FROM b.api_jobs").fetchone()[0] != n:
+            raise sqlite3.Error("the backup does not hold every job; nothing was removed")
+        conn.execute(f"DELETE FROM main.api_jobs WHERE {where}", params)
+        conn.commit()
+        return {"backup": backup_path, "removed": n, "kept": _count_going(conn, ownership, owner_params)}
+    finally:
+        conn.close()
+
+
+def _count_going(conn: sqlite3.Connection, ownership: str, owner_params: list) -> int:
+    where = f"status IN ({', '.join('?' * len(_GOING))})" + (f" AND {ownership}" if ownership else "")
+    return conn.execute(f"SELECT count(*) FROM main.api_jobs WHERE {where}", [*_GOING, *owner_params]).fetchone()[0]
+
+
 # ---- CLI: <action> argument, JSON payload on stdin, JSON result on stdout ----
 
 def dispatch(action: str, payload: dict):
@@ -328,6 +370,9 @@ def dispatch(action: str, payload: dict):
     if action == "count":
         return count_jobs(db_path, payload.get("workflow"),
                           payload.get("owner_username"), payload.get("owner_cluster_username"))
+    if action == "clear":
+        return clear_jobs(db_path, payload["backup_path"],
+                          payload.get("owner_username"), payload.get("owner_cluster_username"))
     raise ValueError(f"unknown action: {action}")
 
 
@@ -335,7 +380,7 @@ def _main() -> int:
     """Reads the action and payload, runs it and prints the JSON result."""
     if len(sys.argv) != 2:
         print("usage: python -m bioinformatics_tools.api.services.job_history "
-              "<create|update|get|list|list_and_count|count>", file=sys.stderr)
+              "<create|update|get|list|list_and_count|count|clear>", file=sys.stderr)
         return 2
     action = sys.argv[1]
     payload = json.loads(sys.stdin.read() or "{}")

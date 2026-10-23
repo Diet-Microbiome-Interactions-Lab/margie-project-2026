@@ -16,6 +16,7 @@ import csv
 import io
 import logging
 import os
+import re
 from pathlib import Path
 
 LOGGER = logging.getLogger(__name__)
@@ -53,6 +54,41 @@ def proteins(cached: int, to_run: int) -> dict:
         return {'source': PARTLY, 'level': PROTEIN_LEVEL,
                 'detail': f'{cached:,} of {total:,} proteins from the protein cache; {to_run:,} annotated now'}
     return {'source': FRESH, 'detail': f'none of its {total:,} proteins in the protein cache; all annotated now'}
+
+
+# The job log's lines that say where results came from (workflow.py, output_cache.py), for a run
+# started before this report was written: grep -E with this, then rows_from_log.
+LOG_PATTERN = 'main_database: |Restored from cache: |Protein cache for '
+# Folders in a run folder that are not a genome's.
+NOT_GENOMES = {'.snakemake', 'original_container_outputs', 'scoring', 'gtdbtk', 'logs'}
+_PROTEIN_COUNT = re.compile(r'([\w.-]+) (\d+)/(\d+) cached')
+
+
+def rows_from_log(lines, output_dir: str) -> list[dict]:
+    """Rebuilds a run's report from its job log: the database it used, each step restored from the
+    genome-level cache ("Restored from cache: <run>/<genome>/<step>/..."), and each tool's share of
+    proteins from the protein-level cache ("Protein cache for <genome>: <tool> <cached>/<all> cached").
+    Steps the log does not mention are left out; a finished one of those ran in the job."""
+    report = CacheReport('')
+    root = output_dir.rstrip('/') + '/'
+    for line in lines:
+        if 'main_database: ' in line:
+            if not report.database:
+                report.database = line.split('main_database: ', 1)[1].strip().strip("'\",")
+        elif 'Restored from cache: ' in line:
+            path = line.split('Restored from cache: ', 1)[1].strip()
+            parts = path[len(root):].split('/') if path.startswith(root) else []
+            if len(parts) >= 3 and parts[0] not in NOT_GENOMES:
+                report.set(parts[0], parts[1], RESTORED, level=GENOME_LEVEL)
+        elif 'Protein cache for ' in line:
+            genome, _, counts = line.split('Protein cache for ', 1)[1].partition(': ')
+            for tool, cached, total in _PROTEIN_COUNT.findall(counts):
+                row = report.rows.get((genome.strip(), tool))
+                if row and row['source'] == RESTORED:
+                    continue
+                c, n = int(cached), int(total)
+                report.set(genome.strip(), tool, **proteins(c, n - c))
+    return list(report.rows.values())
 
 
 class CacheReport:

@@ -105,7 +105,7 @@ export interface GenomeSummary {
 	/** The genome's genes around a ring, by confidence tier (see GLYPH_TIERS on the server). */
 	glyph: { length: number; contigs: number; plus: number[]; minus: number[] } | null;
 	/** How many genomes of the operon reference it was scored against (itself left out), and when (scoring's scored-against.json). */
-	scoredAgainst?: { genomes: number; reference: string; left_out_self: boolean; scored_at: string } | null;
+	scoredAgainst?: { genomes: number; reference: string; left_out_self: boolean; scored_at: string; estimated?: boolean } | null;
 	/** How many genomes the operon reference holds now (<reference>.summary.json), when known. */
 	referenceNow?: number | null;
 	/** False when its map was drawn by an older version of the map script than the one deployed. */
@@ -148,6 +148,8 @@ export interface StoreInfo {
 	/** The working version, or null when it is not set up yet. */
 	version: number | null;
 	path: string;
+	/** What a run reads now (the store's setting); outside path, it names another copy. */
+	in_use?: string;
 	/** The copy every user starts from. */
 	base: string;
 	/** A copy already in the working folder (put there by hand), used as is by the next setup once ready. */
@@ -881,9 +883,9 @@ class Workspace {
 	}
 
 	/**
-	 * Empties the history. The server copies everything it removes into
-	 * run-history/<when>/ first, and says where, so nothing is ever only
-	 * deleted. A run still going stays in the list.
+	 * Empties the history. The server copies everything it removes into a backup
+	 * first (on the cluster, job-history-backups/ in the working folder) and says
+	 * where, so nothing is ever only deleted. A run still going stays in the list.
 	 */
 	async clearRuns() {
 		try {
