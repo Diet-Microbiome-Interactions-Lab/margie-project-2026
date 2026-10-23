@@ -27,6 +27,9 @@
 
 	type Row = { tone: 'ok' | 'mine' | 'wait' | 'need'; word: string; path: string; note: string };
 	function row(s: NonNullable<typeof st>['stores'][number]): Row {
+		// A setting still naming another copy: runs would read that one until it is pointed here.
+		if (s.version && s.in_use && !s.in_use.startsWith(s.path))
+			return { tone: 'wait', word: 'Runs read another copy', path: s.in_use, note: `Not the one in your working folder (${s.path}); Look again points them here.` };
 		if (s.version) return { tone: 'ok', word: `In your working folder (v${s.version})`, path: s.path, note: '' };
 		if (s.found?.ready) return { tone: 'mine', word: 'Your copy is there', path: s.found.path, note: 'Used where it is when you set up; nothing is copied.' };
 		if (s.found) return { tone: 'wait', word: 'Your copy is there, not ready', path: s.found.path, note: `It is ${s.found.note}.` };

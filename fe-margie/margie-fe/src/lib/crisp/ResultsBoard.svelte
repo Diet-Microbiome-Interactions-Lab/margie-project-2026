@@ -407,7 +407,11 @@
 						{#if summary.domain && summary.domain !== 'Unknown'}<li><span>domain</span>{summary.domain}</li>{/if}
 						{#if summary.envelope}<li><span>envelope</span>{summary.envelope}</li>{/if}
 						{#if summary.scoredAgainst}
-							<li title="Its operon scores compare it with this many other genomes in the operon reference ({summary.scoredAgainst.scored_at.slice(0, 10)})">
+							<li
+								title={summary.scoredAgainst.estimated
+									? 'Its operon scores compare it with this many other genomes in the operon reference, read from the reference size the run recorded when this genome went in'
+									: `Its operon scores compare it with this many other genomes in the operon reference (${summary.scoredAgainst.scored_at.slice(0, 10)})`}
+							>
 								<span>scored against</span>{count(summary.scoredAgainst.genomes)} genomes
 							</li>
 						{/if}

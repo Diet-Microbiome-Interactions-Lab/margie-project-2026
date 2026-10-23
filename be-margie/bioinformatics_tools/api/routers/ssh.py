@@ -8,6 +8,7 @@ validated by get_current_user(), which returns the user's cluster credentials.
 _build_connection() decrypts the stored private key and builds a per-user
 SSHConnection for each request.
 """
+import csv
 import io
 import json
 import logging
@@ -36,6 +37,7 @@ from bioinformatics_tools.utilities import ssh_sftp, ssh_slurm
 from bioinformatics_tools.utilities.ssh_connection import (
     make_user_connection, provision_in_background, sync_remote_dane_wf, wait_provisioned,
 )
+from bioinformatics_tools.workflow_tools import cache_report
 from bioinformatics_tools.workflow_tools.workflow_helpers import GENOME_EXTENSIONS
 from bioinformatics_tools.workflow_tools.workflow_registry import (
     MARGIE_SB_PHASED_TOOLS,
@@ -2359,6 +2361,30 @@ def _list_jobs(conn, current_user: dict, workflow: str | None, page: int, page_s
     }
 
 
+@router.post("/job_history/clear")
+def clear_job_history(current_user: dict = Depends(get_current_user)):
+    """Clears the job list: copies this user's finished jobs into a backup in the working folder
+    (job-history-backups/job-history-<time>.db), then removes them from the history. A job still
+    going stays. Returns {backup, removed, kept}."""
+    conn = _build_connection(current_user)
+    try:
+        user_config = ssh_sftp.read_remote_yaml(_config_path(current_user["home_dir"]), connection=conn)
+    except Exception:
+        raise HTTPException(status_code=400, detail="Configuration file not found. Create your configuration first.")
+    main_db = user_config.get("main_database")
+    if not main_db:
+        return {"backup": "", "removed": 0, "kept": 0}
+    root = _stores_call(user_stores.scratch_root, conn, user_config)
+    stamp = datetime.now(timezone.utc).strftime("%Y-%m-%d-%H%M%S")
+    result = job_history_client.clear_jobs(
+        conn, main_db, f"{root}/job-history-backups/job-history-{stamp}.db",
+        owner_username=current_user["username"], owner_cluster_username=current_user["cluster_username"])
+    if result is None:
+        raise HTTPException(status_code=500, detail="Could not clear the job history; nothing was removed.")
+    read_cache.drop(current_user["user_id"], "jobs")
+    return result
+
+
 @router.post("/cancel_job/{job_id}")
 def cancel_job(job_id: str, current_user: dict = Depends(get_current_user)):
     """Emergency stop: cancels the run's SLURM jobs, kills the remote process and marks the job cancelled.
@@ -2600,6 +2626,31 @@ def job_command(job_id: str, current_user: dict = Depends(get_current_user)):
         "exact": False,
         "file": None,
     }
+
+
+@router.get("/job_sources/{job_id}")
+def job_sources(job_id: str, current_user: dict = Depends(get_current_user)):
+    """Where each step's results in a run came from: its cache-report.tsv, or, for a run started
+    before that report was written, rebuilt from its job log (from: "log"; cache_report.rows_from_log)."""
+    if not re.fullmatch(r"[0-9A-Za-z-]{8,64}", job_id):
+        raise HTTPException(status_code=400, detail="Not a job id")
+    conn = _build_connection(current_user)
+    job = _load_job_for_action(job_id, current_user, conn)
+    work_dir = (job.get("work_dir") or job.get("output_dir") or "").rstrip('/')
+    if not work_dir:
+        return {"rows": [], "from": None}
+    report = shlex.quote(f"{work_dir}/{cache_report.FILE}")
+    log = f"$HOME/.local/share/bsp/jobs/{job_id}.log"
+    _, out = _run_remote_check(
+        conn,
+        f"if [ -f {report} ]; then echo @@report; cat {report}; "
+        f"else echo @@log; grep -E {shlex.quote(cache_report.LOG_PATTERN)} {log} 2>/dev/null | head -n 50000; fi")
+    kind, _, body = out.partition("\n")
+    if kind.strip() == "@@report":
+        rows = list(csv.DictReader(io.StringIO(body), delimiter="\t"))
+        return {"rows": rows, "from": "report"}
+    rows = cache_report.rows_from_log(body.splitlines(), work_dir)
+    return {"rows": rows, "from": "log" if rows else None}
 
 
 @router.get("/job_files/{job_id}")

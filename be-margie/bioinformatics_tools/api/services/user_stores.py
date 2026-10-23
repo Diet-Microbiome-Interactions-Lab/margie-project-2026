@@ -735,6 +735,8 @@ def status(conn, cfg: dict, user: str) -> dict:
             'note': s['note'],
             'version': v if present else None,
             'path': path if present else '',
+            # What a run reads now: the store's setting (point_config keeps it on the working copy).
+            'in_use': str(_cfg_get(cfg, next(iter(s['config']))) or ''),
             # A copy of it in the working folder that the next setup uses instead of copying.
             'found': found.get(s['id']),
             'base': bases[s['id']],
@@ -1050,7 +1052,11 @@ def apply_finished(conn, cfg: dict, user: str) -> bool:
 
 
 def point_config(conn, cfg: dict, user: str, root: str | None = None) -> bool:
-    """Sets every store's and output folder's config key to its scratch path."""
+    """Sets every store's and output folder's config key to its path in the working folder.
+
+    A run reads and writes everything in the working folder, so a key still pointing somewhere
+    else (an earlier working folder, say) is brought here too; to keep the databases elsewhere,
+    that folder is chosen as the working folder instead."""
     root = root or scratch_root(conn, cfg)
     manifest = read_manifest(conn, root)
     changed = False
@@ -1064,22 +1070,10 @@ def point_config(conn, cfg: dict, user: str, root: str | None = None) -> bool:
     # Cached so later requests skip the cluster lookup.
     wanted['margie_sb.stores_root'] = root
     for key, value in wanted.items():
-        current = _cfg_get(cfg, key)
-        if current == value:
-            continue
-        # A path the user pointed somewhere else (a moved file, a copy of their own) is kept;
-        # only empty keys and earlier working copies under the stores root are brought up to date.
-        if key != 'margie_sb.stores_root' and not _managed_path(current, root):
-            continue
-        _cfg_set(cfg, key, value)
-        changed = True
+        if _cfg_get(cfg, key) != value:
+            _cfg_set(cfg, key, value)
+            changed = True
     return changed
-
-
-def _managed_path(value, root: str) -> bool:
-    """Returns whether a config value is empty or inside the stores root, so point_config may set it."""
-    v = str(value or '').strip()
-    return not v or v == root or v.startswith(root.rstrip('/') + '/')
 
 
 def is_ready(conn, cfg: dict, user: str) -> bool:

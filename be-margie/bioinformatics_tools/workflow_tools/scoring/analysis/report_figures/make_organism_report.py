@@ -445,16 +445,13 @@ def main() -> None:
     org_label = args.organism
     genes = L.load_organism_genes(run_root, args.organism)
     operons = L.build_operons(genes)
-    # Falls back to this run's organisms when the OCC reference is unreadable.
-    restrict = L.load_occ_organisms(Path(args.occ_reference)) or set(L.discover_organisms(run_root))
     # Leave-one-out: the pool excludes this organism, as in its C3 scoring.
-    restrict = set(restrict)
-    restrict.discard(org_label)
+    restrict, missing = L.comparison_pool(args.occ_reference, args.operon_db, leave_out=org_label)
     recurrence = L.load_operon_recurrence(Path(args.operon_db), restrict_to=restrict)
     # Provenance line: pool size and tallies from the OCC genome-stats sidecar.
     pool_list = sorted(restrict)
-    pstats = L.aggregate_pool_stats(L.load_pool_stats(Path(args.occ_reference)), pool_list)
-    L.set_provenance(L.provenance_text(len(pool_list), pstats, leave_one_out=True))
+    pstats = L.aggregate_pool_stats(L.load_pool_stats(Path(args.occ_reference)), pool_list) if not missing else None
+    L.set_provenance(L.provenance_text(len(pool_list), pstats, leave_one_out=True, missing=missing))
 
     jobs = [
         ("fig01", lambda: fig01(genes, outdir, org_label)),

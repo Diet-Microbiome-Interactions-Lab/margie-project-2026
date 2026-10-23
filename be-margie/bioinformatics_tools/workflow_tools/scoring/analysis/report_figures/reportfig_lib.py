@@ -195,13 +195,18 @@ def set_provenance(text: str | None) -> None:
     _PROVENANCE = text
 
 
-def provenance_text(pool_organisms: int, stats=None, leave_one_out: bool = False) -> str:
+def provenance_text(pool_organisms: int, stats=None, leave_one_out: bool = False,
+                    missing: str | None = None) -> str:
     """Returns the provenance text describing the operon-database pool.
 
     stats is an aggregate_pool_stats() dict or a bare total-gene int; leave_one_out
-    notes that the candidate genome was excluded from the pool."""
+    notes that the candidate genome was excluded from the pool; missing names an operon
+    reference that could not be read (comparison_pool), whose figures say so."""
     loo = (" | this candidate genome EXCLUDED from the pool (leave-one-out, "
            "avoids candidate-self bias)" if leave_one_out else "")
+    if missing is not None:
+        return (f"(operon reference not found: {missing} | the pool is the {pool_organisms:,} genomes "
+                f"of the operon fingerprint database{loo})")
     if isinstance(stats, dict):
         return (f"(operon-database pool: {pool_organisms:,} genomes | "
                 f"{stats.get('total_genes', 0):,} genes | "
@@ -644,14 +649,31 @@ def load_operon_recurrence(depot_db: Path, restrict_to=None) -> dict[str, dict]:
 
 # Default depot locations of the operon recurrence DB and the OCC reference.
 DEFAULT_OPERON_DB = Path(os.environ.get("MARGIE_OPERON_FINGERPRINT_DB", "operon-fingerprint-database-label-ordered.tsv"))
-DEFAULT_OCC_REFERENCE = Path(os.environ.get("MARGIE_OCC_REFERENCE", "occ_reference.pkl"))
+# The OCC reference is always named by the workflow (--occ-reference); no default file is guessed.
+DEFAULT_OCC_REFERENCE = os.environ.get("MARGIE_OCC_REFERENCE", "")
+
+
+def comparison_pool(occ_reference, operon_db, leave_out: str | None = None):
+    """Returns (organisms, missing) for a figure's comparison pool: the OCC reference's genomes, less
+    leave_out, with missing None; or, when the reference cannot be read, the genomes of the operon
+    fingerprint database, with missing naming the reference, so the caption says so."""
+    ref = str(occ_reference or "").strip()
+    pool = load_occ_organisms(ref) if ref else None
+    missing = None
+    if pool is None:
+        missing = ref or "(not given)"
+        pool = {o for rec in load_operon_recurrence(Path(operon_db)).values() for o in rec["organisms"]}
+    pool = set(pool)
+    if leave_out:
+        pool.discard(leave_out)
+    return pool, missing
 
 
 def load_occ_organisms(occ_reference=DEFAULT_OCC_REFERENCE):
     """Returns the set of organisms in the OCC reference (the pool C3 was scored against).
 
-    Returns None when the reference is unreadable, so callers fall back to the run's organisms;
-    that is said in the log, as the figures then compare with far fewer genomes."""
+    Returns None when the reference is unreadable (comparison_pool then uses the fingerprint
+    database's genomes, and the figures say the reference was not found)."""
     try:
         import pickle
         with open(occ_reference, "rb") as fh:
@@ -660,7 +682,7 @@ def load_occ_organisms(occ_reference=DEFAULT_OCC_REFERENCE):
         return orgs or None
     except Exception as exc:
         print(f"[report_figures] WARNING: the operon reference {occ_reference} could not be read ({exc}); "
-              "the figures compare with this run's genomes only", flush=True)
+              "the figures compare with the operon fingerprint database's genomes and say so", flush=True)
         return None
 
 
@@ -914,7 +936,8 @@ def write_sources_manifest(outdir: Path, run_root: Path, organisms: list[str],
         "depot pangenome operon-fingerprint database (label-ordered): how many "
         "genomes each operon recurs across and how often -- drives the "
         "reproduced / unique / most-conserved operon figures")
-    add("reference: operon co-occurrence (OCC)", occ_reference,
+    occ_given = str(occ_reference or "").strip() not in ("", ".")
+    add("reference: operon co-occurrence (OCC)", occ_reference if occ_given else "(not given)",
         "depot operon co-occurrence reference behind the operon-probability (C2) "
         "and operon-context (C3) scores that scoring wrote into the scored file")
     for tsv in sorted(outdir.glob("fig*_*.tsv")):

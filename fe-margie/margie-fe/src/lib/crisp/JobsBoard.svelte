@@ -13,7 +13,7 @@
 	import { uiBase } from '$lib/workspace/base.svelte';
 	import { ws } from '$lib/workspace/data.svelte';
 	import { ago, duration } from '$lib/workspace/format';
-	import { cachedOn, countsByGenome, readCacheReport, type SourceRow } from '$lib/crisp/cache-report';
+	import { cachedOn, countsByGenome, readSources, type SourceRow } from '$lib/crisp/cache-report';
 	import { untrack } from 'svelte';
 
 	/**
@@ -85,15 +85,15 @@
 	// ------------------------------------------------ fresh or restored: the run's cache report
 	/** Read again only when the run, its folder or its status changes (and every 30 s while it goes). */
 	const reportKey = $derived(shown?.kind === 'annotate' && shown.outputDir ? `${shown.id}\n${shown.outputDir}\n${shown.status}` : '');
-	let sources = $state<{ id: string; rows: SourceRow[] | null } | null>(null);
+	let sources = $state<{ id: string; rows: SourceRow[] | null; fromLog: boolean } | null>(null);
 	$effect(() => {
 		const key = reportKey;
 		if (!key) return;
 		const [id, dir, status] = key.split('\n');
 		let stop = false;
 		const read = () =>
-			readCacheReport(dir).then((rows) => {
-				if (!stop) sources = { id, rows };
+			readSources(dir, id).then((d) => {
+				if (!stop) sources = { id, rows: d?.rows ?? null, fromLog: !!d?.fromLog };
 			});
 		untrack(read);
 		if (status !== 'running') return () => (stop = true);
@@ -104,6 +104,8 @@
 		};
 	});
 	const srcRows = $derived(sources && shown && sources.id === shown.id ? sources.rows : null);
+	/** Rebuilt from the job log (a run from before reports): only its restores are listed. */
+	const srcFromLog = $derived(!!srcRows && !!sources?.fromLog);
 	/** The rows that say something (a step the run did not run is left out). */
 	const srcShown = $derived((srcRows ?? []).filter((r) => r.source !== 'not run'));
 	const srcDb = $derived(srcShown.find((r) => r.database)?.database ?? '');
@@ -341,6 +343,8 @@
 				<p class="fr-note">
 					<b>Genome level</b>: the whole output of a step for a genome whose sequence was run before. <b>Protein level</b>: a tool's rows
 					for proteins seen before, after gene calling, so it annotates only the new ones.
+					{#if srcFromLog}This run started before MARGIE kept a report, so this is read from its log: the steps listed came back from the
+						database, and the others ran in this job.{/if}
 				</p>
 				<div class="fr-wrap">
 					<table class="fr-table">
