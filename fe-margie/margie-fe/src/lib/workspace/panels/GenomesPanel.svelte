@@ -42,7 +42,7 @@
 	/** What the domain and genetic code mean and which to pick: open from the column heads, or by itself in Guided mode. */
 	let helpOpen = $state(ui.guided);
 	/** The NCBI translation tables offered, with who uses them. */
-	const CODE_LABEL: Record<string, string> = { '11': '11 · most bacteria and archaea', '4': '4 · Mycoplasma and kin', '25': '25 · SR1, Gracilibacteria' };
+	const CODE_LABEL: Record<string, string> = { '11': '11 | most bacteria and archaea', '4': '4 | Mycoplasma and kin', '25': '25 | SR1, Gracilibacteria' };
 	const CODE_NOTE: Record<string, string> = {
 		'': 'Genetic code not set: GTDB-Tk can work it out, or Prodigal calls the genes without RASTtk',
 		'11': 'Table 11, the standard code of almost all bacteria and archaea',

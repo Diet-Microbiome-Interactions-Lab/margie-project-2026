@@ -173,7 +173,7 @@
 	{:else if tab === 'settings'}
 		<text class="muted" x="72" y="55">Folders, cores and the steps a run takes</text>
 		<rect class="card" x="72" y="62" width="278" height="68" rx="4" />
-		<text class="tiny" x="80" y="74">DATABASES · NEEDED FOR EVERY RUN</text>
+		<text class="tiny" x="80" y="74">DATABASES | NEEDED FOR EVERY RUN</text>
 		{#each Array(3) as _, i (i)}
 			<rect class="cell" x={80 + i * 88} y="80" width="84" height="40" rx="3" />
 			<rect class="line" x={86 + i * 88} y="88" width="50" height="5" rx="2.5" />

@@ -252,11 +252,11 @@ def main():
 
     # Centre block: stats only; the genome identifier is the figure title.
     n_flag = sum(1 for r in rows if col(r, "NEEDS_REVIEW?").strip().lower() == "yes")
-    ax.text(0, 0.05, f"{total_len/1e6:.2f} Mb · {len(rows):,} genes", ha="center", va="center",
+    ax.text(0, 0.05, f"{total_len/1e6:.2f} Mb | {len(rows):,} genes", ha="center", va="center",
             fontsize=13, color="#000000")
     # Many pieces means a draft assembly, so they are called contigs.
     unit = "contig" if len(order) > MAX_LABELLED else "replicon"
-    ax.text(0, -0.05, f"{len(order)} {unit}{'s' if len(order) > 1 else ''} · "
+    ax.text(0, -0.05, f"{len(order)} {unit}{'s' if len(order) > 1 else ''} | "
             f"{n_flag:,} flagged for review", ha="center", va="center", fontsize=11.5, color="#000000")
 
     # tier legend (bottom), only tiers actually present

@@ -166,7 +166,7 @@
 					<span class="mg-grow"></span>
 					{#each a.qos as q (q)}
 						{@const info = qosOf(q)}
-						<span class="cb-chip" title={info?.max_wall ? `Longest job: ${info.max_wall}` : 'No time limit of its own'}>{q}{info?.max_wall ? ` · ${info.max_wall}` : ''}</span>
+						<span class="cb-chip" title={info?.max_wall ? `Longest job: ${info.max_wall}` : 'No time limit of its own'}>{q}{info?.max_wall ? ` | ${info.max_wall}` : ''}</span>
 					{/each}
 				</header>
 				<div class="cb-bars">
