@@ -1,0 +1,16 @@
+@import 'tailwindcss';
+@import '@skeletonlabs/skeleton';
+@import '@skeletonlabs/skeleton-svelte';
+@import '@skeletonlabs/skeleton/themes/cerberus';
+@import '@skeletonlabs/skeleton/themes/rocket';
+@import '@skeletonlabs/skeleton/themes/modern';
+@import '@skeletonlabs/skeleton/themes/vintage';
+@import '@skeletonlabs/skeleton/themes/seafoam';
+
+/* Dark mode follows the Theme menu: the top bar puts .dark on the page. */
+@custom-variant dark (&:where(.dark, .dark *));
+
+html,
+body {
+	min-height: 100%;
+}

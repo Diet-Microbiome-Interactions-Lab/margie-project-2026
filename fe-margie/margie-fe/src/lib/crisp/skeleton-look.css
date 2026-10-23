@@ -1,0 +1,183 @@
+/*
+ * The original pages' look (Dane's, Skeleton UI) over MARGIE's parts. Loaded after
+ * workspace.css and crisp.css, so these win. Colours come from the Skeleton theme on
+ * <html> through the variables skeleton-theme.ts sets; this file shapes the parts.
+ */
+
+/* ---------------------------------------------------------------- the page */
+
+.crisp {
+	-webkit-font-smoothing: auto;
+}
+
+/* A page's title as on Dane's pages: large, bold, in the primary colour; what the page
+   is for underneath it, and the page's buttons at the right. */
+.crisp .cr-page {
+	padding-top: 22px;
+	gap: 16px;
+}
+.crisp .cr-head {
+	grid-template-columns: minmax(0, 1fr) auto;
+	grid-template-areas:
+		'title acts'
+		'lede meta';
+	align-items: end;
+	gap: 6px 18px;
+}
+.crisp .cr-title {
+	font-family: var(--heading-font-family, inherit);
+	font-size: clamp(1.35rem, 1.9vw, 1.6rem);
+	font-weight: 750;
+	letter-spacing: -0.015em;
+	line-height: 1.15;
+	color: var(--cr-page);
+	white-space: normal;
+}
+.crisp .cr-lede {
+	padding-left: 0;
+	border-left: none;
+	font-size: var(--mg-fs-sm);
+	color: var(--mg-text-2);
+}
+.crisp .cr-meta {
+	align-self: end;
+}
+.crisp .cr-head-acts {
+	align-self: end;
+}
+
+/* ---------------------------------------------------------------- blocks */
+
+/* Flat grey cards with no outline, square-ish corners from the theme. */
+.crisp .mg-card,
+.crisp .cr-block {
+	border: none;
+	border-radius: var(--radius-container);
+	background: var(--cr-card);
+}
+.crisp .mg-card-head,
+.crisp [data-shade] > .mg-card-head,
+.crisp .cr-block-head {
+	border-bottom: 1px solid var(--color-surface-200-800);
+}
+.crisp .mg-card-head h2,
+.crisp .cr-block-head h2 {
+	font-family: var(--heading-font-family, inherit);
+	font-weight: 700;
+}
+
+/* ---------------------------------------------------------------- controls */
+
+/* Buttons as Skeleton's: tonal by default, filled in the primary colour for the main one. */
+.crisp .mg-btn {
+	border: none;
+	border-radius: var(--radius-base);
+	background: color-mix(in oklab, var(--mg-text) 7%, transparent);
+	color: var(--mg-text);
+	font-weight: 500;
+}
+.crisp .mg-btn:hover:not(:disabled) {
+	background: color-mix(in oklab, var(--mg-text) 12%, transparent);
+}
+.crisp .mg-btn.primary {
+	background: var(--color-primary-500);
+	color: var(--color-primary-contrast-500);
+}
+.crisp .mg-btn.primary:hover:not(:disabled) {
+	background: var(--color-primary-500);
+	filter: brightness(1.08);
+}
+.crisp .mg-btn.danger,
+.crisp .mg-btn.stop {
+	background: var(--color-error-500);
+	color: var(--color-error-contrast-500);
+}
+
+/* Fields: white, a thin grey line, the theme's corners. */
+.crisp .mg-input,
+.crisp .mg-select {
+	border: 1px solid var(--cr-field-edge);
+	border-radius: var(--radius-base);
+	background: var(--color-surface-50-950);
+}
+.crisp .mg-input:focus,
+.crisp .mg-select:focus {
+	outline: none;
+	border-color: var(--color-primary-500);
+	box-shadow: 0 0 0 1px var(--color-primary-500);
+}
+
+/* Links in the primary colour, as Skeleton's anchors. */
+.crisp .mg-link {
+	color: var(--color-primary-600-400);
+}
+
+/* Code and paths in the theme's mono face where it has one. */
+.crisp code,
+.crisp .mg-mono {
+	font-family: var(--mg-mono);
+}
+
+/* Even grids (lib/workspace/even.ts): every row full, columns set by the `even` action. */
+.mg-even {
+	display: grid;
+	grid-template-columns: repeat(var(--cols, 1), minmax(0, 1fr));
+}
+
+/* Simple mode: explanations belong to Guided mode (ui.explain), or to a part whose ? is
+   pressed (data-help="on" on it). Status, warnings and controls never carry .mg-explain;
+   whole blocks of help use <Explain> instead. */
+.crisp[data-help='off'] .mg-explain:not([data-help='on'] .mg-explain) {
+	display: none !important;
+}
+
+/* The original pages' large type, brought to the same scale inside a page (the bar keeps its own). */
+.crisp .content :is(.text-4xl, .text-5xl) {
+	font-size: 1.6rem;
+	line-height: 1.2;
+}
+.crisp .content .text-3xl {
+	font-size: 1.35rem;
+}
+.crisp .content .text-2xl {
+	font-size: 1.15rem;
+}
+.crisp .content .text-xl {
+	font-size: 1.05rem;
+}
+.crisp .content .text-lg {
+	font-size: 0.95rem;
+}
+
+/* Tab completion's list under a path field (lib/workspace/path-complete.ts). */
+.mg-complete {
+	position: fixed;
+	z-index: 60;
+	display: flex;
+	flex-direction: column;
+	max-width: min(560px, 90vw);
+	max-height: 260px;
+	padding: 4px;
+	overflow: auto;
+	border: 1px solid var(--mg-border);
+	border-radius: var(--mg-r-sm);
+	background: var(--cr-card, var(--mg-surface));
+	box-shadow: 0 8px 24px rgb(0 0 0 / 0.14);
+}
+.mg-complete button {
+	padding: 4px 10px;
+	border: none;
+	border-radius: 6px;
+	background: none;
+	color: var(--mg-text);
+	font-family: var(--mg-mono, ui-monospace, monospace);
+	font-size: var(--mg-fs-sm);
+	text-align: left;
+	white-space: nowrap;
+	cursor: pointer;
+}
+.mg-complete button:hover,
+.mg-complete button[aria-selected] {
+	background: color-mix(in srgb, var(--mg-accent) 14%, transparent);
+	color: var(--mg-accent-ink, var(--mg-accent));
+}

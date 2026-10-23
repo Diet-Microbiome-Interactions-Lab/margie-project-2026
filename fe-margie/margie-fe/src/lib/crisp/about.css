@@ -1,0 +1,101 @@
+/* The About pages (Methods, README, Contributors, Acknowledgements): boxes with a small label
+   at the top, as Install, Settings and the User profile have. */
+@layer components {
+	.ab {
+		display: flex;
+		flex-direction: column;
+		gap: var(--cr-gutter, 16px);
+		max-width: 1100px;
+	}
+	.ab-pair {
+		display: grid;
+		grid-template-columns: repeat(2, minmax(0, 1fr));
+		gap: var(--cr-gutter, 16px);
+		align-items: stretch;
+	}
+	.ab-box {
+		display: flex;
+		flex-direction: column;
+		gap: 10px;
+		min-width: 0;
+		padding: 16px 18px;
+		border: 1px solid var(--cr-card-edge, var(--mg-border));
+		border-radius: var(--mg-r);
+		background: var(--cr-card, var(--mg-surface));
+		color: var(--mg-text);
+		font-size: var(--mg-fs-sm);
+		line-height: 1.6;
+	}
+	.ab-box > h2 {
+		margin: 0;
+		font-size: var(--mg-fs-xs);
+		font-weight: 650;
+		letter-spacing: 0.06em;
+		text-transform: uppercase;
+		color: var(--mg-text-2);
+	}
+	.ab-box p {
+		margin: 0;
+	}
+	.ab-box h3 {
+		margin: 6px 0 0;
+		font-size: var(--mg-fs-sm);
+		font-weight: 650;
+	}
+	.ab-box ul,
+	.ab-box ol {
+		margin: 0;
+		padding-left: 1.3em;
+	}
+	.ab-box li + li {
+		margin-top: 3px;
+	}
+	.ab-lab {
+		color: var(--mg-text-2);
+	}
+	.ab-table {
+		width: 100%;
+		border-collapse: collapse;
+		font-size: var(--mg-fs-sm);
+	}
+	.ab-table th {
+		padding: 6px 8px;
+		border-bottom: 1px solid var(--mg-border);
+		color: var(--mg-text-3);
+		font-size: var(--mg-fs-xs);
+		font-weight: 600;
+		text-align: left;
+	}
+	.ab-table td {
+		padding: 6px 8px;
+		border-top: 1px solid var(--mg-border);
+		vertical-align: top;
+	}
+	.ab-table tr:first-child td {
+		border-top: none;
+	}
+	.ab-num {
+		color: var(--mg-text-3);
+		font-variant-numeric: tabular-nums;
+		white-space: nowrap;
+	}
+	.ab-formula {
+		padding: 8px 12px;
+		border-radius: var(--mg-r-sm);
+		background: var(--mg-surface-2);
+		font-family: var(--mg-mono, ui-monospace, monospace);
+		font-size: var(--mg-fs-xs);
+		white-space: pre-wrap;
+	}
+	.ab-cite {
+		padding: 10px 12px;
+		border-left: 3px solid var(--mg-accent);
+		border-radius: var(--mg-r-sm);
+		background: color-mix(in srgb, var(--mg-accent) 6%, transparent);
+	}
+	@media (max-width: 860px) {
+		.ab-pair {
+			grid-template-columns: minmax(0, 1fr);
+		}
+	}
+}

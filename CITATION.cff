@@ -1,0 +1,17 @@
+cff-version: 1.2.0
+message: "If you use this software, please cite it as below."
+authors:
+  - family-names: "Bhattarai"
+    given-names: "Sajal"
+    orcid: "https://orcid.org/0000-0002-3143-5483"
+  - family-names: "Deemer"
+    given-names: "Dane"
+    orcid: "https://orcid.org/0000-0002-4485-0280"
+  - family-names: "Lindemann"
+    given-names: "Stephen R."
+    orcid: "https://orcid.org/0000-0002-3788-5389"
+title: "MARGIE: Mostly Automated Rapid Genome Inference Environment"
+type: software
+license: MIT
+url: "https://github.com/Diet-Microbiome-Interactions-Lab/margie-project-2026"
+repository-code: "https://github.com/Diet-Microbiome-Interactions-Lab/margie-project-2026"
