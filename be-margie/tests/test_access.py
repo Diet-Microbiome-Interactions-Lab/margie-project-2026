@@ -107,16 +107,24 @@ def test_a_good_sign_in_clears_the_count(client, test_rsa_key):  # noqa: F811
 
 def test_many_names_from_one_address_lock_the_address(client):  # noqa: F811
     for k in range(20):
-        client.post("/v1/auth/login", json={"username": f"guess{k}", "password": "nope"}, headers={"X-Real-IP": "203.0.113.9"})
-    r = client.post("/v1/auth/login", json={"username": "someone", "password": "x"}, headers={"X-Real-IP": "203.0.113.9"})
+        client.post("/v1/auth/login", json={"username": f"guess{k}", "password": "nope"}, headers={"X-Real-IP": "34.1.2.3"})
+    r = client.post("/v1/auth/login", json={"username": "someone", "password": "x"}, headers={"X-Real-IP": "34.1.2.3"})
     assert r.status_code == 429
     # Another address is not affected.
-    assert client.post("/v1/auth/login", json={"username": "someone", "password": "x"}, headers={"X-Real-IP": "198.51.100.7"}).status_code == 401
+    assert client.post("/v1/auth/login", json={"username": "someone", "password": "x"}, headers={"X-Real-IP": "100.24.1.9"}).status_code == 401
+
+
+def test_a_private_address_never_locks_everyone_out(client):  # noqa: F811
+    # Behind a proxy that hides callers, everyone arrives from one internal address.
+    for k in range(25):
+        client.post("/v1/auth/login", json={"username": f"guess{k}", "password": "nope"}, headers={"X-Real-IP": "10.5.29.0"})
+    assert client.post("/v1/auth/login", json={"username": "someone", "password": "x"}, headers={"X-Real-IP": "10.5.29.0"}).status_code == 401
 
 
 def test_sign_ups_from_one_address_are_limited(client, test_rsa_key):  # noqa: F811
     with patch(f"{AUTH}.make_user_connection") as make:
         make.return_value.connect.side_effect = Exception("refused")
-        codes = [client.post("/v1/auth/register", json={**REG, "username": f"n{k}", "cluster_host": "x.example.edu", "private_key": test_rsa_key}).status_code
+        codes = [client.post("/v1/auth/register", json={**REG, "username": f"n{k}", "cluster_host": "x.example.edu", "private_key": test_rsa_key},
+                             headers={"X-Real-IP": "34.1.2.3"}).status_code
                  for k in range(11)]
     assert codes[:10] == [400] * 10 and codes[10] == 429

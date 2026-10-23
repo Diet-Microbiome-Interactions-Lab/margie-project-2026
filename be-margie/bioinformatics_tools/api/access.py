@@ -7,13 +7,17 @@ is tied to a cluster account (sign-up logs in to it with the user's key), so thi
 can sign up and sign in. Empty, any cluster is accepted.
 
 Guessing: failed sign-ins lock the username, and the address they come from, for a while;
-sign-ups are limited per address too, since each makes the server log in to a cluster.
-Counted in memory, per API process (one replica: SQLite).
+sign-ups are limited per address too, since each makes the server log in to a cluster. An
+address counts only when it is a public one: behind a proxy that hides callers, everyone
+arrives from the same internal address, and limiting by it would lock everyone out at once,
+so there only the per-username limit applies. Counted in memory, per API process (one
+replica: SQLite).
 """
 
 from __future__ import annotations
 
 import fnmatch
+import ipaddress
 import os
 import threading
 import time
@@ -106,9 +110,21 @@ SIGNIN_BY_ADDRESS = Guard(limit=20, window=15 * 60, lock=15 * 60)
 SIGNUP_BY_ADDRESS = Guard(limit=10, window=60 * 60, lock=60 * 60)
 
 
-def client_address(request: Request) -> str:
-    """The caller's address: X-Real-IP, which the ingress in front sets, else the connection's."""
-    return (request.headers.get('x-real-ip') or (request.client.host if request.client else '') or '?').strip()
+def raw_address(request: Request) -> str:
+    """The caller's address as given: X-Real-IP, which the ingress in front sets, else the connection's."""
+    return (request.headers.get('x-real-ip') or (request.client.host if request.client else '') or '').strip()
+
+
+def client_address(request: Request) -> str | None:
+    """The caller's public address, to limit attempts by; None when it is private, loopback or
+    unknown (a proxy that hides callers), when only the per-username limit applies."""
+    try:
+        ip = ipaddress.ip_address(raw_address(request))
+    except ValueError:
+        return None
+    if ip.is_private or ip.is_loopback or ip.is_link_local or ip.is_unspecified or ip.is_reserved:
+        return None
+    return str(ip)
 
 
 def too_many(wait: float, what: str) -> HTTPException:

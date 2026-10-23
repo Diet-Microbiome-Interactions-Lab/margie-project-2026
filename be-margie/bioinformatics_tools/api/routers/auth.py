@@ -95,10 +95,11 @@ def register(body: UserRegister, request: Request):
     # each makes the server log in to a cluster.
     access.check_cluster(body.cluster_host)
     address = access.client_address(request)
-    wait = access.SIGNUP_BY_ADDRESS.wait(address)
-    if wait:
-        raise access.too_many(wait, 'new accounts from here')
-    access.SIGNUP_BY_ADDRESS.count(address)
+    if address:
+        wait = access.SIGNUP_BY_ADDRESS.wait(address)
+        if wait:
+            raise access.too_many(wait, 'new accounts from here')
+        access.SIGNUP_BY_ADDRESS.count(address)
 
     _validate_private_key(body.private_key)
 
@@ -192,7 +193,7 @@ def login(body: UserLogin, request: Request):
     )
     name = body.username.strip().lower()
     address = access.client_address(request)
-    wait = max(access.SIGNIN_BY_NAME.wait(name), access.SIGNIN_BY_ADDRESS.wait(address))
+    wait = max(access.SIGNIN_BY_NAME.wait(name), access.SIGNIN_BY_ADDRESS.wait(address) if address else 0)
     if wait:
         raise access.too_many(wait, 'failed sign-ins')
 
@@ -204,8 +205,9 @@ def login(body: UserLogin, request: Request):
 
     if row is None or not verify_password(body.password, row['password_hash']):
         access.SIGNIN_BY_NAME.count(name)
-        access.SIGNIN_BY_ADDRESS.count(address)
-        LOGGER.warning('Failed sign-in for %r from %s (connection from %s)', name, address,
+        if address:
+            access.SIGNIN_BY_ADDRESS.count(address)
+        LOGGER.warning('Failed sign-in for %r from %s (connection from %s)', name, access.raw_address(request) or '?',
                        request.client.host if request.client else '?')
         raise _invalid
     if not is_local_mode():
