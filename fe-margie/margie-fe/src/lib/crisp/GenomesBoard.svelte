@@ -33,6 +33,11 @@
 	const folder = $derived(ws.genomeFolder || ws.setting('USER_INPUT_DIR'));
 	const output = $derived(ws.setting('OUTPUT_ROOT') || ws.resultRoots.outputRoot);
 	const working = $derived(ws.setting('margie_sb.stores_root'));
+	/** The folders' last names for the one-line summary; the whole path shows on hover. */
+	const last = (p: string) => p.replace(/\/+$/, '').split('/').pop() || p;
+	/** The three folder fields: folded under the genomes' title, open while no genomes folder is set. */
+	let foldersOpen = $state(false);
+	const showFolders = $derived(foldersOpen || !folder);
 
 	// ------------------------------------------------ adding files
 	async function add(files: FileList | File[]) {
@@ -49,44 +54,6 @@
 	}
 </script>
 
-<!-- The folders a run uses: always open. -->
-<section class="gb-board" aria-labelledby="gb-folders-t">
-	<div class="gb-top">
-		{#if step}<span class="gb-step">{step}</span>{/if}
-		<h2 class="gb-colhead" id="gb-folders-t">Folders</h2>
-	</div>
-	<div class="gb-folders" class:three={backend.cluster}>
-		<FolderField label="Genomes folder" key="USER_INPUT_DIR" value={folder} placeholder="/path/to/genomes" />
-		<FolderField label="Results folder" key="OUTPUT_ROOT" value={output} placeholder="/path/to/results" />
-		{#if backend.cluster}
-			<FolderField label="MARGIE-generated databases" key="margie_sb.stores_root" value={working} placeholder="/scratch/cluster/you/margie/margie-databases">
-				{#snippet help()}
-					<p>
-						These are not the reference databases the annotation tools search (Pfam, KEGG, COG and the others, set up on Install). They are the
-						databases MARGIE builds from your own runs and adds to with every genome: the MARGIE database (SQLite: results, cached tool outputs
-						and job history), the operon reference, the fingerprint databases and the genome pool. You can back them up to depot from
-						<a class="mg-link" href={uiBase.to('/settings#databases')}>Settings</a>.
-					</p>
-					<p>
-						They live in this working folder on the cluster, and runs need them; change the path here to use another folder. When none are found
-						here, the first run copies the lab's base databases from the group's folder on depot and works from those, unless you set up fresh,
-						empty ones in <a class="mg-link" href={uiBase.to('/settings#databases')}>Settings → Databases</a>.
-					</p>
-					<p>
-						Scoring compares each genome with what the SQLite database, the operon reference and the fingerprint databases already hold. Starting
-						from the base databases gives it reference genomes to compare with from the first run, so that is the recommended start.
-					</p>
-				{/snippet}
-			</FolderField>
-		{/if}
-	</div>
-	<p class="gb-note mg-explain">
-		Genomes are read from the first folder and results written to the second.{backend.cluster
-			? ' The third holds the databases MARGIE generates from your runs (not the tools\' reference databases); its ? says more.'
-			: ''}
-	</p>
-</section>
-
 <!-- The genomes: folded to one line until opened; files dropped anywhere on it are added. -->
 <section
 	class="gb-board"
@@ -102,9 +69,12 @@
 	ondrop={drop}
 >
 	<div class="gb-top">
-		{#if step}<span class="gb-step">{step + 1}</span>{/if}
+		{#if step}<span class="gb-step">{step}</span>{/if}
 		<h2 class="gb-colhead">Genomes <span class="gb-count">{ws.genomes.length || ''}</span></h2>
-		{#if ws.genomes.length}<span class="gb-sum">{described} with a domain and genetic code</span>{/if}
+		<!-- Only when it changes the gene caller: without GTDB-Tk, a genome needs both to be called by RASTtk. -->
+		{#if ws.genomes.length && ws.setting('RUN_GTDBTK') !== '1' && described < ws.genomes.length}
+			<span class="gb-sum">{ws.genomes.length - described} without a domain and genetic code (called by Prodigal)</span>
+		{/if}
 		<span class="mg-grow"></span>
 		{#if canAdd}
 			<button type="button" class="mg-link quiet" disabled={adding} onclick={() => fileInput?.click()}>{adding ? (backend.cluster ? 'Copying…' : 'Adding…') : dragging ? 'Drop to add them' : 'Add files'}</button>
@@ -113,6 +83,48 @@
 			<button type="button" class="mg-link quiet" aria-expanded={!shut} onclick={() => ui.toggleFold(foldId, true)}>{shut ? 'Show' : 'Hide'}</button>
 		{/if}
 	</div>
+
+	<!-- Where genomes come from and results go: one line, the fields behind Change folders. -->
+	<div class="gb-where">
+		<span>
+			From <b class="mg-mono" title={folder}>{folder ? last(folder) : 'no folder yet'}</b> · results to
+			<b class="mg-mono" title={output}>{output ? last(output) : 'your home folder'}</b>{#if backend.cluster}{' · '}databases in
+				<b class="mg-mono" title={working}>{working ? last(working) : 'margie-databases'}</b>{/if}
+		</span>
+		{#if folder}<button type="button" class="mg-link quiet" aria-expanded={foldersOpen} onclick={() => (foldersOpen = !foldersOpen)}>{foldersOpen ? 'Done' : 'Change folders'}</button>{/if}
+	</div>
+	{#if showFolders}
+		<div class="gb-folders" class:three={backend.cluster}>
+			<FolderField label="Genomes folder" key="USER_INPUT_DIR" value={folder} placeholder="/path/to/genomes" />
+			<FolderField label="Results folder" key="OUTPUT_ROOT" value={output} placeholder="/path/to/results" />
+			{#if backend.cluster}
+				<FolderField label="MARGIE-generated databases" key="margie_sb.stores_root" value={working} placeholder="/scratch/cluster/you/margie/margie-databases">
+					{#snippet help()}
+						<p>
+							These are not the reference databases the annotation tools search (Pfam, KEGG, COG and the others, set up on Install). They are the
+							databases MARGIE builds from your own runs and adds to with every genome: the MARGIE database (SQLite: results, cached tool outputs
+							and job history), the operon reference, the fingerprint databases and the genome pool. You can back them up to depot from
+							<a class="mg-link" href={uiBase.to('/settings#databases')}>Settings</a>.
+						</p>
+						<p>
+							They live in this working folder on the cluster, and runs need them; change the path here to use another folder. When none are found
+							here, the first run copies the lab's base databases from the group's folder on depot and works from those, unless you set up fresh,
+							empty ones in <a class="mg-link" href={uiBase.to('/settings#databases')}>Settings → Databases</a>.
+						</p>
+						<p>
+							Scoring compares each genome with what the SQLite database, the operon reference and the fingerprint databases already hold. Starting
+							from the base databases gives it reference genomes to compare with from the first run, so that is the recommended start.
+						</p>
+					{/snippet}
+				</FolderField>
+			{/if}
+		</div>
+		<p class="gb-note mg-explain">
+			Genomes are read from the first folder and results written to the second.{backend.cluster
+				? ' The third holds the databases MARGIE generates from your runs (not the tools\' reference databases); its ? says more.'
+				: ''}
+		</p>
+	{/if}
 
 	{#if !shut}
 		<div class="gb-src">
@@ -176,6 +188,19 @@
 	.gb-board.folded {
 		padding-top: 10px;
 		padding-bottom: 10px;
+	}
+	.gb-where {
+		display: flex;
+		flex-wrap: wrap;
+		align-items: baseline;
+		gap: 4px 12px;
+		padding-left: 32px;
+		font-size: var(--mg-fs-sm);
+		color: var(--mg-text-2);
+	}
+	.gb-where b {
+		font-weight: 500;
+		color: var(--mg-text);
 	}
 	.gb-note {
 		margin: 0;

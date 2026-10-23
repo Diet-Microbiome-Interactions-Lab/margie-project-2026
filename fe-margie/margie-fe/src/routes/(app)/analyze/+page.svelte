@@ -38,6 +38,26 @@
 		return { text: `All ${plural(done.length, 'genome')} annotated.`, action: { label: 'Open Results', href: '/results' } };
 	});
 
+	/** Before a run, a short checklist: genomes, tools, then only what still needs doing. */
+	type Check = { ok: boolean; text: string; href?: string; info?: boolean };
+	const checklist = $derived.by((): Check[] => {
+		const tools = ws.chosenTools.length;
+		const items: Check[] = [
+			{ ok: n > 0, text: n ? plural(n, 'genome') : 'Add genomes', href: '#genomes' },
+			{ ok: true, text: tools ? plural(tools, 'tool') : 'Gene calling only', href: '#tools' }
+		];
+		// The licence terms have their own step on this page, so they are not repeated here.
+		const todo = ws.setup.filter((r) => r.required && r.id !== 'terms' && (r.tone === 'warn' || r.tone === 'danger'));
+		for (const r of todo) items.push({ ok: false, text: `${r.label}: ${r.value.toLowerCase()}`, href: r.id === 'terms' ? '#licence' : r.href });
+		if (!todo.length && ws.setup.length) items.push({ ok: true, text: backend.cluster ? 'Cluster ready' : 'Ready', href: '/install' });
+		if (backend.cluster && ws.stores && !ws.stores.ready) {
+			// Copies already put in the working folder are used as they are; the rest are copied once.
+			const own = ws.stores.stores.some((x) => !x.version && x.found?.ready);
+			items.push({ ok: true, info: true, text: own ? 'First run uses your own copies and copies the rest' : 'First run copies your databases', href: '/install#databases' });
+		}
+		return items;
+	});
+
 	/** Evidence-grid columns: the running run's tools (all when it names none), else the chosen ones. */
 	const runTools = $derived.by(() => {
 		const args = ws.active?.args ?? [];
@@ -58,19 +78,28 @@
 <div class="cr-page" data-shade="page-analyze">
 	<header class="cr-head">
 		<h1 class="cr-title">Analyze</h1>
+		{#if backend.cluster && backend.user}
+			<span class="cr-meta">runs as <b class="mg-mono">{backend.user}@{backend.host.split('.')[0]}</b>{account ? `, account ${account}` : ''}</span>
+		{/if}
 	</header>
 
-	<!-- Where things stand, on one thin line: for reading only. -->
-	<p class="an-status" role="status">
-		<span class="an-dot" class:going={!!ws.active} aria-hidden="true"></span>
-		<span class="an-text">{status.text}</span>
-		{#if status.action}<a class="mg-link" href={status.action.href}>{status.action.label}</a>{/if}
-		<span class="mg-grow"></span>
-		{#if done.length && waiting.length}<span class="an-meta">{done.length} annotated</span>{/if}
-		{#if backend.cluster && backend.user}
-			<span class="an-meta">runs as <b class="mg-mono">{backend.user}@{backend.host.split('.')[0]}</b>{account ? `, account ${account}` : ''}</span>
-		{/if}
-	</p>
+	<!-- While a run goes: where it is. Otherwise: a short checklist, with only what still needs doing. -->
+	{#if ws.active || !ws.genomesRead}
+		<p class="an-status" role="status">
+			<span class="an-dot" class:going={!!ws.active} aria-hidden="true"></span>
+			<span class="an-text">{status.text}</span>
+			{#if status.action}<a class="mg-link" href={status.action.href}>{status.action.label}</a>{/if}
+		</p>
+	{:else}
+		<ul class="an-check" aria-label="Before a run">
+			{#each checklist as c (c.text)}
+				<li class:ok={c.ok && !c.info} class:todo={!c.ok} class:info={c.info}>
+					<span class="an-mark" aria-hidden="true">{c.info ? 'i' : c.ok ? '✓' : '!'}</span>
+					{#if c.href}<a href={c.href}>{c.text}</a>{:else}{c.text}{/if}
+				</li>
+			{/each}
+		</ul>
+	{/if}
 
 	<AnalyzeBoard tools={runTools} />
 </div>
@@ -85,6 +114,54 @@
 		padding: 0 2px;
 		font-size: var(--mg-fs-sm);
 		color: var(--mg-text-2);
+	}
+	/* The checklist: one row of small items, green when done, amber when it needs doing. */
+	.an-check {
+		display: flex;
+		flex-wrap: wrap;
+		gap: 6px 8px;
+		margin: -4px 0 0;
+		padding: 0;
+		list-style: none;
+		font-size: var(--mg-fs-sm);
+	}
+	.an-check li {
+		display: inline-flex;
+		align-items: center;
+		gap: 6px;
+		padding: 3px 10px 3px 4px;
+		border-radius: 999px;
+		background: color-mix(in srgb, var(--mg-text) 5%, transparent);
+	}
+	.an-check a {
+		color: inherit;
+		text-decoration: none;
+	}
+	.an-check a:hover {
+		text-decoration: underline;
+	}
+	.an-mark {
+		display: grid;
+		place-items: center;
+		width: 18px;
+		height: 18px;
+		border-radius: 50%;
+		font-size: 11px;
+		font-weight: 700;
+		color: var(--mg-on-accent, #fff);
+		background: var(--mg-text-3);
+	}
+	.an-check li.ok .an-mark {
+		background: var(--mg-ok);
+	}
+	.an-check li.todo {
+		background: color-mix(in srgb, var(--mg-warn) 12%, transparent);
+	}
+	.an-check li.todo .an-mark {
+		background: var(--mg-warn);
+	}
+	.an-check li.info .an-mark {
+		background: var(--mg-accent);
 	}
 	.an-dot {
 		flex: none;
@@ -104,14 +181,6 @@
 	}
 	.an-text {
 		color: var(--mg-text);
-	}
-	.an-meta {
-		font-size: var(--mg-fs-xs);
-		color: var(--mg-text-3);
-	}
-	.an-meta b {
-		font-weight: 500;
-		color: var(--mg-text-2);
 	}
 	:global([data-motion='off']) .an-dot {
 		animation: none;

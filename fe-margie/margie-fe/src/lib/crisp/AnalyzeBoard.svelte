@@ -30,18 +30,10 @@
 	const GRID = 'analyze:grid';
 	const GENOME_TABLE = 'analyze:genome-table';
 
-	/** On the cluster, a first run copies your databases to scratch first; said before the button. */
+	/** On the cluster, your databases' state (the page's checklist says when a first run copies them). */
 	$effect(() => {
 		if (backend.cluster) ws.loadStores();
 	});
-	const firstCopy = $derived(!!backend.cluster && !!ws.stores && !ws.stores.ready);
-	/** Databases already put in the working folder by hand, which setting up uses as they are. */
-	const ownCopies = $derived(
-		(ws.stores?.stores ?? [])
-			.filter((s) => !s.version && s.found?.ready)
-			.map((s) => s.label)
-			.join(', ')
-	);
 
 	/** On the cluster, the licence terms are accepted once, here, before a first run. */
 	const needsTerms = $derived(!!backend.cluster && ws.setup.some((r) => r.id === 'terms' && r.tone !== 'ok'));
@@ -214,7 +206,7 @@
 {#if needsTerms}
 	<section class="card licbox" class:folded={ui.isFolded(LICENCE, true)} id="licence" aria-labelledby="lic-h">
 		<header class="lichead">
-			<span class="stepn">5</span>
+			<span class="stepn">4</span>
 			<h2 id="lic-h">Licence terms</h2>
 			<span class="lic-need">Not accepted yet: needed once, before your first run</span>
 			<span class="mg-grow"></span>
@@ -260,22 +252,15 @@
 				</div>
 			</div>
 		{/if}
-		{#if firstCopy && !ws.storesBusy}
-			<p class="first" role="status">
-				<b>First run:</b>
-				{#if ownCopies}your own {ownCopies} in the databases folder {ownCopies.includes(',') ? 'are' : 'is'} used as is; the rest {:else}your databases
-				{/if}are copied there once first.
-				<button type="button" class="mg-link" onclick={() => ws.setupStores()}>Set them up now</button>
-			</p>
-		{/if}
 		<RunAction />
 	{/if}
 </section>
 
-<!-- ------------------------------------------------ genomes and progress -->
+<!-- ------------------------------------------------ genomes and progress: once there is a run to show -->
+{#if run || reportRun}
 <section class="card gridcard" class:folded={ui.isFolded(GRID, true)}>
 	<header class="ghead">
-		<FoldTitle id={GRID} closed>Genomes and progress</FoldTitle>
+		<FoldTitle id={GRID} closed>{run ? 'Progress' : 'Last run'}</FoldTitle>
 		<span class="count">{rows.length ? `${rows.length} genome${rows.length === 1 ? '' : 's'}` : ''}{counts.all ? ` | ${counts.done} of ${counts.all} steps done` : ''}{srcLine ? ` | ${srcLine}` : ''}</span>
 		<span class="mg-grow"></span>
 		{#if !ui.isFolded(GRID, true)}
@@ -375,6 +360,7 @@
 		{/if}
 	</Fold>
 </section>
+{/if}
 </div>
 
 <svelte:window onkeydown={(e) => e.key === 'Escape' && (pick = null)} />
@@ -535,14 +521,6 @@
 		font-weight: 700;
 	}
 
-	.first {
-		margin: 0;
-		font-size: var(--mg-fs-sm);
-		color: var(--mg-text-2);
-	}
-	.first b {
-		font-weight: 600;
-	}
 
 	/* ---------------------------------------- the run */
 	.runcard {

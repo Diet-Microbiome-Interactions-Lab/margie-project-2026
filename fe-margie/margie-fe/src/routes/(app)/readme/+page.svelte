@@ -1,4 +1,5 @@
 <script lang="ts">
+	import AboutTabs from '$lib/crisp/AboutTabs.svelte';
 	import '$lib/crisp/about.css';
 	import { Download, MonitorDown } from 'lucide-svelte';
 	import { DESKTOP_URL } from '$lib/crisp/about';
@@ -20,12 +21,13 @@
 
 <div class="cr-page" data-shade="page-readme">
 	<div class="cr-head">
-		<h1 class="cr-title">README</h1>
+		<h1 class="cr-title">About MARGIE</h1>
 		<div class="cr-head-acts acts">
 			<a class="mg-btn small" href={DESKTOP_URL} target="_blank" rel="noreferrer"><MonitorDown size={14} /> Desktop app</a>
 			<button type="button" class="mg-btn small" onclick={download}><Download size={14} /> README.md</button>
 		</div>
 	</div>
+	<AboutTabs />
 
 	<div class="ab">
 		<section class="ab-box readme"><Markdown source={README} /></section>

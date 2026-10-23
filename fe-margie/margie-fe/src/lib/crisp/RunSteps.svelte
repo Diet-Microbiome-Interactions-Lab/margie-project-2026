@@ -113,7 +113,7 @@
 <!-- ------------------------------------------------ 2. gene calling -->
 <section class="rs-box" class:folded={ui.isFolded(CALLING, true)} aria-labelledby="rs-calling" data-help={help.calling ? 'on' : undefined}>
 	<header class="rs-head">
-		<span class="rs-n">3</span>
+		<span class="rs-n">2</span>
 		<h2 id="rs-calling">Gene calling</h2>
 		<span class="rs-sum">
 			{#if backend.cluster}
@@ -183,9 +183,9 @@
 </section>
 
 <!-- ------------------------------------------------ 3. annotation tools -->
-<section class="rs-box" class:folded={ui.isFolded(TOOLS, true)} aria-labelledby="rs-tools" data-help={help.tools ? 'on' : undefined}>
+<section class="rs-box" id="tools" class:folded={ui.isFolded(TOOLS, true)} aria-labelledby="rs-tools" data-help={help.tools ? 'on' : undefined}>
 	<header class="rs-head">
-		<span class="rs-n">4</span>
+		<span class="rs-n">3</span>
 		<h2 id="rs-tools">Annotation tools</h2>
 		<span class="rs-sum">{picked} of {offered}{ui.isFolded(TOOLS, true) ? `, ${DEPTHS.find((d) => d.value === ws.depth)?.label.toLowerCase()}` : ''}</span>
 		<span class="mg-grow"></span>

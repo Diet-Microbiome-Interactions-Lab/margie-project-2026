@@ -744,7 +744,8 @@
 				<span class="sb-desc mg-explain">Each save keeps the version it replaces beside it.</span>
 			</div>
 		{/if}
-		{#if places.length}
+		<!-- On the cluster, Files lists these same places. -->
+		{#if places.length && !backend.cluster}
 			<div class="sb-places" aria-label="Folders">
 				<span class="sb-here-t">{backend.cluster ? 'Your folders on the cluster' : 'Folders'}</span>
 				{#each places as p (p.path)}

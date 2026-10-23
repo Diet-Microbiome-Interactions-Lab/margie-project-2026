@@ -87,7 +87,6 @@
 		<p class="motto">Annotate with confidence: a genome-centric, context-dependent approach</p>
 		<div class="cta">
 			<a class="pill primary" href="/analyze"><Play size={15} /> Start annotating</a>
-			<a class="pill" href={uiBase.to('/analyze#genomes')}>Add genomes</a>
 			<a class="pill" href={uiBase.to('/results')}>See results</a>
 			{#if !ui.guided}
 				<button type="button" class="pill quiet" aria-pressed={more} aria-controls="home-more" onclick={() => (more = !more)}>
@@ -206,7 +205,6 @@
 		</section>
 	{/if}
 
-	<p class="lead">Industry-leading bioinformatics tools for comprehensive genome analysis</p>
 
 </div>
 
@@ -383,12 +381,6 @@
 		color: var(--mg-accent-ink);
 	}
 	/* The platform's line, quiet, between the opening and the notes. */
-	.lead {
-		font-size: var(--mg-fs-sm);
-		text-align: center;
-		color: var(--mg-text-3);
-	}
-
 	/* ---- Learn more ---- */
 	.more {
 		display: flex;

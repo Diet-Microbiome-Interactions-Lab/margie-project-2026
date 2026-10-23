@@ -64,8 +64,10 @@
 	.res-scroll:fullscreen {
 		background: var(--mg-bg);
 	}
+	/* The whole window's width, and room past the last row so the scroll reaches every edge. */
 	.fill {
+		max-width: none;
 		min-height: 100%;
-		padding-bottom: 16px;
+		padding-bottom: 32px;
 	}
 </style>
