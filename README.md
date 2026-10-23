@@ -149,8 +149,8 @@ Every gene in the final table, `FINAL_ANNOTATION_WITH_CONFIDENCE.tsv`, carries o
 flowchart LR
     T["Tool results<br/>one row per gene"] --> L["Labeling<br/>one label per gene"]
     L --> R["Operon reference<br/>this genome is added"]
-    R --> C["Four measures<br/>C1 · C2 · C3 · C4"]
-    C --> F["Confidence 0–1<br/>tier · review flag"]
+    R --> C["Four measures<br/>C1 | C2 | C3 | C4"]
+    C --> F["Confidence 0–1<br/>tier | review flag"]
 ```
 
 ### 1. Labeling: one name per gene

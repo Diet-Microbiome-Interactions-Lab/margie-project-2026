@@ -138,7 +138,7 @@ def fig02(genes: pd.DataFrame, outdir: Path, org_label: str) -> None:
     axC.set_ylabel("mean confidence")
     axC.set_xlim(-0.35, 1.35)
     axC.set_ylim(min(means) - 0.05, max(means) + 0.05)
-    axC.set_xlabel(f"{int(up.sum()):,} genes raised · {int(dn.sum()):,} lowered")
+    axC.set_xlabel(f"{int(up.sum()):,} genes raised | {int(dn.sum()):,} lowered")
     L.set_title(axC, "Mean confidence before vs after")
     L.panel_letter(axC, "c")
 

@@ -79,7 +79,7 @@ def fig02(recurrence: dict, outdir: Path, n_org: int) -> None:
         axTab = fig.add_subplot(inner[1])
         entries = L.draw_gene_track(axT, members, show_gaps=False, min_span=_CAP + 1)
         shown = f"  (first {_CAP} of {int(r['n_members'])} shown)" if r["n_members"] > _CAP else ""
-        axT.set_title(f"{int(r['n_members'])}-gene operon  ·  in "
+        axT.set_title(f"{int(r['n_members'])}-gene operon  |  in "
                       f"{int(r['pangenome_organisms'])} pangenome genomes{shown}",
                       fontsize=11.5, pad=6, loc="left", fontweight="bold")
         L.render_gene_table(axTab, entries, fontsize=7.8, show_location=False,

@@ -130,7 +130,7 @@
 	{#if !ui.isFolded(CALLING, true)}
 	<ol class="rs-phases">
 		<li>
-			<span class="rs-ph">Phase 1 · Quality</span>
+			<span class="rs-ph">Phase 1 | Quality</span>
 			<div class="rs-row">
 				<b>QUAST</b>
 				<span class="mg-grow"></span>
@@ -139,7 +139,7 @@
 			<p class="mg-note mg-explain">Assembly statistics (contigs, N50, length) for each genome. Optional; nothing later depends on it.</p>
 		</li>
 		<li>
-			<span class="rs-ph">Phase 2 · Taxonomy</span>
+			<span class="rs-ph">Phase 2 | Taxonomy</span>
 			<div class="rs-row">
 				<b>GTDB-Tk</b>
 				<span class="mg-grow"></span>
@@ -154,7 +154,7 @@
 			</p>
 		</li>
 		<li>
-			<span class="rs-ph">Phase 3 · Gene caller</span>
+			<span class="rs-ph">Phase 3 | Gene caller</span>
 			{#if backend.cluster}
 				<div class="rs-split" aria-label="Gene caller by genome">
 					<span class="rs-cell" class:on={byRast > 0}><b>RASTtk</b><span>{byRast} genome{byRast === 1 ? '' : 's'}</span></span>
@@ -211,7 +211,7 @@
 		{#each groups as g (g.phase)}
 			<section class="rs-group" aria-label="Phase {g.phase}">
 				<h3>
-					Phase {g.phase}{PHASE_NAME[g.phase] ? ` · ${PHASE_NAME[g.phase]}` : ''}
+					Phase {g.phase}{PHASE_NAME[g.phase] ? ` | ${PHASE_NAME[g.phase]}` : ''}
 					{#if g.phase === 4}<span class="rs-rec">recommended</span>{/if}
 					<span class="rs-gcount">{g.tools.filter((t) => inRun.has(t.name)).length} of {g.tools.length}</span>
 				</h3>

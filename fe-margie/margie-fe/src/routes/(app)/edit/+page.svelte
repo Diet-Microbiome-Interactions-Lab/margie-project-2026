@@ -100,9 +100,9 @@
 	<p class="note" class:warn={workflow}>
 		<span class="mg-mono">{path}</span>
 		{#if config}
-			· The settings MARGIE reads; Settings edits the same file. It must stay valid YAML, or it is not saved.
+			| The settings MARGIE reads; Settings edits the same file. It must stay valid YAML, or it is not saved.
 		{:else if workflow}
-			· The workflow in your copy of MARGIE on the cluster (~/margie-project-2026): your edits apply to your runs. While it differs from
+			| The workflow in your copy of MARGIE on the cluster (~/margie-project-2026): your edits apply to your runs. While it differs from
 			MARGIE's, MARGIE does not update your copy (it never overwrites your edits).
 		{/if}
 		Each save keeps the version it replaces beside it, as <span class="mg-mono">{name}.bak-&lt;date-time&gt;</span>.
