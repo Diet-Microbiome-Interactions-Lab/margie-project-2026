@@ -12,7 +12,7 @@
 	import './viewers/tools.css';
 	import { uiBase } from './base.svelte';
 	import { untrack } from 'svelte';
-	import { ArrowUp, Check, ChevronLeft, ChevronRight, ClipboardCopy, ClipboardPaste, Copy, CornerDownLeft, Download, File, FileArchive, FileCode, FileImage, FilePlus, FileSpreadsheet, FileText, Folder, FolderOpen, FolderPlus, RefreshCw, Scissors, Trash2, X } from 'lucide-svelte';
+	import { ArrowUp, Check, ChevronLeft, ChevronRight, ClipboardCopy, ClipboardPaste, Copy, CornerDownLeft, Download, Ellipsis, File, FileArchive, FileCode, FileImage, FilePlus, FileSpreadsheet, FileText, Folder, FolderOpen, FolderPlus, RefreshCw, Scissors, Trash2, X } from 'lucide-svelte';
 	import { ApiError, api, fileUrl, formatBytes, post } from '$lib/api';
 	import { ui } from './ui.svelte';
 	import { pathComplete } from './path-complete';
@@ -362,6 +362,38 @@
 	}
 	/** Every file and folder in this folder, to tick all at once. */
 	const everything = $derived(entries.map((x) => child(x.name)));
+	/** "3 folders | 12 files, 31 MB" for the folder open, leaving out what is none. */
+	const tally = $derived.by(() => {
+		const dirs = entries.filter((x) => x.type === 'directory').length;
+		const files = entries.filter((x) => x.type !== 'directory');
+		const bytes = files.reduce((n, x) => n + (x.size || 0), 0);
+		return [
+			dirs && `${dirs} folder${dirs === 1 ? '' : 's'}`,
+			files.length && `${files.length} file${files.length === 1 ? '' : 's'}${bytes ? `, ${formatBytes(bytes)}` : ''}`
+		]
+			.filter(Boolean)
+			.join(' | ');
+	});
+
+	/* A row's actions sit in one menu (the ⋯ beside Download), placed on the screen so a long list
+	   cannot clip it and nothing lies over the names. */
+	let menu = $state<{ path: string; name: string; dir: boolean; x: number; y: number; up: boolean } | null>(null);
+	function openMenu(ev: MouseEvent, path: string, name: string, dir: boolean) {
+		if (menu?.path === path) return (menu = null);
+		const r = (ev.currentTarget as HTMLElement).getBoundingClientRect();
+		const up = r.bottom + 220 > innerHeight;
+		menu = { path, name, dir, x: Math.max(8, r.right - 210), y: up ? r.top - 4 : r.bottom + 4, up };
+	}
+	/** Mounts the menu at the interface's root: the folder view is a size container, which would
+	   otherwise place a fixed menu relative to itself rather than the screen. */
+	function toRoot(node: HTMLElement) {
+		(node.closest('[data-mg-root]') ?? document.querySelector('[data-mg-root]') ?? document.body).appendChild(node);
+		return { destroy: () => node.remove() };
+	}
+	function fromMenu(run: () => void) {
+		run();
+		menu = null;
+	}
 	const allTicked = $derived(everything.length > 0 && everything.every((p) => selected.includes(p)));
 	function tickAll() {
 		selected = allTicked ? [] : [...everything];
@@ -413,7 +445,14 @@
 	}
 </script>
 
-<svelte:window onkeydown={(e) => asking && e.key === 'Escape' && (asking = null)} />
+<svelte:window
+	onkeydown={(e) => {
+		if (e.key !== 'Escape') return;
+		if (menu) menu = null;
+		else if (asking) asking = null;
+	}}
+	onresize={() => (menu = null)}
+/>
 
 <div class="fv" class:fill>
 	<div class="vw-bar fv-bar">
@@ -460,6 +499,25 @@
 			><RefreshCw size={15} /><span class="fv-lbl">Refresh</span></button
 		>
 	</div>
+
+	{#if menu}
+		{@const m = menu}
+		<div class="fv-menu-wrap" use:toRoot>
+		<button type="button" class="fv-menu-scrim" aria-label="Close the menu" onclick={() => (menu = null)}></button>
+		<div class="fv-menu" class:up={m.up} role="menu" aria-label="{m.name}" style="left: {m.x}px; top: {m.y}px">
+			{#if !m.dir || backend.cluster}
+				<!-- A folder on the cluster comes zipped (lib/cluster/downloads). -->
+				<a role="menuitem" href={fileUrl(m.path)} download onclick={() => (menu = null)}><Download size={14} />{m.dir ? 'Download as a zip' : 'Download'}</a>
+			{/if}
+			<button type="button" role="menuitem" onclick={() => fromMenu(() => copyPath(m.path))}><ClipboardCopy size={14} />Copy path</button>
+			{#if backend.cluster}
+				<button type="button" role="menuitem" onclick={() => fromMenu(() => take('copy', m.path))}><Copy size={14} />Copy</button>
+				<button type="button" role="menuitem" onclick={() => fromMenu(() => take('move', m.path))}><Scissors size={14} />Cut, to move it</button>
+				<button type="button" role="menuitem" class="danger" disabled={!!deleting} onclick={() => fromMenu(() => askDelete([m.path]))}><Trash2 size={14} />Delete</button>
+			{/if}
+		</div>
+		</div>
+	{/if}
 
 	{#if backend.cluster && clip.paths.length}
 		<!-- What is waiting to be pasted, and where it would go. -->
@@ -515,6 +573,7 @@
 				<li class="fv-row fv-crumb" style="--d: {top + i}">
 					{#if i === crumbs.length - 1}
 						<span class="fv-name here" title={c.path}><FolderOpen size={16} /><span>{c.label}</span></span>
+						{#if tally && !missing && !error}<span class="fv-tally" title="In this folder">{tally}</span>{/if}
 					{:else}
 						<button type="button" class="fv-name" title={c.path} onclick={() => open(c.path)}><Folder size={16} /><span>{c.label}</span></button>
 					{/if}
@@ -618,22 +677,18 @@
 						<span class="fv-size">{e.type === 'directory' ? '' : formatBytes(e.size)}</span>
 						<span class="fv-when" class:fresh={fresh(e)} title={new Date(e.mtime).toLocaleString()}>{ago(e.mtime)}</span>
 						<span class="fv-acts">
-							<button type="button" class="fv-dl" class:done={copiedPath === p} title="Copy the path of {e.name}" aria-label="Copy the path of {e.name}" onclick={() => copyPath(p)}>
-								{#if copiedPath === p}<Check size={14} />{:else}<ClipboardCopy size={14} />{/if}
+							<button
+								type="button"
+								class="fv-dl fv-more"
+								class:on={menu?.path === p || clip.paths.includes(p) || copiedPath === p}
+								title="Download, copy path, copy, cut or delete {e.name}"
+								aria-label="More for {e.name}"
+								aria-haspopup="menu"
+								aria-expanded={menu?.path === p}
+								onclick={(ev) => openMenu(ev, p, e.name, e.type === 'directory')}
+							>
+								{#if copiedPath === p}<Check size={14} />{:else if clip.paths.includes(p)}{#if clip.op === 'copy'}<Copy size={14} />{:else}<Scissors size={14} />{/if}{:else}<Ellipsis size={15} />{/if}
 							</button>
-							{#if backend.cluster}
-								<button type="button" class="fv-dl" class:on={clip.op === 'copy' && clip.paths.includes(p)} title="Copy {e.name}" aria-label="Copy {e.name}" onclick={() => take('copy', p)}><Copy size={14} /></button>
-								<button type="button" class="fv-dl" class:on={clip.op === 'move' && clip.paths.includes(p)} title="Cut {e.name}, to move it" aria-label="Cut {e.name}" onclick={() => take('move', p)}><Scissors size={14} /></button>
-								<button type="button" class="fv-dl fv-del" title="Delete {e.name}" aria-label="Delete {e.name}" disabled={!!deleting} onclick={() => askDelete([p])}><Trash2 size={14} /></button>
-							{/if}
-							{#if e.type === 'file'}
-								<a class="fv-dl" href={fileUrl(p)} download title="Download {e.name}" aria-label="Download {e.name}"><Download size={14} /></a>
-							{:else if backend.cluster}
-								<!-- A folder on the cluster comes zipped (lib/cluster/downloads). -->
-								<a class="fv-dl" href={fileUrl(p)} download title="Download {e.name} as a zip" aria-label="Download {e.name} as a zip"><Download size={14} /></a>
-							{:else}
-								<span class="fv-dl"></span>
-							{/if}
 						</span>
 					</li>
 				{/each}
@@ -765,7 +820,7 @@
 		align-items: center;
 		gap: 12px;
 		min-height: 34px;
-		padding: 0 6px 0 calc(6px + min(var(--d, 0), 8) * 18px);
+		padding: 0 6px 0 calc(6px + min(var(--d, 0), 5) * 14px);
 		border-radius: var(--mg-r-sm);
 		transition: background-color 120ms ease;
 	}
@@ -782,6 +837,10 @@
 	.fv-crumb,
 	.fv-note {
 		grid-template-columns: minmax(0, 1fr);
+	}
+	/* The folder open: its name, and what is in it at the right. */
+	.fv-crumb:has(.fv-tally) {
+		grid-template-columns: minmax(0, 1fr) auto;
 	}
 	.fv-place {
 		grid-template-columns: minmax(0, 1fr) minmax(0, 1.2fr) auto;
@@ -903,50 +962,85 @@
 			opacity 120ms ease,
 			background-color 120ms ease;
 	}
-	/* Only Download takes room in a row; Copy and Cut lie over the row's right end, showing on
-	   the row under the pointer, or when the row is on the clipboard, so names keep their width. */
+	/* Download and the ⋯ menu each take their own room at the row's end, so nothing lies over the name. */
 	.fv-acts {
-		position: relative;
 		display: flex;
+		gap: 2px;
 		justify-content: flex-end;
 	}
 	button.fv-dl {
-		position: absolute;
-		top: 0;
 		padding: 0;
 		border: none;
-		background: var(--mg-surface);
+		background: none;
 		cursor: pointer;
-	}
-	/* Counted from the end: Copy path, then (on a cluster) Copy, Cut and Delete, left of Download. */
-	button.fv-dl:nth-last-of-type(1) {
-		right: 30px;
-	}
-	button.fv-dl:nth-last-of-type(2) {
-		right: 60px;
-	}
-	button.fv-dl:nth-last-of-type(3) {
-		right: 90px;
-	}
-	button.fv-dl:nth-last-of-type(4) {
-		right: 120px;
-	}
-	button.fv-del:hover {
-		background: color-mix(in srgb, var(--mg-danger) 14%, transparent);
-		color: var(--mg-danger);
-	}
-	.fv-row button.fv-dl:not(.on, .done) {
-		opacity: 0;
-		pointer-events: none;
-	}
-	.fv-row:is(:hover, :focus-within) button.fv-dl {
-		pointer-events: auto;
 	}
 	.fv-row:is(:hover, :focus-within, .picked) :is(a, button).fv-dl {
 		opacity: 1;
 	}
-	.fv-dl.done {
-		color: var(--mg-ok);
+	.fv-dl:hover {
+		background: color-mix(in srgb, var(--mg-text) 8%, transparent);
+	}
+	.fv-tally {
+		padding-left: 12px;
+		overflow: hidden;
+		text-overflow: ellipsis;
+		white-space: nowrap;
+		font-size: var(--mg-fs-xs);
+		font-weight: 400;
+		color: var(--mg-text-3);
+		font-variant-numeric: tabular-nums;
+	}
+	.fv-menu-scrim {
+		position: fixed;
+		inset: 0;
+		z-index: 60;
+		border: none;
+		background: transparent;
+		cursor: default;
+	}
+	.fv-menu {
+		position: fixed;
+		z-index: 61;
+		display: flex;
+		flex-direction: column;
+		width: 210px;
+		padding: 4px;
+		border: 1px solid var(--mg-border);
+		border-radius: var(--mg-r);
+		background: var(--mg-surface);
+		box-shadow: var(--cr-pop-shadow, 0 8px 24px rgb(0 0 0 / 0.14));
+	}
+	.fv-menu.up {
+		transform: translateY(-100%);
+	}
+	.fv-menu :is(button, a) {
+		display: flex;
+		align-items: center;
+		gap: 10px;
+		height: 32px;
+		padding: 0 10px;
+		border: none;
+		border-radius: var(--mg-r-sm);
+		background: none;
+		color: var(--mg-text);
+		font: inherit;
+		font-size: var(--mg-fs-sm);
+		text-align: left;
+		text-decoration: none;
+		cursor: pointer;
+	}
+	.fv-menu :is(button, a):hover:not(:disabled) {
+		background: color-mix(in srgb, var(--mg-text) 7%, transparent);
+	}
+	.fv-menu button.danger {
+		color: var(--mg-danger);
+	}
+	.fv-menu button.danger:hover:not(:disabled) {
+		background: color-mix(in srgb, var(--mg-danger) 12%, transparent);
+	}
+	.fv-menu button:disabled {
+		opacity: 0.5;
+		cursor: not-allowed;
 	}
 	.fv-dl.on {
 		opacity: 1;
