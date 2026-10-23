@@ -120,9 +120,10 @@
 	const going = $derived(shown?.status === 'running');
 	const clock = $derived(live ? (ws.logOf === shown?.id ? ws.clock : null) : (fetched && shown && fetched.id === shown.id ? (fetched.clock ?? null) : null));
 	let tickAt = $state(Date.now());
+	// Ticks each second while the job goes, so its elapsed time counts up live.
 	$effect(() => {
 		if (!going) return;
-		const t = setInterval(() => (tickAt = Date.now()), 2000);
+		const t = setInterval(() => (tickAt = Date.now()), 1000);
 		return () => clearInterval(t);
 	});
 	const setting = (key: string) => ws.settings.find((x) => x.key === key)?.value ?? '';
@@ -240,7 +241,7 @@
 					<div class="job-what">
 						<span class="job-name">{title(shown)}</span>
 						<span class="job-meta">
-							<span class="mg-mono">{shown.id}</span> | <span class="st {shown.status}">{statusWord(shown)}</span> | {ago(shown.started)}{shown.finished ? ` | took ${duration(shown)}` : ` | running for ${duration(shown)}`}{toolsLine(shown) ? ` | ${toolsLine(shown)}` : ''}
+							<span class="mg-mono">{shown.id}</span> | <span class="st {shown.status}">{statusWord(shown)}</span> | {ago(shown.started, tickAt)}{shown.finished ? ` | took ${duration(shown, tickAt)}` : ` | running for ${duration(shown, tickAt)}`}{toolsLine(shown) ? ` | ${toolsLine(shown)}` : ''}
 						</span>
 					</div>
 					<div class="job-acts">
@@ -262,7 +263,7 @@
 				<section class="status" aria-label="Progress of {title(shown)}">
 					<div class="st-head">
 						<span class="st-sum">
-							<b>{prog.overall}%</b> | {prog.counts.done} of {prog.counts.all} steps | {going ? `${duration(shown)} so far` : `took ${duration(shown)}`}{going && leftText(prog.left, prog.unknown, UNTIMED_FLOOR) ? ` | ${leftText(prog.left, prog.unknown, UNTIMED_FLOOR)}` : ''}
+							<b>{prog.overall}%</b> | {prog.counts.done} of {prog.counts.all} steps | {going ? `${duration(shown, tickAt)} so far` : `took ${duration(shown, tickAt)}`}{going && leftText(prog.left, prog.unknown, UNTIMED_FLOOR) ? ` | ${leftText(prog.left, prog.unknown, UNTIMED_FLOOR)}` : ''}
 						</span>
 						<span class="st-bar" role="progressbar" aria-valuenow={prog.overall} aria-valuemin="0" aria-valuemax="100"><span style="width: {prog.overall}%"></span></span>
 					</div>

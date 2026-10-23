@@ -1,6 +1,7 @@
 <script lang="ts">
 	import { Eraser } from 'lucide-svelte';
 	import JobsBoard from '$lib/crisp/JobsBoard.svelte';
+	import RefreshButton from '$lib/workspace/blocks/RefreshButton.svelte';
 	import { ws } from '$lib/workspace/data.svelte';
 
 	const count = (status: string) => ws.runs.filter((r) => r.status === status).length;
@@ -39,13 +40,14 @@
 	<div class="cr-head">
 		<h1 class="cr-title">Jobs</h1>
 		<p class="cr-lede">{ws.runs.length ? counts : 'Every job started from MARGIE, with its log.'}</p>
-		{#if finished}
-			<div class="cr-head-acts">
+		<div class="cr-head-acts">
+			{#if finished}
 				<button type="button" class="mg-btn small" disabled={clearing} title="Back up the job list, then clear the finished jobs from it" onclick={clearHistory}>
 					<Eraser size={14} />{clearing ? 'Clearing…' : 'Clear history'}
 				</button>
-			</div>
-		{/if}
+			{/if}
+			<RefreshButton title="Read the jobs again" run={() => ws.loadRuns()} />
+		</div>
 	</div>
 
 	<JobsBoard />

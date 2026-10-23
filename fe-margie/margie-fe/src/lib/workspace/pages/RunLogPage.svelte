@@ -21,6 +21,13 @@
 	 */
 	let { id }: { id: string } = $props();
 	let run = $state<Run | null>(null);
+	/** Ticks each second while the run goes, so its time counts up live. */
+	let now = $state(Date.now());
+	$effect(() => {
+		if (!run || run.finished) return;
+		const t = setInterval(() => (now = Date.now()), 1000);
+		return () => clearInterval(t);
+	});
 	let step = $state('');
 	let log = $state('');
 	let error = $state('');
@@ -115,8 +122,8 @@
 				<p class="rl-meta">
 					<span class="rl-tag">{STATUS[run.status]}</span>
 					<span>{TYPE[run.kind] ?? run.kind}</span>
-					<span>started {ago(run.started)}</span>
-					<span>{run.finished ? `took ${duration(run)}` : `running for ${duration(run)}`}</span>
+					<span>started {ago(run.started, now)}</span>
+					<span>{run.finished ? `took ${duration(run)}` : `running for ${duration(run, now)}`}</span>
 					{#if run.exitCode != null && run.exitCode !== 0}<span class="rl-bad">exit {run.exitCode}</span>{/if}
 				</p>
 			{/if}
@@ -167,7 +174,7 @@
 				<div><dt>Job ID</dt><dd class="mg-mono">{id}</dd></div>
 				{#if run}
 					<div><dt>Started</dt><dd>{when(run.started)}</dd></div>
-					<div><dt>{run.finished ? 'Finished' : 'Running for'}</dt><dd>{run.finished ? when(run.finished) : duration(run)}</dd></div>
+					<div><dt>{run.finished ? 'Finished' : 'Running for'}</dt><dd>{run.finished ? when(run.finished) : duration(run, now)}</dd></div>
 					{#if run.exitCode != null}<div><dt>Exit code</dt><dd class:rl-bad={run.exitCode !== 0}>{run.exitCode}</dd></div>{/if}
 					{#if step}<div><dt>Step</dt><dd>{step}</dd></div>{/if}
 					{#if run.files?.length}
