@@ -1,5 +1,4 @@
 <script lang="ts">
-	import AboutTabs from '$lib/crisp/AboutTabs.svelte';
 	import '$lib/crisp/about.css';
 
 	/**
@@ -65,10 +64,9 @@
 
 <div class="cr-page" data-shade="page-methods">
 	<div class="cr-head">
-		<h1 class="cr-title">About MARGIE</h1>
+		<h1 class="cr-title">Methods</h1>
 		<p class="cr-lede">How MARGIE annotates a genome and scores each gene.</p>
 	</div>
-	<AboutTabs />
 
 	<div class="ab">
 		<section class="ab-box">

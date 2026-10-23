@@ -10,7 +10,7 @@
 	import { cubicOut } from 'svelte/easing';
 	import { fade, fly } from 'svelte/transition';
 	import { page } from '$app/state';
-	import { BookOpen, ChartPie, Eye, FolderOpen, Gauge, House, ListChecks, LogOut, Menu, MonitorDown, Package, Palette, Play, SlidersHorizontal, SquareTerminal, UserRound, Users, X } from 'lucide-svelte';
+	import { BookOpen, ChartPie, Eye, FlaskConical, FolderOpen, Gauge, HeartHandshake, House, ListChecks, LogOut, Menu, MonitorDown, Package, Palette, Play, SlidersHorizontal, SquareTerminal, UserRound, Users, X } from 'lucide-svelte';
 	import { DESKTOP_URL } from './about';
 	import { AppBar } from '@skeletonlabs/skeleton-svelte';
 	import avatar from '$lib/assets/neuromancer.jpg';
@@ -74,13 +74,14 @@
 			]
 		}
 	];
-	/** About MARGIE (its four pages share one entry and a tab bar, AboutTabs), and the desktop app's download page. */
-	const ABOUT_PAGES = ['/methods', '/readme', '/contributors', '/acknowledgements'];
+	/** About MARGIE, at the foot of the sidebar; the desktop app opens its download page. */
 	const ABOUT: { href: string; label: string; icon: typeof Users; external?: boolean }[] = [
-		{ href: '/methods', label: 'About MARGIE', icon: BookOpen },
+		{ href: '/methods', label: 'Methods', icon: FlaskConical },
+		{ href: '/readme', label: 'README', icon: BookOpen },
+		{ href: '/contributors', label: 'Contributors', icon: Users },
+		{ href: '/acknowledgements', label: 'Acknowledgements', icon: HeartHandshake },
 		{ href: DESKTOP_URL, label: 'Desktop app', icon: MonitorDown, external: true }
 	];
-	const aboutCurrent = (href: string) => (href === '/methods' ? ABOUT_PAGES.some((p) => current(p)) : current(href));
 
 	/*
 	 * The sidebar: the pages down the left, under the bar. The menu button folds it to its
@@ -267,7 +268,7 @@
 				{/if}
 				{#if backend.cluster && clusterParts.Compute}<clusterParts.Compute />{/if}
 				<span class="relative">
-					<button type="button" class="btn-icon btn-icon-lg hover:preset-tonal" title="Appearance: light or dark, colours, type" aria-label="Appearance" aria-expanded={themeOpen} onclick={() => (themeOpen = !themeOpen)}>
+					<button type="button" class="btn-icon btn-icon-lg hover:preset-tonal" title="Theme" aria-label="Theme" aria-expanded={themeOpen} onclick={() => (themeOpen = !themeOpen)}>
 						<Palette />
 					</button>
 					{#if themeOpen}
@@ -313,11 +314,17 @@
 								onclick={() => {
 									themeOpen = false;
 									open('colours');
-								}}>Customize: colours, type and corners</button
+								}}>All colours, type and corners</button
 							>
 						</div>
 					{/if}
 				</span>
+				<button type="button" class="btn-icon btn-icon-lg {drawer ? 'preset-tonal-primary' : 'hover:preset-tonal'}" title="Customize" aria-label="Customize" aria-pressed={drawer} onclick={() => (drawer ? (drawer = false) : open(tab))}>
+					<SlidersHorizontal />
+				</button>
+				<a href="/profile" title={who} class="hover:opacity-80 transition-opacity">
+					<img src={avatar} alt="Profile" class="size-10 rounded-full object-cover ring-2 ring-surface-300-700" />
+				</a>
 				<button type="button" class="btn-icon btn-icon-lg hover:preset-tonal" title="Sign out" aria-label="Sign out" onclick={() => backend.signOut()}>
 					<LogOut />
 				</button>
@@ -380,7 +387,7 @@
 				<div class="border-t border-surface-300-700 pt-3 space-y-1">
 					<p class="px-3 text-xs font-bold uppercase tracking-wider opacity-60">About</p>
 					{#each ABOUT as n (n.href)}
-						<a href={n.href} class="mg-drawer-item" aria-current={aboutCurrent(n.href) ? 'page' : undefined} target={n.external ? '_blank' : undefined} rel={n.external ? 'noreferrer' : undefined}>
+						<a href={n.href} class="mg-drawer-item" aria-current={current(n.href) ? 'page' : undefined} target={n.external ? '_blank' : undefined} rel={n.external ? 'noreferrer' : undefined}>
 							<n.icon size={18} />
 							<span><b>{n.label}</b></span>
 						</a>
@@ -406,7 +413,7 @@
 			<span class="grow"></span>
 			<div class="mg-side-about">
 				{#each ABOUT as n (n.href)}
-					<a href={n.href} class="mg-side-item small" aria-current={aboutCurrent(n.href) ? 'page' : undefined} title={n.external ? `${n.label}: download it` : n.label} target={n.external ? '_blank' : undefined} rel={n.external ? 'noreferrer' : undefined}>
+					<a href={n.href} class="mg-side-item small" aria-current={current(n.href) ? 'page' : undefined} title={n.external ? `${n.label}: download it` : n.label} target={n.external ? '_blank' : undefined} rel={n.external ? 'noreferrer' : undefined}>
 						<n.icon size={15} /><span>{n.label}</span>
 					</a>
 				{/each}

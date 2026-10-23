@@ -1,5 +1,4 @@
 <script lang="ts">
-	import AboutTabs from '$lib/crisp/AboutTabs.svelte';
 	import '$lib/crisp/about.css';
 	import { Copy } from 'lucide-svelte';
 	import { CITATION, CITE_URL, LAB, PEOPLE } from '$lib/crisp/about';
@@ -18,9 +17,9 @@
 
 <div class="cr-page" data-shade="page-contributors">
 	<div class="cr-head">
-		<h1 class="cr-title">About MARGIE</h1>
+		<h1 class="cr-title">Contributors</h1>
+		<p class="cr-lede">A product of the {LAB.name}. PI: {LAB.pi} (<a class="mg-link" href="mailto:{LAB.email}">{LAB.email}</a>).</p>
 	</div>
-	<AboutTabs />
 
 	<div class="ab">
 		<div class="ab-pair">
@@ -36,9 +35,8 @@
 			<section class="ab-box">
 				<h2>The lab</h2>
 				<p><b>{LAB.name}</b>, Purdue University</p>
-				<p class="ab-lab">
-					Questions, accounts for reviewers and collaborators, and requests: <a class="mg-link" href="mailto:{LAB.email}">{LAB.email}</a>
-				</p>
+				<p>PI: {LAB.pi}, <a class="mg-link" href="mailto:{LAB.email}">{LAB.email}</a></p>
+				<p class="ab-lab">Questions, accounts for reviewers and collaborators, and requests go to the same address.</p>
 			</section>
 		</div>
 

@@ -1,5 +1,4 @@
 <script lang="ts">
-	import AboutTabs from '$lib/crisp/AboutTabs.svelte';
 	import '$lib/crisp/about.css';
 	import { onMount } from 'svelte';
 	import { EXTRA_REFERENCES, LAB, SOFTWARE } from '$lib/crisp/about';
@@ -34,9 +33,9 @@
 
 <div class="cr-page" data-shade="page-acknowledgements">
 	<div class="cr-head">
-		<h1 class="cr-title">About MARGIE</h1>
+		<h1 class="cr-title">Acknowledgements</h1>
+		<p class="cr-lede">A product of the {LAB.name}. PI: {LAB.pi} (<a class="mg-link" href="mailto:{LAB.email}">{LAB.email}</a>).</p>
 	</div>
-	<AboutTabs />
 
 	<div class="ab">
 		<section class="ab-box">
