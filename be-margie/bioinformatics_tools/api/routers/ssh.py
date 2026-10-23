@@ -41,6 +41,7 @@ from bioinformatics_tools.workflow_tools import cache_report
 from bioinformatics_tools.workflow_tools.workflow_helpers import GENOME_EXTENSIONS
 from bioinformatics_tools.workflow_tools.workflow_registry import (
     MARGIE_SB_PHASED_TOOLS,
+    MARGIE_SB_REQUIRED_TOOLS,
     WORKFLOWS,
     REQUIRED_SYSTEM_PARAMS,
     resolve_user_paths,
@@ -1949,6 +1950,10 @@ def run_workflow(genome_data: GenomeSend, current_user: dict = Depends(get_curre
             "Running %d selected genome(s) from a staged folder: %s",
             len(genome_data.genomes), genome_path,
         )
+
+    # The tools every run needs come with any choice (workflow_registry.MARGIE_SB_REQUIRED_TOOLS).
+    if genome_data.workflow == 'margie_sb' and genome_data.selected_tools:
+        genome_data.selected_tools = list(dict.fromkeys([*genome_data.selected_tools, *sorted(MARGIE_SB_REQUIRED_TOOLS)]))
 
     # Validates tool keys; [] means "run nothing", None "run everything".
     if genome_data.selected_tools is not None:

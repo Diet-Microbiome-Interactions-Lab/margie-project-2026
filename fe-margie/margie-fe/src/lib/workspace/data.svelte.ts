@@ -34,6 +34,8 @@ export interface Tool {
 	phase?: number;
 	/** Its name as written ("eggNOG"), when known. */
 	label?: string;
+	/** Runs in every run (the cluster's labeling and scoring read it), so it cannot be switched off. */
+	required?: boolean;
 }
 
 export interface CheckRow {
@@ -373,10 +375,17 @@ class Workspace {
 	/** Tools the chosen depth runs (before annotate.sh adds operon and the envelope inputs). */
 	chosenTools = $derived.by(() => {
 		const usable = new Set(this.tools.filter((t) => t.licensed).map((t) => t.name));
-		if (this.depth === 'quick') return ['operon'];
-		if (this.depth === 'standard') return STANDARD_TOOLS.filter((t) => usable.has(t));
-		if (this.depth === 'licensed') return [...usable];
-		return this.custom.filter((t) => usable.has(t));
+		// The tools every run needs come with any choice.
+		const required = this.tools.filter((t) => t.required && t.licensed).map((t) => t.name);
+		const pick =
+			this.depth === 'quick'
+				? ['operon']
+				: this.depth === 'standard'
+					? STANDARD_TOOLS.filter((t) => usable.has(t))
+					: this.depth === 'licensed'
+						? [...usable]
+						: this.custom.filter((t) => usable.has(t));
+		return [...new Set([...required, ...pick])];
 	});
 
 	/** Images and databases the chosen depth needs that are not there yet. */

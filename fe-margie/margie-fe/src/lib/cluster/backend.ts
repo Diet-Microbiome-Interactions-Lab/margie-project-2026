@@ -56,6 +56,8 @@ interface WorkflowTool {
 	phase?: number;
 	name: string;
 	purpose: string;
+	/** Runs in every run (workflow_registry.MARGIE_SB_REQUIRED_TOOLS). */
+	required?: boolean;
 }
 interface Workflow {
 	id: string;
@@ -405,8 +407,9 @@ async function startRun(body: { kind?: string; tools?: string[]; all?: boolean; 
 	const lic = await licence.get();
 	const known = new Map(w.tools.filter((t) => t.key).map((t) => [t.key as string, t]));
 	const disabled = new Set(lic.disabled_tools);
-	// No tools chosen: only gene calling runs.
-	const chosen = new Set(body.tools?.length ? [...ALWAYS, ...body.tools] : ['rasttk']);
+	// The tools every run needs (labeling and scoring read them) come with any choice.
+	const required = w.tools.filter((t) => t.required && t.key).map((t) => t.key as string);
+	const chosen = new Set([...ALWAYS, ...required, ...(body.tools ?? [])]);
 	// GTDB-Tk follows its switch only, never the tool list.
 	chosen.delete('gtdbtk');
 	if (useGtdbtk(cfg)) chosen.add('gtdbtk');
@@ -579,7 +582,8 @@ async function listTools(): Promise<{ annotation: Tool[] }> {
 			licensed: !disabled.has(t.key as string),
 			gramDependent: (t.phase ?? 0) > ENVELOPE_PHASE && (t.phase ?? 0) < 9,
 			phase: t.phase,
-			label: t.name
+			label: t.name,
+			required: !!t.required
 		}));
 	return { annotation };
 }

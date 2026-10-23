@@ -130,6 +130,13 @@ def workflow_path_params(wf_id: str, include_sif: bool = True, include_db_root: 
     return params
 
 
+# Tools every MARGIE(SB) run includes, chosen or not: the seven C1 sources (RASTtk is the gene
+# caller), InterPro (NCBIfam, HAMAP, PIRSF and CDD for labeling), dbCAN (an EC source for C4), and
+# the operons C2 and C3 read. Leaving one out lowers or empties a score, so runs would not compare.
+# MEROPS, TCDB and GenProp stay optional: labeling and C1 do not depend on them.
+MARGIE_SB_REQUIRED_TOOLS = frozenset({
+    'cog', 'kegg', 'eggnog', 'uniprot', 'pfam', 'tigrfam', 'pgap', 'interpro', 'dbcan', 'operon'})
+
 # 'database': reads a reference database from db.<key>, else <db_root>/<key>.
 MARGIE_SB_PHASED_TOOLS = [
     {'key': 'quast', 'label': 'QUAST', 'phase': 1, 'sif': 'quast.sif', 'purpose': 'Assembly quality metrics'},
@@ -487,6 +494,7 @@ WORKFLOWS: dict[str, WorkflowKey] = {
                 'key': tool['key'],
                 'phase': tool['phase'],
                 'name': tool['label'],
+                'required': tool['key'] in MARGIE_SB_REQUIRED_TOOLS,
                 'purpose': f"Phase {tool['phase']}: {tool['purpose']}",
                 'version': 'latest',
                 'output': 'Phase report in margie_sb/phases plus stage-specific outputs in later functional commits'

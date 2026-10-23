@@ -22,8 +22,8 @@
 		{
 			n: '4',
 			step: 'Function',
-			tools: 'COG, KEGG (KofamScan), eggNOG, UniProt Swiss-Prot, Pfam, TIGRFAM, PGAP, InterPro, dbCAN, Genome Properties; MEROPS and TCDB when chosen',
-			does: 'Each tool annotates the predicted proteins on its own. Results are kept per protein, so a protein annotated in an earlier run is not searched again.'
+			tools: 'COG, KEGG (KofamScan), eggNOG, UniProt Swiss-Prot, Pfam, TIGRFAM, PGAP, InterPro and dbCAN in every run; Genome Properties, MEROPS and TCDB when chosen',
+			does: 'Each tool annotates the predicted proteins on its own. The ones labeling and scoring read always run, so scores compare across runs. Results are kept per protein, so a protein annotated in an earlier run is not searched again.'
 		},
 		{ n: '5', step: 'Operons', tools: 'UniOP', does: 'Pairwise operon probabilities between neighbouring genes, from intergenic distance, grouping genes into operons.' },
 		{ n: '6', step: 'Membrane topology', tools: 'Phobius, TMbed, SignalP 6 (when licensed)', does: 'Transmembrane helices and signal peptides.' },

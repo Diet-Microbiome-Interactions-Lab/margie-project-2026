@@ -30,6 +30,7 @@ from bioinformatics_tools.workflow_tools.workflow_helpers import (
     discover_genomes, get_workflow_prefix_for, WORKFLOW_PATH_DEFAULTS, genome_calls)
 from bioinformatics_tools.workflow_tools.workflow_registry import (
     MARGIE_SB_PHASED_TOOLS,
+    MARGIE_SB_REQUIRED_TOOLS,
     WORKFLOWS,
     margie_sb_sif_files,
 )
@@ -1482,6 +1483,8 @@ class WorkflowBase(ProgramBase):
         sif_files_override = None
         if selected_tools_raw:
             selected_tool_keys = {t.strip() for t in selected_tools_raw.split(',') if t.strip()}
+            # The tools every run needs come with any choice.
+            selected_tool_keys |= MARGIE_SB_REQUIRED_TOOLS
             for tool in MARGIE_SB_PHASED_TOOLS:
                 run_flag = _tool_to_run_flag.get(tool['key'], f"run_{tool['key']}")
                 config_overrides[run_flag] = tool['key'] in selected_tool_keys

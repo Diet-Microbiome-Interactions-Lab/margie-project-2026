@@ -88,14 +88,24 @@
 	const offered = $derived(groups.reduce((a, g) => a + g.tools.length, 0));
 	const locked = $derived(ws.tools.filter((t) => !t.licensed));
 
-	const DEPTHS: { value: Depth; label: string }[] = [
-		{ value: 'standard', label: 'Recommended' },
-		{ value: 'licensed', label: 'All' },
-		{ value: 'quick', label: 'None' },
-		{ value: 'custom', label: 'Custom' }
-	];
-	/** A tool ticked by hand makes the choice Custom, from what was chosen. */
+	/** Some tools run every time (the cluster's); then "None" is not a choice. */
+	const anyRequired = $derived(ws.tools.some((t) => t.required));
+	const DEPTHS = $derived(
+		(
+			[
+				{ value: 'standard', label: 'Recommended' },
+				{ value: 'licensed', label: 'All' },
+				{ value: 'quick', label: 'None' },
+				{ value: 'custom', label: 'Custom' }
+			] as { value: Depth; label: string }[]
+		).filter((d) => !(anyRequired && d.value === 'quick'))
+	);
+	$effect(() => {
+		if (anyRequired && ws.depth === 'quick') ws.depth = 'standard';
+	});
+	/** A tool ticked by hand makes the choice Custom, from what was chosen; a required one stays on. */
 	function toggle(name: string) {
+		if (ws.tools.find((t) => t.name === name)?.required) return;
 		const now = ws.chosenTools;
 		ws.custom = now.includes(name) ? now.filter((x) => x !== name) : [...now, name];
 		ws.depth = 'custom';
@@ -201,10 +211,17 @@
 	</header>
 	{#if !ui.isFolded(TOOLS, true)}
 	<p class="mg-note mg-explain">
-		Recommended runs the phase 4 tools, which the envelope stage and scoring read. MEROPS and TCDB are not used in scoring but add
-		peptidase and transporter calls. Tools with licence terms (MEROPS, Phobius, SignalP and others) stay off until you accept their terms;
-		add them yourself. KEGG uses only the public KOfam data. Gene calling, operons, consolidation, labeling, fingerprints and scoring always
-		run.
+		{#if anyRequired}
+			COG, KEGG, eggNOG, UniProt, Pfam, TIGRFAM, PGAP, InterPro and dbCAN run every time: labeling and the confidence score read them,
+			so every run's scores mean the same. MEROPS, TCDB and GenProp are yours to add: MEROPS and TCDB add peptidase and transporter
+			calls, and need their licence terms accepted. KEGG uses only the public KOfam data. Gene calling, operons, consolidation,
+			labeling, fingerprints and scoring always run.
+		{:else}
+			Recommended runs the phase 4 tools, which the envelope stage and scoring read. MEROPS and TCDB are not used in scoring but add
+			peptidase and transporter calls. Tools with licence terms (MEROPS, Phobius, SignalP and others) stay off until you accept their
+			terms; add them yourself. KEGG uses only the public KOfam data. Gene calling, operons, consolidation, labeling, fingerprints and
+			scoring always run.
+		{/if}
 	</p>
 
 	<div class="rs-groups" bind:clientWidth={groupsWidth} style="--cols: {toolCols}">
@@ -212,7 +229,7 @@
 			<section class="rs-group" aria-label="Phase {g.phase}">
 				<h3>
 					Phase {g.phase}{PHASE_NAME[g.phase] ? ` | ${PHASE_NAME[g.phase]}` : ''}
-					{#if g.phase === 4}<span class="rs-rec">recommended</span>{/if}
+					{#if g.phase === 4 && !anyRequired}<span class="rs-rec">recommended</span>{/if}
 					<span class="rs-gcount">{g.tools.filter((t) => inRun.has(t.name)).length} of {g.tools.length}</span>
 				</h3>
 				<ul class="rs-even mg-even">
@@ -224,9 +241,16 @@
 								class="rs-tool"
 								class:on
 								class:locked={!t.licensed}
+								class:required={t.required}
 								aria-pressed={on}
-								disabled={!t.licensed}
-								title={t.licensed ? (t.gated ? 'Licence accepted' : '') : 'Accept its licence terms first'}
+								disabled={!t.licensed || t.required}
+								title={t.required
+									? 'Runs every time: labeling and the confidence score read it'
+									: t.licensed
+										? t.gated
+											? 'Licence accepted'
+											: ''
+										: 'Accept its licence terms first'}
 								onclick={() => toggle(t.name)}
 							>
 								<span class="rs-box-mark" aria-hidden="true">{#if on}<Check size={12} strokeWidth={3.2} />{/if}</span>
@@ -234,7 +258,9 @@
 									<span>{t.label ?? t.name}</span>
 									{#if BLURB[t.name]}<small>{BLURB[t.name]}</small>{/if}
 								</span>
-								{#if !t.licensed}
+								{#if t.required && t.licensed}
+									<span class="rs-always">always</span>
+								{:else if !t.licensed}
 									<span class="rs-lic need"><Lock size={11} /></span>
 								{:else if t.gated}
 									<span class="rs-lic" aria-label="Licence accepted"><KeyRound size={11} /></span>
@@ -476,6 +502,21 @@
 		border-style: dashed;
 		opacity: 0.6;
 		cursor: not-allowed;
+	}
+	/* On in every run: shown on, not greyed like a button that cannot be pressed. */
+	.rs-tool.required:disabled {
+		opacity: 1;
+		color: var(--mg-text);
+		cursor: default;
+	}
+	.rs-always {
+		flex: none;
+		padding: 1px 6px;
+		border-radius: var(--mg-r-sm);
+		background: color-mix(in srgb, var(--mg-accent) 12%, transparent);
+		color: var(--mg-accent-ink, var(--mg-accent));
+		font-size: var(--mg-fs-xs);
+		font-weight: 600;
 	}
 	.rs-box-mark {
 		display: grid;
