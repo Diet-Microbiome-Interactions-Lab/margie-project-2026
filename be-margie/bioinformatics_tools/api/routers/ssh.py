@@ -1162,9 +1162,13 @@ def get_config(current_user: dict = Depends(get_current_user)):
     def read():
         config = ssh_sftp.read_remote_yaml(path, connection=conn)
         try:
-            # Genomes and results folders left empty get their defaults on scratch (user_stores.DEFAULT_FOLDERS).
-            if isinstance(config, dict) and user_stores.fill_default_folders(conn, config):
-                ssh_sftp.write_remote_yaml(path, config, connection=conn)
+            # Genomes and results folders left empty get their defaults on scratch (user_stores.DEFAULT_FOLDERS),
+            # and an empty partition the cluster's default (a cluster may refuse a job without one).
+            if isinstance(config, dict):
+                changed = user_stores.fill_default_folders(conn, config)
+                changed = user_stores.fill_default_partition(conn, config) or changed
+                if changed:
+                    ssh_sftp.write_remote_yaml(path, config, connection=conn)
         except Exception as exc:
             LOGGER.warning("Could not fill the default folders for %s: %s", current_user["username"], exc)
         return config
@@ -1503,6 +1507,7 @@ def _stores_call(fn, *args):
     try:
         return fn(*args)
     except user_stores.StoreError as exc:
+        LOGGER.warning("Databases: %s", exc)
         raise HTTPException(status_code=exc.status, detail=str(exc))
 
 
@@ -1872,7 +1877,8 @@ def run_workflow(genome_data: GenomeSend, current_user: dict = Depends(get_curre
         missing_fields.append('compute.cluster_default.account (SLURM account)')
     slurm_account = str(account).strip() if account else None
     partition = user_config.get('compute', {}).get('cluster_default', {}).get('partition')
-    slurm_partition = str(partition).strip() if partition else None
+    # None set: the cluster's default (a cluster may refuse a job without one).
+    slurm_partition = (str(partition).strip() if partition else '') or user_stores.default_partition(conn) or None
     slurm_walltime = _cluster_default(user_config, 'driver_walltime')
 
     if missing_fields:
@@ -2541,7 +2547,8 @@ def resume_job(job_id: str, current_user: dict = Depends(get_current_user)):
 
     main_db, user_config = _main_db_for(current_user, conn)
     slurm_account = str(user_config.get('compute', {}).get('cluster_default', {}).get('account', '')).strip() or None
-    slurm_partition = str(user_config.get('compute', {}).get('cluster_default', {}).get('partition', '')).strip() or None
+    slurm_partition = (str(user_config.get('compute', {}).get('cluster_default', {}).get('partition', '')).strip()
+                       or user_stores.default_partition(conn) or None)
     slurm_walltime = _cluster_default(user_config, 'driver_walltime')
     if not slurm_account:
         raise HTTPException(
@@ -2582,7 +2589,8 @@ def restart_job(job_id: str, current_user: dict = Depends(get_current_user)):
 
     main_db, user_config = _main_db_for(current_user, conn)
     slurm_account = str(user_config.get('compute', {}).get('cluster_default', {}).get('account', '')).strip() or None
-    slurm_partition = str(user_config.get('compute', {}).get('cluster_default', {}).get('partition', '')).strip() or None
+    slurm_partition = (str(user_config.get('compute', {}).get('cluster_default', {}).get('partition', '')).strip()
+                       or user_stores.default_partition(conn) or None)
     slurm_walltime = _cluster_default(user_config, 'driver_walltime')
     if not slurm_account:
         raise HTTPException(

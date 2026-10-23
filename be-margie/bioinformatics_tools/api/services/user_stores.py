@@ -246,6 +246,19 @@ def fill_default_folders(conn, cfg: dict) -> bool:
     return True
 
 
+def fill_default_partition(conn, cfg: dict) -> bool:
+    """Sets an empty SLURM partition setting to the cluster's default (default_partition), since a
+    cluster that marks none may refuse a job without one. A partition chosen in Settings is
+    never changed. Returns True when the config changed."""
+    if str(_cfg_get(cfg, 'compute.cluster_default.partition') or '').strip():
+        return False
+    partition = default_partition(conn)
+    if not partition:
+        return False
+    _cfg_set(cfg, 'compute.cluster_default.partition', partition)
+    return True
+
+
 # ---- Names ----
 
 def versioned(store: dict, user: str, version: int) -> str:
@@ -480,6 +493,10 @@ def _op_from(sections: dict, root: str) -> dict:
         # Pending reason (Resources, Priority, ...) shown beside the queued state.
         if slurm_state == 'PENDING' and slurm_reason and slurm_reason != 'None':
             op['slurm_reason'] = slurm_reason
+    if op.get('state') == 'queued' and not job:
+        # Queued with no SLURM job behind it: the submission was refused (as an older version left it).
+        op['state'] = 'failed'
+        op['message'] = op.get('message') or 'The copy job never reached SLURM; start it again.'
     if op.get('state') in ('queued', 'running') and job:
         # A SLURM job missing from squeue has ended.
         if not slurm_state:
@@ -666,12 +683,9 @@ def _start(conn, root: str, kind: str, plan: list[list], after: dict, cfg: dict 
     ssh_sftp.write_remote_text_file(f'{state}/op.after.json', json.dumps(after) + '\n', connection=conn)
     _run(conn, f'cd {shlex.quote(state)} && rm -f op.status op.log op.jobid op.slurm.out')
     account = str(_cfg_get(cfg or {}, 'compute.cluster_default.account') or '').strip()
-    partition = str(_cfg_get(cfg or {}, 'compute.cluster_default.partition') or '').strip()
+    partition = str(_cfg_get(cfg or {}, 'compute.cluster_default.partition') or '').strip() or default_partition(conn)
     q = shlex.quote
     if account:
-        # Shows the job as queued until it starts.
-        ssh_sftp.write_remote_text_file(
-            f'{state}/op.status', f'state=queued\nop={kind}\nlabel=Waiting for a SLURM slot\n', connection=conn)
         cmd = (f'cd {q(state)} && sbatch --parsable --job-name=margie-databases --account={q(account)} '
                + (f'--partition={q(partition)} ' if partition else '')
                + f'--time={q(walltime)} --ntasks=1 --cpus-per-task={_copy_cpus(cfg)} --mem={q(mem)} --output={q(state)}/op.slurm.out '
@@ -679,8 +693,17 @@ def _start(conn, root: str, kind: str, plan: list[list], after: dict, cfg: dict 
         code, out = _run(conn, cmd)
         job = out.strip().split(';')[0].split()[-1] if out.strip() else ''
         if code != 0 or not job.isdigit():
-            raise StoreError(f'SLURM would not take the copy job: {out.strip()}')
+            said = ' '.join(out.split())[:300]
+            # Said on the page, rather than a wait for a job that never was.
+            ssh_sftp.write_remote_text_file(
+                f'{state}/op.status', f'state=failed\nop={kind}\nlabel=SLURM would not take the copy job\n'
+                f'message=SLURM would not take the copy job (account {account}, partition {partition or "none"}): {said}\n',
+                connection=conn)
+            raise StoreError(f'SLURM would not take the copy job (account {account}, partition {partition or "none"}): {said}')
         ssh_sftp.write_remote_text_file(f'{state}/op.jobid', job + '\n', connection=conn)
+        # Shows the job as queued until it starts, unless the script has started and said running.
+        _run(conn, f'cd {q(state)} && [ -e op.status ] || '
+                   f'printf "state=queued\\nop=%s\\nlabel=Waiting for a SLURM slot\\n" {q(kind)} > op.status')
         return
     code, out = _run(conn, f'cd {q(state)} && setsid nohup bash op.sh {q(state)} '
                             f'> /dev/null 2>&1 < /dev/null & echo started')
@@ -691,6 +714,16 @@ def _start(conn, root: str, kind: str, plan: list[list], after: dict, cfg: dict 
         if _read_text(conn, f'{state}/op.status'):
             break
         time.sleep(0.25)
+
+
+def default_partition(conn) -> str:
+    """Returns the partition a job goes to when none is set: the cluster's default (sinfo marks it
+    with *), else 'cpu' where there is one; '' when neither. Some clusters mark no default
+    and refuse a job without a partition."""
+    _, out = _run(conn, 'sinfo -h -o %P 2>/dev/null')
+    names = [n.strip() for n in out.split() if n.strip()]
+    marked = next((n.rstrip('*') for n in names if n.endswith('*')), '')
+    return marked or ('cpu' if 'cpu' in names else '')
 
 
 def _size(conn, paths: list[str]) -> int:
