@@ -601,11 +601,12 @@ rule all:
 rule rasttk_all:
     """Stage 1 of workflow.py's sequential run: phase1-3 for every genome.
 
-    run_gtdbtk gates only the GTDB-Tk database load here.
+    run_gtdbtk and run_quast gate their database loads here.
     """
     input:
         expand(RASTTK_TOKEN, genome=list(GENOMES.keys())),
-        (expand(GTDBTK_TOKEN, genome=list(GENOMES.keys())) if rc_bool('run_gtdbtk', True, config=config) else [])
+        (expand(GTDBTK_TOKEN, genome=list(GENOMES.keys())) if rc_bool('run_gtdbtk', True, config=config) else []),
+        (expand(QUAST_TOKEN, genome=list(GENOMES.keys())) if rc_bool('run_quast', True, config=config) else [])
 
 
 rule phase4_8_one_genome:

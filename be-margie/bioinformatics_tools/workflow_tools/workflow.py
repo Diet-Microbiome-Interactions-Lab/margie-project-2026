@@ -753,6 +753,8 @@ class WorkflowBase(ProgramBase):
         db_path = smk_config.get('main_database')
         # Off: nothing reads GTDB-Tk, so its batch is neither restored nor run.
         run_gtdbtk_enabled = smk_config.get('run_gtdbtk', True) not in (False, 'false', '0', 'no')
+        # QUAST (phase 1) runs in Stage 1 with the gene calls; rule all is never asked for here.
+        run_quast_enabled = smk_config.get('run_quast', True) not in (False, 'false', '0', 'no')
 
         restored: dict[str, dict[str, bool]] = {}
         rasttk_restored: dict[str, bool] = {}
@@ -793,6 +795,8 @@ class WorkflowBase(ProgramBase):
                 provenance.set(g, 'gtdbtk', cache_report.KEPT, "already in this run's folder (an earlier attempt)")
             else:
                 provenance.set(g, 'gtdbtk', cache_report.FRESH, 'run with this batch' if db_path else 'no MARGIE database set')
+            if run_quast_enabled:
+                provenance.set(g, 'quast', cache_report.FRESH, "measured on each run; an assembly's quality is never cached")
             if g in prodigal_genomes:
                 provenance.set(g, 'prodigal', cache_report.FRESH, 'Prodigal gene calls are never cached')
             elif rasttk_restored.get(g):
@@ -806,11 +810,14 @@ class WorkflowBase(ProgramBase):
         # Stage 1: phases 1-3 in waves with --jobs=1, one BV-BRC submission at a time.
         def _stage1_targets(genome: str) -> list[str]:
             '''Returns the files rule rasttk_all asks for, for one genome: the
-            RASTtk DB token, plus the GTDB-Tk one when GTDB-Tk is selected.'''
+            RASTtk DB token, plus the GTDB-Tk and QUAST ones when they are selected
+            (QUAST runs once over every genome, then is split per genome).'''
             prefix = get_workflow_prefix_for(genome, smk_config)
             targets = [f"{prefix}rasttk/rasttk_db.tkn"]
             if run_gtdbtk_enabled:
                 targets.append(f"{prefix}gtdbtk/gtdbtk_db.tkn")
+            if run_quast_enabled:
+                targets.append(f"{prefix}quast/quast_db.tkn")
             return targets
 
         # "Ready": per-genome GTDB-Tk outputs on disk, or always when GTDB-Tk is off.
@@ -1543,8 +1550,10 @@ class WorkflowBase(ProgramBase):
             '''Returns each phase4-11 tool's output files for one genome, keyed by
             tool name, for restore_all()/store_all().
 
-            Excludes quast/gtdbtk/rasttk, which run as batches the DAG replans
-            anyway. Empty for Prodigal genomes, whose feature ids differ from RASTtk's.'''
+            Excludes gtdbtk/rasttk, which run as batches the DAG replans anyway, and
+            QUAST, never cached: it measures the assembly submitted, and two assemblies
+            of one strain can differ in quality. Empty for Prodigal genomes, whose
+            feature ids differ from RASTtk's.'''
             if genome in prodigal_genomes:
                 return {}
             prefix = get_workflow_prefix_for(genome, config_overrides)
