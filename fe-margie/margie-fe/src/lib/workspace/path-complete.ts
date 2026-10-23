@@ -34,7 +34,9 @@ export function sharedStart(names: string[]): string {
 	return out;
 }
 
-export function pathComplete(node: HTMLInputElement, opts: { dirs?: boolean } = {}) {
+export function pathComplete(field: HTMLInputElement | HTMLTextAreaElement, opts: { dirs?: boolean } = {}) {
+	// A path box of one line or several: both behave alike here.
+	const node = field as HTMLInputElement;
 	let dirsOnly = !!opts.dirs;
 	let list: HTMLDivElement | null = null;
 	let options: string[] = [];

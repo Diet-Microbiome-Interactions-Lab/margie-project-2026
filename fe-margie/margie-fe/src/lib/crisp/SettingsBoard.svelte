@@ -112,6 +112,46 @@
 		const m = s.description.match(/^Phase\s+(\d+)/i);
 		return m ? Number(m[1]) : null;
 	};
+	/** What each pipeline phase does, for the Phases and Per tool cards. */
+	const PHASE_NAMES: Record<number, string> = {
+		1: 'Assembly quality',
+		2: 'Taxonomy',
+		3: 'Gene calling',
+		4: 'Annotation',
+		5: 'Operons',
+		6: 'Topology and signal peptides',
+		7: 'Cell envelope',
+		8: 'Localisation',
+		9: 'Consolidation',
+		10: 'Labeling',
+		11: 'Fingerprints',
+		12: 'Scoring',
+		13: 'Fingerprint database',
+		14: 'Comparisons',
+		15: 'Evidence and the model'
+	};
+	/** A wide group's columns that hold folders or files (shown in full, below the numbers). */
+	const pathCols = (t: { rows: Row[]; cols: string[] }) =>
+		new Set(t.cols.filter((c) => t.rows.some((r) => r.at.get(c)?.s.type === 'path')));
+	/** A text box that grows with what it holds, so a long path shows in full. */
+	function autogrow(node: HTMLTextAreaElement, _value?: unknown) {
+		const fit = () => {
+			node.style.height = 'auto';
+			// scrollHeight leaves out the borders, which the box's height includes.
+			node.style.height = `${node.scrollHeight + node.offsetHeight - node.clientHeight}px`;
+		};
+		fit();
+		node.addEventListener('input', fit);
+		const seen = new ResizeObserver(fit);
+		seen.observe(node);
+		return {
+			update: fit,
+			destroy() {
+				node.removeEventListener('input', fit);
+				seen.disconnect();
+			}
+		};
+	}
 	function table(id: string, items: Setting[]) {
 		const all = chunks(id, items);
 		const rows: Row[] = [];
@@ -315,7 +355,7 @@
 	});
 </script>
 
-{#snippet control(s: Setting)}
+{#snippet control(s: Setting, wrap?: boolean)}
 	{@const r = rangeOf(s, budget)}
 	{#if isConfirmed(s.key) && !opened[s.key]}
 		{#if confirming === s.key}
@@ -420,15 +460,35 @@
 			{:else}
 				<span class="sb-folder" aria-hidden="true"><Folder size={15} /></span>
 			{/if}
-			<input
-				class="mg-input mg-mono"
-				aria-label={s.label}
-				placeholder={s.default}
-				spellcheck="false"
-				bind:value={draft[s.key]}
-				use:pathComplete
-				onkeydown={(e) => e.key === 'Enter' && e.currentTarget.blur()}
-			/>
+			{#if wrap}
+				<!-- In a card: the whole path, wrapping, never cut off. -->
+				<textarea
+					class="mg-input mg-mono sb-path-area"
+					rows="1"
+					aria-label={s.label}
+					placeholder={s.default}
+					spellcheck="false"
+					bind:value={draft[s.key]}
+					use:pathComplete
+					use:autogrow={draft[s.key]}
+					onkeydown={(e) => {
+						if (e.key === 'Enter') {
+							e.preventDefault();
+							e.currentTarget.blur();
+						}
+					}}
+				></textarea>
+			{:else}
+				<input
+					class="mg-input mg-mono"
+					aria-label={s.label}
+					placeholder={s.default}
+					spellcheck="false"
+					bind:value={draft[s.key]}
+					use:pathComplete
+					onkeydown={(e) => e.key === 'Enter' && e.currentTarget.blur()}
+				/>
+			{/if}
 		</div>
 	{:else}
 		<input
@@ -449,6 +509,15 @@
 	{#if String(draft[s.key] ?? s.value) !== s.default && s.type !== 'flag' && !locked(s)}
 		<button type="button" class="sb-reset" title="Back to the default{s.default ? `: ${s.default}` : ''} (saved with the section)" onclick={() => (draft[s.key] = s.default)}>
 			<RotateCcw size={12} aria-hidden="true" />Reset
+		</button>
+	{/if}
+{/snippet}
+
+<!-- In a card: the same, as a small icon beside the field's name, so the cards stay level. -->
+{#snippet undo(s: Setting)}
+	{#if String(draft[s.key] ?? s.value) !== s.default && s.type !== 'flag' && !locked(s)}
+		<button type="button" class="sb-undo" aria-label="Back to the default for {s.label}" title="Back to the default{s.default ? `: ${s.default}` : ''} (saved with the section)" onclick={() => (draft[s.key] = s.default)}>
+			<RotateCcw size={11} aria-hidden="true" />
 		</button>
 	{/if}
 {/snippet}
@@ -484,35 +553,57 @@
 		<div class="sb-body">
 			{#if t && t.rows.length}
 				{#if t.cols.length > 1}
-					<div class="sb-table" role="table" aria-label={g.title} style="--cols: {t.cols.length}">
-						<div class="sb-tr sb-thead" role="row">
-							<span class="sb-th" role="columnheader">{g.id === 'per-tool' ? 'Tool' : 'Phase'}</span>
-							{#each t.cols as col (col)}<span class="sb-th" role="columnheader">{col}</span>{/each}
-						</div>
-						{#each t.rows as row, ri (row.head)}
-							{#if row.phase !== null && row.phase !== t.rows[ri - 1]?.phase}
-								<div class="sb-tr sb-phase-row" role="row">
-									<span class="sb-phase" role="rowheader">Phase {row.phase}</span>
-								</div>
-							{/if}
-							<div class="sb-tr" role="row">
-								<div class="sb-rh" role="rowheader">
-									<b>{row.head}</b>
-									{#if row.note}<span class="sb-desc mg-explain">{row.note}</span>{/if}
-								</div>
-								{#each t.cols as col (col)}
-									{@const it = row.at.get(col)}
-									{#if it}
-										<div class="sb-td" role="cell" id={it.s.key} title={it.s.description}>
-											<span class="sb-td-lbl"><span class="sb-td-name">{col}</span>{@render dot(it.s)}</span>
-											<div class="sb-field">{@render control(it.s)}</div>
-											{@render reset(it.s)}
+					{@const tools = g.id === 'per-tool'}
+					{@const paths = pathCols(t)}
+					{@const numbers = t.cols.filter((c) => !paths.has(c))}
+					{@const loose = t.rest.flatMap((c) => c.items)}
+					<!-- Cards, not a long table: tools two to a row in the order they run (each wearing its
+					     phase), phases three or four to a row; numbers side by side, a folder or file in full. -->
+					<div class="sb-grid" class:tools role="list" aria-label={g.title}>
+						{#if loose.length}
+							<!-- The group's own settings without a phase: one card across the top. -->
+							<article class="sb-tc sb-tc-loose" role="listitem" aria-label="For every tool">
+								<header class="sb-tc-head"><span class="sb-tc-num">all</span><b>{tools ? 'Every tool' : 'Every tool, unless set under Per tool'}</b></header>
+								<div class="sb-tc-fields">
+									{#each loose as it (it.s.key)}
+										<div class="sb-tf" id={it.s.key} title={it.s.description}>
+											<span class="sb-tf-lbl"><span>{it.label}</span>{@render dot(it.s)}<span class="mg-grow"></span>{@render undo(it.s)}</span>
+											<div class="sb-field">{@render control(it.s, true)}</div>
 										</div>
+									{/each}
+								</div>
+							</article>
+						{/if}
+						{#each t.rows as row (row.head)}
+							{@const n = tools ? row.phase : Number(row.head.replace(/\D+/g, '')) || null}
+							{@const mine = tools ? [...numbers, ...paths] : t.cols.filter((c) => row.at.has(c))}
+							<article class="sb-tc" role="listitem" aria-label={row.head}>
+								<header class="sb-tc-head">
+									{#if tools}
+										<b>{row.head}</b>
+										<span class="mg-grow"></span>
+										{#if n}<span class="sb-tc-phase" title="Phase {n}"><span class="sb-tc-num">{n}</span>{PHASE_NAMES[n] ?? ''}</span>{/if}
 									{:else}
-										<div class="sb-td sb-none" role="cell" aria-label="{col}: not used by {row.head}"><span aria-hidden="true">—</span></div>
+										<span class="sb-tc-num">{n ?? '·'}</span><b>{(n && PHASE_NAMES[n]) || row.head}</b>
 									{/if}
-								{/each}
-							</div>
+								</header>
+								<div class="sb-tc-fields" style="--path-span: {4 - (numbers.length % 4) || 4}">
+									{#each mine as col (col)}
+										{@const it = row.at.get(col)}
+										{#if it}
+											<div class="sb-tf" class:path={paths.has(col)} id={it.s.key} title={it.s.description}>
+												<span class="sb-tf-lbl"><span>{col}</span>{@render dot(it.s)}<span class="mg-grow"></span>{@render undo(it.s)}</span>
+												<div class="sb-field">{@render control(it.s, true)}</div>
+											</div>
+										{:else}
+											<div class="sb-tf sb-tf-none" class:path={paths.has(col)} aria-label="{col}: not used by {row.head}">
+												<span class="sb-tf-lbl"><span>{col}</span></span>
+												<span class="sb-tf-dash" aria-hidden="true">not used</span>
+											</div>
+										{/if}
+									{/each}
+								</div>
+							</article>
 						{/each}
 					</div>
 				{:else}
@@ -534,7 +625,7 @@
 					</ul>
 				{/if}
 			{/if}
-			<ul class="sb-list" class:sb-empty={t && !t.rest.length} class:sb-parts={parts.some((c) => c.cells && c.head)}>
+			<ul class="sb-list" class:sb-empty={t ? !t.rest.length || (t.rows.length > 0 && t.cols.length > 1) : false} class:sb-parts={parts.some((c) => c.cells && c.head)}>
 				{#each parts as c, j (c.items[0].s.key + j)}
 					{#if c.cells && g.id === 'databases' && c.head === DB_BACKUPS}
 						<li class="sb-sub sb-sub-fold">
@@ -1266,95 +1357,203 @@
 		gap: 14px;
 	}
 
-	/* ---- a wide group as a table: phases down, fields across ---- */
+	/* ---- a wide group as cards: phases three or four to a row, tools two ---- */
 	.sb-empty {
 		display: none;
 	}
-	.sb-table {
+	.sb-grid {
 		display: grid;
-		grid-template-columns: minmax(12em, 1.15fr) repeat(var(--cols), minmax(0, 1fr));
-		border-top: 1px solid var(--mg-border);
+		grid-template-columns: repeat(auto-fill, minmax(min(100%, 290px), 1fr));
+		gap: 10px;
+		padding: 14px var(--mg-pad) 16px;
 	}
-	.sb-tr {
-		display: contents;
+	.sb-grid.tools {
+		grid-template-columns: repeat(2, minmax(0, 1fr));
+		gap: 10px 12px;
 	}
-	.sb-th {
-		padding: 9px 16px;
-		border-bottom: 1px solid var(--mg-border-strong);
-		background: color-mix(in srgb, var(--mg-surface) 70%, transparent);
+	/* A tool's phase, small, at the right of its card's head. */
+	.sb-tc-phase {
+		display: inline-flex;
+		align-items: center;
+		gap: 6px;
+		min-width: 0;
+		overflow: hidden;
 		font-size: var(--mg-fs-xs);
 		font-weight: 600;
-		letter-spacing: 0.05em;
-		text-transform: uppercase;
 		color: var(--mg-text-3);
+		white-space: nowrap;
+		text-overflow: ellipsis;
 	}
-	.sb-rh,
-	.sb-td {
-		min-width: 0;
-		padding: 12px 16px;
-		border-bottom: 1px solid var(--mg-border);
-		transition: background-color 1200ms ease;
+	/* The group's settings without a phase: one card across the top, its fields at most so wide. */
+	.sb-tc-loose {
+		grid-column: 1 / -1;
+		background: color-mix(in srgb, var(--mg-accent) 4%, var(--mg-surface));
 	}
-	.sb-tr:last-child > * {
-		border-bottom: 0;
+	.sb-tc-loose .sb-tc-fields > .sb-tf {
+		flex: 0 1 220px;
 	}
-	.sb-td,
-	.sb-th + .sb-th {
-		border-left: 1px solid var(--mg-border);
+	.sb-tc-num {
+		display: inline-grid;
+		place-items: center;
+		flex: none;
+		min-width: 20px;
+		height: 20px;
+		padding: 0 5px;
+		border-radius: 999px;
+		background: color-mix(in srgb, var(--mg-accent) 14%, transparent);
+		color: var(--mg-accent-ink, var(--mg-accent));
+		font-size: 11px;
+		font-weight: 700;
+		letter-spacing: 0;
+		font-variant-numeric: tabular-nums;
 	}
-	.sb-tr:nth-child(odd) > :is(.sb-rh, .sb-td) {
-		background: color-mix(in srgb, var(--mg-surface) 45%, transparent);
-	}
-	.sb-rh {
+	.sb-tc {
 		display: flex;
 		flex-direction: column;
-		gap: 3px;
+		gap: 10px;
+		min-width: 0;
+		padding: 11px 13px 12px;
+		border: 1px solid var(--mg-border);
+		border-radius: var(--mg-r);
+		background: var(--mg-surface);
+		transition:
+			border-color 160ms ease,
+			box-shadow 160ms ease;
 	}
-	.sb-rh b {
+	.sb-tc:hover {
+		border-color: var(--mg-border-strong);
+	}
+	.sb-tc:focus-within {
+		border-color: color-mix(in srgb, var(--mg-accent) 60%, var(--mg-border));
+		box-shadow: 0 0 0 3px color-mix(in srgb, var(--mg-accent) 12%, transparent);
+	}
+	.sb-tc-head {
+		display: flex;
+		align-items: center;
+		gap: 8px;
+		min-width: 0;
+	}
+	.sb-tc-head b {
+		overflow: hidden;
+		text-overflow: ellipsis;
+		white-space: nowrap;
 		font-size: var(--mg-fs-sm);
 		font-weight: 650;
 	}
-	.sb-td {
-		position: relative;
+	/* A phase's few fields side by side; a tool's on a four-column grid, its folder or file
+	   finishing the last row (--path-span), so every tool card has the same shape. */
+	.sb-tc-fields {
+		display: flex;
+		flex-wrap: wrap;
+		gap: 8px 10px;
+	}
+	.sb-tc-fields > .sb-tf {
+		flex: 1 1 120px;
+	}
+	.tools .sb-tc-fields {
+		display: grid;
+		grid-template-columns: repeat(4, minmax(0, 1fr));
+	}
+	.tools .sb-tf.path {
+		grid-column: span var(--path-span, 4);
+	}
+	.sb-tf {
 		display: flex;
 		flex-direction: column;
-		justify-content: center;
-		gap: 6px;
+		gap: 4px;
+		min-width: 0;
+		border-radius: var(--mg-r-sm);
+		transition: background-color 1200ms ease;
 	}
-	.sb-td:global(.flash) {
-		background: color-mix(in srgb, var(--mg-accent) 14%, transparent) !important;
+	.sb-tf:global(.flash) {
+		background: color-mix(in srgb, var(--mg-accent) 14%, transparent);
 		transition: none;
 	}
-	.sb-td-lbl {
-		position: absolute;
-		top: 8px;
-		right: 10px;
+	.sb-tf-lbl {
 		display: flex;
 		align-items: center;
+		gap: 5px;
+		min-height: 18px;
+		font-size: 10.5px;
+		font-weight: 650;
+		letter-spacing: 0.05em;
+		text-transform: uppercase;
+		color: var(--mg-text-3);
+		white-space: nowrap;
 	}
-	.sb-td-name {
+	.sb-tf-lbl > span:first-child {
+		overflow: hidden;
+		text-overflow: ellipsis;
+	}
+	/* Fields in a card start at the top, so a one-line box lines up with a path's first line. */
+	.sb-tf .sb-field {
+		flex: none;
+		align-items: flex-start;
+	}
+	.sb-tf .sb-num {
+		display: flex;
+		width: 100%;
+	}
+	.sb-tf .sb-num input,
+	.sb-tf .sb-text-in {
+		width: 100%;
+		min-width: 0;
+	}
+	/* The field's name carries the unit ("Memory (MB)"). */
+	.sb-tf .sb-unit {
 		display: none;
 	}
-	.sb-td .sb-num input {
-		width: 96px;
-	}
-	.sb-td .sb-reset {
-		align-self: flex-start;
-	}
-	.sb-none {
+	.sb-tf-none .sb-tf-dash {
+		display: flex;
 		align-items: center;
+		height: var(--mg-ctl-sm, 30px);
+		padding: 0 10px;
+		border: 1px dashed var(--mg-border);
+		border-radius: var(--mg-r-sm);
+		font-size: var(--mg-fs-xs);
 		color: var(--mg-text-3);
 	}
-	/* Per tool: a heading across the table where the next phase's tools begin. */
-	.sb-phase {
-		grid-column: 1 / -1;
-		padding: 14px 16px 6px;
-		border-bottom: 1px solid var(--mg-border);
+	.sb-path-area {
+		display: block;
+		width: 100%;
+		min-height: var(--mg-ctl-sm, 30px);
+		padding: 6px 10px 6px 38px;
+		overflow: hidden;
+		resize: none;
+		line-height: 1.4;
 		font-size: var(--mg-fs-xs);
-		font-weight: 700;
-		letter-spacing: 0.06em;
-		text-transform: uppercase;
-		color: var(--mg-accent-ink);
+		/* Breaks where a path allows (after - or /) before anywhere else. */
+		overflow-wrap: anywhere;
+		white-space: pre-wrap;
+	}
+	.sb-tf .sb-path {
+		align-items: flex-start;
+	}
+	.sb-tf .sb-folder {
+		bottom: auto;
+		height: calc(var(--mg-ctl-sm, 30px) - 2px);
+	}
+	.sb-undo {
+		display: inline-grid;
+		place-items: center;
+		width: 18px;
+		height: 18px;
+		padding: 0;
+		border: none;
+		border-radius: 999px;
+		background: none;
+		color: var(--mg-text-3);
+		cursor: pointer;
+	}
+	.sb-undo:hover {
+		background: color-mix(in srgb, var(--mg-accent) 14%, transparent);
+		color: var(--mg-accent-ink, var(--mg-accent));
+	}
+	.sb-undo :global(svg) {
+		transition: transform 300ms ease;
+	}
+	.sb-undo:hover :global(svg) {
+		transform: rotate(-120deg);
 	}
 
 	/* ---- a wide group of one field each: even tiles ---- */
@@ -1458,42 +1657,17 @@
 		transition: none !important;
 	}
 
-	@media (max-width: 760px) {
-		.sb-table {
-			display: flex;
-			flex-direction: column;
+	@media (max-width: 1000px) {
+		.sb-grid.tools {
+			grid-template-columns: minmax(0, 1fr);
 		}
-		.sb-thead {
-			display: none;
-		}
-		.sb-tr {
-			display: grid;
+	}
+	@media (max-width: 520px) {
+		.tools .sb-tc-fields {
 			grid-template-columns: repeat(2, minmax(0, 1fr));
-			border-bottom: 1px solid var(--mg-border);
 		}
-		.sb-tr > :is(.sb-rh, .sb-td) {
-			border-bottom: 0;
-		}
-		.sb-rh {
+		.tools .sb-tf.path {
 			grid-column: 1 / -1;
-			padding-bottom: 4px;
-		}
-		.sb-td {
-			border-left: 0;
-			justify-content: flex-start;
-		}
-		.sb-td-lbl {
-			position: static;
-			gap: 6px;
-		}
-		.sb-td-name {
-			display: inline;
-			font-size: var(--mg-fs-xs);
-			font-weight: 600;
-			color: var(--mg-text-2);
-		}
-		.sb-none {
-			display: none;
 		}
 	}
 	@media (max-width: 600px) {
