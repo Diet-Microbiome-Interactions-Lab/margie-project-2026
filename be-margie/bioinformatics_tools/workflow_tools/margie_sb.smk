@@ -161,6 +161,19 @@ def _one_of(names):
     return '|'.join(re.escape(n) for n in names) if names else '(?!)'
 
 
+def _cached(key):
+    """Genomes named in config[key], comma-joined: those whose output workflow.py took from the MARGIE database."""
+    value = config.get(key)
+    return [g for g in str(value).split(',') if g in GENOMES] if value not in (None, '') else []
+
+
+# Genomes whose GTDB-Tk and RASTtk outputs this run took from the MARGIE database before
+# Stage 1 (workflow.py). Rules gtdbtk_from_cache and rasttk_from_cache stand for them:
+# having no inputs, they stay up to date when the GTDB-Tk batch runs for the other genomes.
+CACHED_GTDBTK = _cached('cached_gtdbtk')
+CACHED_RASTTK = [g for g in _cached('cached_rasttk') if g in RASTTK_GENOMES]
+
+
 # Per-genome domain (GTDBTK_domain) and genetic code (translation_table), using
 # GTDB-Tk's column names; written from GTDB-Tk or genome_info, config wins.
 GENOME_INFO = f"{GENOME_PREFIX}genome_info/genome_info.tsv"
@@ -1686,10 +1699,10 @@ rule load_quast_to_db:
 
 
 rule run_gtdbtk_batch:
-    """Phase2: runs GTDB-Tk classify_wf once over all genomes and writes the combined
-    results and translation-table files."""
+    """Phase2: runs GTDB-Tk classify_wf once over the genomes not taken from the MARGIE
+    database (CACHED_GTDBTK) and writes the combined results and translation-table files."""
     input:
-        list(GENOMES.values())
+        [f for g, f in GENOMES.items() if g not in CACHED_GTDBTK]
     output:
         results=GTDBTK_BATCH_RESULTS,
         translation_table=GTDBTK_BATCH_TRANSLATION_TABLE,
@@ -1712,7 +1725,7 @@ rule run_gtdbtk_batch:
         stage_dir=GTDBTK_BATCH_STAGE_DIR,
         output_dir=rc('gtdbtk.output_dir', GTDBTK_BATCH_OUTPUT_DIR, config=config),
         db=db_path('gtdbtk', config=config, workflow_id='margie_sb'),
-        genome_count=len(GENOMES)
+        genome_count=len(GENOMES) - len(CACHED_GTDBTK)
     container: sif_path('gtdbtk.sif', config=config, workflow_id='margie_sb')
     shell:
         """
@@ -1854,6 +1867,31 @@ rule split_gtdbtk_batch_per_genome:
             writer.writerow(row)
 
         Path(output.tkn).write_text(f"gtdbtk split complete for {genome}\n")
+
+
+rule gtdbtk_from_cache:
+    """GTDB-Tk's per-genome files for a genome taken from the MARGIE database (CACHED_GTDBTK).
+
+    workflow.py writes all three before Stage 1, so this rule has nothing to do; with no
+    inputs, the batch run for the other genomes leaves them up to date. It runs only when a
+    file has gone missing since, and then fails: Snakemake removes a rule's outputs before
+    running it, and the genome's GTDB-Tk results come back on the next start of the run.
+    """
+    output:
+        results=GTDBTK_RESULTS,
+        translation_table=GTDBTK_TRANSLATION_TABLE,
+        tkn=GTDBTK_COMPUTE_TOKEN
+    wildcard_constraints:
+        genome=_one_of(CACHED_GTDBTK)
+    shell:
+        """
+        echo "GTDB-Tk's files for {wildcards.genome} came from the MARGIE database and are missing now; start the run again" >&2
+        exit 1
+        """
+
+
+ruleorder: gtdbtk_from_cache > split_gtdbtk_batch_per_genome
+localrules: gtdbtk_from_cache
 
 
 rule load_gtdbtk_to_db:
@@ -2034,6 +2072,30 @@ rule run_prodigal:
         echo prodigal > $(dirname {output.results})/gene_caller.txt
         echo "prodigal complete for {wildcards.genome}" > {output.tkn}
         """
+
+
+rule rasttk_from_cache:
+    """RASTtk's gene calls for a genome taken from the MARGIE database (CACHED_RASTTK).
+
+    As gtdbtk_from_cache: workflow.py writes the files before Stage 1, and with no inputs
+    they stay up to date; it runs (and fails) only when a file has gone missing since.
+    """
+    output:
+        results=RASTTK_RESULTS,
+        faa=RASTTK_FAA,
+        gff=RASTTK_GFF,
+        tkn=RASTTK_COMPUTE_TOKEN
+    wildcard_constraints:
+        genome=_one_of(CACHED_RASTTK)
+    shell:
+        """
+        echo "RASTtk's files for {wildcards.genome} came from the MARGIE database and are missing now; start the run again" >&2
+        exit 1
+        """
+
+
+ruleorder: rasttk_from_cache > run_rasttk
+localrules: rasttk_from_cache
 
 
 rule load_rasttk_to_db:

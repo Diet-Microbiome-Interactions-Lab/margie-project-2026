@@ -71,7 +71,7 @@ def test_a_run_restores_the_tools_first_and_stores_merges_under_their_tables(moc
         (g / 'consolidation').mkdir(exist_ok=True)
         (g / 'consolidation' / 'consolidated-merged-all-columns.tsv').write_text('merged')
 
-    with patch.object(wf, '_restore_gtdbtk_batch', return_value=False), \
+    with patch.object(wf, '_restore_gene_calls', return_value=({}, {})), \
             patch(f'{w.__name__}.restore', return_value=False), \
             patch(f'{w.__name__}.restore_all', side_effect=fake_restore_all), \
             patch(f'{w.__name__}.cached_when', return_value={}), \
