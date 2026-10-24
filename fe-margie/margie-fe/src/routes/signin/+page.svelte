@@ -211,9 +211,8 @@
 								</div>
 								<address class="contact">
 									<span class="contact-head">Contact</span>
-									<span>Prof. Dr. {LAB.pi}, PI</span>
+									<span>{LAB.pi}, PhD</span>
 									<span>{LAB.name}</span>
-									<span>Department of Food Science</span>
 									<span>Purdue University</span>
 									<span class="addr"><a class="mg-link" href="mailto:{CONTACT}">{CONTACT}</a><button type="button" class="mg-icon-btn" aria-label="Copy the address" onclick={() => copy(CONTACT)}><Copy size={14} /></button></span>
 								</address>
