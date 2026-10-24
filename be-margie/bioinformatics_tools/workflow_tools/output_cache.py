@@ -158,7 +158,7 @@ def _extract_pattern_suffix(filename: str) -> str:
 
 
 def restore(db_path: str, input_file: str, tool_name: str,
-            output_paths: list[str]) -> bool:
+            output_paths: list[str], optional: list[str] = ()) -> bool:
     """Restore cached outputs for *tool_name* from the DB using pattern matching.
 
     Matches files by pattern suffix rather than exact filename, allowing cache hits
@@ -172,7 +172,8 @@ def restore(db_path: str, input_file: str, tool_name: str,
         Expected: pfam.tsv (pattern: pfam.tsv) → MATCH!
 
     Returns True if **all** expected files were found in the cache and
-    written to disk, False on any miss.
+    written to disk, False on any miss. Files in *optional* are written too when
+    they are cached, and a miss on them is not a miss.
     """
     if not Path(db_path).exists():
         return False
@@ -218,6 +219,10 @@ def restore(db_path: str, input_file: str, tool_name: str,
                        tool_name, expected_pattern, expected_fname)
             LOGGER.debug("Available patterns: %s", list(cached_patterns.keys()))
             return False
+    for path in optional:
+        pattern = _extract_pattern_suffix(Path(path).name)
+        if pattern in cached_patterns:
+            matched[path] = cached_patterns[pattern]
 
     # Write all matched BLOBs to expected paths
     for path, blob in matched.items():

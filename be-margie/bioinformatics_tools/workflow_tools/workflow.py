@@ -654,21 +654,29 @@ class WorkflowBase(ProgramBase):
 
         GTDB-Tk for every genome cached; RASTtk where GTDB-Tk came back too, so its domain and
         genetic code are the ones the cached gene calls were made with, and the config names
-        neither. Each restore also writes the step's compute token, so margie_sb.smk's
-        gtdbtk_from_cache and rasttk_from_cache rules (told about these genomes through
-        cached_gtdbtk and cached_rasttk) have nothing to do, and only the other genomes go into
-        the GTDB-Tk batch. Returns ({genome: gtdbtk restored}, {genome: rasttk restored}).
+        neither. GTDB-Tk's database token comes back when it was stored with the results, and
+        load_gtdbtk_to_db makes it otherwise; results that name only the domain (an older
+        format, without the classification) are run again. Each restore also writes the step's
+        compute token, so margie_sb.smk's gtdbtk_from_cache and rasttk_from_cache rules (told
+        about these genomes through cached_gtdbtk and cached_rasttk) have nothing to do, and only
+        the other genomes go into the GTDB-Tk batch. Returns ({genome: gtdbtk restored},
+        {genome: rasttk restored}).
         '''
         # As do_margie_sb: a domain or genetic code the config names is the config's.
         calls = genome_calls(genome_files, {'run_gtdbtk': True, 'margie_sb': self.conf.get('margie_sb', {}) if self.conf else {}})
         gtdbtk, rasttk = {}, {}
         for genome, fasta_path in genome_files.items():
             prefix = get_workflow_prefix_for(genome, smk_config)
-            gtdbtk[genome] = restore(db_path, fasta_path, 'gtdbtk', WorkflowBase._gtdbtk_split_paths(genome, smk_config))
+            results, table, token = WorkflowBase._gtdbtk_split_paths(genome, smk_config)
+            gtdbtk[genome] = restore(db_path, fasta_path, 'gtdbtk', [results, table], optional=[token])
+            if gtdbtk[genome] and not WorkflowBase._names_classification(results):
+                LOGGER.info("Cached GTDB-Tk results for %s name only the domain -- GTDB-Tk runs again", genome)
+                for path in (results, table, token):
+                    Path(path).unlink(missing_ok=True)
+                gtdbtk[genome] = False
             if not gtdbtk[genome]:
                 continue
-            WorkflowBase._mark_restored([*WorkflowBase._gtdbtk_split_paths(genome, smk_config),
-                                         f"{prefix}gtdbtk/gtdbtk_compute.tkn"])
+            WorkflowBase._mark_restored([results, table, token, f"{prefix}gtdbtk/gtdbtk_compute.tkn"])
             LOGGER.info("Cache HIT for gtdbtk (genome=%s) — skipping recomputation", genome)
             if genome in prodigal_genomes or calls.get(genome, {}).get('source') == 'metadata':
                 continue  # Prodigal's genes, or a domain/code from the config: RASTtk runs fresh
@@ -678,6 +686,15 @@ class WorkflowBase(ProgramBase):
                                              f"{prefix}rasttk/rasttk_compute.tkn"])
                 LOGGER.info("Cache HIT for rasttk (genome=%s) — skipping recomputation", genome)
         return gtdbtk, rasttk
+
+    @staticmethod
+    def _names_classification(results: str) -> bool:
+        '''Whether a gtdbtk_results.tsv has the GTDBTK_classification column.'''
+        try:
+            with open(results) as fh:
+                return 'GTDBTK_classification' in fh.readline().rstrip('\n').split('\t')
+        except OSError:
+            return False
 
     @staticmethod
     def _mark_restored(paths: list[str]) -> None:
@@ -766,8 +783,10 @@ class WorkflowBase(ProgramBase):
         restored: dict[str, dict[str, bool]] = {}
         gtdbtk_restored: dict[str, bool] = {}
         rasttk_restored: dict[str, bool] = {}
-        # Genomes whose GTDB-Tk outputs are cached as soon as they exist.
+        # Genomes whose GTDB-Tk outputs are cached as soon as they exist, and those cached
+        # with their database token too.
         gtdbtk_stored: set[str] = set()
+        gtdbtk_loaded: set[str] = set()
         if db_path:
             # Deferred so restored files are newer than Stage 1's rast.faa.
             LOGGER.info('Phase4+ cache restore deferred to per-genome pre-Stage-2 (after rasttk outputs are fresh)')
@@ -775,6 +794,7 @@ class WorkflowBase(ProgramBase):
             if run_gtdbtk_enabled:
                 gtdbtk_restored, rasttk_restored = self._restore_gene_calls(db_path, genome_files, smk_config, prodigal_genomes)
                 gtdbtk_stored |= {g for g, hit in gtdbtk_restored.items() if hit}
+                gtdbtk_loaded |= {g for g in gtdbtk_stored if Path(self._gtdbtk_split_paths(g, smk_config)[2]).exists()}
             LOGGER.info('From the MARGIE database: GTDB-Tk for %d of %d genome(s), RASTtk for %d',
                         sum(gtdbtk_restored.values()), len(genome_files), sum(rasttk_restored.values()))
         # margie_sb.smk takes these genomes' GTDB-Tk and RASTtk outputs as they are (rules
@@ -892,14 +912,20 @@ class WorkflowBase(ProgramBase):
         progress_memo: dict[str, tuple[int, int]] = {}  # genome -> completeness, for most-complete-first ordering
 
         while pending or queue:
-            # Caches GTDB-Tk outputs on their db token, so a RASTtk failure keeps them.
+            # Caches GTDB-Tk outputs once the split has written them (its compute token comes
+            # last), so a run that stops before a genome's Stage 1 wave keeps them, and again
+            # once they are loaded, with the database token.
             if db_path and run_gtdbtk_enabled:
                 for genome in genome_files:
-                    if genome in gtdbtk_stored:
+                    if genome in gtdbtk_loaded:
                         continue
-                    if all(Path(p).exists() for p in self._gtdbtk_split_paths(genome, smk_config)):
-                        store(db_path, genome_files[genome], 'gtdbtk', self._gtdbtk_split_paths(genome, smk_config))
+                    paths = self._gtdbtk_split_paths(genome, smk_config)
+                    split = [*paths[:2], f"{get_workflow_prefix_for(genome, smk_config)}gtdbtk/gtdbtk_compute.tkn"]
+                    if Path(paths[2]).exists() or (genome not in gtdbtk_stored and all(Path(p).exists() for p in split)):
+                        store(db_path, genome_files[genome], 'gtdbtk', paths)
                         gtdbtk_stored.add(genome)
+                        if Path(paths[2]).exists():
+                            gtdbtk_loaded.add(genome)
 
             for genome in list(pending):
                 if Path(_rasttk_token_path(genome)).exists():
