@@ -1,12 +1,12 @@
 <script lang="ts">
 	import { onMount } from 'svelte';
-	import { Cpu, MapPin, RefreshCw, SquareTerminal, Users } from 'lucide-svelte';
+	import { Cpu, MapPin, RefreshCw, Users } from 'lucide-svelte';
 	import { api } from '$lib/api';
 	import { uiBase } from '$lib/workspace/base.svelte';
 
 	/**
 	 * Cluster → Resources: SLURM as the user sees it (GET /v1/ssh/cluster_resources): where the
-	 * site's commands run and any interactive session, the user's jobs, each account's group
+	 * site's commands run, the user's jobs, each account's group
 	 * allocation and what is in use, and every partition's free CPUs and memory. Refreshes
 	 * every 30 seconds while open.
 	 */
@@ -136,18 +136,6 @@
 				<div>
 					<b>{data.on_login_node ? 'Login node' : 'Node'} <span class="mg-mono">{data.host.split('.')[0]}</span></b>
 					<span class="mg-note">The site's commands and the Terminal start here; runs go to compute nodes through SLURM.</span>
-				</div>
-			</div>
-			<div class="cb-where">
-				<SquareTerminal size={16} />
-				<div>
-					{#if data.interactive.length}
-						<b>Interactive: {#each data.interactive as j, i (j.id)}{i ? ', ' : ''}<span class="mg-mono">{j.nodelist}</span>{/each}</b>
-						<span class="mg-note">{data.interactive.length === 1 ? `Job ${data.interactive[0].id}, ${data.interactive[0].time} of ${data.interactive[0].limit}` : `${data.interactive.length} sessions`}</span>
-					{:else}
-						<b>No interactive session</b>
-						<span class="mg-note">For one, run <span class="mg-mono">srun --pty bash</span> in the <a class="mg-link" href={uiBase.to('/terminal')}>Terminal</a>.</span>
-					{/if}
 				</div>
 			</div>
 			<div class="cb-counts">
