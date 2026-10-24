@@ -3440,6 +3440,53 @@ def edit_file(payload: dict, current_user: dict = Depends(get_current_user)):
     return {"path": path, "backup": backup if "KEPT" in out else None}
 
 
+# The Snakemake workflow in the account's copy of MARGIE (Settings → Advanced).
+_WORKFLOW_FILE = "~/bioinformatics-tools/bioinformatics_tools/workflow_tools/margie_sb.smk"
+
+
+@router.get("/advanced_files")
+def advanced_files(current_user: dict = Depends(get_current_user)):
+    """Tells whether the workflow file has edits by hand; sync_remote_dane_wf updates the copy of
+    MARGIE once it has none."""
+    conn = _build_connection(current_user)
+    path = _resolve_browse_path(_WORKFLOW_FILE, current_user)
+    folder, name = posixpath.split(path)
+    code, out = _run_remote_check(conn, f"cd {shlex.quote(folder)} && git status --porcelain -- {shlex.quote(name)}")
+    return {"workflow": path, "workflow_edited": code == 0 and bool(out.strip())}
+
+
+@router.post("/restore_default")
+def restore_default(payload: dict, current_user: dict = Depends(get_current_user)):
+    """Puts back MARGIE's default config.yaml or Snakemake workflow, keeping the file it replaces
+    beside it as <name>.bak-<date-time>.
+
+    Body: {"which": "config" | "workflow"}. The config is written as for a new account; the
+    workflow comes back from the copy's git (git checkout), so the copy takes updates again."""
+    which = payload.get("which")
+    if which not in ("config", "workflow"):
+        raise HTTPException(status_code=400, detail="which must be config or workflow")
+    conn = _build_connection(current_user)
+    q = shlex.quote
+    path = _config_path(current_user["home_dir"]) if which == "config" else _resolve_browse_path(_WORKFLOW_FILE, current_user)
+    backup = f"{path}.bak-{time.strftime('%Y%m%d-%H%M%S')}"
+    keep = f"if [ -e {q(path)} ]; then cp -p -- {q(path)} {q(backup)} && echo KEPT; else echo NEW; fi"
+    if which == "config":
+        code, out = _run_remote_check(conn, keep)
+        if code != 0:
+            raise HTTPException(status_code=_permission_status(Exception(out)), detail=f"Could not keep a copy of {path}: {out}")
+        text = _build_default_config_text(_build_default_config_payload(current_user.get("cluster_username")))
+        try:
+            ssh_sftp.write_remote_text_file(path, text, connection=conn)
+        except Exception as exc:
+            raise HTTPException(status_code=_permission_status(exc), detail=f"Could not write {path}: {exc}")
+    else:
+        folder, name = posixpath.split(path)
+        code, out = _run_remote_check(conn, f"{keep} && cd {q(folder)} && git checkout -- {q(name)} 2>&1 && echo RESTORED")
+        if code != 0 or "RESTORED" not in out:
+            raise HTTPException(status_code=500, detail=f"Could not restore {path}: {out}")
+    return {"path": path, "backup": backup if "KEPT" in out else None}
+
+
 @router.post("/make_path")
 def make_path(payload: dict, current_user: dict = Depends(get_current_user)):
     """Makes a folder, with any missing folders above it (mkdir -p), or a new empty text file,

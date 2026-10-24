@@ -889,6 +889,16 @@ async function createDefaultConfig() {
 	return settingsList();
 }
 
+/** Puts back the default config.yaml or workflow; the file it replaces is kept beside it. */
+async function restoreDefault(body: { which?: string }) {
+	const d = await call<{ path: string; backup: string | null }>('POST', '/v1/ssh/restore_default', body);
+	if (body.which === 'config') {
+		config.drop();
+		installed.drop();
+	}
+	return d;
+}
+
 /** Writes changed settings into config.yaml, converting by parameter type. */
 async function saveSettings(body: { values?: Record<string, string> }) {
 	const values = body.values ?? {};
@@ -1391,6 +1401,11 @@ export async function clusterApi<T = any>(path: string, init: RequestInit = {}):
 				return saveSettings(body ?? {});
 			case 'POST /settings/create-default':
 				return createDefaultConfig();
+			// Settings → Advanced: whether the workflow has edits by hand, and putting a default back.
+			case 'GET /settings/advanced':
+				return get('/v1/ssh/advanced_files');
+			case 'POST /settings/restore-default':
+				return restoreDefault(body ?? {});
 			// A new folder (and any above it) or an empty text file; refused where the account may not write.
 			case 'POST /files/make':
 				return call('POST', '/v1/ssh/make_path', body ?? {});
