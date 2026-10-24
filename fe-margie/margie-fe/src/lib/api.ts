@@ -57,13 +57,30 @@ const TYPES: Record<string, string> = {
 	pdf: 'application/pdf'
 };
 
+/** Cluster files already fetched this visit, by URL: shown again at once (the newest 80 kept). */
+const fetched = new Map<string, Promise<string>>();
+const KEPT = 80;
+
 /** Returns a URL an <img> or <iframe> can load: `url` itself, or a blob copy of a cluster file. */
 export async function viewableUrl(url: string): Promise<string> {
 	if (!url.startsWith(CLUSTER_FILE)) return url;
-	const path = new URL(url, location.origin).searchParams.get('path') ?? '';
-	const blob = await fileBlob(path);
-	const type = TYPES[path.split('.').pop()?.toLowerCase() ?? ''] ?? blob.type;
-	return URL.createObjectURL(new Blob([blob], { type }));
+	const known = fetched.get(url);
+	if (known) return known;
+	const made = (async () => {
+		const path = new URL(url, location.origin).searchParams.get('path') ?? '';
+		const blob = await fileBlob(path, true);
+		const type = TYPES[path.split('.').pop()?.toLowerCase() ?? ''] ?? blob.type;
+		return URL.createObjectURL(new Blob([blob], { type }));
+	})();
+	fetched.set(url, made);
+	// A failed fetch is asked again next time.
+	made.catch(() => fetched.delete(url));
+	while (fetched.size > KEPT) {
+		const [oldest, blob] = fetched.entries().next().value as [string, Promise<string>];
+		fetched.delete(oldest);
+		blob.then((u) => URL.revokeObjectURL(u)).catch(() => {});
+	}
+	return made;
 }
 
 export function formatBytes(n: number): string {

@@ -1022,11 +1022,15 @@ async function jobFor(path: string): Promise<{ id: string; rel: string } | null>
 	return null;
 }
 
-/** Returns a file as a Blob: a job's file in full, otherwise the head of a text file. */
-export async function fileBlob(path: string): Promise<Blob> {
+/**
+ * Returns a file as a Blob: a job's file in full; elsewhere the head of a text file, or with
+ * `whole` (an image, a map, a PDF to show) the whole file by its path.
+ */
+export async function fileBlob(path: string, whole = false): Promise<Blob> {
 	const abs = await expand(path);
 	const job = await jobFor(abs);
 	if (job) return (await fetchRaw(`/v1/ssh/download_file/${q(job.id)}?path=${q(job.rel)}`)).blob();
+	if (whole) return (await fetchRaw(`/v1/ssh/download_path?path=${q(abs)}`)).blob();
 	const d = await get<{ content: string; binary: boolean; truncated: boolean }>(`/v1/ssh/browse_view?path=${q(abs)}`);
 	if (d.binary) throw new ApiError('Outside a job’s folder only text files can be opened from the cluster.', 415);
 	return new Blob([d.content], { type: 'text/plain' });
@@ -1107,30 +1111,17 @@ const NOT_TOOLS = new Set(['consolidation', 'labeling', 'scoring', 'fingerprint'
 /** How many of the latest runs Results looks through. */
 const RUNS_LOOKED_AT = 12;
 
-/** Runs `work` over `items`, a few at a time: each is a trip to the cluster. */
-async function few<T, R>(items: T[], work: (item: T) => Promise<R>, at = 6): Promise<R[]> {
-	const out: R[] = new Array(items.length);
-	let next = 0;
-	await Promise.all(
-		Array.from({ length: Math.min(at, items.length) }, async () => {
-			while (next < items.length) {
-				const i = next++;
-				out[i] = await work(items[i]);
-			}
-		})
-	);
-	return out;
-}
-
 /** Names of entries of one type. */
 const names = (entries: Entry[], type: Entry['type']) => new Set(entries.filter((e) => e.type === type).map((e) => e.name));
 
-/** Reads a genome folder's finished results (table, Excel, viewer, diagrams), if any. */
-async function readGenome(dir: string): Promise<OrganismResult & { jobDir: string }> {
+/** A genome folder's results (table, Excel, viewer, diagrams, tools) from its entries, the paths inside it. */
+function genomeFrom(dir: string, kids: [string, string][]): OrganismResult & { jobDir: string } {
 	const organism = baseName(dir);
-	const entries = (await browse(dir).catch(() => ({ entries: [] as Entry[] }))).entries;
-	const files = names(entries, 'file');
-	const dirs = names(entries, 'directory');
+	/** Names directly inside `under` ('' for the genome folder) of one type. */
+	const inside = (under: string, type: 'd' | 'f') =>
+		new Set(kids.filter(([k, r]) => k === type && r.startsWith(under) && r.length > under.length && !r.slice(under.length).includes('/')).map(([, r]) => r.slice(under.length)));
+	const files = inside('', 'f');
+	const dirs = inside('', 'd');
 	const final: NonNullable<OrganismResult['final']> = { dir };
 	if (files.has(VIEWER_NAME)) final.viewer = `${dir}/${VIEWER_NAME}`;
 	if (files.has(TABLE_NAME)) {
@@ -1138,16 +1129,13 @@ async function readGenome(dir: string): Promise<OrganismResult & { jobDir: strin
 		if (files.has(EXCEL_NAME)) final.excel = `${dir}/${EXCEL_NAME}`;
 		if (dirs.has('diagrams')) final.diagrams = `${dir}/diagrams`;
 	} else if (dirs.has('scoring')) {
-		const scoring = await browse(`${dir}/scoring`).catch(() => ({ entries: [] as Entry[] }));
-		const inside = names(scoring.entries, 'file');
-		if (inside.has(TABLE_NAME)) final.table = `${dir}/scoring/${TABLE_NAME}`;
-		if (inside.has(EXCEL_NAME)) final.excel = `${dir}/scoring/${EXCEL_NAME}`;
-		if (names(scoring.entries, 'directory').has('figures')) final.diagrams = `${dir}/scoring/figures`;
+		const scoring = inside('scoring/', 'f');
+		if (scoring.has(TABLE_NAME)) final.table = `${dir}/scoring/${TABLE_NAME}`;
+		if (scoring.has(EXCEL_NAME)) final.excel = `${dir}/scoring/${EXCEL_NAME}`;
+		if (inside('scoring/', 'd').has('figures')) final.diagrams = `${dir}/scoring/figures`;
 	}
-	// Its tools: their folders (run or brought back from the cache), beside the report or tidied under per-tool-phased-output.
-	// Done once the report is in; until then a folder only says the tool started.
 	const toolDir = dirs.has(PER_TOOL) ? `${dir}/${PER_TOOL}` : dir;
-	const toolNames = dirs.has(PER_TOOL) ? names((await browse(toolDir).catch(() => ({ entries: [] as Entry[] }))).entries, 'directory') : dirs;
+	const toolNames = dirs.has(PER_TOOL) ? inside(`${PER_TOOL}/`, 'd') : dirs;
 	const tools = [...toolNames]
 		.filter((n) => !NOT_TOOLS.has(n) && !n.startsWith('.'))
 		.map((tool) => ({ tool, path: `${toolDir}/${tool}`, processed: !!final.table }));
@@ -1156,25 +1144,35 @@ async function readGenome(dir: string): Promise<OrganismResult & { jobDir: strin
 
 /** Genome result folders across the latest runs, cached for 20 s. */
 const resultList = new Cache(async () => {
-	const rows = (await jobs.get()).filter((j) => j.work_dir).slice(0, RUNS_LOOKED_AT);
+	const [rows, cfg] = await Promise.all([jobs.get().catch(() => [] as JobRow[]), config.get()]);
+	// The run folders in the results folder (named by their start, newest first), then any other
+	// run in the job history, so a cleared history leaves Results as it was.
+	const output = str(dig(cfg, `${WORKFLOW}.output_path`));
+	const root = output ? (await expand(output)).replace(/\/$/, '') : '';
+	const listed = root ? ((await browse(root).catch(() => null))?.entries ?? []) : [];
+	const fromFolder = listed
+		.filter((e) => e.type === 'directory' && !e.name.startsWith('.'))
+		.map((e) => e.name)
+		.sort()
+		.reverse()
+		.map((name) => `${root}/${name}`);
+	const fromJobs = rows.filter((j) => j.work_dir).map((j) => (j.work_dir as string).replace(/\/$/, ''));
+	const runs = [...new Set([...fromFolder, ...fromJobs])].slice(0, RUNS_LOOKED_AT);
+	if (!runs.length) return [];
+	// The runs' genome folders, three levels deep, in one trip to the cluster (/v1/ssh/tree).
+	const { trees } = await call<{ trees: Record<string, [string, string][]> }>('POST', '/v1/ssh/tree', { paths: runs, depth: 3, prune: [...RUN_LEVEL] });
 	// Newest run first, so a genome annotated twice shows its latest result.
-	const perRun = await few(rows, async (j) => {
-		const dir = (j.work_dir as string).replace(/\/$/, '');
-		const d = await browse(dir).catch(() => null);
-		return (d?.entries ?? [])
-			.filter((e) => e.type === 'directory' && !e.name.startsWith('.') && !RUN_LEVEL.has(e.name))
-			.map((e) => `${dir}/${e.name}`);
-	});
 	const seen = new Set<string>();
-	const dirs: string[] = [];
-	for (const run of perRun) {
-		for (const dir of run) {
-			if (seen.has(baseName(dir))) continue;
-			seen.add(baseName(dir));
-			dirs.push(dir);
+	const organisms: (OrganismResult & { jobDir: string })[] = [];
+	for (const run of runs) {
+		const entries = trees[run] ?? [];
+		for (const [kind, name] of entries) {
+			if (kind !== 'd' || name.includes('/') || name.startsWith('.') || RUN_LEVEL.has(name) || seen.has(name)) continue;
+			seen.add(name);
+			const kids = entries.filter(([, r]) => r.startsWith(`${name}/`)).map(([k, r]) => [k, r.slice(name.length + 1)] as [string, string]);
+			organisms.push(genomeFrom(`${run}/${name}`, kids));
 		}
 	}
-	const organisms = await few(dirs, readGenome);
 	return organisms.sort((a, b) => a.organism.localeCompare(b.organism));
 }, 20_000);
 

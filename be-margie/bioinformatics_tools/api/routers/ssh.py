@@ -2930,6 +2930,49 @@ def _permission_status(exc: Exception) -> int:
     return 500
 
 
+@router.post("/tree")
+def tree(payload: dict, current_user: dict = Depends(get_current_user)):
+    """Lists several folders a few levels deep in one command on the cluster, for pages that
+    read many folders (Results: a run's genome folders, their scoring and tool folders).
+
+    Body: {"paths": [...], "depth": 1-4, "prune": [names of first-level folders to skip]}.
+    Returns {"trees": {path: [[type, relative path], ...]}}, type "d" or "f"; hidden entries are
+    left out. Reused for 30 s, and answered from that copy while refreshed for 5 min."""
+    paths = payload.get("paths")
+    depth = payload.get("depth", 3)
+    prune = payload.get("prune") or []
+    if not isinstance(paths, list) or not paths or len(paths) > 50 or not all(isinstance(p, str) and p.strip() for p in paths):
+        raise HTTPException(status_code=400, detail="paths: one to fifty folders")
+    if not isinstance(depth, int) or not 1 <= depth <= 4:
+        raise HTTPException(status_code=400, detail="depth: 1 to 4")
+    if not isinstance(prune, list) or not all(isinstance(n, str) and n and "/" not in n for n in prune):
+        raise HTTPException(status_code=400, detail="prune: folder names")
+    if any(c in "".join(paths + prune) for c in "\n\r\t"):
+        raise HTTPException(status_code=400, detail="paths and names on one line each")
+    conn = _build_connection(current_user)
+    resolved = [_resolve_browse_path(p.strip(), current_user).rstrip("/") or "/" for p in paths]
+    q = shlex.quote
+
+    def ask() -> dict:
+        parts = []
+        for p in resolved:
+            skip = " -o ".join([f"-path {q(f'{p}/{n}')}" for n in prune] + ["-name '.*'"])
+            parts.append(f"echo @@{q(p)}; find {q(p)} -mindepth 1 -maxdepth {depth} \\( {skip} \\) -prune -o -printf '%y\\t%P\\n' 2>/dev/null")
+        _, out = _run_remote_check(conn, "; ".join(parts))
+        trees: dict[str, list] = {p: [] for p in resolved}
+        at = None
+        for line in out.splitlines():
+            if line.startswith("@@"):
+                at = line[2:]
+                continue
+            kind, _, rel = line.partition("\t")
+            if at in trees and rel and kind in ("d", "f"):
+                trees[at].append([kind, rel])
+        return {"trees": trees}
+
+    return read_cache.get((current_user["user_id"], "tree", tuple(resolved), depth, tuple(prune)), ask, fresh=30, stale=300)
+
+
 @router.get("/browse")
 def browse(path: str, current_user: dict = Depends(get_current_user)):
     """Lists a remote directory for the file explorer: directories first, then

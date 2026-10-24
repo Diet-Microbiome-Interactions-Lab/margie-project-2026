@@ -123,6 +123,8 @@ def _read(conn, path: str, limit: int | None = None) -> bytes | None:
     sftp = conn.connect().open_sftp()
     try:
         with sftp.open(path, 'rb') as fh:
+            # Blocks asked for ahead of the reads (see ssh_sftp.stream_remote_file).
+            fh.prefetch(max_concurrent_requests=ssh_sftp.PREFETCH_BLOCKS)
             return fh.read(limit) if limit else fh.read()
     except FileNotFoundError:
         return None
