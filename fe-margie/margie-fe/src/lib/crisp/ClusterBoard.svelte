@@ -1,7 +1,8 @@
 <script lang="ts">
 	import { onMount } from 'svelte';
-	import { Cpu, MapPin, RefreshCw, Users } from 'lucide-svelte';
-	import { api } from '$lib/api';
+	import { Cpu, MapPin, RefreshCw, Users, X } from 'lucide-svelte';
+	import { api, post } from '$lib/api';
+	import { ui } from '$lib/workspace/ui.svelte';
 	import { uiBase } from '$lib/workspace/base.svelte';
 
 	/**
@@ -92,6 +93,23 @@
 			loading = false;
 		}
 	}
+	/** The job being cancelled, so its button waits. */
+	let cancelling = $state('');
+	/** Cancels one of the user's jobs, asked first; a MARGIE run's driver job ends its run. */
+	async function cancel(j: Job) {
+		if (!confirm(`Cancel SLURM job ${j.id} (${j.name})? It stops now. If it belongs to a MARGIE run, that run stops too.`)) return;
+		cancelling = j.id;
+		try {
+			const r = await post<{ cancelled: string; run: string | null }>('/cluster/cancel', { id: j.id });
+			ui.notify(r.run ? `Job ${j.id} cancelled, and with it MARGIE run ${r.run}.` : `Job ${j.id} cancelled.`, 'ok');
+			await load();
+		} catch (e) {
+			ui.notify(e instanceof Error ? e.message : String(e), 'error');
+		} finally {
+			cancelling = '';
+		}
+	}
+
 	onMount(() => {
 		load();
 		const poll = setInterval(() => document.visibilityState === 'visible' && load(), 30_000);
@@ -224,7 +242,7 @@
 			{#if data.jobs.length}
 				<div class="cb-scroll">
 					<table class="cb-table">
-						<thead><tr><th>Job</th><th>Name</th><th>Partition</th><th>State</th><th>Time</th><th class="num">CPUs</th><th>Node or reason</th></tr></thead>
+						<thead><tr><th>Job</th><th>Name</th><th>Partition</th><th>State</th><th>Time</th><th class="num">CPUs</th><th>Node or reason</th><th><span class="sr-only">Cancel</span></th></tr></thead>
 						<tbody>
 							{#each data.jobs as j (j.id)}
 								<tr>
@@ -235,6 +253,12 @@
 									<td class="mg-mono">{j.time} / {j.limit}</td>
 									<td class="num">{j.cpus}</td>
 									<td class="mg-mono">{j.state === 'RUNNING' ? j.nodelist : j.reason}</td>
+									<td class="cb-act">
+										<button type="button" class="cb-cancel" disabled={cancelling === j.id} title="Cancel job {j.id} (asked first)" onclick={() => cancel(j)}>
+											<X size={13} />
+											{cancelling === j.id ? 'Cancelling' : 'Cancel'}
+										</button>
+									</td>
 								</tr>
 							{/each}
 						</tbody>
@@ -477,6 +501,30 @@
 	.cb-table .num {
 		text-align: right;
 		font-variant-numeric: tabular-nums;
+	}
+	.cb-act {
+		text-align: right;
+	}
+	.cb-cancel {
+		display: inline-flex;
+		align-items: center;
+		gap: 4px;
+		padding: 3px 9px;
+		border: 1px solid color-mix(in srgb, var(--mg-danger) 35%, var(--mg-border));
+		border-radius: var(--mg-r-sm);
+		background: var(--mg-surface);
+		color: var(--mg-danger);
+		font: inherit;
+		font-size: var(--cr-fs-micro, 12px);
+		font-weight: 600;
+		cursor: pointer;
+	}
+	.cb-cancel:hover:not(:disabled) {
+		background: var(--mg-danger-soft);
+	}
+	.cb-cancel:disabled {
+		opacity: 0.6;
+		cursor: progress;
 	}
 	.cb-table .name {
 		max-width: 260px;

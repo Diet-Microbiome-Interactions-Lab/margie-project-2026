@@ -1409,6 +1409,9 @@ export async function clusterApi<T = any>(path: string, init: RequestInit = {}):
 			// SLURM as the user sees it: accounts and limits, jobs, partitions (Cluster: Resources).
 			case 'GET /cluster/resources':
 				return get('/v1/ssh/cluster_resources');
+			// One of the user's SLURM jobs, cancelled (a MARGIE run's driver as its run).
+			case 'POST /cluster/cancel':
+				return call('POST', `/v1/ssh/cancel_slurm_job/${encodeURIComponent(String(body?.id ?? ''))}`);
 			case 'GET /check':
 				return { rows: await installed.get() };
 			case 'GET /settings':

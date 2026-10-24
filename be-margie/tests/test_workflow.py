@@ -502,6 +502,10 @@ class TestRunPipelineBatchSequential:
         stage1_done = threading.Event()
 
         def fake_sleep(seconds):
+            # The patch reaches every thread's time.sleep; only the workflow's own waits (this
+            # thread) advance the tokens, not threads other tests left running.
+            if threading.current_thread() is not threading.main_thread():
+                return
             if 'genome1' not in ready:
                 ready.add('genome1')
             elif 'genome3' not in ready:
