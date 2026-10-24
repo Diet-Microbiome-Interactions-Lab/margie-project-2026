@@ -1128,7 +1128,10 @@ const RUNS_LOOKED_AT = 12;
 const names = (entries: Entry[], type: Entry['type']) => new Set(entries.filter((e) => e.type === type).map((e) => e.name));
 
 /** A genome folder's results (table, Excel, viewer, diagrams, tools) from its entries, the paths inside it. */
-function genomeFrom(dir: string, kids: [string, string][]): OrganismResult & { jobDir: string } {
+/** A folder tree entry: type, path under the genome folder, and size in bytes (sent by newer APIs). */
+type Kid = [string, string, number?];
+
+function genomeFrom(dir: string, kids: Kid[]): OrganismResult & { jobDir: string } {
 	const organism = baseName(dir);
 	/** Names directly inside `under` ('' for the genome folder) of one type. */
 	const inside = (under: string, type: 'd' | 'f') =>
@@ -1152,7 +1155,13 @@ function genomeFrom(dir: string, kids: [string, string][]): OrganismResult & { j
 	const tools = [...toolNames]
 		.filter((n) => !NOT_TOOLS.has(n) && !n.startsWith('.'))
 		.map((tool) => ({ tool, path: `${toolDir}/${tool}`, processed: !!final.table }));
-	return { organism, tools, folder: dir, final: final.table ? final : undefined, jobDir: dir.slice(0, dir.lastIndexOf('/')) };
+	// Each folder's files with their sizes: a step's popup names its results file and whether it is in the database.
+	const byFolder: Record<string, { name: string; size: number }[]> = {};
+	for (const [k, r, size] of kids) {
+		const [folder, name, more] = r.split('/');
+		if (k === 'f' && folder && name && more === undefined) (byFolder[folder] ??= []).push({ name, size: Number(size) || 0 });
+	}
+	return { organism, tools, folder: dir, final: final.table ? final : undefined, files: byFolder, jobDir: dir.slice(0, dir.lastIndexOf('/')) };
 }
 
 /** Genome result folders across the latest runs, cached for 20 s. */
@@ -1173,7 +1182,7 @@ const resultList = new Cache(async () => {
 	const runs = [...new Set([...fromFolder, ...fromJobs])].slice(0, RUNS_LOOKED_AT);
 	if (!runs.length) return [];
 	// The runs' genome folders, three levels deep, in one trip to the cluster (/v1/ssh/tree).
-	const { trees } = await call<{ trees: Record<string, [string, string][]> }>('POST', '/v1/ssh/tree', { paths: runs, depth: 3, prune: [...RUN_LEVEL] });
+	const { trees } = await call<{ trees: Record<string, Kid[]> }>('POST', '/v1/ssh/tree', { paths: runs, depth: 3, prune: [...RUN_LEVEL] });
 	// Newest run first, so a genome annotated twice shows its latest result.
 	const seen = new Set<string>();
 	const organisms: (OrganismResult & { jobDir: string })[] = [];
@@ -1182,7 +1191,7 @@ const resultList = new Cache(async () => {
 		for (const [kind, name] of entries) {
 			if (kind !== 'd' || name.includes('/') || name.startsWith('.') || RUN_LEVEL.has(name) || seen.has(name)) continue;
 			seen.add(name);
-			const kids = entries.filter(([, r]) => r.startsWith(`${name}/`)).map(([k, r]) => [k, r.slice(name.length + 1)] as [string, string]);
+			const kids = entries.filter(([, r]) => r.startsWith(`${name}/`)).map(([k, r, size]) => [k, r.slice(name.length + 1), size] as Kid);
 			organisms.push(genomeFrom(`${run}/${name}`, kids));
 		}
 	}
@@ -1194,7 +1203,7 @@ async function results() {
 	const [m, cfg] = await Promise.all([me.get(), config.get()]);
 	const output = await expand(str(dig(cfg, `${WORKFLOW}.output_path`)) || m.home_dir);
 	const organisms = await resultList.get().catch(() => [] as OrganismResult[]);
-	return { outputRoot: output, genomesDir: '', organisms: organisms.map(({ organism, tools, folder, final }) => ({ organism, tools, folder, final })) };
+	return { outputRoot: output, genomesDir: '', organisms: organisms.map(({ organism, tools, folder, final, files }) => ({ organism, tools, folder, final, files })) };
 }
 
 /** Returns the API URL and token, for chat keys kept in the HPC home (lib/server/genome-chat). */

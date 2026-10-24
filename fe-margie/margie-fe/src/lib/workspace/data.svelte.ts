@@ -78,6 +78,8 @@ export interface OrganismResult {
 	/** The genome's own results folder, once it exists. */
 	folder?: string;
 	final?: { dir: string; viewer?: string; table?: string; excel?: string; diagrams?: string };
+	/** The files in each of its folders (rasttk, pfam, scoring, ...), with their sizes in bytes. */
+	files?: Record<string, { name: string; size: number }[]>;
 }
 
 /** A genome file in a folder inside the genomes folder, where runs do not look. */
