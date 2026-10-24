@@ -15,6 +15,7 @@
 	import DatabasesPanel from '$lib/workspace/DatabasesPanel.svelte';
 	import FreshDatabases from './FreshDatabases.svelte';
 	import { DB_BACKUPS, DB_PARTS } from '$lib/cluster/backend';
+	import { NOT_YET } from '$lib/license';
 	import { backend } from '$lib/workspace/backend.svelte';
 	import { uiBase } from '$lib/workspace/base.svelte';
 	import { rangeOf } from './settingRange';
@@ -152,6 +153,9 @@
 			}
 		};
 	}
+	/** A tool the website does not offer in a run yet (lib/license NOT_YET), from its settings' keys. */
+	const notYet = (r: Row) => NOT_YET.has([...r.at.values()][0]?.s.key.split('.')[1] ?? '');
+
 	function table(id: string, items: Setting[]) {
 		const all = chunks(id, items);
 		const rows: Row[] = [];
@@ -174,8 +178,8 @@
 				at: new Map(c.items.map((it) => [it.label, it]))
 			});
 		}
-		// Per tool: the tools in the order the pipeline runs them, under their phase.
-		if (id === 'per-tool') rows.sort((a, b) => (a.phase ?? 99) - (b.phase ?? 99));
+		// Per tool: the tools in the order the pipeline runs them, under their phase; the ones not wired yet last.
+		if (id === 'per-tool') rows.sort((a, b) => Number(notYet(a)) - Number(notYet(b)) || (a.phase ?? 99) - (b.phase ?? 99));
 		// Phases in their own order: 1, 2, ... 15.
 		if (id === 'phases') rows.sort((a, b) => Number(a.head.replace(/\D+/g, '')) - Number(b.head.replace(/\D+/g, '')));
 		// The columns in the order of the fullest row, then any the others add; a partition first.
@@ -662,13 +666,17 @@
 								</div>
 							</article>
 						{/if}
-						{#each t.rows as row (row.head)}
+						{#each t.rows as row, i (row.head)}
 							{@const n = tools ? row.phase : Number(row.head.replace(/\D+/g, '')) || null}
+							{@const later = tools && notYet(row)}
+							{#if later && !(i > 0 && notYet(t.rows[i - 1]))}
+								<p class="sb-later" role="listitem">Not wired yet: you can ignore these.</p>
+							{/if}
 							<!-- A tool shows the fields it has: no Database or Container where it uses none. -->
 							{@const mine = tools ? [...numbers, ...paths].filter((c) => row.at.has(c)) : t.cols.filter((c) => row.at.has(c))}
 							{@const shut = tools && folded.has(row.head)}
 							{@const changed = shut ? toolChanged(row.at) : ''}
-							<article class="sb-tc" class:shut role="listitem" aria-label={row.head}>
+							<article class="sb-tc" class:shut class:later role="listitem" aria-label={row.head}>
 								<header class="sb-tc-head">
 									{#if tools}
 										<button type="button" class="sb-tc-fold" aria-expanded={!shut} title={shut ? `Show the settings for ${row.head}` : `Fold the settings for ${row.head}`} onclick={() => foldTool(row.head)}>
@@ -1608,6 +1616,17 @@
 	.sb-tc.shut {
 		align-self: start;
 		gap: 6px;
+	}
+	/* The tools not wired yet, after a note, a little quieter. */
+	.sb-later {
+		grid-column: 1 / -1;
+		margin: 10px 2px 0;
+		font-size: var(--mg-fs-sm);
+		font-weight: 500;
+		color: var(--mg-text-2);
+	}
+	.sb-tc.later:not(:focus-within) {
+		opacity: 0.72;
 	}
 	.sb-tc-line {
 		margin: 0;
