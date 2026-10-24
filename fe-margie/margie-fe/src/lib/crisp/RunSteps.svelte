@@ -493,9 +493,10 @@
 	.rs-tool:hover:not(:disabled) {
 		border-color: var(--mg-border-strong);
 	}
+	/* Picked: a faint wash, so the choice shows quietly. */
 	.rs-tool.on {
-		border-color: color-mix(in srgb, var(--mg-accent) 55%, var(--mg-border));
-		background: color-mix(in srgb, var(--mg-accent) 8%, var(--mg-surface));
+		border-color: color-mix(in srgb, var(--mg-accent) 25%, var(--mg-border));
+		background: color-mix(in srgb, var(--mg-accent) 3%, var(--mg-surface));
 		color: var(--mg-text);
 	}
 	.rs-tool.locked {
@@ -503,20 +504,19 @@
 		opacity: 0.6;
 		cursor: not-allowed;
 	}
-	/* On in every run: shown on, not greyed like a button that cannot be pressed. */
+	/* In every run, so not a choice: plain, with a grey tick, apart from the tools to pick. */
 	.rs-tool.required:disabled {
+		border-color: var(--mg-border);
+		background: var(--mg-surface);
 		opacity: 1;
 		color: var(--mg-text);
 		cursor: default;
 	}
 	.rs-required {
 		flex: none;
-		padding: 1px 6px;
-		border-radius: var(--mg-r-sm);
-		background: color-mix(in srgb, var(--mg-accent) 12%, transparent);
-		color: var(--mg-accent-ink, var(--mg-accent));
+		color: var(--mg-text-3);
 		font-size: var(--mg-fs-xs);
-		font-weight: 600;
+		font-weight: 500;
 	}
 	.rs-box-mark {
 		display: grid;
@@ -530,6 +530,10 @@
 	.on .rs-box-mark {
 		border-color: var(--mg-accent);
 		background: var(--mg-accent);
+	}
+	.required .rs-box-mark {
+		border-color: var(--mg-text-3);
+		background: var(--mg-text-3);
 	}
 	.rs-tname {
 		display: flex;

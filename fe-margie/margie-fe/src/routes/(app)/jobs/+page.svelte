@@ -39,7 +39,7 @@
 <div class="cr-page" data-shade="page-runs">
 	<div class="cr-head">
 		<h1 class="cr-title">Jobs</h1>
-		<p class="cr-lede">{ws.runs.length ? counts : 'Every job started from MARGIE, with its log.'}</p>
+		<p class="cr-lede">{ws.runs.length ? counts : 'Jobs started from MARGIE, with their detailed logs.'}</p>
 		<div class="cr-head-acts">
 			{#if finished}
 				<button type="button" class="mg-btn small" disabled={clearing} title="Back up the job list, then clear the finished jobs from it" onclick={clearHistory}>

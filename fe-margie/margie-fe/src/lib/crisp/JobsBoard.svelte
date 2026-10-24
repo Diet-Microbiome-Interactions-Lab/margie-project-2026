@@ -358,7 +358,7 @@
 {:else}
 	<p class="empty">
 		<strong>No jobs yet.</strong>
-		<span>Start one on <a class="mg-link" href="/analyze">Analyze</a>; every job shows up here with its log.</span>
+		<span>Start one on <a class="mg-link" href="/analyze">Analyze</a>. Jobs show up here with their detailed logs.</span>
 	</p>
 {/if}
 
