@@ -17,6 +17,7 @@
 	import { ui } from './ui.svelte';
 	import { pathComplete } from './path-complete';
 	import { backend } from './backend.svelte';
+	import { HOSTED } from '$lib/hosted';
 	import { ws } from './data.svelte';
 	import { ago } from './format';
 	import { copyText } from './clipboard';
@@ -265,10 +266,12 @@
 	interface Transfer {
 		id: string | null;
 		state: 'queued' | 'running' | 'done' | 'failed';
-		where: 'slurm' | 'login' | null;
+		where: 'slurm' | 'login' | 'local' | null;
 		job: string | null;
 		results: { source: string; ok: boolean | null; message: string }[];
 	}
+	/** Copy, move, delete and new folders: on the cluster, and in the desktop app on this computer too. */
+	const ops = $derived(backend.cluster || !HOSTED);
 	/** The paste under way: a job on SLURM (or the login node), followed until it ends. */
 	let pasting = $state<Transfer | null>(null);
 	const pastedSoFar = $derived(pasting ? pasting.results.filter((r) => r.ok !== null).length : 0);
@@ -486,7 +489,7 @@
 			{/if}
 		</form>
 		{#if ws.active}<span class="fv-live" title="Updating as the run writes"><i></i>Live</span>{/if}
-		{#if backend.cluster && current && !missing}
+		{#if ops && current && !missing}
 			<button type="button" class="vw-pill icon" title="New folder here" aria-label="New folder here" aria-pressed={making === 'folder'} onclick={() => startMaking('folder')}><FolderPlus size={15} /></button>
 			<button type="button" class="vw-pill icon" title="New text file here" aria-label="New text file here" aria-pressed={making === 'file'} onclick={() => startMaking('file')}><FilePlus size={15} /></button>
 		{/if}
@@ -510,7 +513,7 @@
 				<a role="menuitem" href={fileUrl(m.path)} download onclick={() => (menu = null)}><Download size={14} />{m.dir ? 'Download as a zip' : 'Download'}</a>
 			{/if}
 			<button type="button" role="menuitem" onclick={() => fromMenu(() => copyPath(m.path))}><ClipboardCopy size={14} />Copy path</button>
-			{#if backend.cluster}
+			{#if ops}
 				<button type="button" role="menuitem" onclick={() => fromMenu(() => take('copy', m.path))}><Copy size={14} />Copy</button>
 				<button type="button" role="menuitem" onclick={() => fromMenu(() => take('move', m.path))}><Scissors size={14} />Cut, to move it</button>
 				<button type="button" role="menuitem" class="danger" disabled={!!deleting} onclick={() => fromMenu(() => askDelete([m.path]))}><Trash2 size={14} />Delete</button>
@@ -519,7 +522,7 @@
 		</div>
 	{/if}
 
-	{#if backend.cluster && clip.paths.length}
+	{#if ops && clip.paths.length}
 		<!-- What is waiting to be pasted, and where it would go. -->
 		<div class="fv-clip" role="status">
 			{#if clip.op === 'copy'}<Copy size={14} />{:else}<Scissors size={14} />{/if}
@@ -530,14 +533,14 @@
 			</span>
 			{#if pasting}
 				<span class="fv-clip-job">
-					{pasting.where === 'slurm' ? `SLURM job ${pasting.job}${pasting.state === 'queued' ? ', waiting' : ''}` : 'on the login node'}{pasting.results.length > 1 ? ` | ${pastedSoFar} of ${pasting.results.length}` : ''}
+					{pasting.where === 'slurm' ? `SLURM job ${pasting.job}${pasting.state === 'queued' ? ', waiting' : ''}` : pasting.where === 'local' ? 'on this computer' : 'on the login node'}{pasting.results.length > 1 ? ` | ${pastedSoFar} of ${pasting.results.length}` : ''}
 				</span>
 			{/if}
 			<button type="button" class="vw-pill fv-paste" disabled={!current || !!pasting} onclick={paste}><ClipboardPaste size={14} />{pasting ? (clip.op === 'copy' ? 'Copying…' : 'Moving…') : 'Paste here'}</button>
 			<button type="button" class="vw-btn icon" title="Clear" aria-label="Clear" disabled={!!pasting} onclick={() => (clip.paths = [])}><X size={14} /></button>
 		</div>
 	{/if}
-	{#if backend.cluster && deleting}
+	{#if ops && deleting}
 		<div class="fv-clip fv-sel" role="status">
 			<Trash2 size={14} />
 			<span class="fv-clip-what">
@@ -545,7 +548,7 @@
 				{deleting.results.length > 1 ? ` | ${deleting.results.filter((r) => r.ok !== null).length} of ${deleting.results.length} done` : '…'}
 			</span>
 		</div>
-	{:else if backend.cluster && selected.length}
+	{:else if ops && selected.length}
 		<!-- The rows ticked here: copy, cut or delete them together. -->
 		<div class="fv-clip fv-sel" role="status">
 			<span class="fv-clip-what fv-count"><b>{selected.length}</b> of {everything.length} selected</span>
@@ -621,7 +624,7 @@
 				<li class="fv-row fv-note bad" style="--d: {inner}">{error}</li>
 			{:else if missing}
 				<li class="fv-row fv-note" style="--d: {inner}">
-					{#if backend.cluster}
+					{#if ops}
 						<span class="fv-missing">
 							This folder does not exist yet.
 							<button type="button" class="vw-pill" disabled={makingBusy} onclick={() => current && make('folder', current.path)}><FolderPlus size={14} />{makingBusy ? 'Creating…' : 'Create it'}</button>
@@ -633,14 +636,14 @@
 			{:else if !entries.length}
 				<li class="fv-row fv-note" style="--d: {inner}">
 					Empty so far.
-					{#if backend.cluster && !making}
+					{#if ops && !making}
 						<button type="button" class="mg-link quiet" onclick={() => startMaking('folder')}>New folder</button>
 						<button type="button" class="mg-link quiet" onclick={() => startMaking('file')}>New file</button>
 					{/if}
 				</li>
 			{:else}
 				<li class="fv-row fv-cols" style="--d: {inner}">
-					{#if backend.cluster}
+					{#if ops}
 						<span class="fv-namecell fv-colname">
 							<input
 								type="checkbox"
@@ -662,7 +665,7 @@
 					{@const p = child(e.name)}
 					<li class="fv-row" class:picked={picked === p} class:clipped={clip.paths.includes(p)} class:cut={clip.op === 'move'} class:ticked={selected.includes(p)} style="--d: {inner}">
 						<span class="fv-namecell">
-							{#if backend.cluster}
+							{#if ops}
 								<input type="checkbox" class="fv-tick" class:shown={selected.length > 0} checked={selected.includes(p)} aria-label="Select {e.name}" title="Select (Shift-click for a run)" onclick={(ev) => tick(ev, k, p)} />
 							{/if}
 							{#if e.type === 'directory'}
