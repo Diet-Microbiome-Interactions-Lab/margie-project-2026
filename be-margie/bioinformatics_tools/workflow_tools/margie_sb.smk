@@ -30,9 +30,9 @@ SIGNALP6_SCRIPT = os.path.join(WORKFLOW_DIR, "process_signalp6.py")
 SIGNALP4_SCRIPT = os.path.join(WORKFLOW_DIR, "process_signalp4.py")
 
 
-# The user's scratch when the config names no store root.
+# Store root: margie_sb.stores_root, or the user's scratch.
 STORE_ROOT = rc('margie_sb.stores_root', '', config=config) or default_store_root()
-# The group's base databases (MARGIE_SHARED_ROOT); otherwise the user's stores.
+# Base databases: the group's (MARGIE_SHARED_ROOT), or the user's stores.
 _SHARED = os.environ.get('MARGIE_SHARED_ROOT', '').rstrip('/')
 BASES = f'{_SHARED}/databases/margie-generated-databases' if _SHARED else STORE_ROOT
 
@@ -44,7 +44,7 @@ def _resolve_cfg_path(preferred_key: str, legacy_key: str, default: str) -> str:
 
 
 def _resolve_shared_dir(preferred_key: str, legacy_key: str, default: str) -> str:
-    """Returns a directory path from config without a trailing slash."""
+    """Returns a directory path from config, its trailing slash trimmed."""
     return _resolve_cfg_path(preferred_key, legacy_key, default).rstrip("/")
 
 
@@ -100,7 +100,7 @@ QUAST_CONTAINER_PREFIX = f"{_OUTPUT_ROOT}/original_container_outputs/quast" if _
 
 # GTDB-Tk outputs
 GTDBTK_RESULTS = f"{GENOME_PREFIX}gtdbtk/gtdbtk_results.tsv"
-# Genetic code for RASTtk; not loaded.
+# Genetic code for RASTtk, kept in its file.
 GTDBTK_TRANSLATION_TABLE = f"{GENOME_PREFIX}gtdbtk/translation_table.tsv"
 GTDBTK_TOKEN = f"{GENOME_PREFIX}gtdbtk/gtdbtk_db.tkn"
 GTDBTK_COMPUTE_TOKEN = f"{GENOME_PREFIX}gtdbtk/gtdbtk_compute.tkn"
@@ -132,13 +132,13 @@ def pc_dir(tool):
 
 
 def pc_faa(tool):
-    # Returns the tool's novel.faa when present, otherwise rast.faa.
+    # Returns the tool's novel.faa if present, else rast.faa.
     def _faa(wildcards):
         novel = f"{GENOME_PREFIX}{tool}/{_protein_cache.PC_DIR}/novel.faa".format(genome=wildcards.genome)
         return novel if os.path.exists(novel) else RASTTK_FAA.format(genome=wildcards.genome)
     return _faa
 
-# Each genome's domain, genetic code and gene caller; Prodigal calls a genome without both.
+# Each genome's domain, genetic code and gene caller (RASTtk with both known, else Prodigal).
 RUN_GTDBTK = rc_bool('run_gtdbtk', True, config=config)
 GENOME_CALLS = genome_calls(GENOMES, config)
 RASTTK_GENOMES = sorted(g for g, c in GENOME_CALLS.items() if c['gene_caller'] == 'rasttk')
@@ -146,7 +146,7 @@ PRODIGAL_GENOMES = sorted(g for g, c in GENOME_CALLS.items() if c['gene_caller']
 
 
 def _one_of(names):
-    """Returns a {genome} wildcard regex matching exactly these genomes (nothing if empty)."""
+    """Returns a {genome} wildcard regex matching exactly these genomes."""
     return '|'.join(re.escape(n) for n in names) if names else '(?!)'
 
 
@@ -205,7 +205,7 @@ INTERPRO_PERDB_RESULTS = {
 }
 INTERPRO_PERDB_TOKEN_PATTERN = f"{GENOME_PREFIX}interpro/interpro_{{db}}_db.tkn"
 
-# Phase5 outputs: operons (UniOP); no database.
+# Phase5 outputs: operons (UniOP), from the gene calls.
 OPERON_RESULTS = f"{GENOME_PREFIX}operon/operon_results.tsv"
 OPERON_TOKEN = f"{GENOME_PREFIX}operon/operon_db.tkn"
 OPERON_COMPUTE_TOKEN = f"{GENOME_PREFIX}operon/operon_compute.tkn"
@@ -214,7 +214,7 @@ OPERON_COMPUTE_TOKEN = f"{GENOME_PREFIX}operon/operon_compute.tkn"
 PHOBIUS_RESULTS = f"{GENOME_PREFIX}phobius/phobius_results.tsv"
 PHOBIUS_TOKEN = f"{GENOME_PREFIX}phobius/phobius_db.tkn"
 PHOBIUS_COMPUTE_TOKEN = f"{GENOME_PREFIX}phobius/phobius_compute.tkn"
-# Per-protein Phobius summary; not loaded.
+# Per-protein Phobius summary, kept as a file.
 PHOBIUS_TOP1 = f"{GENOME_PREFIX}phobius/phobius_top1.tsv"
 
 # TMbed reads the ProtT5 model in db/tmbed; runs on CPU.
@@ -222,7 +222,7 @@ TMBED_RESULTS = f"{GENOME_PREFIX}tmbed/tmbed_results.tsv"
 TMBED_TOKEN = f"{GENOME_PREFIX}tmbed/tmbed_db.tkn"
 TMBED_COMPUTE_TOKEN = f"{GENOME_PREFIX}tmbed/tmbed_compute.tkn"
 
-# SignalP 6 runs as an HPC module; --format none skips per-protein plots.
+# SignalP 6 runs as an HPC module; --format none writes the tables only.
 SIGNALP6_RESULTS = f"{GENOME_PREFIX}signalp6/signalp6_results.tsv"
 SIGNALP6_TOKEN = f"{GENOME_PREFIX}signalp6/signalp6_db.tkn"
 SIGNALP6_COMPUTE_TOKEN = f"{GENOME_PREFIX}signalp6/signalp6_compute.tkn"
@@ -332,12 +332,12 @@ GENOME_VIEWER_NAME = "FINAL_GENOME_VIEWER.html"
 GENOME_VIEWER_HTML = f"{GENOME_PREFIX}{GENOME_VIEWER_NAME}"
 GENOME_VIEWER_CIRCULAR_PNG = f"{GENOME_PREFIX}scoring/figures/{{genome}}_circular.png"
 GENOME_VIEWER_TOKEN = f"{GENOME_PREFIX}scoring/genome_viewer.tkn"
-# Full operon atlas (every multi-gene operon); off by default.
+# Full operon atlas (all multi-gene operons); off by default.
 COMPLETE_OPERON_MAP_TOKEN = f"{GENOME_PREFIX}scoring/figures/complete_operon_map.tkn"
 
 
 def _home_config_flag(section, key):
-    """Returns a boolean from the home config.yaml; False when missing or unreadable."""
+    """Returns a boolean from the home config.yaml, False by default."""
     try:
         import yaml
         p = os.path.join(os.path.expanduser("~"), ".config",
@@ -392,7 +392,7 @@ FINGERPRINT_FULL_WITH_SCORES = f"{GENOME_PREFIX}fingerprint/labeled-genes-finger
 FINAL_ANNOTATED = f"{GENOME_PREFIX}scoring/scored-raw-labeled-genes-final-annotated.tsv"
 # Publication subset (~43 columns) with the scoring columns.
 FINAL_ANNOTATED_PUBLICATION = f"{GENOME_PREFIX}scoring/FINAL-scored-labeled-genes-annotated.tsv"
-# GFF3 from the publication table and rast.gff (no LLM).
+# GFF3 from the publication table and rast.gff.
 ANNOTATION_GFF = f"{GENOME_PREFIX}scoring/annotation.gff3"
 FINGERPRINT_COMPUTE_TOKEN = f"{GENOME_PREFIX}fingerprint/fingerprint_compute.tkn"
 FINGERPRINT_TOKEN = f"{GENOME_PREFIX}fingerprint/fingerprint_db.tkn"
@@ -443,7 +443,7 @@ CLOSEST_RESULTS = f"{_OUTPUT_ROOT}/closest/closest_organisms.tsv" if _OUTPUT_ROO
 CLOSEST_COMPUTE_TOKEN = f"{_OUTPUT_ROOT}/closest/closest_compute.tkn" if _OUTPUT_ROOT else "closest/closest_compute.tkn"
 CLOSEST_TOKEN = f"{_OUTPUT_ROOT}/closest/closest_db.tkn" if _OUTPUT_ROOT else "closest/closest_db.tkn"
 
-# Mauve and synteny paths; no rule uses them yet.
+# Mauve and synteny paths, for their rules to come.
 SYNTENY_SCRIPTS_DIR = os.path.join(WORKFLOW_DIR, "synteny")
 # Genome name -> FASTA path, read by stage_references.py.
 GENOME_FASTA_INDEX = f"{_OUTPUT_ROOT}/synteny/genome_fasta_index.tsv" if _OUTPUT_ROOT else "synteny/genome_fasta_index.tsv"
@@ -462,7 +462,7 @@ SYNTENY_TOKEN = f"{GENOME_PREFIX}synteny/synteny_db.tkn"
 
 def _phase4_8_targets_for_genome(genome):
     """Returns one genome's selected phase4-8 db tokens (run_<tool>)."""
-    # No target_genome: no targets.
+    # Targets come for a named target_genome.
     if not genome:
         return []
     targets = []
@@ -535,7 +535,7 @@ def _phase9_12_targets_for_genome(genome, include_llm=True):
 
 
 rule all:
-    # Every selected tool's db token for every genome.
+    # The selected tools' db tokens for all genomes.
     input:
         (expand(QUAST_TOKEN, genome=list(GENOMES.keys())) if rc_bool('run_quast', False, config=config) else []),
         (expand(GTDBTK_TOKEN, genome=list(GENOMES.keys())) if rc_bool('run_gtdbtk', True, config=config) else []),
@@ -549,14 +549,14 @@ rule all:
 
 
 rule rasttk_all:
-    """Stage 1: GTDB-Tk and gene calling for every genome."""
+    """Stage 1: GTDB-Tk and gene calling for all genomes."""
     input:
         expand(RASTTK_TOKEN, genome=list(GENOMES.keys())),
         (expand(GTDBTK_TOKEN, genome=list(GENOMES.keys())) if rc_bool('run_gtdbtk', True, config=config) else [])
 
 
 rule phase4_8_one_genome:
-    """Runs every selected phase4-8 tool for target_genome."""
+    """Runs the selected phase4-8 tools for target_genome."""
     input:
         _phase4_8_targets_for_genome(rc('target_genome', '', config=config))
 
@@ -569,20 +569,20 @@ rule phase4_12_one_genome:
 
 
 rule phase4_12_one_genome_no_llm:
-    """Stage 2 without the LLM, which llm_all runs."""
+    """Stage 2 up to the LLM, which llm_all runs."""
     input:
         _phase4_8_targets_for_genome(rc('target_genome', '', config=config)),
         _phase9_12_targets_for_genome(rc('target_genome', '', config=config), include_llm=False)
 
 
 rule llm_all:
-    """Stage 3: the LLM for every genome, one GPU job at a time."""
+    """Stage 3: the LLM for all genomes, one GPU job at a time."""
     input:
         expand(LLM_TOKEN, genome=list(GENOMES.keys())) if rc_bool('run_llm', False, config=config) else []
 
 
 rule run_consolidation:
-    """Phase9: merges every phase4-8 results.tsv into one row per gene, plus a no-stat view."""
+    """Phase9: merges the phase4-8 results.tsv files into one row per gene, plus a no-stat view."""
     input:
         phase4_8=lambda wildcards: _phase4_8_targets_for_genome(wildcards.genome),
         gtdbtk_results=GENOME_INFO
@@ -1085,7 +1085,7 @@ rule run_genome_viewer_one_genome:
 
 
 rule run_full_operon_map_one_genome:
-    """Draws every multi-gene operon (run_full_operon_map, off by default); errors are logged and skipped."""
+    """Draws all multi-gene operons (run_full_operon_map, off by default); errors are logged and skipped."""
     input:
         scoring_tkn=SCORING_TOKEN
     output:
@@ -1226,7 +1226,7 @@ rule build_gene_evidence_report:
         mem_mb=rc('evidence.mem_mb', 8000, config=config),
         runtime=runtime_min('evidence.runtime', 60, config=config)
     params:
-        # Shared databases are params, so other genomes' updates trigger no reruns.
+        # Shared databases are params, so this genome's outputs stay as they are when other genomes update them.
         gene_fp_db=FINGERPRINT_DATABASE_PATH,
         operon_fp_db_evidence_ordered=OPERON_FINGERPRINT_DATABASE_EVIDENCE_ORDERED,
         operon_fp_db_evidence_composition=OPERON_FINGERPRINT_DATABASE_EVIDENCE_COMPOSITION,
@@ -1454,7 +1454,7 @@ rule load_aai_to_db:
 
 
 rule run_closest_organisms_batch:
-    """Phase13: each genome's top-N closest relatives, from ANI or else AAI."""
+    """Phase13: each genome's top-N closest relatives, from ANI, then AAI."""
     input:
         ani=ANI_RESULTS,
         aai=AAI_RESULTS,
@@ -1547,7 +1547,7 @@ rule load_quast_to_db:
 
 
 rule run_gtdbtk_batch:
-    """Phase2: GTDB-Tk classify_wf once over the genomes not from the MARGIE database."""
+    """Phase2: GTDB-Tk classify_wf once over the genomes that need it (CACHED_GTDBTK come from the MARGIE database)."""
     input:
         [f for g, f in GENOMES.items() if g not in CACHED_GTDBTK]
     output:
@@ -1580,7 +1580,7 @@ rule run_gtdbtk_batch:
         rm -rf {params.stage_dir}
         mkdir -p {params.stage_dir}
 
-        # Stages every genome as <stem>.fna (gunzipped): GTDB-Tk reads only --extension fna.
+        # Stages each genome as <stem>.fna (gunzipped), the --extension GTDB-Tk reads.
         i=0
         for src in {input}; do
             base=$(basename "$src")
@@ -1597,7 +1597,7 @@ rule run_gtdbtk_batch:
             i=$((i + 1))
         done
 
-        # Full species placement for every genome, so each gets a translation table.
+        # Full species placement for all genomes, so each gets a translation table.
         # GTDBTK_PPLACER_CPUS=16; check MaxRSS (seff) before raising it.
         GTDBTK_PLACE_SPECIES=1 GTDBTK_PPLACER_CPUS=16 /usr/local/bin/run -i {params.stage_dir} -o {params.output_dir} -d {params.db} -t {threads} --collection-name margie_sb_batch
 
@@ -1650,7 +1650,7 @@ rule split_gtdbtk_batch_per_genome:
             first = fh.readline().strip()
             rest = fh.read()
 
-        # Usually with headers; some GTDB-Tk runs write <genome>\t<table> without.
+        # With headers (user_genome or genome), or two bare columns: <genome>\t<table>.
         header_like = ('user_genome' in first) or ('genome' in first)
         if header_like:
             import io
@@ -1676,7 +1676,7 @@ rule split_gtdbtk_batch_per_genome:
 
         row = rows_by_genome.get(genome)
         if row is None:
-            # Every genome has a row, so a gap is an error.
+            # Each genome has a row, so a gap is an error.
             raise ValueError(f"Missing GTDB-Tk translation table row for genome '{genome}' in {input.translation_table}")
         target = Path(output.translation_table)
         target.parent.mkdir(parents=True, exist_ok=True)
@@ -1690,7 +1690,7 @@ rule split_gtdbtk_batch_per_genome:
 
 
 rule gtdbtk_from_cache:
-    """Stands for a genome's GTDB-Tk files from the MARGIE database; fails if one is missing."""
+    """Stands for a genome's GTDB-Tk files from the MARGIE database, which workflow.py writes before Stage 1."""
     output:
         results=GTDBTK_RESULTS,
         translation_table=GTDBTK_TRANSLATION_TABLE,
@@ -1709,7 +1709,7 @@ localrules: gtdbtk_from_cache
 
 
 rule load_gtdbtk_to_db:
-    """Loads GTDB-Tk results into main_database (not grouped: GTDB-Tk needs highmem)."""
+    """Loads GTDB-Tk results into main_database, in a group of its own (GTDB-Tk runs on highmem)."""
     input:
         results=GTDBTK_RESULTS
     output:
@@ -1792,14 +1792,14 @@ rule run_rasttk:
         """
         echo "=== MARGIE_SB PHASE 3: RASTTK ({wildcards.genome}) ==="
         DOMAIN=$(awk -F'\\t' 'NR==1{{for(i=1;i<=NF;i++) if($i=="GTDBTK_domain") c=i}} NR==2{{print $c}}' {input.gtdbtk_results})
-        # No default code: a missing translation_table is an upstream error.
+        # The genetic code comes from translation_table.tsv; an empty one stops the rule.
         GCODE=$(awk -F'\t' 'NR==1{{for(i=1;i<=NF;i++){{gsub(/\r/,"",$i); if($i=="translation_table") c=i}}}} NR>1{{gsub(/\r/,"",$c); if(c && $c!=""){{print $c; exit}}}}' {input.translation_table})
         if [[ -z "$GCODE" ]]; then
             echo "ERROR: could not read a genetic code for {wildcards.genome} from {input.translation_table} -- refusing to guess" >&2
             exit 1
         fi
 
-        # The holder writes alive_at every minute; a lock silent for STALE_SECONDS is taken over.
+        # The holder writes alive_at each minute; a lock silent for STALE_SECONDS is taken over.
         STALE_SECONDS=600
         while ! mkdir "{params.lock}" 2>/dev/null; do
             SEEN=$(cat "{params.lock}/alive_at" "{params.lock}/acquired_at" 2>/dev/null | sort -n | tail -1 || true)
@@ -1827,7 +1827,7 @@ rule run_rasttk:
 
 
 rule run_prodigal:
-    """Phase3: Prodigal gene calls in RASTtk's layout, for genomes without a known domain or code."""
+    """Phase3: Prodigal gene calls in RASTtk's layout, for PRODIGAL_GENOMES (domain or code unknown)."""
     input:
         fasta=lambda wildcards: GENOMES[wildcards.genome],
         info=GENOME_INFO
@@ -1862,7 +1862,7 @@ rule run_prodigal:
 
 
 rule rasttk_from_cache:
-    """Stands for a genome's RASTtk files from the MARGIE database; fails if one is missing."""
+    """Stands for a genome's RASTtk files from the MARGIE database, which workflow.py writes before Stage 1."""
     output:
         results=RASTTK_RESULTS,
         faa=RASTTK_FAA,
@@ -2202,7 +2202,7 @@ rule load_uniprot_to_db:
 
 
 rule run_kegg:
-    """Phase4: KEGG Orthology with KofamScan (per-KO thresholds, no evalue flag)."""
+    """Phase4: KEGG Orthology with KofamScan and its per-KO thresholds."""
     input:
         faa=pc_faa('kegg'),
         gtdbtk_results=GENOME_INFO
@@ -2434,7 +2434,7 @@ rule run_interpro:
         fi
         sh {params.merge} "$SRC/processed/interpro_results.tsv" {output.results} {params.pc} interpro_results.tsv tsv
         for db in {params.db_basenames}; do
-            # A database with no output leaves an empty stub.
+            # Each member database writes its TSV, a header-only stub for zero hits.
             sh {params.merge} "$SRC/processed/interpro_${{db}}_results.tsv" "$OUT_DIR/interpro_${{db}}_results.tsv" {params.pc} "interpro_${{db}}_results.tsv" "tsv?"
         done
         echo "interpro complete for {wildcards.genome}" > {output.tkn}
@@ -2523,7 +2523,7 @@ rule load_geneprop_to_db:
 
 
 rule run_operon:
-    """Phase5: UniOP operons from rast.faa and rast.gff; no database."""
+    """Phase5: UniOP operons from rast.faa and rast.gff."""
     input:
         faa=RASTTK_FAA,
         gff=RASTTK_GFF,
@@ -2944,7 +2944,7 @@ rule load_signalp4_to_db:
 # ─────────────────────── Template ─────────────────────── #
 # A new tool, as Dane designed it: its paths with the others, a run rule, then a load rule.
 # Add its token to _phase4_8_targets_for_genome, gated by run_<tool>. A rule on another
-# SLURM partition does not share a group with its load rule.
+# SLURM partition gets a group apart from its load rule.
 #
 # # Newtool outputs
 # NEWTOOL_RESULTS = f"{GENOME_PREFIX}newtool/newtool_results.tsv"
