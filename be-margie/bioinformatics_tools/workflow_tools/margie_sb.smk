@@ -84,6 +84,12 @@ def runtime_min(key: str, default: int, config=None) -> int:
         minutes = int(default)
     return max(MIN_SLURM_RUNTIME_MINUTES, minutes)
 
+# Database loads (load_*_to_db): 10-minute SLURM jobs (load_db.runtime), one at a time within a
+# run (margie_sb_db_writer) so none waits out another's lock, retried twice. Each table loads in one
+# transaction, so a retry loads what an attempt did not finish and skips what it did.
+LOAD_RUNTIME = int(rc('load_db.runtime', 10, config=config))
+LOAD_RETRIES = 2
+
 # Lock that lets one RASTtk job at a time submit to BV-BRC, across the account's runs.
 RASTTK_BVBRC_LOCK = _resolve_shared_dir(
     'rasttk.bvbrc_lock_dir', 'rasttk_bvbrc_lock_dir',
@@ -899,6 +905,10 @@ rule load_consolidation_to_db:
         fasta=lambda wildcards: GENOMES[wildcards.genome]
     output:
         tkn=CONSOLIDATION_TOKEN
+    retries: LOAD_RETRIES
+    resources:
+        runtime=LOAD_RUNTIME,
+        margie_sb_db_writer=1
     params:
         db=MAIN_DATABASE,
         script=LOAD_SCRIPT
@@ -923,6 +933,10 @@ rule load_labeling_to_db:
         fasta=lambda wildcards: GENOMES[wildcards.genome]
     output:
         tkn=LABELING_TOKEN
+    retries: LOAD_RETRIES
+    resources:
+        runtime=LOAD_RUNTIME,
+        margie_sb_db_writer=1
     params:
         db=MAIN_DATABASE,
         script=LOAD_SCRIPT
@@ -954,6 +968,10 @@ rule load_scoring_to_db:
         fasta=lambda wildcards: GENOMES[wildcards.genome]
     output:
         tkn=SCORING_TOKEN
+    retries: LOAD_RETRIES
+    resources:
+        runtime=LOAD_RUNTIME,
+        margie_sb_db_writer=1
     params:
         db=MAIN_DATABASE,
         script=LOAD_SCRIPT
@@ -1293,6 +1311,10 @@ rule load_llm_to_db:
     output:
         final_llm_publication=FINAL_LLM_ANNOTATED_PUBLICATION,
         tkn=LLM_TOKEN
+    retries: LOAD_RETRIES
+    resources:
+        runtime=LOAD_RUNTIME,
+        margie_sb_db_writer=1
     params:
         db=MAIN_DATABASE,
         script=LOAD_SCRIPT
@@ -1318,6 +1340,10 @@ rule load_fingerprint_to_db:
         compute_tkn=FINGERPRINT_COMPUTE_TOKEN
     output:
         tkn=FINGERPRINT_TOKEN
+    retries: LOAD_RETRIES
+    resources:
+        runtime=LOAD_RUNTIME,
+        margie_sb_db_writer=1
     params:
         db=MAIN_DATABASE,
         script=LOAD_SCRIPT
@@ -1393,6 +1419,10 @@ rule load_ani_to_db:
     output:
         tkn=ANI_TOKEN
     group: "ani"
+    retries: LOAD_RETRIES
+    resources:
+        runtime=LOAD_RUNTIME,
+        margie_sb_db_writer=1
     params:
         db=MAIN_DATABASE,
         script=LOAD_SCRIPT
@@ -1442,6 +1472,10 @@ rule load_aai_to_db:
     output:
         tkn=AAI_TOKEN
     group: "aai"
+    retries: LOAD_RETRIES
+    resources:
+        runtime=LOAD_RUNTIME,
+        margie_sb_db_writer=1
     params:
         db=MAIN_DATABASE,
         script=LOAD_SCRIPT
@@ -1492,6 +1526,10 @@ rule load_closest_to_db:
     output:
         tkn=CLOSEST_TOKEN
     group: "closest"
+    retries: LOAD_RETRIES
+    resources:
+        runtime=LOAD_RUNTIME,
+        margie_sb_db_writer=1
     params:
         db=MAIN_DATABASE,
         script=LOAD_SCRIPT
@@ -1536,6 +1574,10 @@ rule load_quast_to_db:
     output:
         tkn=QUAST_TOKEN
     group: "quast"
+    retries: LOAD_RETRIES
+    resources:
+        runtime=LOAD_RUNTIME,
+        margie_sb_db_writer=1
     params:
         db=MAIN_DATABASE,
         script=LOAD_SCRIPT
@@ -1713,6 +1755,10 @@ rule load_gtdbtk_to_db:
         results=GTDBTK_RESULTS
     output:
         tkn=GTDBTK_TOKEN
+    retries: LOAD_RETRIES
+    resources:
+        runtime=LOAD_RUNTIME,
+        margie_sb_db_writer=1
     params:
         db=MAIN_DATABASE,
         script=LOAD_SCRIPT
@@ -1886,6 +1932,10 @@ rule load_rasttk_to_db:
         results=RASTTK_RESULTS
     output:
         tkn=RASTTK_TOKEN
+    retries: LOAD_RETRIES
+    resources:
+        runtime=LOAD_RUNTIME,
+        margie_sb_db_writer=1
     params:
         db=MAIN_DATABASE,
         script=LOAD_SCRIPT
@@ -1938,6 +1988,10 @@ rule load_cog_to_db:
         results=PHASE4_RESULTS['cog']
     output:
         tkn=PHASE4_TOKENS['cog']
+    retries: LOAD_RETRIES
+    resources:
+        runtime=LOAD_RUNTIME,
+        margie_sb_db_writer=1
     params:
         db=MAIN_DATABASE,
         script=LOAD_SCRIPT
@@ -1988,6 +2042,10 @@ rule load_pfam_to_db:
         results=PHASE4_RESULTS['pfam']
     output:
         tkn=PHASE4_TOKENS['pfam']
+    retries: LOAD_RETRIES
+    resources:
+        runtime=LOAD_RUNTIME,
+        margie_sb_db_writer=1
     params:
         db=MAIN_DATABASE,
         script=LOAD_SCRIPT
@@ -2039,6 +2097,10 @@ rule load_tigrfam_to_db:
         results=PHASE4_RESULTS['tigrfam']
     output:
         tkn=PHASE4_TOKENS['tigrfam']
+    retries: LOAD_RETRIES
+    resources:
+        runtime=LOAD_RUNTIME,
+        margie_sb_db_writer=1
     params:
         db=MAIN_DATABASE,
         script=LOAD_SCRIPT
@@ -2089,6 +2151,10 @@ rule load_merops_to_db:
         results=PHASE4_RESULTS['merops']
     output:
         tkn=PHASE4_TOKENS['merops']
+    retries: LOAD_RETRIES
+    resources:
+        runtime=LOAD_RUNTIME,
+        margie_sb_db_writer=1
     params:
         db=MAIN_DATABASE,
         script=LOAD_SCRIPT
@@ -2140,6 +2206,10 @@ rule load_tcdb_to_db:
         results=PHASE4_RESULTS['tcdb']
     output:
         tkn=PHASE4_TOKENS['tcdb']
+    retries: LOAD_RETRIES
+    resources:
+        runtime=LOAD_RUNTIME,
+        margie_sb_db_writer=1
     params:
         db=MAIN_DATABASE,
         script=LOAD_SCRIPT
@@ -2191,6 +2261,10 @@ rule load_uniprot_to_db:
         results=PHASE4_RESULTS['uniprot']
     output:
         tkn=PHASE4_TOKENS['uniprot']
+    retries: LOAD_RETRIES
+    resources:
+        runtime=LOAD_RUNTIME,
+        margie_sb_db_writer=1
     params:
         db=MAIN_DATABASE,
         script=LOAD_SCRIPT
@@ -2240,6 +2314,10 @@ rule load_kegg_to_db:
         results=PHASE4_RESULTS['kegg']
     output:
         tkn=PHASE4_TOKENS['kegg']
+    retries: LOAD_RETRIES
+    resources:
+        runtime=LOAD_RUNTIME,
+        margie_sb_db_writer=1
     params:
         db=MAIN_DATABASE,
         script=LOAD_SCRIPT
@@ -2289,6 +2367,10 @@ rule load_eggnog_to_db:
         results=PHASE4_RESULTS['eggnog']
     output:
         tkn=PHASE4_TOKENS['eggnog']
+    retries: LOAD_RETRIES
+    resources:
+        runtime=LOAD_RUNTIME,
+        margie_sb_db_writer=1
     params:
         db=MAIN_DATABASE,
         script=LOAD_SCRIPT
@@ -2339,6 +2421,10 @@ rule load_dbcan_to_db:
         results=PHASE4_RESULTS['dbcan']
     output:
         tkn=PHASE4_TOKENS['dbcan']
+    retries: LOAD_RETRIES
+    resources:
+        runtime=LOAD_RUNTIME,
+        margie_sb_db_writer=1
     params:
         db=MAIN_DATABASE,
         script=LOAD_SCRIPT
@@ -2388,6 +2474,10 @@ rule load_pgap_to_db:
         results=PHASE4_RESULTS['pgap']
     output:
         tkn=PHASE4_TOKENS['pgap']
+    retries: LOAD_RETRIES
+    resources:
+        runtime=LOAD_RUNTIME,
+        margie_sb_db_writer=1
     params:
         db=MAIN_DATABASE,
         script=LOAD_SCRIPT
@@ -2446,7 +2536,10 @@ rule load_interpro_to_db:
         results=PHASE4_RESULTS['interpro']
     output:
         tkn=PHASE4_TOKENS['interpro']
+    retries: LOAD_RETRIES
     resources:
+        runtime=LOAD_RUNTIME,
+        margie_sb_db_writer=1,
         mem_mb=rc('interpro.load_mem_mb', 2000, config=config)
     params:
         db=MAIN_DATABASE,
@@ -2465,7 +2558,10 @@ rule load_interpro_perdb_to_db:
         tkn=INTERPRO_PERDB_TOKEN_PATTERN
     wildcard_constraints:
         db="|".join(INTERPRO_DB_BASENAMES)
+    retries: LOAD_RETRIES
     resources:
+        runtime=LOAD_RUNTIME,
+        margie_sb_db_writer=1,
         mem_mb=rc('interpro.load_mem_mb', 2000, config=config)
     params:
         db_file=MAIN_DATABASE,
@@ -2512,6 +2608,10 @@ rule load_geneprop_to_db:
         results=PHASE4_RESULTS['geneprop']
     output:
         tkn=PHASE4_TOKENS['geneprop']
+    retries: LOAD_RETRIES
+    resources:
+        runtime=LOAD_RUNTIME,
+        margie_sb_db_writer=1
     params:
         db=MAIN_DATABASE,
         script=LOAD_SCRIPT
@@ -2553,6 +2653,10 @@ rule load_operon_to_db:
         results=OPERON_RESULTS
     output:
         tkn=OPERON_TOKEN
+    retries: LOAD_RETRIES
+    resources:
+        runtime=LOAD_RUNTIME,
+        margie_sb_db_writer=1
     params:
         db=MAIN_DATABASE,
         script=LOAD_SCRIPT
@@ -2600,6 +2704,10 @@ rule load_phobius_to_db:
         results=PHOBIUS_RESULTS
     output:
         tkn=PHOBIUS_TOKEN
+    retries: LOAD_RETRIES
+    resources:
+        runtime=LOAD_RUNTIME,
+        margie_sb_db_writer=1
     params:
         db=MAIN_DATABASE,
         script=LOAD_SCRIPT
@@ -2656,6 +2764,10 @@ rule load_tmbed_to_db:
         results=TMBED_RESULTS
     output:
         tkn=TMBED_TOKEN
+    retries: LOAD_RETRIES
+    resources:
+        runtime=LOAD_RUNTIME,
+        margie_sb_db_writer=1
     params:
         db=MAIN_DATABASE,
         script=LOAD_SCRIPT
@@ -2717,6 +2829,10 @@ rule load_signalp6_to_db:
         results=SIGNALP6_RESULTS
     output:
         tkn=SIGNALP6_TOKEN
+    retries: LOAD_RETRIES
+    resources:
+        runtime=LOAD_RUNTIME,
+        margie_sb_db_writer=1
     params:
         db=MAIN_DATABASE,
         script=LOAD_SCRIPT
@@ -2763,6 +2879,10 @@ rule load_envelope_to_db:
         results=ENVELOPE_RESULTS
     output:
         tkn=ENVELOPE_TOKEN
+    retries: LOAD_RETRIES
+    resources:
+        runtime=LOAD_RUNTIME,
+        margie_sb_db_writer=1
     params:
         db=MAIN_DATABASE,
         script=LOAD_SCRIPT
@@ -2812,6 +2932,10 @@ rule load_deepsig_to_db:
         envelope_summary=ENVELOPE_SUMMARY
     output:
         tkn=DEEPSIG_TOKEN
+    retries: LOAD_RETRIES
+    resources:
+        runtime=LOAD_RUNTIME,
+        margie_sb_db_writer=1
     params:
         db=MAIN_DATABASE,
         script=LOAD_SCRIPT,
@@ -2863,6 +2987,10 @@ rule load_psortb_to_db:
         envelope_summary=ENVELOPE_SUMMARY
     output:
         tkn=PSORTB_TOKEN
+    retries: LOAD_RETRIES
+    resources:
+        runtime=LOAD_RUNTIME,
+        margie_sb_db_writer=1
     params:
         db=MAIN_DATABASE,
         script=LOAD_SCRIPT,
@@ -2929,6 +3057,10 @@ rule load_signalp4_to_db:
         envelope_summary=ENVELOPE_SUMMARY
     output:
         tkn=SIGNALP4_TOKEN
+    retries: LOAD_RETRIES
+    resources:
+        runtime=LOAD_RUNTIME,
+        margie_sb_db_writer=1
     params:
         db=MAIN_DATABASE,
         script=LOAD_SCRIPT,

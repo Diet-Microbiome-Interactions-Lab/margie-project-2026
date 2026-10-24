@@ -543,21 +543,24 @@ class TestRunPipelineBatchSequential:
     @patch('bioinformatics_tools.workflow_tools.workflow.cache_sif_files')
     @patch('bioinformatics_tools.workflow_tools.workflow.locate_local_sif_files')
     @patch('bioinformatics_tools.workflow_tools.workflow.time.sleep')
-    def test_failure_halts_before_next_genome(self, mock_sleep, mock_locate, mock_cache, wf):
-        """Checks that a Stage 2 failure halts the queue: no third genome is
-        started, nothing runs after it, and the run is reported as failed."""
+    def test_a_failed_genome_does_not_stop_the_others(self, mock_sleep, mock_locate, mock_cache, wf):
+        """Checks that a Stage 2 failure on one genome lets the queue go on: the third genome
+        still runs, the finalize steps wait for a run without gaps, and the run ends with gaps."""
         genome_files = {'genome1': '/g1.fa', 'genome2': '/g2.fa', 'genome3': '/g3.fa'}
 
         with patch('bioinformatics_tools.workflow_tools.workflow.Path') as mock_path_cls, \
-             _fake_launchers(wf, stage2_returncodes=(0, 1)) as rec:
-            mock_path_cls.return_value.exists.return_value = True  # every genome is RASTtk-ready
+             _fake_launchers(wf, stage2_returncodes=(0, 1, 0)) as rec:
+            mock_path_cls.return_value.exists.return_value = True  # each genome is RASTtk-ready
             ret = wf._run_pipeline_batch_sequential('margie_sb', dict(self.SMK_CONFIG), genome_files,
                                                      cache_map_fn=lambda s: {}, mode='dev')
 
-        assert len(rec['stage2']) == 2
-        assert rec['run'] == []  # no Stage 3 / finalize after a halt
-        assert ret == 1
-        assert wf.report.status.indicates_failure
+        assert len(rec['stage2']) == 3
+        assert rec['run'] == []  # no finalize with a gap
+        assert ret is None  # finished(), not failed()
+        assert not wf.report.status.indicates_failure
+        failed = _target_genome_of(rec['stage2'][1])
+        assert wf.report.data['genomes_failed'] == [failed]
+        assert wf.report.data['genomes_processed'] == 2
 
     @patch('bioinformatics_tools.workflow_tools.workflow.cache_sif_files')
     @patch('bioinformatics_tools.workflow_tools.workflow.locate_local_sif_files')
