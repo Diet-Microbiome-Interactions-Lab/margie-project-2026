@@ -31,7 +31,7 @@ from dataclasses import asdict
 from bioinformatics_tools.api import build_gate, licensing
 from bioinformatics_tools.api.auth import decode_token, decrypt_private_key, get_current_user
 from bioinformatics_tools.api.models import GenomeSend, SlurmSend
-from bioinformatics_tools.api.services import job_history_client, job_runner, read_cache, tool_assets, user_stores
+from bioinformatics_tools.api.services import job_history_client, job_runner, read_cache, scratch_cache, tool_assets, user_stores
 from bioinformatics_tools.api.services.job_store import job_store
 from bioinformatics_tools.utilities import ssh_sftp, ssh_slurm
 from bioinformatics_tools.utilities.ssh_connection import (
@@ -2376,8 +2376,10 @@ def list_jobs(
     A user with no history gets an empty list."""
     conn = _build_connection(current_user)
     # The slowest read every page makes: reused for 5 s, then returned while it is asked again.
-    return read_cache.get((current_user["user_id"], "jobs", workflow, page, page_size),
-                          lambda: _list_jobs(conn, current_user, workflow, page, page_size), fresh=5.0)
+    key = (current_user["user_id"], "jobs", workflow, page, page_size)
+    # A copy in the working folder answers an API that has just started (scratch_cache).
+    return read_cache.get(key, lambda: _list_jobs(conn, current_user, workflow, page, page_size), fresh=5.0,
+                          backup=scratch_cache.backup(conn, current_user, key))
 
 
 def _list_jobs(conn, current_user: dict, workflow: str | None, page: int, page_size: int) -> dict:
@@ -2970,7 +2972,8 @@ def tree(payload: dict, current_user: dict = Depends(get_current_user)):
                 trees[at].append([kind, rel])
         return {"trees": trees}
 
-    return read_cache.get((current_user["user_id"], "tree", tuple(resolved), depth, tuple(prune)), ask, fresh=30, stale=300)
+    key = (current_user["user_id"], "tree", tuple(resolved), depth, tuple(prune))
+    return read_cache.get(key, ask, fresh=30, stale=300, backup=scratch_cache.backup(conn, current_user, key))
 
 
 @router.get("/browse")

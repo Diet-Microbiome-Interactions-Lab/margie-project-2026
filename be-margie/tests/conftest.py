@@ -139,3 +139,10 @@ def _fresh_access(monkeypatch):
     for guard in (access.SIGNIN_BY_NAME, access.SIGNIN_BY_ADDRESS, access.SIGNUP_BY_ADDRESS):
         guard.reset()
     yield
+
+
+@pytest.fixture(autouse=True)
+def _no_scratch_copies(monkeypatch):
+    """Tests run without the working folder's copies (scratch_cache): their connections are fakes."""
+    from bioinformatics_tools.api.services import scratch_cache
+    monkeypatch.setattr(scratch_cache, "backup", lambda *args, **kwargs: None)
