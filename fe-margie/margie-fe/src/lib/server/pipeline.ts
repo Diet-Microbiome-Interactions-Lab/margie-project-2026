@@ -55,7 +55,7 @@ export interface SettingDef {
  * operon finder, the envelope stage and MARGIE's own scripts, since the app may be used outside academia.
  * margie-desktop/scripts/stage.mjs writes the same list into the pipeline it ships (LICENCE_GATED_TOOLS).
  */
-export const LICENCE_TOOLS = ['kegg', 'tigrfam', 'dbcan', 'eggnog', 'merops', 'tcdb', 'uniprot', 'interpro', 'geneprop', 'psortb', 'deepsig', 'signalp4', 'tmbed', 'phobius'];
+export const LICENCE_TOOLS = ['kegg', 'tigrfam', 'dbcan', 'eggnog', 'merops', 'tcdb', 'uniprot', 'interpro', 'geneprop', 'psortb', 'deepsig', 'tmbed', 'phobius'];
 
 /**
  * Local-mode defaults over pipeline.conf.sh: GTDB-Tk off (too memory-hungry for

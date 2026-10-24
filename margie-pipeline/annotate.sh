@@ -8,7 +8,7 @@
 #   output/<tool>/<genome>/.
 #
 # GRAM STAIN comes from the envelope stage, which runs after the annotation
-#   tools (from tigrfam, pgap, pfam, uniprot); psortb, deepsig and signalp4 run after it.
+#   tools (from tigrfam, pgap, pfam, uniprot); psortb and deepsig run after it.
 #
 # RUNTIME MODES
 #   local  (no SLURM_JOB_ID): one genome at a time, end to end:
@@ -52,7 +52,7 @@ runner_dir="$here/processing/scripts/run-individual-containers"
 # scoring (run-meta.sh) reads it. Phase 1b is split around the envelope:
 #   Phase 1b-pre  — gram-agnostic tools
 #   envelope      — infers diderm / monoderm / archaea
-#   Phase 1b-post — PSORTb, DeepSig, SignalP4, which pick models by envelope
+#   Phase 1b-post — PSORTb and DeepSig, which pick models by envelope
 annotation_tools_default=(
     # Stage C — general functional annotation (gram-agnostic)
     kegg cog pfam pgap tigrfam dbcan eggnog merops tcdb uniprot interpro geneprop
@@ -61,12 +61,13 @@ annotation_tools_default=(
     # Stage C — operonic structure
     operon
     # envelope runs automatically between pre and post phases (not listed here)
-    # Stage C — localization, gram-dependent predictors (run after envelope)
-    psortb deepsig signalp4
+    # Stage C — localization, gram-dependent predictors (run after envelope). SignalP 4 and 6 are
+    # cluster modules, so this computer predicts signal peptides with DeepSig.
+    psortb deepsig
 )
 
 # Gram-dependent tools (run after envelope); all others are Phase 1b-pre.
-_gram_post_tools_default=(psortb deepsig signalp4)
+_gram_post_tools_default=(psortb deepsig)
 
 # Tools the envelope reads; added to each annotation run (the gated ones once their licence is accepted).
 _envelope_input_tools=(tigrfam pgap pfam uniprot)

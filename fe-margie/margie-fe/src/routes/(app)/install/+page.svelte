@@ -38,6 +38,8 @@
 	/** On this computer: the tools that wait for their own licence (Settings → Licences), by id. */
 	const localGated = $derived(backend.cluster ? null : new Set(ws.overview?.licences.tools ?? []));
 	const opensHere = (t: { id: string; tier: string }) => !localGated?.has(t.id) && t.tier !== 'blocked';
+	/** Cluster modules, which this computer has no copy of; DeepSig predicts signal peptides here. */
+	const CLUSTER_ONLY = new Set(['signalp4', 'signalp6']);
 	const TIER: Record<string, string> = {
 		blocked: 'Your own licence needed',
 		commercial_restricted: 'Academic use free; commercial needs permission',
@@ -116,7 +118,7 @@
 										<td><b>{t.name}</b></td>
 										<td>{t.license}</td>
 										<td>{TIER[t.tier] ?? t.tier}</td>
-										{#if localGated}<td>{opensHere(t) ? 'Open' : 'Accept its licence first'}</td>{/if}
+										{#if localGated}<td>{CLUSTER_ONLY.has(t.id) ? 'Cluster only' : opensHere(t) ? 'Open' : 'Accept its licence first'}</td>{/if}
 										<td class="act">{t.user_action}</td>
 										<td class="links">
 											{#if t.license_url}<a class="mg-link" href={t.license_url} target="_blank" rel="noopener noreferrer">Licence</a>{/if}

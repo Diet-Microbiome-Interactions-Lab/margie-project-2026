@@ -142,7 +142,7 @@ gpu_capable_tools=(
 # tier-1: one container per tool, once per genome.
 # tier-2: host scripts, not containers (processing/host-scripts/, run-meta.sh).
 # GTDB-Tk (optional, RUN_GTDBTK) is run by annotate.sh, not listed here.
-# envelope runs between the annotation tools and psortb / deepsig / signalp4.
+# envelope runs between the annotation tools and psortb / deepsig.
 all_classify_tools=()
 all_tier1_tools=(
     rasttk prodigal
