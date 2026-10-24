@@ -87,6 +87,22 @@
 	const picked = $derived(groups.reduce((a, g) => a + g.tools.filter((t) => inRun.has(t.name)).length, 0));
 	const offered = $derived(groups.reduce((a, g) => a + g.tools.length, 0));
 	const locked = $derived(ws.tools.filter((t) => !t.licensed));
+	/** What a tool's box says on hover: why it is in every run, or locked, or its licence accepted. */
+	const hint = (t: (typeof ws.tools)[number]) =>
+		t.required
+			? 'Part of every run: labeling and the confidence score read it'
+			: !t.licensed
+				? `${t.label ?? t.name} is locked until its licence terms are accepted (Licence terms, on Analyze)`
+				: t.gated
+					? 'Licence accepted'
+					: '';
+
+	// SignalP 4 and 6 both predict signal peptides: picked together, a note says so once (OK closes it).
+	const bothSignalp = $derived(inRun.has('signalp4') && inRun.has('signalp6'));
+	let signalpSeen = $state(false);
+	$effect(() => {
+		if (!bothSignalp) signalpSeen = false;
+	});
 
 	/** Some tools run every time (the cluster's); then "None" is not a choice. */
 	const anyRequired = $derived(ws.tools.some((t) => t.required));
@@ -235,7 +251,7 @@
 				<ul class="rs-even mg-even">
 					{#each g.tools as t (t.name)}
 						{@const on = inRun.has(t.name)}
-						<li>
+						<li title={hint(t)}>
 							<button
 								type="button"
 								class="rs-tool"
@@ -244,13 +260,7 @@
 								class:required={t.required}
 								aria-pressed={on}
 								disabled={!t.licensed || t.required}
-								title={t.required
-									? 'Part of every run: labeling and the confidence score read it'
-									: t.licensed
-										? t.gated
-											? 'Licence accepted'
-											: ''
-										: 'Accept its licence terms first'}
+								title={hint(t)}
 								onclick={() => toggle(t.name)}
 							>
 								<span class="rs-box-mark" aria-hidden="true">{#if on}<Check size={12} strokeWidth={3.2} />{/if}</span>
@@ -261,7 +271,7 @@
 								{#if t.required && t.licensed}
 									<span class="rs-required">required</span>
 								{:else if !t.licensed}
-									<span class="rs-lic need"><Lock size={11} /></span>
+									<span class="rs-lic need" aria-label="Locked until its licence terms are accepted"><Lock size={11} /></span>
 								{:else if t.gated}
 									<span class="rs-lic" aria-label="Licence accepted"><KeyRound size={11} /></span>
 								{/if}
@@ -272,6 +282,12 @@
 			</section>
 		{/each}
 	</div>
+	{#if bothSignalp && !signalpSeen}
+		<div class="rs-both" role="status">
+			<span>SignalP 4 and SignalP 6 both predict signal peptides, so one of them is enough. Both run while both are picked.</span>
+			<button type="button" class="mg-btn small" onclick={() => (signalpSeen = true)}>OK</button>
+		</div>
+	{/if}
 	{#if locked.length}
 		<p class="mg-note rs-locked">
 			<Lock size={11} /> {locked.length} need their licence terms accepted first:
@@ -503,6 +519,25 @@
 		border-style: dashed;
 		opacity: 0.6;
 		cursor: not-allowed;
+	}
+	/* A disabled button shows no tooltip: its box (the li) carries the hint. */
+	.rs-tool:disabled {
+		pointer-events: none;
+	}
+	.rs-both {
+		display: flex;
+		flex-wrap: wrap;
+		align-items: center;
+		gap: 8px 12px;
+		margin-top: 10px;
+		padding: 8px 12px;
+		border: 1px solid color-mix(in srgb, var(--mg-accent) 30%, var(--mg-border));
+		border-radius: var(--mg-r-sm);
+		background: color-mix(in srgb, var(--mg-accent) 5%, var(--mg-surface));
+		font-size: var(--mg-fs-sm);
+	}
+	.rs-both span {
+		flex: 1 1 280px;
 	}
 	/* In every run, so not a choice: plain, with a grey tick, apart from the tools to pick. */
 	.rs-tool.required:disabled {
