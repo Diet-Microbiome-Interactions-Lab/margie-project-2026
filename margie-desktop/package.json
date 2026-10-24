@@ -1,0 +1,31 @@
+{
+	"name": "margie-desktop",
+	"productName": "MARGIE",
+	"version": "2.0.0",
+	"description": "MARGIE as a desktop application for macOS, Windows and Linux: run analyses on this computer or on your HPC cluster.",
+	"private": true,
+	"type": "module",
+	"main": "src/main.js",
+	"author": {
+		"name": "Sajal Bhattarai"
+	},
+	"license": "MIT",
+	"scripts": {
+		"stage": "node scripts/stage.mjs",
+		"icon": "node scripts/make-icon.mjs",
+		"start": "npm run stage && node scripts/run-dev.mjs",
+		"start:quick": "node scripts/run-dev.mjs",
+		"dist": "npm run stage && npm run icon && electron-builder --mac",
+		"dist:arm64": "npm run stage && npm run icon && electron-builder --mac --arm64",
+		"dist:x64": "npm run stage && npm run icon && electron-builder --mac --x64",
+		"dist:win": "npm run stage && npm run icon && electron-builder --win",
+		"pack": "npm run stage && npm run icon && electron-builder --mac --dir",
+		"dist:linux": "npm run stage && npm run icon && electron-builder --linux",
+		"dist:all": "npm run stage && npm run icon && electron-builder --mac --win --linux"
+	},
+	"devDependencies": {
+		"electron": "^44.4.4",
+		"electron-builder": "^26.0.12"
+	},
+	"homepage": "https://github.com/Diet-Microbiome-Interactions-Lab/margie-project-2026"
+}

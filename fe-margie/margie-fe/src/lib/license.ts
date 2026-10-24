@@ -102,6 +102,11 @@ export async function fetchTerms(): Promise<TermsPayload> {
 	return jsonOrThrow(res);
 }
 
+/** The same terms from the desktop app's own copy, for this computer (routes/api/local/terms). */
+export async function fetchLocalTerms(): Promise<TermsPayload> {
+	return jsonOrThrow(await fetch('/api/local/terms'));
+}
+
 /** Records the user's acceptance. Returns the acceptance result. */
 export async function acceptTerms(body: {
 	accepted_items: string[];

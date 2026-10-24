@@ -4,6 +4,7 @@ import { LICENCE_TOOLS, getSettings, licenceAccepted } from '$lib/server/pipelin
 import { freeBytes, runtimeStatus } from '$lib/server/platform';
 import { hostPython } from '$lib/server/python';
 import { inspectSetupRepo } from '$lib/server/setupRepo';
+import { openBuildFolder, vaultBundled } from '$lib/server/build-vault';
 import type { RequestHandler } from './$types';
 
 /**
@@ -23,6 +24,8 @@ export const GET: RequestHandler = async () => {
 		runtimes: rt.platform.runtimes,
 		recommended: rt.platform.recommended,
 		repo: { ok: repo.ok, path: (settings.SETUP_REPO ?? '').trim() ? repo.path : '', reason: repo.reason ?? '', containers: repo.containers, databases: repo.databases },
+		/** The desktop app's locked build files: carried, and unlocked for this session. */
+		vault: { bundled: vaultBundled(), open: !!openBuildFolder() },
 		python: hostPython(),
 		licences: { tools: LICENCE_TOOLS, accepted, intendedUse },
 		gtdbtk: settings.RUN_GTDBTK === '1',

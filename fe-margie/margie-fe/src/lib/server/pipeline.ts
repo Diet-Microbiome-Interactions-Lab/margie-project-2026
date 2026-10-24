@@ -9,6 +9,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { LICENCE_LEGAL_NOTICE, LICENCE_STATEMENT, statementMatches } from '$lib/licence';
+import { openBuildFolder } from './build-vault';
 
 function findPipelineRoot(): string {
 	const candidates = [
@@ -48,7 +49,13 @@ export interface SettingDef {
 	fallback?: string;
 }
 
-export const LICENCE_TOOLS = ['merops', 'tcdb', 'tmbed', 'interpro', 'phobius', 'psortb'];
+/**
+ * Tools that run and install only once their licence is accepted (the typed statement and an intended
+ * use): every tool but the gene callers (RASTtk, Prodigal), Pfam, COG, PGAP, GTDB-Tk, QUAST, the operon
+ * finder, the envelope and MARGIE's own scripts, since the app may be used outside academia and research.
+ * margie-desktop/scripts/stage.mjs writes the same list into the pipeline it ships (LICENCE_GATED_TOOLS).
+ */
+export const LICENCE_TOOLS = ['kegg', 'tigrfam', 'dbcan', 'eggnog', 'merops', 'tcdb', 'uniprot', 'interpro', 'geneprop', 'psortb', 'deepsig', 'tmbed', 'phobius'];
 
 /**
  * Local-mode defaults over pipeline.conf.sh: GTDB-Tk off (too memory-hungry for
@@ -62,11 +69,16 @@ const LOCAL_DEFAULTS: Record<string, string> = {
 	...Object.fromEntries(LICENCE_TOOLS.map((t) => [`LICENCE_AGREED_${t.toUpperCase()}`, '0']))
 };
 
-/** Returns a margie-build checkout next to this pipeline, if there is one. */
+/** Returns the desktop app's unlocked build files, else a margie-build checkout next to this pipeline. */
 function siblingSetupRepo(): string {
+	const open = openBuildFolder();
+	if (open) return open;
 	const sibling = path.resolve(PIPELINE_ROOT, '..', 'margie-build');
 	return fs.existsSync(path.join(sibling, 'build.sh')) ? sibling : '';
 }
+
+/** A setting's value when neither pipeline.conf.sh nor the user gives one. */
+const fallbackOf = (s: SettingDef) => (s.key === 'SETUP_REPO' ? siblingSetupRepo() : s.fallback) || '';
 
 /**
  * SLURM resources per phase (SLURM_<PHASE>_* in pipeline.conf.sh). `sized`
@@ -147,7 +159,7 @@ export const SETTINGS: SettingDef[] = [
 	},
 	...PHASE_SETTINGS,
 	...PER_TOOL,
-	{ key: 'SETUP_REPO', label: 'Setup or build folder', group: 'Setup', type: 'path', fallback: siblingSetupRepo(), description: 'Your margie-build folder, which builds the container images and downloads the databases. Subject to additional licensing terms (see Install).' },
+	{ key: 'SETUP_REPO', label: 'Setup or build folder', group: 'Setup', type: 'path', description: 'Your margie-build folder, which builds the container images and downloads the databases. Subject to additional licensing terms (see Install).' },
 	// The six a run actually needs; everything else is derived from them and
 	// lives under "Other folders".
 	{ key: 'USER_INPUT_DIR', label: 'Genomes in', group: 'Folders', type: 'path', description: 'Where you keep your genomes: the .fna/.fa/.fasta assemblies to annotate.' },
@@ -264,8 +276,8 @@ export function getSettings(): SettingsView {
 		pipelineRoot: PIPELINE_ROOT,
 		settings: SETTINGS.map((s) => ({
 			...s,
-			default: defaults[s.key] || s.fallback || '',
-			value: effective[s.key] || s.fallback || '',
+			default: defaults[s.key] || fallbackOf(s),
+			value: effective[s.key] || fallbackOf(s),
 			overridden: s.key in overrides
 		}))
 	};

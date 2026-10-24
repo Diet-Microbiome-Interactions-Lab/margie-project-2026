@@ -97,15 +97,18 @@ export function readSettings(): ConnectSettings {
 	}
 	const get = (k: keyof ConnectSettings) => file[KEYS[k]] ?? process.env[KEYS[k]] ?? '';
 	const target = get('target');
+	// The 1.3 app's backend (bioinformatics-tools on its margie-backend branch, in ~/margie-backend or
+	// ~/bioinformatics-tools) gives way to margie-project-2026's be-margie and its defaults.
+	const older = /bioinformatics-tools(\.git)?\/?$/.test(get('backendRepo'));
 	return {
 		target: target === 'local' || target === 'hpc' ? target : '',
 		hpcHost: get('hpcHost'),
-		backendDir: get('backendDir'),
+		backendDir: /\/be-margie\/?$/.test(get('backendDir')) ? get('backendDir') : '',
 		sshKey: get('sshKey'),
 		recentKeys: get('recentKeys'),
 		pipelineRoot: get('pipelineRoot'),
-		backendRepo: get('backendRepo'),
-		backendBranch: get('backendBranch'),
+		backendRepo: older ? '' : get('backendRepo'),
+		backendBranch: older ? '' : get('backendBranch'),
 		backendLocal: get('backendLocal'),
 		compute: get('compute') === '1' ? '1' : '',
 		computeCpus: get('computeCpus'),

@@ -947,13 +947,12 @@
 				</header>
 				<div class="sb-body">
 					<div class="sb-lic">
-						<Explain>
 						<p class="sb-desc">
-							These tools carry academic or non-commercial terms, and stay off until you accept them. Read each tool's terms in
+							Open to everyone: RASTtk, Prodigal, Pfam, COG, PGAP, GTDB-Tk, QUAST, the operon finder, the envelope and MARGIE's own scripts.
+							The tools below install and run once you accept their licence terms here; read each tool's terms in
 							<a class="mg-link" href={uiBase.to('/install')}>Install</a>
 							first.
 						</p>
-						</Explain>
 
 						<label class="sb-use">
 							<span class="sb-lbl">Intended use</span>

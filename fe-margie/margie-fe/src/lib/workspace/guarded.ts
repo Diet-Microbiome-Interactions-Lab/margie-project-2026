@@ -1,9 +1,11 @@
 /**
  * Settings that ask before they change, such as the margie-build folder. The phrase is the
- * build password, which only the API checks (api/build_gate.py); nothing of it is in this
- * code, which is public.
+ * build password, which the API checks (api/build_gate.py), or on this computer the desktop
+ * app's locked build files (lib/server/build-vault); nothing of it is in this code.
  */
 import { call } from '$lib/cluster/http';
+import { post } from '$lib/api';
+import { backend } from './backend.svelte';
 
 /** Setting keys that need unlocking, and what to say when asking. */
 export const GUARDED: Record<string, { title: string; why: string }> = {
@@ -35,7 +37,8 @@ export async function unlocks(phrase: string): Promise<boolean> {
 	const text = phrase.trim();
 	if (!text) return false;
 	try {
-		await call('POST', '/v1/ssh/assets/build-unlock', { password: text });
+		if (backend.cluster) await call('POST', '/v1/ssh/assets/build-unlock', { password: text });
+		else await post('/build-vault', { password: text, check: true });
 		return true;
 	} catch {
 		// Not the password, or the API could not be asked: the field stays locked.

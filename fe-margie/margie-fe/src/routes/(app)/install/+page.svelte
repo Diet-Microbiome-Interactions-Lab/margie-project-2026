@@ -5,7 +5,7 @@
 	import { ws } from '$lib/workspace/data.svelte';
 	import { installLock } from '$lib/workspace/install-lock.svelte';
 	import { INSTALL_STATEMENT } from '$lib/workspace/install-statement';
-	import { fetchTerms, NOT_YET, type TermsPayload } from '$lib/license';
+	import { fetchLocalTerms, fetchTerms, NOT_YET, type TermsPayload } from '$lib/license';
 	import Markdown from '$lib/workspace/viewers/Markdown.svelte';
 	import StoresCheck from '$lib/cluster/StoresCheck.svelte';
 
@@ -25,7 +25,8 @@
 	async function readTerms() {
 		if (terms || termsError) return;
 		try {
-			terms = await fetchTerms();
+			if (!backend.cluster && !ws.overview) await ws.loadOverview().catch(() => {});
+			terms = await (backend.cluster ? fetchTerms() : fetchLocalTerms());
 		} catch (e) {
 			termsError = e instanceof Error ? e.message : String(e);
 		}
@@ -34,6 +35,9 @@
 	const byPhase = $derived(
 		[...(terms?.tools ?? [])].filter((t) => !NOT_YET.has(t.id)).sort((a, b) => a.phase - b.phase || a.name.localeCompare(b.name))
 	);
+	/** On this computer: the tools that wait for their own licence (Settings → Licences), by id. */
+	const localGated = $derived(backend.cluster ? null : new Set(ws.overview?.licences.tools ?? []));
+	const opensHere = (t: { id: string; tier: string }) => !localGated?.has(t.id) && t.tier !== 'blocked';
 	const TIER: Record<string, string> = {
 		blocked: 'Your own licence needed',
 		commercial_restricted: 'Academic use free; commercial needs permission',
@@ -81,6 +85,12 @@
 			<h2>Before installing</h2>
 			<p class="mg-note">Type this statement exactly as shown to confirm it (pasting is not allowed):</p>
 			<blockquote class="lock-statement" oncopy={(e) => e.preventDefault()}>{INSTALL_STATEMENT}</blockquote>
+			{#if !backend.cluster}
+				<p class="mg-note">
+					Open to everyone: RASTtk, Prodigal, Pfam, COG, PGAP, GTDB-Tk, QUAST, the operon finder, the envelope and MARGIE's own scripts. The
+					other tools install and run once you also accept their licences in Settings → Licences.
+				</p>
+			{/if}
 			<!-- What is being agreed to: every tool's licence, and MARGIE's own terms. -->
 			<details class="lock-read" ontoggle={(e) => e.currentTarget.open && readTerms()}>
 				<summary>Read the licences first</summary>
@@ -95,7 +105,9 @@
 					<div class="lock-table-wrap">
 						<table class="lock-table">
 							<thead>
-								<tr><th>Phase</th><th>Tool</th><th>Licence</th><th>Use</th><th>Before you run it</th><th>Links</th></tr>
+								<tr>
+									<th>Phase</th><th>Tool</th><th>Licence</th><th>Use</th>{#if localGated}<th>Here</th>{/if}<th>Before you run it</th><th>Links</th>
+								</tr>
 							</thead>
 							<tbody>
 								{#each byPhase as t (t.id)}
@@ -104,6 +116,7 @@
 										<td><b>{t.name}</b></td>
 										<td>{t.license}</td>
 										<td>{TIER[t.tier] ?? t.tier}</td>
+										{#if localGated}<td>{opensHere(t) ? 'Open' : 'Accept its licence first'}</td>{/if}
 										<td class="act">{t.user_action}</td>
 										<td class="links">
 											{#if t.license_url}<a class="mg-link" href={t.license_url} target="_blank" rel="noopener noreferrer">Licence</a>{/if}

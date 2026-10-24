@@ -175,6 +175,27 @@
 		savingBuild = false;
 	}
 
+	// ---- the desktop app's build files, locked with the build password ----
+	const vaultLocked = $derived(!!o?.vault?.bundled && !o.vault.open);
+	let buildPass = $state('');
+	let buildWrong = $state('');
+	let unlocking = $state(false);
+	async function unlockFiles() {
+		if (!buildPass.trim() || unlocking) return;
+		unlocking = true;
+		buildWrong = await ws.unlockBuildFiles(buildPass);
+		unlocking = false;
+		if (!buildWrong) {
+			buildPass = '';
+			buildTouched = false;
+			ui.notify('Build files unlocked until MARGIE quits', 'ok');
+		}
+	}
+	async function lockFiles() {
+		const kept = await ws.lockBuildFiles();
+		ui.notify(kept ? `The build files stay unlocked: ${kept}` : 'Build files locked', kept ? 'error' : 'ok');
+	}
+
 	async function build(what: Kind, tools?: string[]) {
 		const run = await ws.build(what, tools);
 		if (run) ui.notify(`${what === 'containers' ? 'Building' : 'Downloading'}${tools?.length ? ` ${tools.join(', ')}` : ''}`, 'ok');
@@ -335,6 +356,34 @@
 
 			<div class="sp-stack">
 			{#snippet folder()}
+				{#if vaultLocked}
+				<form class="sp-folder" onsubmit={(e) => (e.preventDefault(), unlockFiles())}>
+					<label class="mg-label" for="build-pass">Build files</label>
+					<span class="mg-note">
+						MARGIE carries the recipes that build its tools and download their data, locked. The build password opens them until MARGIE
+						quits.
+					</span>
+					<span class="sp-folder-row">
+						<input
+							id="build-pass"
+							class="mg-input"
+							type="password"
+							autocomplete="off"
+							placeholder="Build password"
+							bind:value={buildPass}
+							oninput={() => (buildWrong = '')}
+						/>
+						<button type="submit" class="mg-btn" disabled={!buildPass.trim() || unlocking}>{unlocking ? 'Opening…' : 'Unlock'}</button>
+					</span>
+					{#if buildWrong}<span class="sp-warn" role="alert">{buildWrong}</span>{/if}
+					{#if o.repo.ok}
+						<span class="sp-found">
+							<span><b>{o.repo.containers.length}</b> container recipes</span>
+							<span><b>{o.repo.databases.length}</b> database recipes</span>
+						</span>
+					{/if}
+				</form>
+				{:else}
 				<form class="sp-folder" onsubmit={(e) => (e.preventDefault(), useBuildFolder())}>
 					<label class="mg-label" for="build-folder">Setup or build folder (margie-build)</label>
 					<span class="sp-folder-row">
@@ -351,9 +400,21 @@
 					{:else}
 						<span class="sp-warn">{o.repo.reason}</span>
 					{/if}
+					{#if o.vault?.open}
+						<span class="sp-vault">
+							<span class="mg-note">The app's build files are unlocked until MARGIE quits.</span>
+							<button type="button" class="mg-link quiet sp-small" onclick={lockFiles}>Lock now</button>
+						</span>
+					{/if}
 				</form>
+				{/if}
 			{/snippet}
-			{@render card('Build folder', 'build-recipes', o.repo.ok ? `${o.repo.containers.length} tools, ${o.repo.databases.length} databases` : 'not found', folder)}
+			{@render card(
+				'Build folder',
+				'build-recipes',
+				o.repo.ok ? `${o.repo.containers.length} tools, ${o.repo.databases.length} databases` : vaultLocked ? 'locked' : 'not found',
+				folder
+			)}
 
 			{#snippet python()}
 				<div class="sp-py">
@@ -790,6 +851,12 @@
 	.sp-folder-row .mg-input {
 		flex: 1;
 		min-width: 0;
+	}
+	.sp-vault {
+		display: flex;
+		align-items: center;
+		flex-wrap: wrap;
+		gap: 4px 10px;
 	}
 	.sp-found {
 		display: grid;

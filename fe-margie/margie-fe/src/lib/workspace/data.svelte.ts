@@ -64,6 +64,8 @@ export interface Overview {
 	runtimes: RuntimeInfo[];
 	recommended: string | null;
 	repo: { ok: boolean; path: string; reason: string; containers: { name: string; gated: boolean }[]; databases: { name: string; gated: boolean }[] };
+	/** The desktop app's build files, locked with the build password (lib/server/build-vault). */
+	vault?: { bundled: boolean; open: boolean };
 	python: { ready: boolean; version: string; path: string; base: { path: string; version: string } | null };
 	licences: { tools: string[]; accepted: string[]; intendedUse: string };
 	gtdbtk: boolean;
@@ -463,6 +465,28 @@ class Workspace {
 
 	async loadOverview() {
 		this.overview = await api<Overview>('/overview');
+	}
+
+	/** Unpacks the desktop app's build files for this session. Returns '' or why it could not. */
+	async unlockBuildFiles(password: string): Promise<string> {
+		try {
+			await post('/build-vault', { password });
+		} catch (e) {
+			return message(e);
+		}
+		await Promise.allSettled([this.loadOverview(), this.loadSettings()]);
+		return '';
+	}
+
+	/** Locks the build files again. Returns why they stay, or ''. */
+	async lockBuildFiles(): Promise<string> {
+		try {
+			const d = await del<{ kept?: string }>('/build-vault');
+			await Promise.allSettled([this.loadOverview(), this.loadSettings()]);
+			return d.kept ?? '';
+		} catch (e) {
+			return message(e);
+		}
 	}
 
 	async loadSettings() {
