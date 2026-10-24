@@ -3,6 +3,7 @@ account (sign-in, profile, stored cluster key) is deleted and its token signs in
 cluster home, the stored language-model keys and the copy of MARGIE go too, unless another MARGIE
 account uses the same cluster account. When they cannot be removed, nothing is deleted."""
 
+import json
 from unittest.mock import MagicMock, patch
 
 from bioinformatics_tools.api.services.job_store import job_store
@@ -10,6 +11,7 @@ from tests.test_api import client, test_rsa_key  # noqa: F401 (fixtures)
 
 PASSWORD = 'S3cur3P@ss!'
 REMOVE = 'bioinformatics_tools.api.routers.auth.remove_margie_files'
+SFTP = 'bioinformatics_tools.utilities.ssh_sftp.write_remote_text_file'
 
 
 def _signed_in(client, key, name='gone', cluster_user='gone'):  # noqa: F811
@@ -85,3 +87,22 @@ def test_the_removal_takes_the_keys_and_the_copy_and_leaves_the_config():
     assert 'repo="$HOME/margie-project-2026"' in command and 'rm -rf -- "$repo"' in command
     # The link goes only when it leads into MARGIE's copy; a folder of the user's own stays.
     assert '[ -L "$link" ]' in command and 'config.yaml' not in command
+
+
+def test_deleting_the_account_revokes_its_licence_on_record(client, test_rsa_key, monkeypatch):  # noqa: F811
+    from bioinformatics_tools.api import licensing
+    monkeypatch.setenv('LICENSE_RECORDS_DIR', '/group/margie/licensing-records')
+    h = _signed_in(client, test_rsa_key, name='licgone', cluster_user='licgone')
+    terms = licensing.load_terms()
+    with patch('bioinformatics_tools.api.routers.ssh._build_connection'), patch(SFTP):
+        assert client.post('/v1/license/accept', headers=h, json={
+            'accepted_items': [a['id'] for a in licensing.catalog.ACK_ITEMS], 'terms_version': terms['version'],
+            'terms_sha256': terms['sha256'], 'usage_type': 'academic', 'licensed_tools': []}).status_code == 200
+    with patch(REMOVE, return_value=''), patch('bioinformatics_tools.api.routers.ssh._build_connection'), patch(SFTP) as write:
+        assert client.post('/v1/auth/delete-account', headers=h, json={'password': PASSWORD}).json()['deleted'] is True
+    revocation = [c for c in write.call_args_list if c[0][0].endswith('/revocation.json')]
+    assert len(revocation) == 1 and revocation[0][0][0].startswith('/group/margie/licensing-records/')
+    assert json.loads(revocation[0][0][1])['reason'] == 'account deleted'
+    # The same name signed up again starts without an acceptance.
+    h2 = _signed_in(client, test_rsa_key, name='licgone', cluster_user='licgone')
+    assert client.get('/v1/license/status', headers=h2).json()['accepted'] is False

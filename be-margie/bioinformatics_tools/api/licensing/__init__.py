@@ -14,7 +14,7 @@ from .catalog import (  # noqa: F401
     load_catalog,
     load_terms,
     record_acceptance,
-    revoke_current_acceptance,
+    record_revocation,
     save_depot_record,
     save_local_record,
 )

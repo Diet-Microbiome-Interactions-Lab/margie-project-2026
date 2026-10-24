@@ -75,7 +75,7 @@
 		busy = true;
 		try {
 			await revokeLicense();
-			ui.notify('Acceptance withdrawn: runs wait until the terms are accepted again', 'ok');
+			ui.notify('Acceptance withdrawn and recorded with the licence records: runs wait until the terms are accepted again', 'ok');
 			await after();
 		} catch (e) {
 			ui.notify(e instanceof Error ? e.message : String(e), 'error');

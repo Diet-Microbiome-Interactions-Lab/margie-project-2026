@@ -29,6 +29,7 @@ from bioinformatics_tools.api.database import PROFILE_FIELDS, get_db
 from bioinformatics_tools.api.services import read_cache
 from bioinformatics_tools.api.services.job_store import job_store
 from bioinformatics_tools.api.local_mode import is_local_mode, local_account
+from bioinformatics_tools.api.routers.license import revoke_on_record
 from bioinformatics_tools.api.models import (
     DeleteAccount,
     TokenResponse,
@@ -335,9 +336,10 @@ def save_look(body: dict, current_user: dict = Depends(get_current_user)):
 
 
 @router.post('/delete-account')
-def delete_account(body: DeleteAccount, current_user: dict = Depends(get_current_user)):
+def delete_account(body: DeleteAccount, request: Request, current_user: dict = Depends(get_current_user)):
     """
-    Deletes the MARGIE account: its sign-in, profile and stored cluster key, and in the cluster
+    Deletes the MARGIE account: its sign-in, profile, stored cluster key and licence acceptances
+    (revoked, with the revocation recorded beside the acceptance records), and in the cluster
     account's home the stored language-model keys and the copy of MARGIE (remove_margie_files);
     config.yaml, databases and results stay. Those files stay too while another MARGIE account
     uses the same cluster account, and in local mode. Asks for the password again, waits while
@@ -363,6 +365,7 @@ def delete_account(body: DeleteAccount, current_user: dict = Depends(get_current
             raise HTTPException(status_code=status.HTTP_502_BAD_GATEWAY,
                                 detail=f"Could not remove MARGIE's files from your home on the cluster ({problem}). Nothing was deleted; try again.")
         removed = True
+    revoke_on_record(current_user, request, 'account deleted')
     with get_db() as db:
         db.execute('DELETE FROM users WHERE id = ?', (current_user['user_id'],))
         db.commit()

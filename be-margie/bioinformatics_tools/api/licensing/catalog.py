@@ -193,17 +193,55 @@ def has_accepted_current_terms(username: str) -> bool:
     return row is not None
 
 
-def revoke_current_acceptance(username: str) -> int:
-    """Deletes the user's current-terms acceptance rows and returns how many were removed.
-
-    The depot record of the acceptance is kept as legal history."""
-    current = load_terms()["version"]
+def record_revocation(
+    *,
+    username: str,
+    reason: str,
+    ip_address: str | None = None,
+    user_agent: str | None = None,
+    save=None,
+) -> dict:
+    """Revokes every acceptance the user holds (any terms version) and records it: a
+    revocation.json beside the acceptance records (same layout, `save` as in record_acceptance),
+    listing what was revoked and why. The acceptance records stay as legal history; a failed copy
+    still revokes and reports the error. Nothing is written when there is nothing to revoke."""
     with get_db() as db:
-        cur = db.execute(
-            "DELETE FROM license_acceptances WHERE username = ? AND terms_version = ?",
-            (username, current),
+        rows = db.execute(
+            "SELECT terms_version, accepted_at, usage_type, licensed_tools, depot_record_path "
+            "FROM license_acceptances WHERE username = ? ORDER BY id",
+            (username,),
+        ).fetchall()
+    if not rows:
+        return {"rows_removed": 0, "depot_record_path": None, "depot_record_error": None}
+    now = datetime.now(timezone.utc)
+    record = {
+        "event": "revoked",
+        "reason": reason,
+        "username": username,
+        "operator": _operator(),
+        "revoked_at_utc": now.strftime("%Y-%m-%dT%H:%M:%SZ"),
+        "ip_address": ip_address,
+        "user_agent": user_agent,
+        "current_terms_version": load_terms()["version"],
+        "revoked_acceptances": [
+            {"terms_version": r["terms_version"], "accepted_at_utc": r["accepted_at"], "usage_type": r["usage_type"],
+             "licensed_tools": json.loads(r["licensed_tools"]) if r["licensed_tools"] else [],
+             "record_path": r["depot_record_path"]}
+            for r in rows
+        ],
+    }
+    depot_path = None
+    depot_error = None
+    try:
+        depot_path = (save or _write_record_file)(
+            username=username, record=record, terms_text="", timestamp=now.strftime("%Y%m%dT%H%M%SZ"),
+            name="revocation.json",
         )
-        return cur.rowcount
+    except Exception as exc:  # noqa: BLE001 — the revocation stands without its copy
+        depot_error = f"{type(exc).__name__}: {exc}"
+    with get_db() as db:
+        removed = db.execute("DELETE FROM license_acceptances WHERE username = ?", (username,)).rowcount
+    return {"rows_removed": removed, "depot_record_path": depot_path, "depot_record_error": depot_error}
 
 
 def record_subdir(username: str, timestamp: str) -> str:
@@ -214,16 +252,18 @@ def record_subdir(username: str, timestamp: str) -> str:
 
 def _write_record_file(
     *, username: str, record: dict, terms_text: str, timestamp: str,
-    base_dir: Path | None = None,
+    base_dir: Path | None = None, name: str = "record.json",
 ) -> str:
-    """Writes terms.txt and record.json to <base_dir>/<timestamp>/<operator>/<username>/.
+    """Writes terms.txt (when given) and the record (record.json, or `name`) to
+    <base_dir>/<timestamp>/<operator>/<username>/.
 
     Returns the directory path; raises on failure so the caller decides what to do.
     """
     dest = (base_dir or _records_dir()) / record_subdir(username, timestamp)
     dest.mkdir(parents=True, exist_ok=True)
-    (dest / "terms.txt").write_text(terms_text, encoding="utf-8")
-    (dest / "record.json").write_text(
+    if terms_text:
+        (dest / "terms.txt").write_text(terms_text, encoding="utf-8")
+    (dest / name).write_text(
         json.dumps(record, indent=2, ensure_ascii=False), encoding="utf-8"
     )
     return str(dest)
@@ -259,6 +299,7 @@ def record_acceptance(
     timestamp_dir = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%SZ")
 
     record = {
+        "event": "accepted",
         "username": username,
         "operator": _operator(),
         "accepted_at_utc": accepted_at,

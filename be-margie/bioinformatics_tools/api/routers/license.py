@@ -1,7 +1,8 @@
 """License-gate endpoints under /v1/license (auth required).
 
 A user accepts the current terms once per terms version before running a workflow;
-acceptance goes to the app database plus a copy with the client IP in the depot.
+acceptance goes to the app database plus a copy with the client IP in the depot, and so does
+each revocation (revoking here, or deleting the account: routers/auth.py).
 Routes: GET /terms, GET /status, POST /accept, POST /revoke.
 
 The copy is written on the user's cluster, as the user, over SSH: in LICENSE_RECORDS_DIR
@@ -73,17 +74,30 @@ def get_status(current_user: dict = Depends(get_current_user)):
 
 
 @router.post("/revoke")
-def revoke_terms(current_user: dict = Depends(get_current_user)):
-    """Revokes the user's acceptance of the current terms so the gate prompts again.
-
-    Clears only the app-side state; the depot record of the acceptance is kept."""
-    removed = licensing.revoke_current_acceptance(current_user["username"])
+def revoke_terms(request: Request, current_user: dict = Depends(get_current_user)):
+    """Revokes the user's acceptance so the gate prompts again, and records the revocation beside
+    the acceptance records (revoke_on_record); the acceptance records stay as legal history."""
+    result = revoke_on_record(current_user, request, "revoked by the user")
     terms = licensing.load_terms()
-    LOGGER.info(
-        "License revoked: user=%s version=%s rows_removed=%d",
-        current_user["username"], terms["version"], removed,
+    return {"revoked": True, **result, "current_terms_version": terms["version"]}
+
+
+def revoke_on_record(current_user: dict, request: Request | None, reason: str) -> dict:
+    """Revokes every acceptance the user holds and writes the revocation record (on the cluster,
+    as the user, like an acceptance's); returns rows_removed and where the record went."""
+    result = licensing.record_revocation(
+        username=current_user["username"],
+        reason=reason,
+        ip_address=_client_ip(request) if request is not None else None,
+        user_agent=request.headers.get("user-agent") if request is not None else None,
+        save=None if is_local_mode() else _save_on_cluster(current_user),
     )
-    return {"revoked": True, "rows_removed": removed, "current_terms_version": terms["version"]}
+    LOGGER.info("License revoked (%s): user=%s rows_removed=%d record=%s", reason,
+                current_user["username"], result["rows_removed"], result.get("depot_record_path"))
+    if result.get("depot_record_error"):
+        LOGGER.error("License revocation record write FAILED for user=%s: %s",
+                     current_user["username"], result["depot_record_error"])
+    return result
 
 
 def _save_on_cluster(current_user: dict):
@@ -91,7 +105,7 @@ def _save_on_cluster(current_user: dict):
     from bioinformatics_tools.api.routers.ssh import _build_connection
     from bioinformatics_tools.utilities import ssh_sftp
 
-    def save(*, username: str, record: dict, terms_text: str, timestamp: str) -> str:
+    def save(*, username: str, record: dict, terms_text: str, timestamp: str, name: str = "record.json") -> str:
         conn = _build_connection(current_user)
         home = current_user["home_dir"].rstrip("/")
         roots = [r for r in (os.getenv("LICENSE_RECORDS_DIR", "").rstrip("/"),
@@ -100,8 +114,9 @@ def _save_on_cluster(current_user: dict):
         for root in roots:
             dest = f"{root}/{record_subdir(username, timestamp)}"
             try:
-                ssh_sftp.write_remote_text_file(f"{dest}/terms.txt", terms_text, connection=conn)
-                ssh_sftp.write_remote_text_file(f"{dest}/record.json", json.dumps(record, indent=2, ensure_ascii=False), connection=conn)
+                if terms_text:
+                    ssh_sftp.write_remote_text_file(f"{dest}/terms.txt", terms_text, connection=conn)
+                ssh_sftp.write_remote_text_file(f"{dest}/{name}", json.dumps(record, indent=2, ensure_ascii=False), connection=conn)
                 return dest
             except Exception as exc:  # noqa: BLE001 — the next folder is tried
                 LOGGER.warning("Could not write the licence record in %s: %s", root, exc)
