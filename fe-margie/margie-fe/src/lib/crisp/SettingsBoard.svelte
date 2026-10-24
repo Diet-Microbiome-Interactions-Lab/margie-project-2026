@@ -587,7 +587,7 @@
 										<span class="sb-tc-num">{n ?? '·'}</span><b>{(n && PHASE_NAMES[n]) || row.head}</b>
 									{/if}
 								</header>
-								<div class="sb-tc-fields" style="--path-span: {4 - (numbers.length % 4) || 4}">
+								<div class="sb-tc-fields">
 									{#each mine as col (col)}
 										{@const it = row.at.get(col)}
 										{#if it}
@@ -1441,8 +1441,8 @@
 		font-size: var(--mg-fs-sm);
 		font-weight: 650;
 	}
-	/* A phase's few fields side by side; a tool's on a four-column grid, its folder or file
-	   finishing the last row (--path-span), so every tool card has the same shape. */
+	/* A phase's few fields side by side; a tool's one under another, each name at the left of
+	   its box and every name one width, so the boxes line up in every card. */
 	.sb-tc-fields {
 		display: flex;
 		flex-wrap: wrap;
@@ -1453,10 +1453,30 @@
 	}
 	.tools .sb-tc-fields {
 		display: grid;
-		grid-template-columns: repeat(4, minmax(0, 1fr));
+		grid-template-columns: minmax(0, 1fr);
+		gap: 5px;
+	}
+	/* The settings for every tool: the same rows, side by side. */
+	.tools .sb-tc-loose .sb-tc-fields {
+		grid-template-columns: repeat(auto-fill, minmax(min(100%, 280px), 1fr));
+		column-gap: 24px;
+	}
+	.tools .sb-tf {
+		display: grid;
+		grid-template-columns: var(--tf-name, 118px) minmax(0, 1fr);
+		align-items: center;
+		column-gap: 10px;
 	}
 	.tools .sb-tf.path {
-		grid-column: span var(--path-span, 4);
+		align-items: start;
+	}
+	.tools .sb-tf-lbl {
+		min-height: var(--mg-ctl-sm, 30px);
+		font-size: var(--mg-fs-xs);
+		font-weight: 500;
+		letter-spacing: 0;
+		text-transform: none;
+		color: var(--mg-text-2);
 	}
 	.sb-tf {
 		display: flex;
@@ -1664,11 +1684,12 @@
 		}
 	}
 	@media (max-width: 520px) {
-		.tools .sb-tc-fields {
-			grid-template-columns: repeat(2, minmax(0, 1fr));
+		.tools .sb-tf {
+			--tf-name: 112px;
 		}
+		/* A folder or file under its name, across the card. */
 		.tools .sb-tf.path {
-			grid-column: 1 / -1;
+			grid-template-columns: minmax(0, 1fr);
 		}
 	}
 	@media (max-width: 600px) {
