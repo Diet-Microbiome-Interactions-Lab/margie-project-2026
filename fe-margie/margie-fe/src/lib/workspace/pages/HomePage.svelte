@@ -6,7 +6,7 @@
 	import { ui } from '../ui.svelte';
 	import TabPicture from './home/TabPicture.svelte';
 	import MargieLogo from '../MargieLogo.svelte';
-	import { CITE_URL, LAB } from '$lib/crisp/about';
+	import { CITE_URL, LAB, THESIS_DOI } from '$lib/crisp/about';
 
 	/**
 	 * Home: the logo, what MARGIE is, and where to start; under Learn more, what a run does,
@@ -160,6 +160,10 @@
 				<p>
 					Bhattarai S, Deemer D, Lindemann SR. <i>MARGIE: Mostly Automated Rapid Genome Inference Environment.</i> Purdue University. Software,
 					MIT licence. <a class="mg-link" href={CITE} target="_blank" rel="noreferrer">github.com/Diet-Microbiome-Interactions-Lab/margie-project-2026</a>
+				</p>
+				<p>
+					And the thesis in which it was first built: Bhattarai S (2026). <i>Mostly Automated Rapid Genome Inference Environment.</i> Thesis,
+					Purdue University. <a class="mg-link" href={THESIS_DOI} target="_blank" rel="noreferrer">doi:10.25394/PGS.33103682.v1</a>
 				</p>
 				<p class="cite-note">
 					Please also cite each tool and database MARGIE runs; they are listed, with their references, under

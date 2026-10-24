@@ -38,6 +38,21 @@ MARGIE also runs as a desktop app that looks and works like this site, on your o
 
 Bhattarai, S., Deemer, D., & Lindemann, S. R. (2026). *MARGIE: Mostly Automated Rapid Genome Inference Environment* [Computer software]. Purdue University. https://github.com/Diet-Microbiome-Interactions-Lab/margie-project-2026
 
+And the thesis in which MARGIE was first built:
+
+Bhattarai, S. (2026). *Mostly Automated Rapid Genome Inference Environment* [Thesis, Purdue University]. Purdue University Graduate School. https://doi.org/10.25394/PGS.33103682.v1
+
+```bibtex
+@article{Bhattarai2026,
+author = "Sajal Bhattarai",
+title = "{MOSTLY AUTOMATED RAPID GENOME INFERENCE ENVIRONMENT}",
+year = "2026",
+month = "7",
+url = "https://hammer.purdue.edu/articles/thesis/_b_MOSTLY_AUTOMATED_RAPID_GENOME_INFERENCE_ENVIRONMENT_b_/33103682",
+doi = "10.25394/PGS.33103682.v1"
+}
+```
+
 Cite the version you ran, and each tool and database MARGIE ran for you; their references are under **Acknowledgements**.
 
 ## Licences

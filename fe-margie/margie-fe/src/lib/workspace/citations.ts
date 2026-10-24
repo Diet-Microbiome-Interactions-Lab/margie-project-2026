@@ -1,6 +1,8 @@
 /** Citations for the tools a genome's results came from (from the pipeline README). */
 
 export const MARGIE_CITATION = 'Bhattarai S, Deemer D, Lindemann SR. MARGIE: Mostly Automated Rapid Genome Inference Environment. Purdue University. Software, MIT licence. https://github.com/Diet-Microbiome-Interactions-Lab/margie-project-2026';
+/** The thesis in which MARGIE was first built. */
+export const MARGIE_THESIS_CITATION = 'Bhattarai S (2026). Mostly Automated Rapid Genome Inference Environment. Thesis, Purdue University. doi:10.25394/PGS.33103682.v1';
 
 export const CITATIONS: Record<string, { name: string; cite: string }> = {
 	prodigal: { name: 'Prodigal', cite: 'Hyatt D, Chen G-L, LoCascio PF, Land ML, Larimer FW, Hauser LJ (2010). Prodigal: prokaryotic gene recognition and translation initiation site identification. BMC Bioinformatics 11:119.' },

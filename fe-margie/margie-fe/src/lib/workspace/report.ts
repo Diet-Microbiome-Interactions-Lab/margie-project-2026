@@ -1,6 +1,6 @@
 /** Wording shared by the genome reports: the gene caller and a methods paragraph with references. */
 
-import { CITATIONS, MARGIE_CITATION } from './citations';
+import { CITATIONS, MARGIE_CITATION, MARGIE_THESIS_CITATION } from './citations';
 import type { GenomeSummary } from './data.svelte';
 
 export const callerName = (s: GenomeSummary) =>
@@ -16,7 +16,7 @@ export function methodsFor(s: GenomeSummary): { text: string; refs: string[] } {
 		`and operons with ${CITATIONS.operon.name}. ` +
 		(used.length ? `Proteins were annotated with ${list(used.map((t) => CITATIONS[t].name))}. ` : '') +
 		'Results were combined, labelled and scored with MARGIE.';
-	return { text, refs: [callerKey, 'operon', ...used].map((k) => CITATIONS[k].cite).concat(MARGIE_CITATION) };
+	return { text, refs: [callerKey, 'operon', ...used].map((k) => CITATIONS[k].cite).concat(MARGIE_CITATION, MARGIE_THESIS_CITATION) };
 }
 
 /** Joins the methods paragraph and numbered references into one block of text to copy. */

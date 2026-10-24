@@ -1,13 +1,13 @@
 <script lang="ts">
 	import '$lib/crisp/about.css';
 	import { Copy } from 'lucide-svelte';
-	import { CITATION, CITE_URL, LAB, PEOPLE } from '$lib/crisp/about';
+	import { CITATION, CITE_URL, LAB, PEOPLE, THESIS_BIBTEX, THESIS_CITATION, THESIS_DOI } from '$lib/crisp/about';
 	import { ui } from '$lib/workspace/ui.svelte';
 
 	/** Contributors: who made MARGIE, the lab it comes from, and how to cite it. */
-	function copy(text: string) {
+	function copy(text: string, what = 'The citation') {
 		navigator.clipboard?.writeText(text).then(
-			() => ui.notify('The citation is copied.', 'ok'),
+			() => ui.notify(`${what} is copied.`, 'ok'),
 			() => {}
 		);
 	}
@@ -46,6 +46,13 @@
 			<div class="acts">
 				<button type="button" class="mg-btn small" onclick={() => copy(CITATION)}><Copy size={14} /> Copy the citation</button>
 				<a class="mg-link" href={CITE_URL} target="_blank" rel="noreferrer">The repository</a>
+			</div>
+			<p class="ab-lab">And the thesis in which MARGIE was first built:</p>
+			<p class="ab-cite">{THESIS_CITATION}</p>
+			<div class="acts">
+				<button type="button" class="mg-btn small" onclick={() => copy(THESIS_CITATION)}><Copy size={14} /> Copy the citation</button>
+				<button type="button" class="mg-btn small" onclick={() => copy(THESIS_BIBTEX, 'The BibTeX')}><Copy size={14} /> Copy BibTeX</button>
+				<a class="mg-link" href={THESIS_DOI} target="_blank" rel="noreferrer">The thesis</a>
 			</div>
 			<p class="ab-lab">
 				Cite the version you ran: its number is on the repository's Releases. Please also cite each tool and database MARGIE ran for you;
