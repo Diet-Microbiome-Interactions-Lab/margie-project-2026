@@ -1356,8 +1356,12 @@ export async function clusterApi<T = any>(path: string, init: RequestInit = {}):
 			case 'POST /runs':
 				return startRun(body ?? {});
 			// Backs up the finished jobs to the working folder, then clears them from the list.
-			case 'DELETE /runs':
-				return call('POST', '/v1/ssh/job_history/clear');
+			case 'DELETE /runs': {
+				const cleared = await call('POST', '/v1/ssh/job_history/clear');
+				// The list is read again at once, not from the copy kept for a few seconds.
+				jobs.drop();
+				return cleared;
+			}
 			case 'GET /genomes':
 				return listGenomes();
 			// Your databases on scratch, their backups on depot, and the copy under way.
