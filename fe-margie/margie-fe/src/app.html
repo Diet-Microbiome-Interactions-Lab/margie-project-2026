@@ -3,6 +3,16 @@
 	<head>
 		<meta charset="utf-8" />
 		<meta name="viewport" content="width=device-width, initial-scale=1" />
+		<script>
+			// The page in its look's own colour from the first paint, so a reload shows no white
+			// flash before the app starts (routes/+layout.svelte keeps margie.ui.paint current).
+			try {
+				var paint = JSON.parse(localStorage.getItem('margie.ui.paint') || 'null');
+				var dark = paint ? paint.dark : matchMedia('(prefers-color-scheme: dark)').matches;
+				document.documentElement.style.background = (paint && paint.bg) || (dark ? '#1C1F25' : '#F5F6F8');
+				document.documentElement.style.colorScheme = dark ? 'dark' : 'light';
+			} catch (e) {}
+		</script>
 		%sveltekit.head%
 	</head>
 	<body data-sveltekit-preload-data="hover">

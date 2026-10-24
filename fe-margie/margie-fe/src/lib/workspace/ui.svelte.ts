@@ -184,7 +184,9 @@ class Ui {
 				}
 				const look = lookOf(d.default ?? {});
 				this.hasDefault = Object.keys(look).length > 0;
-				this.init({ interface: FIRST_INTERFACE, ...d.prefs, ...look } as UiPrefs);
+				// The same look as this browser's copy changes nothing, so nothing repaints.
+				const next = sanitizePrefs({ interface: FIRST_INTERFACE, ...d.prefs, ...look } as UiPrefs);
+				if (JSON.stringify(next) !== JSON.stringify($state.snapshot(this.prefs))) this.prefs = next;
 				try {
 					localStorage.setItem(PREFS_KEY, JSON.stringify(this.prefs));
 					localStorage.setItem(DEFAULT_KEY, JSON.stringify(look));
