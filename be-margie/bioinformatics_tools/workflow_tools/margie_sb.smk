@@ -84,6 +84,21 @@ def runtime_min(key: str, default: int, config=None) -> int:
         minutes = int(default)
     return max(MIN_SLURM_RUNTIME_MINUTES, minutes)
 
+def _llm_mem_mb() -> int:
+    """llm.mem_mb, or with 0 (the default) 80% of the smallest node memory in llm.partition."""
+    mb = int(rc('llm.mem_mb', 0, config=config) or 0)
+    if mb > 0:
+        return mb
+    import subprocess
+    part = rc('llm.partition', 'gpu', config=config)
+    try:
+        out = subprocess.run(['sinfo', '-h', '-p', str(part), '-o', '%m'], capture_output=True, text=True, timeout=30).stdout
+        sizes = [int(m) for m in re.findall(r'\d+', out)]
+    except (OSError, subprocess.SubprocessError):
+        sizes = []
+    return int(min(sizes) * 0.8) if sizes else 32000
+
+
 # Database loads (load_*_to_db): 10-minute SLURM jobs (load_db.runtime), one at a time within a
 # run (margie_sb_db_writer) so none waits out another's lock, retried twice. Each table loads in one
 # transaction, so a retry loads what an attempt did not finish and skips what it did.
@@ -1277,7 +1292,7 @@ rule run_llm:
         tkn=LLM_COMPUTE_TOKEN
     threads: rc('llm.threads', 10, config=config)
     resources:
-        mem_mb=rc('llm.mem_mb', 32000, config=config),
+        mem_mb=lambda wildcards: _llm_mem_mb(),
         runtime=runtime_min('llm.runtime', 240, config=config),
         slurm_partition=rc('llm.partition', 'gpu', config=config),
         gres=rc('llm.gres', 'gpu:1', config=config)

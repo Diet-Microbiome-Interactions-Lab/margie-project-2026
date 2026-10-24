@@ -209,10 +209,14 @@ def _margie_sb_default_threads(tool_key: str) -> int:
         return 2  # for information, so it takes little: see margie_sb.quast.at_once
     if tool_key in {'kegg', 'eggnog'}:
         return 16
+    if tool_key == 'llm':
+        return 10  # a GPU node's cores per GPU
     return 8
 
 
 def _margie_sb_default_mem_mb(tool_key: str) -> int:
+    if tool_key == 'llm':
+        return 0  # 80% of a GPU node's memory (margie_sb.smk, run_llm)
     if tool_key == 'gtdbtk':
         return 460000
     if tool_key == 'interpro':
@@ -258,6 +262,15 @@ def _margie_sb_location_params() -> list[dict]:
         'description': f"{tool['label']} database folder; empty means <Databases folder>/{tool['key']}",
         'type': 'path',
     } for tool in MARGIE_SB_PHASED_TOOLS if tool.get('database')]
+    # The language models, beside the other databases; the built-in genome chat uses the trained one when
+    # its folder holds a model, else the base one (api/services/cluster_llm.py).
+    params.extend({
+        'param': f'margie_sb.llm.{which}_model',
+        'default': '',
+        'description': f'The {which} language model folder (Hugging Face format: config.json and its weights); '
+                       f'empty means <Databases folder>/llm/{which}-model',
+        'type': 'path',
+    } for which in ('trained', 'base'))
     params.append({
         'param': 'margie_sb.build_repo',
         'default': '',
@@ -283,14 +296,15 @@ def _margie_sb_tool_params() -> list[dict]:
             },
             {
                 'param': f'margie_sb.{key}.partition',
-                'default': 'highmem' if key == 'gtdbtk' else 'cpu',
+                'default': {'gtdbtk': 'highmem', 'llm': 'gpu'}.get(key, 'cpu'),
                 'description': f'Phase {phase}: SLURM partition for {label}',
                 'type': 'string'
             },
             {
                 'param': f'margie_sb.{key}.mem_mb',
                 'default': _margie_sb_default_mem_mb(key),
-                'description': f'Phase {phase}: memory limit (MB) for {label}',
+                'description': f'Phase {phase}: memory limit (MB) for {label}'
+                               + ("; 0 means 80% of a GPU node's memory" if key == 'llm' else ''),
                 'type': 'int'
             },
             {
