@@ -731,6 +731,8 @@ async function overview(): Promise<Overview> {
 // ---- settings ----
 
 const PATHS: Record<string, string> = {
+	// The folder the genomes, results and databases folders go in when left empty.
+	working_folder: 'Working folder',
 	input_path: 'Genomes folder',
 	output_path: 'Results folder',
 	sif_path: 'Containers folder',

@@ -133,7 +133,8 @@ def test_empty_folders_get_their_defaults_and_set_ones_stay():
     cfg = {"margie_sb": {"input_path": "", "output_path": "/scratch/c/u/my-results"}}
     with patch.object(us, "_run", side_effect=lambda conn, cmd, timeout=60: ran.append(cmd) or (0, "c u" if "hostname" in cmd else "")):
         assert us.fill_default_folders(None, cfg)
-    assert cfg["margie_sb"] == {"input_path": "/scratch/c/u/margie/margie-input", "output_path": "/scratch/c/u/my-results"}
+    assert cfg["margie_sb"] == {"input_path": "/scratch/c/u/margie/margie-input", "output_path": "/scratch/c/u/my-results",
+                                "working_folder": "/scratch/c/u/margie"}
     assert "/scratch/c/u/margie/margie-input" in ran[-1] and "/scratch/c/u/margie/margie-databases" in ran[-1]
     with patch.object(us, "_run", side_effect=AssertionError("nothing to do")):
         assert not us.fill_default_folders(None, cfg)
@@ -143,3 +144,28 @@ def test_the_databases_folder_defaults_under_margie():
     with patch.object(us, "_run", return_value=(0, "c u")):
         assert us.scratch_root(None, {}) == "/scratch/c/u/margie/margie-databases"
     assert us.scratch_root(None, {"margie_sb": {"stores_root": "/mine/"}}) == "/mine"
+
+
+def test_a_chosen_working_folder_holds_the_empty_folders():
+    cfg = {"margie_sb": {"working_folder": "/scratch/c/u/thesis/", "input_path": "", "output_path": ""}}
+    with patch.object(us, "_run", return_value=(0, "")):
+        assert us.fill_default_folders(None, cfg)
+    assert cfg["margie_sb"]["input_path"] == "/scratch/c/u/thesis/margie-input"
+    assert cfg["margie_sb"]["output_path"] == "/scratch/c/u/thesis/margie-output"
+    assert us.scratch_root(None, cfg) == "/scratch/c/u/thesis/margie-databases"
+
+
+def test_empty_container_and_reference_folders_take_the_groups():
+    shared = {"sif_path": "/group/sif", "db_root": "/group/databases/reference-database-for-annotation/db"}
+    cfg = {"margie_sb": {"working_folder": "/w", "input_path": "/w/in", "output_path": "/w/out", "sif_path": "", "db_root": "/mine/db"}}
+    with patch.object(us, "SHARED_FOLDER_DEFAULTS", shared), patch.object(us, "_run", side_effect=AssertionError("nothing to make")):
+        assert us.fill_default_folders(None, cfg)
+    assert cfg["margie_sb"]["sif_path"] == "/group/sif" and cfg["margie_sb"]["db_root"] == "/mine/db"
+
+
+def test_the_install_list_joins_folders_with_one_slash():
+    from bioinformatics_tools.api.services import tool_assets
+    rows = tool_assets.inventory({"margie_sb": {"sif_path": "/", "db_root": "/refs/"}}, "/home/u")
+    paths = [r["path"] for r in rows] + [r["shared"] for r in rows]
+    assert not [x for x in paths if "//" in x]
+    assert "/refs/gtdbtk" in paths and "/gtdbtk.sif" in paths

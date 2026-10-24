@@ -16,6 +16,12 @@ LOGGER = logging.getLogger(__name__)
 # Root of each user's writable stores; {user} is filled by resolve_user_paths().
 MARGIE_DEPOT_ROOT = os.environ.get('MARGIE_SHARED_ROOT', '').rstrip('/')
 MARGIE_USER_ROOT = f'{MARGIE_DEPOT_ROOT}/users/{{user}}'
+# The group's containers and reference databases in its shared folder, where the server names one
+# (MARGIE_SHARED_ROOT): MARGIE(SB)'s default sif_path and db_root, which runs only read.
+SHARED_FOLDER_DEFAULTS = {
+    'sif_path': f'{MARGIE_DEPOT_ROOT}/sif',
+    'db_root': f'{MARGIE_DEPOT_ROOT}/databases/reference-database-for-annotation/db',
+} if MARGIE_DEPOT_ROOT else {}
 
 
 def resolve_user_paths(params: list[dict], username: str | None) -> list[dict]:
@@ -94,10 +100,20 @@ def workflow_path_params(wf_id: str, include_sif: bool = True, include_db_root: 
     output_path), namespaced as e.g. 'margie_sb.sif_path'.
 
     sif_path/db_root are included only for workflows with local SIF lookup
-    (local_sif_only) or a db_root fallback (supports_db_root).
+    (local_sif_only) or a db_root fallback (supports_db_root). MARGIE(SB) also has a working
+    folder, the group's containers and reference databases as its defaults (SHARED_FOLDER_DEFAULTS).
     """
-    defaults = WORKFLOW_PATH_DEFAULTS.get(wf_id, {})
+    margie = wf_id == 'margie_sb'
+    defaults = {**WORKFLOW_PATH_DEFAULTS.get(wf_id, {}), **(SHARED_FOLDER_DEFAULTS if margie else {})}
     params = []
+    if margie:
+        params.append({
+            'param': f'{wf_id}.working_folder',
+            'default': '',
+            'description': 'The folder your genomes, results and databases folders go in when they are left empty '
+                           '(empty: margie in your scratch, /scratch/<cluster>/<user>/margie)',
+            'type': 'path'
+        })
     if include_sif:
         params.append({
             'param': f'{wf_id}.sif_path',
