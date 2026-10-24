@@ -67,6 +67,8 @@ class UserProfile(BaseModel):
     institution: str = ''
     department: str = ''
     orcid: str = ''
+    # Emails when a run completes, fails or waits for over an hour (services/run_mail.py).
+    notify_runs: bool = True
 
 
 class UpdateProfile(BaseModel):
@@ -76,6 +78,7 @@ class UpdateProfile(BaseModel):
     institution: str | None = Field(default=None, max_length=200)
     department: str | None = Field(default=None, max_length=200)
     orcid: str | None = Field(default=None, max_length=40)
+    notify_runs: bool | None = None
 
 
 class UpdateClusterCredentials(BaseModel):

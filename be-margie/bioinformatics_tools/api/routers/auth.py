@@ -234,7 +234,7 @@ def _profile(user_id: int) -> UserProfile:
     """Returns a user's profile, with their own details; never the password or the key."""
     with get_db() as db:
         row = db.execute(
-            'SELECT id, username, cluster_host, cluster_username, home_dir, created_at, '
+            'SELECT id, username, cluster_host, cluster_username, home_dir, created_at, notify_runs, '
             + ', '.join(PROFILE_FIELDS) + ' FROM users WHERE id = ?',
             (user_id,)
         ).fetchone()
@@ -249,6 +249,7 @@ def _profile(user_id: int) -> UserProfile:
         cluster_username=row['cluster_username'],
         home_dir=row['home_dir'],
         created_at=row['created_at'],
+        notify_runs=bool(row['notify_runs']),
         **{f: row[f] or '' for f in PROFILE_FIELDS},
     )
 
@@ -263,13 +264,17 @@ def update_profile(body: UpdateProfile, current_user: dict = Depends(get_current
     Saves the details a user keeps about themselves (name, email, institution,
     department or lab, ORCID). Fields left out are kept; an empty one is cleared.
     """
-    given = {k: v.strip() for k, v in body.model_dump(exclude_none=True).items()}
+    fields = body.model_dump(exclude_none=True)
+    notify = fields.pop('notify_runs', None)
+    given = {k: v.strip() for k, v in fields.items()}
     if given.get('email') and not _EMAIL.match(given['email']):
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail='That email address does not look right.')
     if given.get('orcid'):
         given['orcid'] = given['orcid'].removeprefix('https://orcid.org/').upper()
         if not _ORCID.match(given['orcid']):
             raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail='An ORCID iD looks like 0000-0002-1825-0097.')
+    if notify is not None:
+        given['notify_runs'] = int(notify)
     if given:
         with get_db() as db:
             db.execute(

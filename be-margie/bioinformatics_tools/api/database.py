@@ -78,6 +78,9 @@ def init_db() -> None:
         for _col in PROFILE_FIELDS:
             if _col not in _user_cols:
                 conn.execute(f"ALTER TABLE users ADD COLUMN {_col} TEXT NOT NULL DEFAULT ''")
+        # Emails about the user's runs (services/run_mail.py), on unless turned off on the profile.
+        if 'notify_runs' not in _user_cols:
+            conn.execute("ALTER TABLE users ADD COLUMN notify_runs INTEGER NOT NULL DEFAULT 1")
         # Adds columns older tables lack; SQLite has no ADD COLUMN IF NOT EXISTS.
         _existing = {row[1] for row in conn.execute("PRAGMA table_info(license_acceptances)")}
         for _col in ("usage_type", "licensed_tools"):
