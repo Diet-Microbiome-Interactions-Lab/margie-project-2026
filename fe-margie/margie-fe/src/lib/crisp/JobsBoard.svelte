@@ -1,25 +1,26 @@
 <script lang="ts">
-	import { Check, ChevronRight, Copy, Database, ExternalLink, FolderOpen, PanelLeftClose, PanelLeftOpen, RotateCcw, RotateCw, Square, X } from 'lucide-svelte';
+	import { Check, Copy, Database, FolderOpen, PanelLeftClose, PanelLeftOpen, RotateCcw, RotateCw, Square, TextWrap } from 'lucide-svelte';
 	import Resizer from '$lib/workspace/motion/Resizer.svelte';
 	import JobCommand from '$lib/crisp/JobCommand.svelte';
+	import ProgressGrid from '$lib/crisp/ProgressGrid.svelte';
 	import { ui } from '$lib/workspace/ui.svelte';
-	import { span } from '$lib/crisp/progress-model';
 	import { page } from '$app/state';
 	import { genomeList, stemOf } from '$lib/crisp/genomes';
-	import { buildProgress, leftText, toolsOfRun, UNTIMED_FLOOR } from '$lib/crisp/progress-model';
+	import { buildProgress, leftText, span, toolsOfRun, UNTIMED_FLOOR } from '$lib/crisp/progress-model';
 	import type { ToolClock } from '$lib/workspace/data.svelte';
 	import '$lib/workspace/viewers/tools.css';
 	import { api, type Run } from '$lib/api';
 	import { uiBase } from '$lib/workspace/base.svelte';
 	import { ws } from '$lib/workspace/data.svelte';
 	import { ago, duration } from '$lib/workspace/format';
-	import { cachedOn, countsByGenome, readSources, type SourceRow } from '$lib/crisp/cache-report';
-	import { untrack } from 'svelte';
+	import { countsByGenome, readSources, type SourceRow } from '$lib/crisp/cache-report';
+	import { onDestroy, tick, untrack } from 'svelte';
 
 	/**
-	 * The Jobs page: a narrow list of jobs, one line each (name | id | status), beside the
-	 * selected one (the running job by default): its actions, its progress by genome, and
-	 * its log, which takes most of the height.
+	 * The Jobs page, one place per job: the list of jobs (name | id | status) beside the one
+	 * picked (the running job by default): its actions, its progress in one bar, where its
+	 * results came from and its details; then its progress by genome and step across the
+	 * width, then its log, followed live while it goes.
 	 */
 
 	const TYPE: Record<string, string> = { annotate: 'Annotate', setup: 'Set up', build: 'Install' };
@@ -54,33 +55,63 @@
 	}
 	const folderHref = (dir: string) => `${uiBase.path}/files?path=${encodeURIComponent(dir)}`;
 
-	// ------------------------------------------------ the log beside the list
-	// ?job=<id> (from Analyze's popup) opens that job.
+	// ------------------------------------------------ the job picked
+	// ?job=<id> opens that job (Analyze, and /jobs/<id>, send here).
 	let picked = $state<string | null>(page.url.searchParams.get('job'));
 	const shown = $derived(ws.runs.find((r) => r.id === picked) ?? ws.active ?? ws.runs[0] ?? null);
-	/** The watched run's log is already in ws.log; any other is read once. */
+	/** The watched run: its log is in ws.log and its clock in ws.clock. */
 	const live = $derived(!!shown && shown.id === ws.active?.id);
-	let fetched = $state<{ id: string; text: string; clock?: ToolClock | null } | null>(null);
+
+	// ------------------------------------------------ its log: the last part, then followed while it goes
+	/** How much of a long log is read at first. */
+	const TAIL = 200_000;
+	/** Lines drawn; Copy copies all that was read. */
+	const SHOWN = 20_000;
+	let log = $state<{ id: string; text: string; offset: number; size: number; clock: ToolClock | null; step: string; error: string } | null>(null);
+	let timer: ReturnType<typeof setTimeout> | null = null;
+	let box = $state<HTMLElement | null>(null);
+	let wrap = $state(true);
+	async function follow(id: string, first: boolean) {
+		try {
+			const at = log?.id === id ? log.offset : 0;
+			const d = await api<{ run: Run; step?: string; log: { text: string; offset: number; size: number }; clock?: ToolClock | null }>(
+				first ? `/runs/${id}?tail=${TAIL}` : `/runs/${id}?offset=${at}`
+			);
+			if (shown?.id !== id) return;
+			const atEnd = !box || box.scrollHeight - box.scrollTop - box.clientHeight < 40;
+			const text = ((first ? '' : (log?.text ?? '')) + d.log.text).slice(-2_000_000);
+			log = { id, text, offset: d.log.offset, size: d.log.size, clock: d.clock ?? null, step: d.step ?? '', error: '' };
+			if (atEnd) tick().then(() => box && (box.scrollTop = box.scrollHeight));
+		} catch (e) {
+			if (shown?.id === id) log = { ...(log ?? { id, text: '', offset: 0, size: 0, clock: null, step: '' }), id, error: e instanceof Error ? e.message : String(e) };
+		}
+		if (shown?.id === id && shown.status === 'running') timer = setTimeout(() => follow(id, false), 2000);
+	}
 	$effect(() => {
-		const r = shown;
-		if (!r || live || fetched?.id === r.id) return;
-		const id = r.id;
-		fetched = { id, text: 'Reading the log…' };
-		api<{ log: { text: string }; clock?: ToolClock | null }>(`/runs/${id}?tail=12000`)
-			.then((d) => {
-				if (fetched?.id === id) fetched = { id, text: d.log.text || 'Nothing in the log.', clock: d.clock ?? null };
-			})
-			.catch(() => {
-				if (fetched?.id === id) fetched = { id, text: 'The log could not be read.' };
-			});
+		const id = shown?.id;
+		if (!id) return;
+		untrack(() => {
+			if (timer) clearTimeout(timer);
+			log = null;
+			follow(id, true);
+		});
+		return () => {
+			if (timer) clearTimeout(timer);
+		};
 	});
-	const logText = $derived(live ? ws.log.slice(-12000) : fetched && shown && fetched.id === shown.id ? fetched.text : '');
-	const lines = $derived(logText.trimEnd().split('\n').slice(-60));
-	let term = $state<HTMLElement | null>(null);
-	$effect(() => {
-		void lines;
-		if (term) term.scrollTop = term.scrollHeight;
-	});
+	onDestroy(() => timer && clearTimeout(timer));
+	const logText = $derived(log && shown && log.id === shown.id ? log.text : '');
+	const all = $derived(logText.replace(/\n$/, '').split('\n'));
+	const lines = $derived(all.length > SHOWN ? all.slice(-SHOWN) : all);
+	/** Only the end of a longer log is read. */
+	const partial = $derived(!!log && log.size > log.text.length);
+	const tone = (l: string) => (/error|failed|traceback|exception/i.test(l) ? 'err' : /warn/i.test(l) ? 'warn' : /\b(done|finished|completed)\b/i.test(l) ? 'ok' : '');
+	let logEl = $state<HTMLElement | null>(null);
+	/** Brings the log into view (a failed step's popup sends here). */
+	function showLog() {
+		logEl?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+		box?.focus();
+	}
 
 	// ------------------------------------------------ fresh or restored: the run's cache report
 	/** Read again only when the run, its folder or its status changes (and every 30 s while it goes). */
@@ -114,11 +145,10 @@
 		for (const c of countsByGenome(srcShown).values()) for (const k of Object.keys(t) as (keyof typeof t)[]) t[k] += c[k];
 		return t;
 	});
-	const SOURCE_WORD: Record<string, string> = { restored: 'restored', fresh: 'run fresh', 'partly restored': 'partly restored', kept: 'kept' };
 
-	// ------------------------------------------------ the job's progress, beside its log
+	// ------------------------------------------------ its progress
 	const going = $derived(shown?.status === 'running');
-	const clock = $derived(live ? (ws.logOf === shown?.id ? ws.clock : null) : (fetched && shown && fetched.id === shown.id ? (fetched.clock ?? null) : null));
+	const clock = $derived(live ? (ws.logOf === shown?.id ? ws.clock : (log?.clock ?? null)) : (log && shown && log.id === shown.id ? log.clock : null));
 	let tickAt = $state(Date.now());
 	// Ticks each second while the job goes, so its elapsed time counts up live.
 	$effect(() => {
@@ -141,7 +171,7 @@
 					tools: toolsOfRun(shown, ws.tools.map((t) => t.name)),
 					offered: ws.tools.map((t) => t.name),
 					genomes: jobGenomes,
-					log: live ? ws.log : logText,
+					log: live && ws.logOf === shown.id ? ws.log : logText,
 					clock,
 					now: tickAt + (clock ? clock.now - Date.now() : 0),
 					results: ws.results,
@@ -152,14 +182,8 @@
 				})
 			: null
 	);
-	let expanded = $state(new Set<string>());
-	function toggleRow(g: string) {
-		const next = new Set(expanded);
-		if (next.has(g)) next.delete(g);
-		else next.add(g);
-		expanded = next;
-	}
-	const ROW_WORD: Record<string, string> = { done: 'done', failed: 'failed', running: 'running', stopped: 'stopped', queued: 'not started' };
+	/** The job's own bar for a job with no genome grid (setting up, installing). */
+	const plainPct = $derived(!shown ? 0 : shown.status === 'completed' ? 100 : Math.max(0, Math.min(100, shown.progress ?? 0)));
 
 	/** How long a genome has been going: from its first step's start (only while the job runs). */
 	function elapsedOf(g: string): string {
@@ -168,6 +192,16 @@
 		if (!starts.length) return '';
 		return span((tickAt + (clock.now - Date.now()) - Math.min(...starts)) / 1000);
 	}
+
+	// ------------------------------------------------ its details (the facts its log names)
+	function found(re: RegExp): string[] {
+		const seen = new Set<string>();
+		for (const m of logText.matchAll(re)) if (seen.size < 12) seen.add(m[1]);
+		return [...seen];
+	}
+	const slurm = $derived(found(/(?:Submitted batch job|SLURM_JOB_ID[=:]?\s*|external jobid\s*'?|slurm[_ -]?job(?:[_ -]?id)?[=:\s]+)(\d{3,})/gi));
+	const containers = $derived(found(/([\w.+-]+\.sif)\b/g));
+	const when = (iso?: string) => (iso ? new Date(iso).toLocaleString(undefined, { dateStyle: 'medium', timeStyle: 'short' }) : '');
 
 	// ------------------------------------------------ the list's width: dragged, or folded away
 	const LIST = 'jobs:list';
@@ -179,21 +213,16 @@
 	const logHeight = $derived(ui.size(LOG, logFallback));
 
 	// ------------------------------------------------ copying the log
-	/** Copies the log as read (its last 12,000 characters); the full one is on its own page. */
+	/** Copies the log as read. */
 	async function copyLog() {
 		const text = logText.trimEnd();
 		if (!text) return;
 		try {
 			await navigator.clipboard.writeText(text);
+			ui.notify('The log is copied.', 'ok');
 		} catch {
-			const range = document.createRange();
-			if (term) range.selectNodeContents(term);
-			getSelection()?.removeAllRanges();
-			getSelection()?.addRange(range);
-			document.execCommand('copy');
-			getSelection()?.removeAllRanges();
+			ui.notify('Could not reach the clipboard', 'error');
 		}
-		ui.notify('The log is copied.', 'ok');
 	}
 	/** Ctrl or Cmd + C in the log: the selection if there is one, otherwise the whole log. */
 	function logKey(e: KeyboardEvent) {
@@ -202,12 +231,11 @@
 			copyLog();
 		}
 	}
-
 </script>
 
 {#if ws.runs.length}
 	<div class="board">
-		<div class="top" style="grid-template-columns: {listShut ? '40px' : `${listWidth}px`} minmax(0, 1fr)">
+		<div class="top" style="--list-w: {listShut ? '40px' : `${listWidth}px`}">
 		<div class="list-pane" class:shut={listShut}>
 			{#if listShut}
 				<button type="button" class="pane-btn" title="Show the job list" aria-label="Show the job list" onclick={() => ui.toggleFold(LIST)}><PanelLeftOpen size={16} /></button>
@@ -241,143 +269,88 @@
 					<div class="job-what">
 						<span class="job-name">{title(shown)}</span>
 						<span class="job-meta">
-							<span class="mg-mono">{shown.id}</span> | <span class="st {shown.status}">{statusWord(shown)}</span> | {ago(shown.started, tickAt)}{shown.finished ? ` | took ${duration(shown, tickAt)}` : ` | running for ${duration(shown, tickAt)}`}{toolsLine(shown) ? ` | ${toolsLine(shown)}` : ''}
+							<span class="mg-mono">{shown.id}</span> | <span class="st {shown.status}">{statusWord(shown)}</span> | started {ago(shown.started, tickAt)}{shown.finished ? ` | took ${duration(shown, tickAt)}` : ''}
 						</span>
 					</div>
 					<div class="job-acts">
 						{#if shown.outputDir}
 							<a class="mg-btn small" href={folderHref(shown.outputDir)} title={shown.outputDir}><FolderOpen size={14} />Folder</a>
 						{/if}
-						<a class="mg-btn small" href={uiBase.to(`/jobs/${shown.id}`)} title="The whole log on its own page"><ExternalLink size={14} />Full log</a>
 						{#if shown.status === 'running'}
 							<button type="button" class="mg-btn small danger" onclick={() => ws.stop(shown.id)}><Square size={11} fill="currentColor" />Stop</button>
 						{:else if again(shown)}
-							<button type="button" class="mg-btn small" disabled={!!busy} onclick={() => relaunch(shown, 'restart')} title="Run it again from the start"><RotateCw size={14} />{busy === 'restart' ? 'Restarting' : 'Restart'}</button>
-							<button type="button" class="mg-btn small primary" disabled={!!busy} onclick={() => relaunch(shown, 'resume')} title="Pick up where it stopped; finished steps are not run again"><RotateCcw size={14} />{busy === 'resume' ? 'Resuming' : 'Resume'}</button>
+							<button type="button" class="mg-btn small" disabled={!!busy} onclick={() => relaunch(shown, 'restart')} title="Run it again from the start"><RotateCw size={14} />{busy === 'restart' ? 'Restarting…' : 'Restart'}</button>
+							<button type="button" class="mg-btn small primary" disabled={!!busy} onclick={() => relaunch(shown, 'resume')} title="Pick up where it stopped; finished steps are kept"><RotateCcw size={14} />{busy === 'resume' ? 'Resuming…' : 'Resume'}</button>
 						{/if}
 					</div>
 				</header>
 				{#if shown.reason}<p class="why" title={shown.reason}>{shown.reason}</p>{/if}
-			{/if}
-			{#if prog && shown}
-				<section class="status" aria-label="Progress of {title(shown)}">
-					<div class="st-head">
-						<span class="st-sum">
+				<div class="sum">
+					{#if prog}
+						<span class="bar" role="progressbar" aria-valuenow={prog.overall} aria-valuemin="0" aria-valuemax="100" aria-label="Progress"><span style="width: {prog.overall}%"></span></span>
+						<span class="sum-line">
 							<b>{prog.overall}%</b> | {prog.counts.done} of {prog.counts.all} steps | {going ? `${duration(shown, tickAt)} so far` : `took ${duration(shown, tickAt)}`}{going && leftText(prog.left, prog.unknown, UNTIMED_FLOOR) ? ` | ${leftText(prog.left, prog.unknown, UNTIMED_FLOOR)}` : ''}
 						</span>
-						<span class="st-bar" role="progressbar" aria-valuenow={prog.overall} aria-valuemin="0" aria-valuemax="100"><span style="width: {prog.overall}%"></span></span>
-					</div>
-					{#if prog.rows.length}
-						<div class="orgs-wrap">
-							<table class="orgs">
-								<thead>
-									<tr><th scope="col">Genome</th><th scope="col">Progress</th><th scope="col">Now</th><th scope="col">Steps</th><th scope="col">Elapsed</th><th scope="col">Left</th></tr>
-								</thead>
-								<tbody>
-									{#each prog.rows as r (r.g)}
-										<tr class="org {r.state}">
-											<td class="o-name">
-												<button type="button" aria-expanded={expanded.has(r.g)} onclick={() => toggleRow(r.g)} title={r.g}>
-													<ChevronRight size={13} class="chev" /><span>{r.g}</span>
-												</button>
-											</td>
-											<td class="o-bar">
-												<span class="bar-s" class:done={r.state === 'done'} class:failed={r.state === 'failed'}><span style="width: {r.pct}%"></span></span>
-												<span class="o-pct">{r.pct}%</span>
-											</td>
-											<td class="o-now" title={r.running.join(', ')}>{r.running.length ? r.running.join(', ') : ROW_WORD[r.state]}</td>
-											<td class="o-steps">{r.done}/{r.of}</td>
-											<td class="o-el">{elapsedOf(r.g)}</td>
-											<td class="o-left" title={r.unknown ? 'Some steps have no timing from earlier runs here, so this is a lower bound' : ''}>{going && r.state !== 'done' ? leftText(r.left, r.unknown).replace(/ left$/, '') : ''}</td>
-										</tr>
-										{#if expanded.has(r.g)}
-											<tr class="o-detail">
-												<td colspan="6">
-													{#each prog.phases as ph (ph.label)}
-														{@const cs = r.cells.filter((c) => ph.cols.includes(c.t) && c.state !== 'na')}
-														{#if cs.length}
-															<div class="ph">
-																<span class="ph-name">{ph.label}</span>
-																<span class="ph-steps">
-																	{#each cs as c (c.t)}
-																		<span class="step" class:fromdb={c.src?.source === 'restored'} class:partdb={c.src?.source === 'partly restored'} title="{c.t}: {c.say}">
-																			<span class="pie {c.state}" style="--p: {c.pct ?? 0}">
-																				{#if c.state === 'done'}<Check size={8} strokeWidth={3.5} />{:else if c.state === 'failed'}<X size={8} strokeWidth={3.5} />{/if}
-																			</span>
-																			<span>{c.t}{c.state === 'run' && c.pct !== null ? ` ${Math.round(c.pct)}%` : ''}</span>
-																			{#if c.src?.source === 'restored' || c.src?.source === 'partly restored'}<Database size={10} class="db-mark" aria-label={c.src.source} />{/if}
-																		</span>
-																	{/each}
-																</span>
-															</div>
-														{/if}
-													{/each}
-												</td>
-											</tr>
-										{/if}
-									{/each}
-								</tbody>
-							</table>
-						</div>
 					{:else}
-						<p class="st-empty">No genomes in view yet: they appear as the run's jobs start.</p>
+						<span class="bar" role="progressbar" aria-valuenow={plainPct} aria-valuemin="0" aria-valuemax="100" aria-label="Progress"><span style="width: {Math.max(going ? 3 : 0, plainPct)}%"></span></span>
+						<span class="sum-line"><b>{plainPct}%</b> | {shown.progressText || log?.step || statusWord(shown)}</span>
 					{/if}
-				</section>
-			{/if}
-
-		</div>
-		</div>
-		{#if srcShown.length && shown}
-			<details class="fr">
-				<summary>
-					<span class="fr-t"><Database size={14} /> Fresh or restored</span>
-					<span class="fr-sum">
+				</div>
+				{#if srcShown.length}
+					<p class="srcs" title="Where its results came from (its cache report); a step's popup says more">
+						<Database size={13} />
 						{#if srcTotals.restoredGenome + srcTotals.restoredProtein}<span class="chip restored">{srcTotals.restoredGenome + srcTotals.restoredProtein} restored</span>{/if}
-						{#if srcTotals.restoredGenome}<span class="fr-n">{srcTotals.restoredGenome} genome level</span>{/if}
-						{#if srcTotals.restoredProtein}<span class="fr-n">{srcTotals.restoredProtein} protein level</span>{/if}
+						{#if srcTotals.restoredGenome}<span class="src-n">{srcTotals.restoredGenome} genome level</span>{/if}
+						{#if srcTotals.restoredProtein}<span class="src-n">{srcTotals.restoredProtein} protein level</span>{/if}
 						{#if srcTotals.partly}<span class="chip partly">{srcTotals.partly} partly restored</span>{/if}
 						{#if srcTotals.fresh}<span class="chip fresh">{srcTotals.fresh} run fresh</span>{/if}
 						{#if srcTotals.kept}<span class="chip kept">{srcTotals.kept} kept</span>{/if}
-					</span>
-					{#if srcDb}<span class="fr-db mg-mono" title="The MARGIE database the run's caches are in: {srcDb}"><span dir="ltr">{srcDb}</span></span>{/if}
-				</summary>
-				<p class="fr-note">
-					<b>Genome level</b>: the whole output of a step for a genome whose sequence was run before. <b>Protein level</b>: a tool's rows
-					for proteins seen before, after gene calling, so it annotates only the new ones.
-					{#if srcFromLog}This run started before MARGIE kept a report, so this is read from its log: the steps listed came back from the
-						database, and the others ran in this job.{/if}
-				</p>
-				<div class="fr-wrap">
-					<table class="fr-table">
-						<thead><tr><th>Genome</th><th>Step</th><th>Stage</th><th>Results</th><th>Cache</th><th>Detail</th><th>Cached</th></tr></thead>
-						<tbody>
-							{#each srcShown as r (`${r.genome}\t${r.step}`)}
-								<tr>
-									<td class="mg-mono">{r.genome}</td>
-									<td>{r.step}</td>
-									<td class="fr-dim">{r.stage}</td>
-									<td><span class="chip {r.source === 'partly restored' ? 'partly' : r.source}">{SOURCE_WORD[r.source] ?? r.source}</span></td>
-									<td>{r.level ? `${r.level} level` : ''}</td>
-									<td class="fr-dim">{r.detail}</td>
-									<td class="fr-dim" title={r.cached_at}>{cachedOn(r.cached_at)}</td>
-								</tr>
-							{/each}
-						</tbody>
-					</table>
-				</div>
-			</details>
+						{#if srcDb}<span class="src-db mg-mono" title="The MARGIE database its caches are in: {srcDb}"><span dir="ltr">{srcDb}</span></span>{/if}
+					</p>
+				{/if}
+				<details class="facts">
+					<summary>Details</summary>
+					<dl>
+						<div><dt>Job ID</dt><dd class="mg-mono">{shown.id}</dd></div>
+						<div><dt>Started</dt><dd>{when(shown.started)}</dd></div>
+						<div><dt>{shown.finished ? 'Finished' : 'Running for'}</dt><dd>{shown.finished ? when(shown.finished) : duration(shown, tickAt)}</dd></div>
+						{#if shown.exitCode != null}<div><dt>Exit code</dt><dd class:bad={shown.exitCode !== 0}>{shown.exitCode}</dd></div>{/if}
+						{#if log?.step}<div><dt>Step</dt><dd>{log.step}</dd></div>{/if}
+						{#if shown.outputDir}<div class="wide"><dt>Output folder</dt><dd><a class="mg-link mg-mono" href={folderHref(shown.outputDir)}>{shown.outputDir}</a></dd></div>{/if}
+						{#if shown.files?.length}
+							<div class="wide"><dt>Genomes <b>{shown.files.length}</b></dt><dd class="chips">{#each shown.files.slice(0, 24) as f (f)}<span class="mg-mono">{f}</span>{/each}{#if shown.files.length > 24}<span>+{shown.files.length - 24}</span>{/if}</dd></div>
+						{/if}
+						{#if shown.tools?.length}
+							<div class="wide"><dt>Tools <b>{shown.tools.length}</b></dt><dd class="chips">{#each shown.tools as t (t)}<span class="mg-mono">{t}</span>{/each}</dd></div>
+						{/if}
+						{#if slurm.length}
+							<div class="wide"><dt>SLURM jobs <b>{slurm.length}</b></dt><dd class="chips">{#each slurm as j (j)}<span class="mg-mono">{j}</span>{/each}</dd></div>
+						{/if}
+						{#if containers.length}
+							<div class="wide"><dt>Containers <b>{containers.length}</b></dt><dd class="chips">{#each containers as c (c)}<span class="mg-mono">{c}</span>{/each}</dd></div>
+						{/if}
+					</dl>
+				</details>
+			{/if}
+		</div>
+		</div>
+		{#if prog && shown}
+			<ProgressGrid {prog} {going} runDir={shown.outputDir ?? ''} fromLog={srcFromLog} reported={!!srcRows} {elapsedOf} onLog={showLog} />
 		{/if}
-		<div class="term-wrap" style="height: {logHeight}px">
+		<div class="term-wrap" style="height: {logHeight}px" bind:this={logEl}>
 		<aside class="term" aria-label="Log of {shown ? title(shown) : 'the job'}">
 			<div class="term-head">
 				<span class="term-t">Log{shown ? ` of ${title(shown)}` : ''}</span>
+				<span class="term-n">{logText ? `${all.length.toLocaleString('en-US')} lines${partial ? ' | the end of a longer log' : ''}${all.length > SHOWN ? `, the last ${SHOWN.toLocaleString('en-US')} shown` : ''}` : ''}</span>
 				<span class="mg-grow"></span>
-				<button type="button" class="term-btn" title="Copy the log (Ctrl or Cmd + C in the log does the same)" disabled={!logText.trim()} onclick={copyLog}><Copy size={13} />Copy</button>
-				{#if shown}<a class="term-btn" href={uiBase.to(`/jobs/${shown.id}`)}><ExternalLink size={13} />Full log</a>{/if}
+				{#if going}<span class="live"><i></i>Live</span>{/if}
+				<button type="button" class="term-btn" aria-pressed={wrap} title="Wrap long lines" onclick={() => (wrap = !wrap)}><TextWrap size={13} />Wrap</button>
+				<button type="button" class="term-btn" title="Copy the log as read (Ctrl or Cmd + C in the log does the same)" disabled={!logText.trim()} onclick={copyLog}><Copy size={13} />Copy</button>
 			</div>
 			{#if shown}<JobCommand run={shown} />{/if}
-			<div class="out mg-mono" role="textbox" aria-readonly="true" aria-multiline="true" tabindex="0" aria-label="Log text" onkeydown={logKey} bind:this={term}>{#each lines as l, k (k)}<span class="ln" class:err={/error|failed|traceback/i.test(l)} class:ok={/\b(done|finished|completed)\b/i.test(l)}>{l}</span>
-{/each}{#if live}<span class="cursor" aria-hidden="true"></span>{/if}</div>
+			{#if log?.error}<p class="term-err">{log.error}</p>{/if}
+			<div class="out mg-mono" class:wrap role="textbox" aria-readonly="true" aria-multiline="true" tabindex="0" aria-label="Log text" onkeydown={logKey} bind:this={box}>{#if logText}{#each lines as l, k (k)}<span class="ln {tone(l)}">{l}</span>
+{/each}{:else}<span class="dim">{shown ? (log ? 'Nothing in the log yet.' : 'Reading the log…') : ''}</span>{/if}{#if going}<span class="cursor" aria-hidden="true"></span>{/if}</div>
 		</aside>
 			<Resizer id={LOG} fallback={logFallback} min={260} max={2400} edge="bottom" label="Drag to make the log taller or shorter" />
 		</div>
@@ -390,7 +363,7 @@
 {/if}
 
 <style>
-	/* Two rows: the jobs beside the picked one's progress, then its log across the width.
+	/* The jobs beside the picked one's line, its progress across the width, then its log.
 	   Each part scrolls on its own; the page scrolls past them. */
 	.board {
 		display: flex;
@@ -398,10 +371,13 @@
 		gap: 12px;
 		color: var(--mg-text);
 	}
+	/* As tall as the job's lines need; a long list scrolls inside it. */
 	.top {
 		display: grid;
+		grid-template-columns: var(--list-w, 300px) minmax(0, 1fr);
 		grid-template-rows: minmax(0, 1fr);
-		height: clamp(380px, 52vh, 620px);
+		min-height: 150px;
+		max-height: clamp(260px, 44vh, 520px);
 		border-radius: var(--mg-r);
 		background: var(--cr-card, var(--mg-surface));
 		overflow: hidden;
@@ -535,6 +511,7 @@
 		flex-direction: column;
 		min-width: 0;
 		min-height: 0;
+		overflow: auto;
 	}
 	/* The job's line and its failure reason keep their height above the table. */
 	.job,
@@ -596,241 +573,60 @@
 		border-bottom: 1px solid var(--mg-border);
 	}
 
-	/* Progress: a line and a bar, then the genomes in a short scrolling table. */
-	.status {
-		flex: 1 1 auto;
-		display: flex;
-		flex-direction: column;
-		min-height: 0;
-		padding: 6px var(--mg-pad) 4px;
-		border-bottom: 1px solid var(--mg-border);
-		font-size: var(--mg-fs-xs);
+
+	/* One bar for the whole job, a line under it, then where its results came from. */
+	.sum,
+	.srcs,
+	.facts {
+		flex: none;
 	}
-	.st-head {
+	.sum {
 		display: flex;
 		align-items: center;
-		gap: 10px;
-		margin-bottom: 4px;
+		gap: 12px;
+		padding: 10px var(--mg-pad) 4px;
 	}
-	.st-sum {
-		flex: none;
-		color: var(--mg-text-2);
-		white-space: nowrap;
-	}
-	.st-bar,
-	.bar-s {
+	.bar {
 		display: block;
+		flex: 1 1 auto;
+		height: 6px;
 		overflow: hidden;
 		border-radius: 99px;
 		background: color-mix(in srgb, var(--mg-text) 10%, transparent);
 	}
-	.st-bar {
-		flex: 1 1 auto;
-		height: 6px;
-	}
-	.st-bar > span,
-	.bar-s > span {
+	.bar > span {
 		display: block;
 		height: 100%;
 		border-radius: inherit;
 		background: var(--mg-accent);
 		transition: width 600ms ease;
 	}
-	.bar-s {
-		flex: 1;
-		height: 5px;
-		min-width: 50px;
-	}
-	.bar-s.failed > span {
-		background: var(--mg-danger);
-	}
-	.orgs-wrap {
-		min-height: 0;
-		overflow: auto;
-	}
-	.orgs {
-		width: 100%;
-		border-collapse: collapse;
-		table-layout: fixed;
-	}
-	.orgs th {
-		position: sticky;
-		top: 0;
-		z-index: 1;
-		padding: 2px 6px;
-		background: var(--cr-card, var(--mg-surface));
-		color: var(--mg-text-3);
-		font-weight: 500;
-		text-align: left;
-	}
-	.orgs th:nth-child(1) { width: 32%; }
-	.orgs th:nth-child(2) { width: 22%; }
-	.orgs th:nth-child(4) { width: 8%; }
-	.orgs th:nth-child(5) { width: 11%; }
-	.orgs th:nth-child(6) { width: 13%; }
-	.o-el {
-		color: var(--mg-text-2);
-		font-variant-numeric: tabular-nums;
-		white-space: nowrap;
-	}
-	.orgs td {
-		padding: 2px 6px;
-		border-top: 1px solid var(--mg-border);
-		vertical-align: middle;
-	}
-	.o-name button {
-		display: flex;
-		align-items: center;
-		gap: 3px;
-		max-width: 100%;
-		padding: 0;
-		border: none;
-		background: none;
-		color: inherit;
-		font: inherit;
-		cursor: pointer;
-	}
-	.o-name button span {
-		overflow: hidden;
-		text-overflow: ellipsis;
-		white-space: nowrap;
-	}
-	.o-name button[aria-expanded='true'] :global(.chev) {
-		transform: rotate(90deg);
-	}
-	.o-bar {
-		display: flex;
-		align-items: center;
-		gap: 6px;
-	}
-	.o-pct {
-		min-width: 3ch;
-		color: var(--mg-text-2);
-		font-variant-numeric: tabular-nums;
-	}
-	.o-now,
-	.o-left {
-		overflow: hidden;
-		color: var(--mg-text-2);
-		text-overflow: ellipsis;
-		white-space: nowrap;
-	}
-	.o-steps {
-		font-variant-numeric: tabular-nums;
-	}
-	.org.done .o-now {
-		color: var(--mg-ok);
-	}
-	.org.failed .o-now {
-		color: var(--mg-danger);
-	}
-	.org.stopped .o-now {
-		color: var(--mg-warn);
-	}
-	.o-detail td {
-		padding: 4px 6px 8px 20px;
-		border-top: none;
-	}
-	.ph {
-		display: grid;
-		grid-template-columns: 70px minmax(0, 1fr);
-		gap: 6px;
-		padding: 2px 0;
-	}
-	.ph-name {
-		color: var(--mg-text-3);
-	}
-	.ph-steps {
-		display: flex;
-		flex-wrap: wrap;
-		gap: 3px 12px;
-	}
-	.step {
-		display: inline-flex;
-		align-items: center;
-		gap: 5px;
-	}
-	/* Restored from the database (or partly): a small cylinder after the name. */
-	.step :global(.db-mark) {
-		color: var(--mg-accent-ink, var(--mg-accent));
-	}
-	.step.partdb :global(.db-mark) {
-		opacity: 0.55;
-	}
-
-	/* ---- fresh or restored: the run's cache report, folded to one line ---- */
-	.fr {
-		border-radius: var(--mg-r);
-		background: var(--cr-card, var(--mg-surface));
+	.sum-line {
+		flex: none;
 		font-size: var(--mg-fs-sm);
+		font-variant-numeric: tabular-nums;
+		color: var(--mg-text-2);
+		white-space: nowrap;
 	}
-	.fr summary {
+	.srcs {
 		display: flex;
-		flex-wrap: wrap;
-		align-items: center;
-		gap: 6px 12px;
-		padding: 10px 14px;
-		cursor: pointer;
-	}
-	.fr-t {
-		display: inline-flex;
-		align-items: center;
-		gap: 6px;
-		font-weight: 650;
-	}
-	.fr-sum {
-		display: inline-flex;
 		flex-wrap: wrap;
 		align-items: center;
 		gap: 4px 8px;
-	}
-	.fr-n {
+		margin: 0;
+		padding: 4px var(--mg-pad);
 		font-size: var(--mg-fs-xs);
+		color: var(--mg-text-2);
+	}
+	.src-n {
 		color: var(--mg-text-3);
 	}
-	.fr-db {
-		flex: 1 1 18ch;
-		min-width: 0;
+	.src-db {
 		overflow: hidden;
+		max-width: 46ch;
 		text-overflow: ellipsis;
 		white-space: nowrap;
 		direction: rtl;
-		text-align: right;
-		font-size: var(--mg-fs-xs);
-		color: var(--mg-text-3);
-	}
-	.fr-note {
-		margin: 0;
-		padding: 0 14px 8px;
-		font-size: var(--mg-fs-xs);
-		color: var(--mg-text-2);
-	}
-	.fr-wrap {
-		max-height: 360px;
-		overflow: auto;
-		border-top: 1px solid var(--mg-border);
-	}
-	.fr-table {
-		width: 100%;
-		border-collapse: collapse;
-		font-size: var(--mg-fs-xs);
-	}
-	.fr-table th {
-		position: sticky;
-		top: 0;
-		padding: 6px 10px;
-		background: var(--cr-card, var(--mg-surface));
-		text-align: left;
-		font-weight: 600;
-		color: var(--mg-text-2);
-		white-space: nowrap;
-	}
-	.fr-table td {
-		padding: 5px 10px;
-		border-top: 1px solid color-mix(in srgb, var(--mg-border) 60%, transparent);
-		vertical-align: top;
-	}
-	.fr-dim {
 		color: var(--mg-text-3);
 	}
 	.chip {
@@ -857,55 +653,49 @@
 		background: color-mix(in srgb, var(--mg-text) 8%, transparent);
 		color: var(--mg-text-2);
 	}
-	.st-empty {
+	/* Its details, folded under a line. */
+	.facts {
+		margin: 4px var(--mg-pad) 10px;
+		font-size: var(--mg-fs-sm);
+	}
+	.facts summary {
+		width: max-content;
+		color: var(--mg-text-2);
+		cursor: pointer;
+	}
+	.facts dl {
+		display: grid;
+		grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+		gap: 8px 16px;
+		margin: 8px 0 0;
+	}
+	.facts dl > div {
+		min-width: 0;
+	}
+	.facts .wide {
+		grid-column: 1 / -1;
+	}
+	.facts dt {
+		font-size: var(--mg-fs-xs);
 		color: var(--mg-text-3);
 	}
-	/* The same pies as the Analyze grid. */
-	@property --p {
-		syntax: '<number>';
-		inherits: false;
-		initial-value: 0;
+	.facts dd {
+		margin: 0;
+		overflow-wrap: anywhere;
 	}
-	.pie {
-		--p: 0;
-		display: inline-grid;
-		place-items: center;
-		flex: none;
-		width: 13px;
-		height: 13px;
-		border-radius: 50%;
-		border: 1.5px solid color-mix(in srgb, var(--mg-accent) 55%, var(--mg-border));
-		background: conic-gradient(var(--mg-accent) calc(var(--p) * 1%), transparent 0);
-		color: var(--mg-on-accent, #fff);
-		transition: --p 600ms ease;
+	.facts dd.bad {
+		color: var(--mg-danger);
 	}
-	.pie.done {
-		border-color: var(--mg-accent);
-		background: var(--mg-accent);
+	.chips {
+		display: flex;
+		flex-wrap: wrap;
+		gap: 4px;
 	}
-	.pie.failed {
-		border-color: var(--mg-danger);
-		background: var(--mg-danger);
-	}
-	.pie.run,
-	.pie.wait {
-		border-color: var(--mg-accent);
-	}
-	.pie.wait {
-		animation: breathe 2.4s ease-in-out infinite;
-	}
-	@keyframes breathe {
-		50% {
-			border-color: color-mix(in srgb, var(--mg-accent) 25%, transparent);
-		}
-	}
-	.pie.partial {
-		border-style: dashed;
-		border-color: var(--mg-warn);
-	}
-	.pie.none {
-		border-style: dotted;
-		border-color: var(--mg-border-strong);
+	.chips span {
+		padding: 1px 6px;
+		border-radius: var(--mg-r-sm);
+		background: color-mix(in srgb, var(--mg-text) 6%, transparent);
+		font-size: var(--mg-fs-xs);
 	}
 
 	/* The log: dark in either theme, most of the window tall, and taller or shorter by its bottom edge. */
@@ -983,6 +773,47 @@
 	.ln.err {
 		color: color-mix(in srgb, var(--mg-danger) 75%, #fff);
 	}
+	.term-n {
+		font-size: 11px;
+		color: #8b949e;
+		white-space: nowrap;
+	}
+	.live {
+		display: inline-flex;
+		align-items: center;
+		gap: 5px;
+		font-size: 11px;
+		color: color-mix(in srgb, var(--mg-ok) 75%, #fff);
+	}
+	.live i {
+		width: 7px;
+		height: 7px;
+		border-radius: 50%;
+		background: currentColor;
+	}
+	.term-btn[aria-pressed='true'] {
+		border-color: rgba(255, 255, 255, 0.34);
+		color: #fff;
+	}
+	.term-err {
+		margin: 0;
+		padding: 4px var(--mg-pad);
+		font-size: var(--mg-fs-xs);
+		color: color-mix(in srgb, var(--mg-danger) 75%, #fff);
+	}
+	.out:not(.wrap) {
+		white-space: pre;
+		word-break: normal;
+	}
+	.ln {
+		display: block;
+	}
+	.ln.warn {
+		color: color-mix(in srgb, var(--mg-warn) 75%, #fff);
+	}
+	.dim {
+		color: #8b949e;
+	}
 	.cursor {
 		display: inline-block;
 		width: 8px;
@@ -1008,16 +839,19 @@
 		animation: none !important;
 	}
 
+	/* On a narrow screen the list sits above the job, and the card grows with both. */
 	@media (max-width: 900px) {
 		.top {
 			grid-template-columns: minmax(0, 1fr);
-			grid-template-rows: auto minmax(0, 1fr);
-			height: auto;
+			grid-template-rows: auto auto;
+			max-height: none;
+		}
+		.list-pane {
+			border-right: none;
+			border-bottom: 1px solid var(--mg-border);
 		}
 		.list {
 			max-height: 34vh;
-			border-right: none;
-			border-bottom: 1px solid var(--mg-border);
 		}
 	}
 </style>

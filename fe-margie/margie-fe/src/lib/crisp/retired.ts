@@ -18,7 +18,7 @@ export function currentPath(rest: string, search = ''): string {
 			return '/';
 		case 'runs':
 		case 'jobs':
-			return `/jobs${more[0] ? `/${more[0]}` : ''}${more[0] ? '' : search}`;
+			return more[0] ? `/jobs?job=${encodeURIComponent(more[0])}` : `/jobs${search}`;
 		case 'setup':
 			return `/install${search}`;
 		case 'genome':

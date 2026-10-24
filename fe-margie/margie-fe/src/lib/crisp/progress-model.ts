@@ -101,6 +101,8 @@ const FUNCTION = ['kegg', 'cog', 'pfam', 'pgap', 'tigrfam', 'dbcan', 'eggnog', '
 const LOCATION = ['tmbed', 'phobius', 'envelope', 'psortb', 'deepsig', 'signalp4', 'signalp6'];
 const GRAM_AFTER = new Set(['psortb', 'deepsig', 'signalp4']);
 const CALLERS = ['rasttk', 'prodigal'];
+/** Parts of the scoring and fingerprint stages, listed as tools: their stage's column stands for them. */
+const PARTS = new Set(['scoring_heuristic', 'fingerprint_database']);
 const KNOWN = new Set([...FUNCTION, ...LOCATION, ...CALLERS, 'operon', 'gtdbtk', 'quast', 'llm', ...RESULT_STAGES, ...COMPARE_TOOLS]);
 
 /** "40 s", "12 min", "1 h 20 min". */
@@ -128,7 +130,7 @@ export function leftText(left: number, unknown: boolean, floor = UNTIMED_FLOOR):
 export function phasesOf(tools: string[], offered: string[]) {
 	const all = new Set([...offered, ...tools]);
 	const pick = (list: readonly string[]) => list.filter((t) => all.has(t) || t === 'envelope');
-	const other = [...all].filter((t) => !KNOWN.has(t));
+	const other = [...all].filter((t) => !KNOWN.has(t) && !PARTS.has(t));
 	return [
 		{ label: 'Prepare', cols: ['quast', 'gtdbtk'] },
 		{ label: 'Genes', cols: ['genes'] },
@@ -202,9 +204,13 @@ export function buildProgress(i: ProgressInput): Progress {
 		const r = results.get(genome);
 		const has = (t: string) => cells.get(`${t}\t${genome}`);
 		switch (col) {
-			case 'quast':
+			case 'quast': {
+				if (has('quast') === 'done') return done();
+				if (!planned.has('quast')) return NA('not chosen for this run');
+				return inPlace('quast', genome) ?? fromClock('quast', genome) ?? none(col);
+			}
 			case 'llm':
-				return has(col) === 'done' ? done() : NA(col === 'quast' ? 'not part of the pipeline on this computer' : 'not part of the pipeline yet');
+				return has(col) === 'done' ? done() : NA('not part of the pipeline yet');
 			case 'gtdbtk': {
 				if (has('gtdbtk') === 'done') return done();
 				const kept = inPlace('gtdbtk', genome);
@@ -230,6 +236,8 @@ export function buildProgress(i: ProgressInput): Progress {
 				if (r?.final?.table) return done('done, 100%: the table, map and figures are in');
 				return fromLog('figures', genome)?.state === 'wait' ? { state: 'wait', pct: null, say: 'being written', left: null } : none(col);
 		}
+		// A comparison runs only when the run chose it; the result stages run in every run.
+		if ((COMPARE_TOOLS as readonly string[]).includes(col) && !planned.has(col)) return NA('not chosen for this run');
 		if ((RESULT_STAGES as readonly string[]).includes(col) || (COMPARE_TOOLS as readonly string[]).includes(col)) {
 			const kept = inPlace(col, genome);
 			if (kept) return kept;

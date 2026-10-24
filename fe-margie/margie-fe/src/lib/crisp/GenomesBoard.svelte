@@ -70,7 +70,8 @@
 >
 	<div class="gb-top">
 		{#if step}<span class="gb-step">{step}</span>{/if}
-		<h2 class="gb-colhead">Genomes <span class="gb-count">{ws.genomes.length || ''}</span></h2>
+		<h2 class="gb-colhead">Genomes</h2>
+		{#if ws.genomes.length}<span class="gb-count">{ws.genomes.length}</span>{/if}
 		<!-- Only when it changes the gene caller: without GTDB-Tk, a genome needs both to be called by RASTtk. -->
 		{#if ws.genomes.length && ws.setting('RUN_GTDBTK') !== '1' && described < ws.genomes.length}
 			<span class="gb-sum">{ws.genomes.length - described} without a domain and genetic code (called by Prodigal)</span>
@@ -240,8 +241,7 @@
 		color: var(--mg-text-2);
 	}
 	.gb-count {
-		font-weight: 400;
-		letter-spacing: 0;
+		font-size: var(--mg-fs-xs);
 		font-variant-numeric: tabular-nums;
 		color: var(--mg-text-3);
 	}

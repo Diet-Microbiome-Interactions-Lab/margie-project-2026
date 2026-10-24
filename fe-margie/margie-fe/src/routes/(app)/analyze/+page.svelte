@@ -57,20 +57,6 @@
 		}
 		return items;
 	});
-
-	/** Evidence-grid columns: the running run's tools (all when it names none), else the chosen ones. */
-	const runTools = $derived.by(() => {
-		const args = ws.active?.args ?? [];
-		const named = args.flatMap((a, i) => (args[i - 1] === '--tool' ? [a] : []));
-		const list = named.length
-			? named
-			: ws.active?.tools?.length
-				? ws.active.tools
-				: !ws.active && ws.chosenTools.length
-					? ws.chosenTools
-					: ws.tools.map((t) => t.name);
-		return ['operon', ...list.filter((t) => t !== 'operon')];
-	});
 </script>
 
 <svelte:head><title>Analyze | MARGIE</title></svelte:head>
@@ -101,7 +87,7 @@
 		</ul>
 	{/if}
 
-	<AnalyzeBoard tools={runTools} />
+	<AnalyzeBoard />
 </div>
 
 <style>
