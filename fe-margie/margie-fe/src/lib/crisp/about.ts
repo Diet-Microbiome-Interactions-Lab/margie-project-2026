@@ -23,6 +23,21 @@ export const CITATION =
 	'Bhattarai, S., Deemer, D., & Lindemann, S. R. (2026). MARGIE: Mostly Automated Rapid Genome Inference Environment [Computer software]. Purdue University. ' +
 	CITE_URL;
 
+/** The thesis in which MARGIE was first built (APA 7th), cited beside the software. */
+export const THESIS_DOI = 'https://doi.org/10.25394/PGS.33103682.v1';
+export const THESIS_CITATION =
+	'Bhattarai, S. (2026). Mostly Automated Rapid Genome Inference Environment [Thesis, Purdue University]. Purdue University Graduate School. ' +
+	THESIS_DOI;
+/** The thesis as BibTeX, as Purdue's repository gives it. */
+export const THESIS_BIBTEX = `@article{Bhattarai2026,
+author = "Sajal Bhattarai",
+title = "{MOSTLY AUTOMATED RAPID GENOME INFERENCE ENVIRONMENT}",
+year = "2026",
+month = "7",
+url = "https://hammer.purdue.edu/articles/thesis/_b_MOSTLY_AUTOMATED_RAPID_GENOME_INFERENCE_ENVIRONMENT_b_/33103682",
+doi = "10.25394/PGS.33103682.v1"
+}`;
+
 /** Where the desktop app is downloaded from (its releases, for now). */
 export const DESKTOP_URL = `${CITE_URL}/releases`;
 

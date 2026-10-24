@@ -179,6 +179,23 @@ APA 7th (software):
 
 Bhattarai, S., Deemer, D., & Lindemann, S. R. (2026). *MARGIE: Mostly Automated Rapid Genome Inference Environment* [Computer software]. Purdue University. https://github.com/Diet-Microbiome-Interactions-Lab/margie-project-2026
 
+APA 7th (thesis, in which MARGIE was first built):
+
+Bhattarai, S. (2026). *Mostly Automated Rapid Genome Inference Environment* [Thesis, Purdue University]. Purdue University Graduate School. https://doi.org/10.25394/PGS.33103682.v1
+
+BibTeX:
+
+```bibtex
+@article{Bhattarai2026,
+author = "Sajal Bhattarai",
+title = "{MOSTLY AUTOMATED RAPID GENOME INFERENCE ENVIRONMENT}",
+year = "2026",
+month = "7",
+url = "https://hammer.purdue.edu/articles/thesis/_b_MOSTLY_AUTOMATED_RAPID_GENOME_INFERENCE_ENVIRONMENT_b_/33103682",
+doi = "10.25394/PGS.33103682.v1"
+}
+```
+
 Use the exact version you ran by checking repository Releases, and include that release version number in your citation.
 
 Please also cite the individual tools and databases you use in the MARGIE pipeline, in accordance with their licensing and referencing requirements. The licensing gates during MARGIE runs provide the relevant licensing details, but you should still cross-check and confirm the requirements before publication.

@@ -1,5 +1,5 @@
 cff-version: 1.2.0
-message: "If you use this software, please cite it as below."
+message: "If you use this software, please cite it and the thesis in which it was first built (under references), as below."
 authors:
   - family-names: "Bhattarai"
     given-names: "Sajal"
@@ -15,3 +15,16 @@ type: software
 license: MIT
 url: "https://github.com/Diet-Microbiome-Interactions-Lab/margie-project-2026"
 repository-code: "https://github.com/Diet-Microbiome-Interactions-Lab/margie-project-2026"
+references:
+  - type: thesis
+    title: "Mostly Automated Rapid Genome Inference Environment"
+    authors:
+      - family-names: "Bhattarai"
+        given-names: "Sajal"
+        orcid: "https://orcid.org/0000-0002-3143-5483"
+    year: 2026
+    month: 7
+    institution:
+      name: "Purdue University"
+    doi: "10.25394/PGS.33103682.v1"
+    url: "https://hammer.purdue.edu/articles/thesis/_b_MOSTLY_AUTOMATED_RAPID_GENOME_INFERENCE_ENVIRONMENT_b_/33103682"
