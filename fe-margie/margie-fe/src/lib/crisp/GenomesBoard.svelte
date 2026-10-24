@@ -18,6 +18,7 @@
 	let { foldId = '', step = 0 }: { foldId?: string; step?: number } = $props();
 	const shut = $derived(!!foldId && ui.isFolded(foldId, true));
 	const described = $derived(ws.genomes.filter((g) => g.domain && g.domain !== 'Unknown' && g.genetic_code).length);
+	const gtdbtkOn = $derived(ws.setting('RUN_GTDBTK') === '1');
 	/** How tall the table may grow before it scrolls: 420 px, or as dragged at its bottom edge. */
 	const TABLE_H = 'genomes:table-height';
 	const tableHeight = $derived(ui.size(TABLE_H, 420));
@@ -73,8 +74,16 @@
 		<h2 class="gb-colhead">Genomes</h2>
 		{#if ws.genomes.length}<span class="gb-count">{ws.genomes.length}</span>{/if}
 		<!-- Only when it changes the gene caller: without GTDB-Tk, a genome needs both to be called by RASTtk. -->
-		{#if ws.genomes.length && ws.setting('RUN_GTDBTK') !== '1' && described < ws.genomes.length}
-			<span class="gb-sum">{ws.genomes.length - described} without a domain and genetic code (called by Prodigal)</span>
+		<!-- GTDB-Tk on works out each genome's domain and genetic code; off, the table gives them. -->
+		<span
+			class="gb-gtdbtk"
+			class:on={gtdbtkOn}
+			title={gtdbtkOn
+				? "GTDB-Tk works out each genome's taxonomy, domain and genetic code (Gene calling, on Analyze)"
+				: "The table's domain and genetic code go to RASTtk; GTDB-Tk switches on under Gene calling, on Analyze"}>GTDB-Tk {gtdbtkOn ? 'on' : 'off'}</span
+		>
+		{#if ws.genomes.length && !gtdbtkOn && described < ws.genomes.length}
+			<span class="gb-sum">{ws.genomes.length - described} go to Prodigal (domain or genetic code unknown)</span>
 		{/if}
 		<span class="mg-grow"></span>
 		{#if canAdd}
@@ -262,6 +271,20 @@
 	.gb-sum {
 		font-size: var(--mg-fs-xs);
 		color: var(--mg-text-3);
+	}
+	.gb-gtdbtk {
+		padding: 1px 8px;
+		border: 1px solid var(--mg-border);
+		border-radius: 999px;
+		font-size: var(--mg-fs-xs);
+		font-weight: 600;
+		color: var(--mg-text-3);
+		white-space: nowrap;
+	}
+	.gb-gtdbtk.on {
+		border-color: color-mix(in srgb, var(--mg-accent) 35%, var(--mg-border));
+		background: color-mix(in srgb, var(--mg-accent) 6%, transparent);
+		color: var(--mg-accent-ink, var(--mg-accent));
 	}
 	.gb-drop {
 		display: flex;

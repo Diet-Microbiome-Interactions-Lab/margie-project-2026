@@ -172,7 +172,7 @@
 				</div>
 				{#if !gtdbtk && known < all}
 					<p class="mg-note">
-						{all - known} without a domain and genetic code go to Prodigal.
+						{all - known} with an unknown domain or genetic code go to Prodigal.
 						<a class="mg-link" href="#genomes">Fill them in</a> or turn on GTDB-Tk for RASTtk.
 					</p>
 				{/if}
