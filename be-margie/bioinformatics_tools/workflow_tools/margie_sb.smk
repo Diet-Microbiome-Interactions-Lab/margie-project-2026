@@ -312,7 +312,7 @@ FINAL_TABLES_DEPOT_PATH = _resolve_shared_dir(
 FINAL_TABLES_DEPOT_TOKEN = f"{GENOME_PREFIX}scoring/final_tables_depot.tkn"
 
 # ---- report figures ----
-# Made from finished scoring outputs; they never fail, so they never block scoring.
+# Made from finished scoring outputs; a failed figure is logged and scoring goes on.
 REPORT_FIGURES_SCRIPTS_DIR = os.path.join(SCORING_SCRIPTS_DIR, "analysis", "report_figures")
 REPORT_FIGURES_OPERON_DB = _resolve_shared_file(
     'margie_sb.report_figures.operon_db',
@@ -1024,7 +1024,7 @@ rule publish_final_annotation_to_depot:
 
 
 rule run_report_figures_one_genome:
-    """Writes per-organism report figures to <genome>/scoring/figures/; errors never fail it."""
+    """Writes per-organism report figures to <genome>/scoring/figures/; errors are logged and skipped."""
     input:
         scoring_tkn=SCORING_TOKEN
     output:
@@ -1055,7 +1055,7 @@ rule run_report_figures_one_genome:
 
 
 rule run_genome_viewer_one_genome:
-    """Builds the HTML genome viewer and the circular map; errors never fail it."""
+    """Builds the HTML genome viewer and the circular map; errors are logged and skipped."""
     input:
         scoring_tkn=SCORING_TOKEN,
         final_with_confidence=SCORING_FINAL_ANNOTATION_WITH_CONFIDENCE,
@@ -1085,7 +1085,7 @@ rule run_genome_viewer_one_genome:
 
 
 rule run_full_operon_map_one_genome:
-    """Draws every multi-gene operon (run_full_operon_map, off by default); errors never fail it."""
+    """Draws every multi-gene operon (run_full_operon_map, off by default); errors are logged and skipped."""
     input:
         scoring_tkn=SCORING_TOKEN
     output:
@@ -1112,7 +1112,7 @@ rule run_full_operon_map_one_genome:
 
 
 rule run_report_figures_global:
-    """Writes pangenome report figures after all genomes score; errors never fail it."""
+    """Writes pangenome report figures after all genomes score; errors are logged and skipped."""
     input:
         scoring_tokens=expand(SCORING_TOKEN, genome=list(GENOMES.keys()))
     output:
