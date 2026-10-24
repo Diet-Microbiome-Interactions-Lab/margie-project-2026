@@ -3,7 +3,8 @@
 	 * Sign-in for the hosted site (lib/hosted.ts): MARGIE's own look, one card.
 	 * Signs in to the cluster API, or creates an account there with the cluster
 	 * login and SSH key the API will use; then opens the interface. People outside
-	 * Purdue (reviewers, collaborators) ask the lab for an account instead.
+	 * Purdue (reviewers, collaborators) ask for an account by email instead. MARGIE's logo
+	 * turns in below the box.
 	 */
 	import '@fontsource/ibm-plex-sans/400.css';
 	import '@fontsource/ibm-plex-sans/500.css';
@@ -17,6 +18,7 @@
 	import { ChevronRight, CircleAlert, Copy, KeyRound, LoaderCircle, Mail, Server } from 'lucide-svelte';
 	import CrispMark from '$lib/crisp/CrispMark.svelte';
 	import Corner from '$lib/workspace/Corner.svelte';
+	import MargieLogo from '$lib/workspace/MargieLogo.svelte';
 	import SizeSliders from '$lib/workspace/SizeSliders.svelte';
 	import { crispVars } from '$lib/crisp/theme';
 	import { isLoggedIn, setToken } from '$lib/auth';
@@ -115,10 +117,10 @@
 		);
 	}
 
-	// ------------------------------------------------ outside Purdue: an account from the lab
-	const LAB = 'lindems@purdue.edu';
+	// ------------------------------------------------ outside Purdue: an account on request
+	const CONTACT = 'lindems@purdue.edu';
 	let req = $state({ name: '', institution: '', email: '', purpose: '', message: '' });
-	/** The request as typed, nothing added: their mail app sends it to the lab. */
+	/** The request as typed, nothing added: their mail app sends it to CONTACT. */
 	const mailto = $derived.by(() => {
 		const body = [
 			`Name: ${req.name.trim()}`,
@@ -128,7 +130,7 @@
 			'',
 			req.message.trim()
 		].join('\n');
-		return `mailto:${LAB}?subject=${encodeURIComponent('MARGIE access request')}&body=${encodeURIComponent(body)}`;
+		return `mailto:${CONTACT}?subject=${encodeURIComponent('MARGIE access request')}&body=${encodeURIComponent(body)}`;
 	});
 	const canRequest = $derived(!!req.name.trim() && !!req.institution.trim() && /\S+@\S+\.\S+/.test(req.email.trim()) && !!req.purpose.trim());
 
@@ -154,7 +156,7 @@
 			<header class="st-head">
 				<h1 class="cr-title">{mode === 'signin' ? 'Sign in' : mode === 'create' ? 'New account' : 'Access from outside Purdue'}</h1>
 				<p class="cr-lede">
-					{mode === 'request' ? 'Reviewers and collaborators get a username and password from the Lindemann lab.' : 'Sign in to run MARGIE on your cluster.'}
+					{mode === 'request' ? 'Reviewers and collaborators get a username and password to sign in with.' : 'Sign in to run MARGIE on your cluster.'}
 				</p>
 			</header>
 
@@ -172,12 +174,12 @@
 					{/if}
 
 					{#if mode === 'request'}
-						<!-- No cluster account: the lab makes one to sign in with. -->
+						<!-- No cluster account: a request for one to sign in with. -->
 						<div class="form">
 							<p class="hint">
-								MARGIE runs on the lab's HPC cluster, so it needs an account there. To ask the lab for a username and password, send this
+								MARGIE runs on Purdue's HPC cluster, so it needs an account there. To ask for a username and password, send this
 								request, or write to
-								<span class="addr"><a class="mg-link" href="mailto:{LAB}">{LAB}</a><button type="button" class="mg-icon-btn" aria-label="Copy the address" onclick={() => copy(LAB)}><Copy size={14} /></button></span>.
+								<span class="addr"><a class="mg-link" href="mailto:{CONTACT}">{CONTACT}</a><button type="button" class="mg-icon-btn" aria-label="Copy the address" onclick={() => copy(CONTACT)}><Copy size={14} /></button></span>.
 								Then sign in with them under Sign in.
 							</p>
 							<div class="fields">
@@ -203,7 +205,7 @@
 								</label>
 							</div>
 							<div class="acts">
-								<span class="hint">Opens your mail app, addressed to {LAB}.</span>
+								<span class="hint">Opens your mail app, addressed to {CONTACT}.</span>
 								<a class="mg-btn primary" class:off={!canRequest} href={canRequest ? mailto : undefined} aria-disabled={!canRequest}><Mail size={15} /> Send request</a>
 							</div>
 						</div>
@@ -272,6 +274,12 @@
 					</form>
 					{/if}
 				</div>
+			</section>
+
+			<section class="welcome" aria-label="MARGIE">
+				<MargieLogo size="clamp(150px, 34vw, 190px)" />
+				<p class="full">Mostly Automated Rapid Genome Inference Environment</p>
+				<p class="motto">Annotate with confidence: a genome-centric, context-dependent approach</p>
 			</section>
 
 			<p class="foot">Want to run MARGIE on your own computer? Get the desktop app, or use the <code>margie</code> command.</p>
@@ -536,6 +544,44 @@
 		flex-shrink: 0;
 		margin-top: 3px;
 		color: var(--mg-danger);
+	}
+	/* Below the box: the logo, MARGIE's full name and its motto, rising in after it. */
+	.welcome {
+		display: flex;
+		flex-direction: column;
+		align-items: center;
+		gap: 6px;
+		padding-top: 6px;
+		text-align: center;
+	}
+	.welcome p {
+		margin: 0;
+		animation: rise 520ms cubic-bezier(0.2, 0.7, 0.2, 1) both;
+	}
+	.welcome .full {
+		margin-top: 4px;
+		font-weight: 600;
+		animation-delay: 400ms;
+	}
+	.welcome .motto {
+		text-wrap: balance;
+		font-size: var(--cr-fs-meta);
+		color: var(--mg-text-2);
+		animation-delay: 520ms;
+	}
+	@keyframes rise {
+		from {
+			opacity: 0;
+			transform: translateY(6px);
+		}
+	}
+	:global([data-motion='off']) .welcome p {
+		animation: none;
+	}
+	@media (prefers-reduced-motion: reduce) {
+		.welcome p {
+			animation: none;
+		}
 	}
 	.foot {
 		text-align: center;
