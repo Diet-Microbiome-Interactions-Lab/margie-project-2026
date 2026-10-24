@@ -10,6 +10,7 @@ API router all the way to the SLURM status checker daemon, so every SSH call
 hits the correct cluster and account.
 """
 import asyncio
+import datetime
 import json
 import logging
 import os
@@ -21,6 +22,7 @@ from concurrent.futures import ThreadPoolExecutor
 
 from bioinformatics_tools.utilities import ssh_slurm
 from bioinformatics_tools.utilities.ssh_connection import SSHConnection
+from bioinformatics_tools.api.services import run_mail
 from bioinformatics_tools.api.services.job_store import job_store
 
 LOGGER = logging.getLogger(__name__)
@@ -48,6 +50,7 @@ SEQUENTIAL_GENOME_RE = re.compile(r'SEQUENTIAL: genome (\d+)/(\d+)')
 
 def _slurm_status_checker(job_id: str, connection: SSHConnection):
     """Daemon thread that periodically checks SLURM job statuses."""
+    driver_checked = 0.0
     while job_store.get_status(job_id) == "running":
         slurm_jobs = job_store.get_slurm_jobs(job_id)
         active_ids = [sj["job_id"] for sj in slurm_jobs if sj["status"] not in ("COMPLETED", "FAILED", "CANCELLED", "TIMEOUT", "CACHED")]
@@ -76,6 +79,18 @@ def _slurm_status_checker(job_id: str, connection: SSHConnection):
                 except Exception as e:
                     LOGGER.warning("Genome backfill failed for job %s: %s", sj["job_id"], e)
 
+        # A step pending for over an hour, or the run's own job before any step, is emailed about once.
+        now = time.time()
+        for sj in slurm_jobs:
+            if sj["status"] == "PENDING":
+                sj.setdefault("pending_since", now)
+        if any(sj["status"] == "PENDING" and now - sj["pending_since"] > run_mail.PENDING_SECONDS for sj in slurm_jobs):
+            run_mail.notify(job_id, "pending", connection)
+        elif not slurm_jobs and now - driver_checked > 300 and now - _started(job_id) > run_mail.PENDING_SECONDS:
+            driver_checked = now
+            if run_mail.driver_pending(job_id, connection):
+                run_mail.notify(job_id, "pending", connection)
+
         # Persists this cycle's status changes; checkpoint() throttles.
         job_store.checkpoint(job_id)
 
@@ -84,6 +99,14 @@ def _slurm_status_checker(job_id: str, connection: SSHConnection):
             if job_store.get_status(job_id) != "running":
                 break
             time.sleep(1)
+
+
+def _started(job_id: str) -> float:
+    """When the run was started, in seconds since the epoch (now when unknown)."""
+    try:
+        return datetime.datetime.fromisoformat(job_store.get(job_id)["start_time"]).timestamp()
+    except (TypeError, KeyError, ValueError):
+        return time.time()
 
 
 def run_ssh_task(job_id: str, command: str, connection: SSHConnection,
@@ -282,6 +305,11 @@ def run_ssh_task(job_id: str, command: str, connection: SSHConnection,
         else:
             job_store.append_log(job_id, f"\nError: {str(e)}")
             job_store.finalize(job_id, status="failed", phase="Error")
+
+    # Emails the owner that the run completed or failed (run_mail, once per run).
+    final = job_store.get_status(job_id)
+    if final in ("completed", "failed"):
+        run_mail.notify(job_id, final, connection)
 
 
 def submit_job(job_id: str, command: str, connection: SSHConnection,

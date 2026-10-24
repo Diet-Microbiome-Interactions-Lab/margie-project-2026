@@ -25,8 +25,10 @@ from bioinformatics_tools.api.auth import (
 )
 from bioinformatics_tools.api.database import PROFILE_FIELDS, get_db
 from bioinformatics_tools.api.services import read_cache
+from bioinformatics_tools.api.services.job_store import job_store
 from bioinformatics_tools.api.local_mode import is_local_mode, local_account
 from bioinformatics_tools.api.models import (
+    DeleteAccount,
     TokenResponse,
     UpdateClusterCredentials,
     UserLogin,
@@ -234,7 +236,7 @@ def _profile(user_id: int) -> UserProfile:
     """Returns a user's profile, with their own details; never the password or the key."""
     with get_db() as db:
         row = db.execute(
-            'SELECT id, username, cluster_host, cluster_username, home_dir, created_at, '
+            'SELECT id, username, cluster_host, cluster_username, home_dir, created_at, notify_runs, '
             + ', '.join(PROFILE_FIELDS) + ' FROM users WHERE id = ?',
             (user_id,)
         ).fetchone()
@@ -249,6 +251,7 @@ def _profile(user_id: int) -> UserProfile:
         cluster_username=row['cluster_username'],
         home_dir=row['home_dir'],
         created_at=row['created_at'],
+        notify_runs=bool(row['notify_runs']),
         **{f: row[f] or '' for f in PROFILE_FIELDS},
     )
 
@@ -263,13 +266,17 @@ def update_profile(body: UpdateProfile, current_user: dict = Depends(get_current
     Saves the details a user keeps about themselves (name, email, institution,
     department or lab, ORCID). Fields left out are kept; an empty one is cleared.
     """
-    given = {k: v.strip() for k, v in body.model_dump(exclude_none=True).items()}
+    fields = body.model_dump(exclude_none=True)
+    notify = fields.pop('notify_runs', None)
+    given = {k: v.strip() for k, v in fields.items()}
     if given.get('email') and not _EMAIL.match(given['email']):
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail='That email address does not look right.')
     if given.get('orcid'):
         given['orcid'] = given['orcid'].removeprefix('https://orcid.org/').upper()
         if not _ORCID.match(given['orcid']):
             raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail='An ORCID iD looks like 0000-0002-1825-0097.')
+    if notify is not None:
+        given['notify_runs'] = int(notify)
     if given:
         with get_db() as db:
             db.execute(
@@ -278,6 +285,29 @@ def update_profile(body: UpdateProfile, current_user: dict = Depends(get_current
             )
             db.commit()
     return _profile(current_user['user_id'])
+
+
+@router.post('/delete-account')
+def delete_account(body: DeleteAccount, current_user: dict = Depends(get_current_user)):
+    """
+    Deletes the MARGIE account: its sign-in, profile and stored cluster key. The files on the
+    cluster stay as they are (config.yaml, the copy of MARGIE, databases, results); signing up
+    again makes a new account. Asks for the password again, and waits while a run is going.
+    """
+    with get_db() as db:
+        row = db.execute('SELECT password_hash FROM users WHERE id = ?', (current_user['user_id'],)).fetchone()
+    if row is None or not verify_password(body.password, row['password_hash']):
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail='That password does not match this account.')
+    going = job_store.going_for(current_user['user_id'])
+    if going:
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT,
+                            detail=f'A run is going ({going[0]}): stop it, or wait for it to finish, before deleting the account.')
+    with get_db() as db:
+        db.execute('DELETE FROM users WHERE id = ?', (current_user['user_id'],))
+        db.commit()
+    read_cache.drop(current_user['user_id'])
+    LOGGER.info('Deleted the account %r', current_user['username'])
+    return {'deleted': True}
 
 
 @router.put('/update-credentials')

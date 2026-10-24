@@ -17,6 +17,8 @@ mylab||gres/hp_cpu=64,gres/gpu=2|
 @@qos
 normal||||
 standby||||04:00:00
+cpu-qpart||||14-00:00:00
+highmem-qpart||||1-00:00:00
 @@usage
 mylab|u1|cpu=4,mem=8000M,node=1,billing=4,gres/hp_cpu=2
 mylab|u2|cpu=64,mem=450G,node=1,billing=64,gres/hp_cpu=8,gres/gpu=1
@@ -36,6 +38,9 @@ highmem|b000|allocated|128/0/0/128|1031600|10000|(null)
 @@partitions
 cpu*|up|infinite|3|100/156/128/384|257400|hp_cpu:128
 highmem|up|14-00:00:00|1|128/0/0/128|1031600|(null)
+@@partqos
+cpu|cpu-qpart|00:30:00
+highmem|highmem-qpart|00:30:00
 @@end
 """
 
@@ -68,7 +73,7 @@ def test_partitions_with_free_cpus_and_memory():
     assert cpu["name"] == "cpu" and cpu["default"] is True and cpu["cpus"] == {"allocated": 100, "idle": 156, "other": 128, "total": 384}
     # Free memory and ready CPUs count idle and mixed nodes only; the node in maintenance is left out.
     assert cpu["mem_free_mb"] == 310000 and cpu["cpus_ready"] == 156 and cpu["node_states"] == {"maint": 1, "idle": 1, "mixed": 1}
-    assert high["gres"] == "" and high["time_limit"] == "14-00:00:00" and high["mem_free_mb"] == 0
+    assert high["gres"] == "" and high["time_limit"] == "1-00:00:00" and high["mem_free_mb"] == 0
     assert r["qos"][1] == {"name": "standby", "group": "", "per_user": "", "jobs_per_user": "", "max_wall": "04:00:00"}
 
 
@@ -94,3 +99,11 @@ def test_each_account_says_who_is_using_it():
     assert (u2["running"], u2["cpu"], u2["gpu"], u2["me"]) == (1, 64, 1, False)
     assert (u1["running"], u1["cpu"], u1["waiting"], u1["waiting_cpu"], u1["me"]) == (1, 4, 1, 8, True)
     assert (u3["running"], u3["waiting"], u3["waiting_cpu"]) == (0, 1, 16)
+
+
+def test_a_partition_shows_the_time_cap_of_its_own_qos():
+    r = parse_cluster(OUT, "u1")
+    cpu, high = r["partitions"]
+    # cpu says infinite and its QOS caps jobs at 14 days; highmem says 14 days and its QOS 1 day.
+    assert (cpu["time_limit"], high["time_limit"]) == ("14-00:00:00", "1-00:00:00")
+    assert cpu["default_time"] == "00:30:00"

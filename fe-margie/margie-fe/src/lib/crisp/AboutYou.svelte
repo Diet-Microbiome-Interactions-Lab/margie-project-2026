@@ -1,12 +1,14 @@
 <script lang="ts">
 	/**
 	 * The User profile's own details: name, email, institution, department or lab, ORCID iD.
-	 * Kept with the account on MARGIE's server (PUT /v1/auth/profile), all optional.
+	 * Kept with the account on MARGIE's server (PUT /v1/auth/profile), all optional; with the
+	 * switch for emails about the user's runs, saved as it is flipped.
 	 */
 	import { onMount } from 'svelte';
 	import { authHeaders } from '$lib/auth.js';
 	import { getApiUrl } from '$lib/config';
 	import { ui } from '$lib/workspace/ui.svelte';
+	import Switch from '$lib/workspace/Switch.svelte';
 
 	const FIELDS = [
 		{ key: 'full_name', label: 'Name', placeholder: 'Your full name', type: 'text', auto: 'name' },
@@ -23,10 +25,33 @@
 	let loaded = $state(false);
 	const changed = $derived(FIELDS.some((f) => (draft[f.key] ?? '') !== (saved[f.key] ?? '')));
 
-	function take(d: Record<string, string>) {
+	/** Emails when a run completes, fails or waits over an hour; to the account's Purdue address and the email above. */
+	let notify = $state(true);
+	let purdue = $state('');
+	const mailTo = $derived([purdue, saved.email].filter((a, i, all) => a && all.findIndex((b) => b.toLowerCase() === a.toLowerCase()) === i).join(' and '));
+
+	function take(d: Record<string, string> & { notify_runs?: boolean }) {
 		for (const f of FIELDS) saved[f.key] = d[f.key] ?? '';
 		draft = { ...saved };
+		if (typeof d.notify_runs === 'boolean') notify = d.notify_runs;
+		if (d.cluster_username && /(^|\.)purdue\.edu$/i.test(d.cluster_host ?? '')) purdue = `${d.cluster_username}@purdue.edu`;
 		loaded = true;
+	}
+
+	async function setNotify(on: boolean) {
+		notify = on;
+		try {
+			const res = await fetch(`${getApiUrl()}/v1/auth/profile`, {
+				method: 'PUT',
+				headers: { ...authHeaders(), 'Content-Type': 'application/json' },
+				body: JSON.stringify({ notify_runs: on })
+			});
+			if (!res.ok) throw new Error('The email setting could not be saved.');
+			ui.notify(on ? 'Emails about your runs are on.' : 'Emails about your runs are off.', 'ok');
+		} catch (e) {
+			notify = !on;
+			ui.notify(e instanceof Error ? e.message : String(e), 'error');
+		}
 	}
 
 	onMount(async () => {
@@ -81,6 +106,13 @@
 			<button type="submit" class="mg-btn small primary" disabled={!changed || saving}>{saving ? 'Saving…' : 'Save'}</button>
 		</div>
 	</form>
+	<div class="notify">
+		<Switch label="Email me about my runs" checked={notify} disabled={!loaded} onchange={setNotify} />
+		<span>
+			<b>Email me about my runs</b>
+			<small>When a run completes, fails, or has been pending for more than an hour{mailTo ? `; to ${mailTo}` : ''}.</small>
+		</span>
+	</div>
 </section>
 
 <style>
@@ -135,6 +167,26 @@
 	label input {
 		width: 100%;
 		height: 34px;
+	}
+	.notify {
+		display: flex;
+		align-items: center;
+		gap: 10px;
+		padding-top: 10px;
+		border-top: 1px solid var(--mg-border);
+	}
+	.notify span {
+		display: flex;
+		flex-direction: column;
+		min-width: 0;
+		font-size: var(--mg-fs-sm);
+	}
+	.notify b {
+		font-weight: 600;
+	}
+	.notify small {
+		font-size: var(--mg-fs-xs);
+		color: var(--mg-text-3);
 	}
 	.acts {
 		display: flex;
