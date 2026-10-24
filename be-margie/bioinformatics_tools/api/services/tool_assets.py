@@ -14,11 +14,11 @@ import shlex
 from bioinformatics_tools.api.services import user_stores
 from bioinformatics_tools.api.services.user_stores import StoreError, _cfg_get, _run
 from bioinformatics_tools.workflow_tools.workflow_helpers import WORKFLOW_PATH_DEFAULTS, genome_calls
-from bioinformatics_tools.workflow_tools.workflow_registry import MARGIE_SB_PHASED_TOOLS
+from bioinformatics_tools.workflow_tools.workflow_registry import MARGIE_SB_PHASED_TOOLS, SHARED_FOLDER_DEFAULTS
 
 WORKFLOW = 'margie_sb'
-SHARED_SIF = WORKFLOW_PATH_DEFAULTS[WORKFLOW]['sif_path']
-SHARED_DB = WORKFLOW_PATH_DEFAULTS[WORKFLOW]['db_root']
+SHARED_SIF = SHARED_FOLDER_DEFAULTS.get('sif_path') or WORKFLOW_PATH_DEFAULTS[WORKFLOW]['sif_path']
+SHARED_DB = SHARED_FOLDER_DEFAULTS.get('db_root') or WORKFLOW_PATH_DEFAULTS[WORKFLOW]['db_root']
 
 # Folders under the user's scratch root for what cannot go where the config points.
 SIF_SUB = 'sif'
@@ -63,6 +63,11 @@ def _in_lab(path: str) -> bool:
     return path == user_stores.DEPOT or path.startswith(user_stores.DEPOT + '/')
 
 
+def _join(folder: str, name: str) -> str:
+    """folder/name with one slash between them, however the folder ends ('/' too)."""
+    return posixpath.join(folder, name) if folder else name
+
+
 def folders(cfg: dict, home: str) -> tuple[str, str]:
     """Returns the containers folder and databases root the run uses."""
     sif_dir = _cfg_get(cfg, f'{WORKFLOW}.sif_path') or SHARED_SIF
@@ -77,7 +82,7 @@ def inventory(cfg: dict, home: str) -> list[dict]:
 
     def image(key: str, label: str, sif: str) -> None:
         rows.append({'id': f'image:{key}', 'kind': 'image', 'tool': key, 'label': label, 'name': sif,
-                     'path': f'{sif_dir}/{sif}', 'shared': f'{SHARED_SIF}/{sif}', 'optional': key in OPTIONAL})
+                     'path': _join(sif_dir, sif), 'shared': _join(SHARED_SIF, sif), 'optional': key in OPTIONAL})
 
     for t in MARGIE_SB_PHASED_TOOLS:
         if t.get('uses_container', True):
@@ -90,8 +95,8 @@ def inventory(cfg: dict, home: str) -> list[dict]:
         key = t['key']
         explicit = _cfg_get(cfg, f'db.{key}')
         rows.append({'id': f'database:{key}', 'kind': 'database', 'tool': key, 'label': t['label'], 'name': key,
-                     'path': _expand(explicit, home) if explicit else f'{db_root}/{key}',
-                     'shared': f'{SHARED_DB}/{key}', 'optional': key in OPTIONAL})
+                     'path': _expand(explicit, home) if explicit else _join(db_root, key),
+                     'shared': _join(SHARED_DB, key), 'optional': key in OPTIONAL})
     return rows
 
 

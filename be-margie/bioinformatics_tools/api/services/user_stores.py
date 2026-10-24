@@ -17,6 +17,7 @@ import shlex
 import time
 
 from bioinformatics_tools.utilities import ssh_sftp
+from bioinformatics_tools.workflow_tools.workflow_registry import SHARED_FOLDER_DEFAULTS
 
 LOGGER = logging.getLogger(__name__)
 
@@ -74,6 +75,8 @@ INPUT_NAME = 'margie-input'
 OUTPUT_NAME = 'margie-output'
 # The genomes and results folders a config leaves empty, and their folder under HOME_NAME.
 DEFAULT_FOLDERS = {'margie_sb.input_path': INPUT_NAME, 'margie_sb.output_path': OUTPUT_NAME}
+# The folder those (and the databases folder) go in when left empty: /scratch/<cluster>/<user>/margie.
+WORKING_KEY = 'margie_sb.working_folder'
 # Bookkeeping folder inside it: the store manifest and the copy under way.
 STATE_DIR = '.margie'
 
@@ -221,24 +224,41 @@ def _scratch(conn) -> str:
     return f'/scratch/{cluster}/{user}'
 
 
+def working_folder(conn, cfg: dict) -> str:
+    """Returns margie_sb.working_folder if set, else /scratch/<cluster>/<user>/margie."""
+    chosen = _cfg_get(cfg, WORKING_KEY)
+    if isinstance(chosen, str) and chosen.strip():
+        return chosen.strip().rstrip('/')
+    return f'{_scratch(conn)}/{HOME_NAME}'
+
+
 def scratch_root(conn, cfg: dict) -> str:
-    """Returns margie_sb.stores_root if set (every finished setup saves it), else
-    /scratch/<cluster>/<user>/margie/margie-databases."""
+    """Returns margie_sb.stores_root if set (every finished setup saves it), else margie-databases
+    in the working folder."""
     chosen = _cfg_get(cfg, 'margie_sb.stores_root')
     if isinstance(chosen, str) and chosen.strip():
         return chosen.strip().rstrip('/')
-    return f'{_scratch(conn)}/{HOME_NAME}/{ROOT_NAME}'
+    return f'{working_folder(conn, cfg)}/{ROOT_NAME}'
 
 
 def fill_default_folders(conn, cfg: dict) -> bool:
-    """Sets the genomes and results folders a config leaves empty to margie-input and margie-output
-    in <scratch>/margie, and makes them (with the databases folder) so files can go straight in.
-    A folder chosen in Settings is never changed. Returns True when the config changed."""
-    empty = [k for k in DEFAULT_FOLDERS if not str(_cfg_get(cfg, k) or '').strip()]
-    if not empty:
-        return False
-    scratch = _scratch(conn)
-    made = [f'{scratch}/{HOME_NAME}/{DEFAULT_FOLDERS[k]}' for k in empty]
+    """Sets the folders a config leaves empty: the containers and reference databases to the
+    group's (SHARED_FOLDER_DEFAULTS), the working folder to margie in <scratch>, and the genomes
+    and results folders to margie-input and margie-output in it, made (with the databases folder)
+    so files can go straight in. A folder chosen in Settings is kept. Returns True when the config
+    changed."""
+    unset = lambda key: not str(_cfg_get(cfg, key) or '').strip()  # noqa: E731
+    changed = False
+    for name, path in SHARED_FOLDER_DEFAULTS.items():
+        if unset(f'margie_sb.{name}'):
+            _cfg_set(cfg, f'margie_sb.{name}', path)
+            changed = True
+    empty = [k for k in DEFAULT_FOLDERS if unset(k)]
+    if not empty and not unset(WORKING_KEY):
+        return changed
+    working = working_folder(conn, cfg)
+    _cfg_set(cfg, WORKING_KEY, working)
+    made = [f'{working}/{DEFAULT_FOLDERS[k]}' for k in empty]
     for k, path in zip(empty, made):
         _cfg_set(cfg, k, path)
     made.append(scratch_root(conn, cfg))
