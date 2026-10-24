@@ -17,7 +17,8 @@
 <script lang="ts">
 	import './tools.css';
 	import type { Snippet } from 'svelte';
-	import { BookOpen, Code, Download, FileCode, FileImage, FileSpreadsheet, FileText, Pencil, Table2 } from 'lucide-svelte';
+	import { BookOpen, Code, Download, FileCode, FileImage, FileSpreadsheet, FileText, Lock, Pencil, Table2 } from 'lucide-svelte';
+	import { advanced, lockedFile } from '../advanced-lock.svelte';
 	import { backend } from '../backend.svelte';
 	import { uiBase } from '../base.svelte';
 	import { api, fileUrl, formatBytes } from '$lib/api';
@@ -83,7 +84,12 @@
 		{/if}
 		{@render actions?.()}
 		{#if backend.cluster && (kind === 'text' || markdown)}
-			<a class="vw-pill" href={uiBase.to(`/edit?path=${encodeURIComponent(path)}`)} title="Edit {name} by hand; the old version is kept beside it"><Pencil size={15} /><span class="vw-lbl">Edit</span></a>
+			{#if lockedFile(path) && !advanced.open}
+				<!-- config.yaml and the workflow are edited by hand after Unlock (Settings → Advanced). -->
+				<a class="vw-pill" href={uiBase.to('/settings')} title="Unlock under Settings → Advanced to edit {name}"><Lock size={15} /><span class="vw-lbl">Locked</span></a>
+			{:else}
+				<a class="vw-pill" href={uiBase.to(`/edit?path=${encodeURIComponent(path)}`)} title="Edit {name} by hand; the old version is kept beside it"><Pencil size={15} /><span class="vw-lbl">Edit</span></a>
+			{/if}
 		{/if}
 		<a class="vw-pill" href={fileUrl(path)} download title="Download {name}"><Download size={15} /><span class="vw-lbl">Download</span></a>
 	</header>
