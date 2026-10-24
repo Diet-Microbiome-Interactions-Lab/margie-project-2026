@@ -2811,7 +2811,9 @@ rule run_tmbed:
     """Phase6: TMbed transmembrane prediction on CPU.
 
     Uses apptainer exec directly to bind db/tmbed/t5 and cnn over the package's
-    hardcoded models/ paths, which ignore HF_HOME and -d.
+    hardcoded models/ paths, which ignore HF_HOME and -d. TMbed downloads ProtT5 when
+    models/t5/config.json is missing, into the container's read-only /models, so a missing
+    file or broken link in db/tmbed/t5 is named here before it starts.
     """
     input:
         faa=pc_faa('tmbed')
@@ -2832,6 +2834,12 @@ rule run_tmbed:
         """
         echo "=== MARGIE_SB PHASE 6: TMBED ({wildcards.genome}) ==="
         if [ -s {input.faa} ]; then
+            for f in config.json pytorch_model.bin spiece.model tokenizer_config.json special_tokens_map.json; do
+                if [ ! -e "{params.model_dir}/t5/$f" ]; then
+                    echo "TMbed: {params.model_dir}/t5/$f is missing or a broken link; it should lead to the ProtT5 files under {params.model_dir}/models--Rostlab--prot_t5_xl_half_uniref50-enc/snapshots" >&2
+                    exit 1
+                fi
+            done
             apptainer exec \
                 -B {params.model_dir}/t5:/usr/local/lib/python3.11/site-packages/tmbed/models/t5 \
                 -B {params.model_dir}/cnn:/usr/local/lib/python3.11/site-packages/tmbed/models/cnn \
