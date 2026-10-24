@@ -281,19 +281,23 @@ def _margie_sb_tool_params() -> list[dict]:
                 'description': f'Phase {phase}: runtime limit (minutes) for {label}',
                 'type': 'int'
             },
-            {
+        ])
+        # A database and a container only for the tools that have them (margie_sb.smk's
+        # db_path and sif_path), so Settings offers nothing that is not read.
+        if tool.get('database'):
+            params.append({
                 'param': f'margie_sb.{key}.db',
                 'default': '',
                 'description': f'Phase {phase}: database path for {label}',
                 'type': 'path'
-            },
-            {
+            })
+        if tool.get('uses_container', True):
+            params.append({
                 'param': f'margie_sb.{key}.sif',
                 'default': tool['sif'],
                 'description': f'Phase {phase}: SIF filename for {label} under sif_path',
                 'type': 'string'
-            },
-        ])
+            })
     # QUAST runs on its own, beside the annotation (workflow.py): how many genomes at a time.
     params.append({
         'param': 'margie_sb.quast.at_once',
