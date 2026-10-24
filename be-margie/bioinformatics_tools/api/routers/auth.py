@@ -7,6 +7,7 @@ GET  /v1/auth/me        — return the current user's profile (requires token)
 GET  /v1/auth/policy    — which clusters accounts may be on (public)
 """
 import io
+import json
 import logging
 import re
 from datetime import datetime, timezone
@@ -291,6 +292,46 @@ def update_profile(body: UpdateProfile, current_user: dict = Depends(get_current
             )
             db.commit()
     return _profile(current_user['user_id'])
+
+
+# The look's parts: the website's settings (prefs) and the look it opens with (default).
+LOOK_PARTS = ('prefs', 'default')
+LOOK_MAX = 64 * 1024
+
+
+def _look(user_id: int) -> dict:
+    with get_db() as db:
+        row = db.execute('SELECT ui_look FROM users WHERE id = ?', (user_id,)).fetchone()
+    try:
+        look = json.loads(row['ui_look']) if row and row['ui_look'] else {}
+    except ValueError:
+        look = {}
+    return {k: v for k, v in look.items() if k in LOOK_PARTS and isinstance(v, dict)} if isinstance(look, dict) else {}
+
+
+@router.get('/look')
+def get_look(current_user: dict = Depends(get_current_user)):
+    """Returns the website's look kept with the account ({prefs, default}); {} before one is kept."""
+    return _look(current_user['user_id'])
+
+
+@router.put('/look')
+def save_look(body: dict, current_user: dict = Depends(get_current_user)):
+    """
+    Keeps the website's look with the account, so each browser signed in to it shows the same one.
+    The parts sent (prefs, default) replace the kept ones; the website checks them as it reads them.
+    """
+    given = {k: v for k, v in body.items() if k in LOOK_PARTS}
+    if not given or not all(isinstance(v, dict) for v in given.values()):
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail='Send prefs or default, as objects.')
+    look = {**_look(current_user['user_id']), **given}
+    text = json.dumps(look, separators=(',', ':'))
+    if len(text) > LOOK_MAX:
+        raise HTTPException(status_code=status.HTTP_413_REQUEST_ENTITY_TOO_LARGE, detail='The look is too large to keep.')
+    with get_db() as db:
+        db.execute('UPDATE users SET ui_look = ? WHERE id = ?', (text, current_user['user_id']))
+        db.commit()
+    return {'saved': True}
 
 
 @router.post('/delete-account')

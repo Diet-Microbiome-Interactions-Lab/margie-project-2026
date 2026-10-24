@@ -245,6 +245,14 @@
 }
 .mg-input.mono { font-family: var(--mg-mono); }
 textarea.mg-input { height: auto; padding: 8px; resize: vertical; line-height: 1.5; }
+/* A field the browser fills in (a saved login) keeps MARGIE's colours, as in each browser. */
+.mg-input:-webkit-autofill {
+	-webkit-text-fill-color: var(--mg-text);
+	box-shadow: 0 0 0 1000px var(--mg-surface) inset;
+	caret-color: var(--mg-text);
+	filter: none;
+	transition: background-color 600000s 0s, color 600000s 0s;
+}
 
 /* A plain radio: a ring, filled when chosen. */
 .mg-radio {
