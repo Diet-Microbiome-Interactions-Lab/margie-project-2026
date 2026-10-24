@@ -374,7 +374,8 @@
 	}
 
 	// ------------------------------------------------ Per tool: each card folds
-	const FOLDED = 'margie.settings.tools.folded';
+	// Folded cards, as "<group>:<card>" (per-tool:COG, phases:Phase 4).
+	const FOLDED = 'margie.settings.cards.folded';
 	let folded = $state<Set<string>>(
 		(() => {
 			try {
@@ -392,10 +393,21 @@
 			// not remembered
 		}
 	}
-	function foldTool(head: string) {
+	function foldCard(key: string) {
 		const next = new Set(folded);
-		if (!next.delete(head)) next.add(head);
+		if (!next.delete(key)) next.add(key);
 		setFolded(next);
+	}
+	/** A folded phase's settings on one line: "cpu | Genomes at once 1 | Tools at once 6". */
+	function cardLine(at: Map<string, { s: Setting }>, cols: string[]): string {
+		return cols
+			.map((col) => {
+				const it = at.get(col);
+				const value = it ? String(draft[it.s.key] ?? it.s.value) || it.s.default : '';
+				return !value ? '' : col === 'Partition' ? value : `${col} ${value}`;
+			})
+			.filter(Boolean)
+			.join(' | ');
 	}
 	/** A folded tool's settings on one line: "cpu | 8 threads | 4000 MB | 240 min". */
 	function toolLine(at: Map<string, { s: Setting }>): string {
@@ -428,10 +440,10 @@
 		const group = real === 'licences' ? 'licences' : (GROUPS.find((g) => g.id === real || ws.settings.some((s) => s.key === real && g.match(s)))?.id ?? '');
 		const wasShut = !!group && !isOpen(group);
 		if (group) openId = group;
-		// A tool's card opens first when it is folded.
-		const one = group === 'per-tool' ? ws.settings.find((x) => x.key === real) : null;
-		const tool = one ? one.label.slice(0, one.label.indexOf(': ')) : '';
-		if (tool && folded.has(tool)) foldTool(tool);
+		// A tool's or phase's card opens first when it is folded.
+		const one = group === 'per-tool' || group === 'phases' ? ws.settings.find((x) => x.key === real) : null;
+		const card = one ? `${group}:${one.label.slice(0, one.label.indexOf(': '))}` : '';
+		if (card && folded.has(card)) foldCard(card);
 		const ready = wasShut ? new Promise((r) => setTimeout(r, ui.ms(420) + 40)) : tick();
 		ready.then(() => {
 			const el = document.getElementById(real);
@@ -644,10 +656,11 @@
 			<span class="sb-count">{g.items.length} setting{g.items.length === 1 ? '' : 's'}</span>
 			{#if pending}<span class="sb-pending">{pending} unsaved</span>{/if}
 			<span class="mg-grow"></span>
-			{#if g.id === 'per-tool' && t && t.rows.length}
-				<span class="sb-folds" role="group" aria-label="Tool cards">
-					<button type="button" class="sb-reset" disabled={!folded.size} onclick={() => setFolded(new Set())}><ChevronsUpDown size={12} aria-hidden="true" />Expand all</button>
-					<button type="button" class="sb-reset" disabled={t.rows.every((r) => folded.has(r.head))} onclick={() => setFolded(new Set(t.rows.map((r) => r.head)))}><ChevronsDownUp size={12} aria-hidden="true" />Collapse all</button>
+			{#if (g.id === 'per-tool' || g.id === 'phases') && t && t.rows.length}
+				{@const keys = t.rows.map((r) => `${g.id}:${r.head}`)}
+				<span class="sb-folds" role="group" aria-label="{g.title} cards">
+					<button type="button" class="sb-reset" disabled={!keys.some((k) => folded.has(k))} onclick={() => setFolded(new Set([...folded].filter((k) => !keys.includes(k))))}><ChevronsUpDown size={12} aria-hidden="true" />Expand all</button>
+					<button type="button" class="sb-reset" disabled={keys.every((k) => folded.has(k))} onclick={() => setFolded(new Set([...folded, ...keys]))}><ChevronsDownUp size={12} aria-hidden="true" />Collapse all</button>
 				</span>
 			{/if}
 			{@render helpButton(g.id)}
@@ -656,12 +669,13 @@
 			{#if t && t.rows.length}
 				{#if t.cols.length > 1}
 					{@const tools = g.id === 'per-tool'}
+					{@const cards = tools || g.id === 'phases'}
 					{@const paths = pathCols(t)}
 					{@const numbers = t.cols.filter((c) => !paths.has(c))}
 					{@const loose = t.rest.flatMap((c) => c.items)}
-					<!-- Cards, not a long table: tools two to a row in the order they run (each wearing its
-					     phase), phases three or four to a row; numbers side by side, a folder or file in full. -->
-					<div class="sb-grid" class:tools role="list" aria-label={g.title}>
+					<!-- Cards, not a long table: tools (each wearing its phase, in the order they run) and
+					     phases two to a row, each setting a name and its box, each card folding. -->
+					<div class="sb-grid" class:cards class:tools role="list" aria-label={g.title}>
 						{#if loose.length}
 							<!-- The group's own settings without a phase: one card across the top. -->
 							<article class="sb-tc sb-tc-loose" role="listitem" aria-label="For every tool">
@@ -684,23 +698,30 @@
 							{/if}
 							<!-- A tool shows the fields it has: no Database or Container where it uses none. -->
 							{@const mine = tools ? [...numbers, ...paths].filter((c) => row.at.has(c)) : t.cols.filter((c) => row.at.has(c))}
-							{@const shut = tools && folded.has(row.head)}
+							{@const key = `${g.id}:${row.head}`}
+							{@const shut = cards && folded.has(key)}
 							{@const changed = shut ? toolChanged(row.at) : ''}
 							<article class="sb-tc" class:shut class:later role="listitem" aria-label={row.head}>
 								<header class="sb-tc-head">
 									{#if tools}
-										<button type="button" class="sb-tc-fold" aria-expanded={!shut} title={shut ? `Show the settings for ${row.head}` : `Fold the settings for ${row.head}`} onclick={() => foldTool(row.head)}>
+										<button type="button" class="sb-tc-fold" aria-expanded={!shut} title={shut ? `Show the settings for ${row.head}` : `Fold the settings for ${row.head}`} onclick={() => foldCard(key)}>
 											<ChevronRight size={14} aria-hidden="true" /><b>{row.head}</b>
 										</button>
 										{#if changed}<span class="sb-dot" class:sb-unsaved={changed === 'unsaved'} title={changed === 'unsaved' ? 'Changed, not saved yet' : 'Changed from the default'}></span>{/if}
 										<span class="mg-grow"></span>
-										{#if n}<span class="sb-tc-phase" title="Phase {n}"><span class="sb-tc-num">{n}</span>{PHASE_NAMES[n] ?? ''}</span>{/if}
+										{#if n}<span class="sb-tc-phase"><span class="sb-tc-num">Phase {n}</span>{PHASE_NAMES[n] ?? ''}</span>{/if}
+									{:else if cards}
+										{@const name = (n && PHASE_NAMES[n]) || row.head}
+										<button type="button" class="sb-tc-fold" aria-expanded={!shut} title={shut ? `Show the settings for ${name}` : `Fold the settings for ${name}`} onclick={() => foldCard(key)}>
+											<ChevronRight size={14} aria-hidden="true" /><span class="sb-tc-num">{n ? `Phase ${n}` : '·'}</span><b>{name}</b>
+										</button>
+										{#if changed}<span class="sb-dot" class:sb-unsaved={changed === 'unsaved'} title={changed === 'unsaved' ? 'Changed, not saved yet' : 'Changed from the default'}></span>{/if}
 									{:else}
 										<span class="sb-tc-num">{n ?? '·'}</span><b>{(n && PHASE_NAMES[n]) || row.head}</b>
 									{/if}
 								</header>
 								{#if shut}
-									<p class="sb-tc-line">{toolLine(row.at)}</p>
+									<p class="sb-tc-line">{tools ? toolLine(row.at) : cardLine(row.at, mine)}</p>
 								{:else}
 								<div class="sb-tc-fields">
 									{#each mine as col (col)}
@@ -1535,7 +1556,7 @@
 		gap: 14px;
 	}
 
-	/* ---- a wide group as cards: phases three or four to a row, tools two ---- */
+	/* ---- a wide group as cards: tools and phases two to a row ---- */
 	.sb-empty {
 		display: none;
 	}
@@ -1545,7 +1566,7 @@
 		gap: 10px;
 		padding: 14px var(--mg-pad) 16px;
 	}
-	.sb-grid.tools {
+	.sb-grid.cards {
 		grid-template-columns: repeat(2, minmax(0, 1fr));
 		gap: 10px 12px;
 	}
@@ -1685,26 +1706,29 @@
 	.sb-tc-fields > .sb-tf {
 		flex: 1 1 120px;
 	}
-	.tools .sb-tc-fields {
+	.cards .sb-tc-fields {
 		display: grid;
 		grid-template-columns: minmax(0, 1fr);
 		gap: 5px;
 	}
-	/* The settings for every tool: the same rows, side by side. */
-	.tools .sb-tc-loose .sb-tc-fields {
+	/* The settings for all tools: the same rows, side by side, with room for longer names. */
+	.cards .sb-tc-loose .sb-tf {
+		--tf-name: 176px;
+	}
+	.cards .sb-tc-loose .sb-tc-fields {
 		grid-template-columns: repeat(auto-fill, minmax(min(100%, 280px), 1fr));
 		column-gap: 24px;
 	}
-	.tools .sb-tf {
+	.cards .sb-tf {
 		display: grid;
 		grid-template-columns: var(--tf-name, 136px) minmax(0, 1fr);
 		align-items: center;
 		column-gap: 10px;
 	}
-	.tools .sb-tf.path {
+	.cards .sb-tf.path {
 		align-items: start;
 	}
-	.tools .sb-tf-lbl {
+	.cards .sb-tf-lbl {
 		min-height: var(--mg-ctl-sm, 30px);
 		font-size: var(--mg-fs-xs);
 		font-weight: 500;
@@ -1903,16 +1927,16 @@
 	}
 
 	@media (max-width: 1000px) {
-		.sb-grid.tools {
+		.sb-grid.cards {
 			grid-template-columns: minmax(0, 1fr);
 		}
 	}
 	@media (max-width: 520px) {
-		.tools .sb-tf {
+		.cards .sb-tf {
 			--tf-name: 112px;
 		}
 		/* A folder or file under its name, across the card. */
-		.tools .sb-tf.path {
+		.cards .sb-tf.path {
 			grid-template-columns: minmax(0, 1fr);
 		}
 	}
