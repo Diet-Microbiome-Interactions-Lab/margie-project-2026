@@ -5,8 +5,8 @@
 	import { tick, untrack } from 'svelte';
 	import { beforeNavigate } from '$app/navigation';
 	import { page } from '$app/state';
-	import { Bot, ChevronRight, ChevronsDownUp, ChevronsUpDown, CircleHelp, Cpu, FileCode, Database, Folder, FolderOpen, Folders, HardDrive, Layers, ListChecks, Lock, MemoryStick, RotateCcw, ScrollText, Server, SlidersHorizontal, Wrench } from 'lucide-svelte';
-	import { api, formatBytes } from '$lib/api';
+	import { Bot, ChevronRight, ChevronsDownUp, ChevronsUpDown, CircleHelp, Cpu, FileCode, Database, Folder, FolderOpen, Folders, HardDrive, Layers, ListChecks, Lock, LockOpen, MemoryStick, RotateCcw, ScrollText, Server, SlidersHorizontal, Wrench } from 'lucide-svelte';
+	import { api, formatBytes, post } from '$lib/api';
 	import { LICENCE_LEGAL_NOTICE, LICENCE_STATEMENT, statementMatches } from '$lib/licence';
 	import Switch from '$lib/workspace/Switch.svelte';
 	import { ws, type Setting } from '$lib/workspace/data.svelte';
@@ -245,6 +245,38 @@
 	/** The files behind the settings and the runs, for editing by hand (Advanced). */
 	const CONFIG_FILE = '~/.config/bioinformatics-tools/config.yaml';
 	const WORKFLOW_FILE = '~/bioinformatics-tools/bioinformatics_tools/workflow_tools/margie_sb.smk';
+	/** The two files open for editing (Unlock), for this visit to Settings. */
+	let filesOpen = $state(false);
+	/** The workflow has edits by hand: the copy of MARGIE takes updates again once it is restored. */
+	let workflowEdited = $state(false);
+	/** Which default is about to be put back, once confirmed. */
+	let restoreAsk = $state<'' | 'config' | 'workflow'>('');
+	let restoring = $state(false);
+	async function openFiles() {
+		filesOpen = true;
+		try {
+			workflowEdited = (await api<{ workflow_edited: boolean }>('/settings/advanced')).workflow_edited;
+		} catch {
+			workflowEdited = false;
+		}
+	}
+	async function restoreDefault() {
+		const which = restoreAsk;
+		if (!which) return;
+		restoring = true;
+		try {
+			const d = await post<{ path: string; backup: string | null }>('/settings/restore-default', { which });
+			const kept = d.backup ? `; yours is ${d.backup.split('/').at(-1)}` : '';
+			ui.notify(which === 'config' ? `The default config.yaml is back${kept}` : `MARGIE's workflow is back${kept}`, 'ok');
+			if (which === 'config') await ws.loadSettings();
+			else workflowEdited = false;
+			restoreAsk = '';
+		} catch (e) {
+			ui.notify(e instanceof Error ? e.message : String(e), 'error');
+		} finally {
+			restoring = false;
+		}
+	}
 
 	// ------------------------------------------------ a cluster account without config.yaml
 	let creating = $state(false);
@@ -797,12 +829,40 @@
 			<div class="sb-machine"><span class="sb-here-t">On the HPC{backend.host ? `, ${backend.host}` : ''}</span><span class="sb-fact">Resources are set per job below (SLURM).</span></div>
 		{/if}
 		{#if backend.cluster}
-			<!-- For advanced users: the files behind the settings and the runs, edited by hand. -->
+			<!-- For advanced users: the files behind the settings and the runs, edited by hand once unlocked. -->
 			<div class="sb-places" aria-label="Advanced">
 				<span class="sb-here-t">Advanced</span>
-				<a class="sb-place" href={uiBase.to(`/edit?path=${encodeURIComponent(CONFIG_FILE)}&check=yaml`)} title="Edit {CONFIG_FILE} by hand"><FileCode size={13} />Edit config.yaml</a>
-				<a class="sb-place" href={uiBase.to(`/edit?path=${encodeURIComponent(WORKFLOW_FILE)}`)} title="Edit {WORKFLOW_FILE} by hand"><FileCode size={13} />Edit the workflow (Snakemake)</a>
-				<span class="sb-desc mg-explain">Each save keeps the version it replaces beside it.</span>
+				{#if filesOpen}
+					<a class="sb-place" href={uiBase.to(`/edit?path=${encodeURIComponent(CONFIG_FILE)}&check=yaml`)} title="Edit {CONFIG_FILE} by hand"><FileCode size={13} />Edit config.yaml</a>
+					<a class="sb-place" href={uiBase.to(`/edit?path=${encodeURIComponent(WORKFLOW_FILE)}`)} title="Edit {WORKFLOW_FILE} by hand"><FileCode size={13} />Edit the workflow (Snakemake)</a>
+					<button type="button" class="sb-place" aria-pressed={restoreAsk === 'config'} onclick={() => (restoreAsk = 'config')}><RotateCcw size={13} />Restore the default config.yaml</button>
+					<button type="button" class="sb-place" aria-pressed={restoreAsk === 'workflow'} onclick={() => (restoreAsk = 'workflow')}><RotateCcw size={13} />Restore the default workflow</button>
+					<button type="button" class="mg-link quiet" onclick={() => ((filesOpen = false), (restoreAsk = ''))}><Lock size={13} aria-hidden="true" />Lock</button>
+				{:else}
+					<a class="sb-place" href={uiBase.to(`/view?path=${encodeURIComponent(CONFIG_FILE)}`)} title="Read {CONFIG_FILE}"><FileCode size={13} />View config.yaml</a>
+					<a class="sb-place" href={uiBase.to(`/view?path=${encodeURIComponent(WORKFLOW_FILE)}`)} title="Read {WORKFLOW_FILE}"><FileCode size={13} />View the workflow (Snakemake)</a>
+					<button type="button" class="sb-place" onclick={openFiles}><LockOpen size={13} />Unlock to edit</button>
+				{/if}
+				<p class="sb-adv-note">
+					The buttons and fields below make changes to config.yaml. If you know how to edit Snakemake and config.yaml, unlock the two files to edit them directly here.
+					{#if filesOpen}Each save, and each restore, keeps the file it replaces beside it.{/if}
+				</p>
+				{#if filesOpen && workflowEdited}
+					<p class="sb-adv-note mg-note">The workflow has your edits: your copy of MARGIE takes MARGIE's updates again once the default workflow is restored.</p>
+				{/if}
+				{#if restoreAsk}
+					<div class="sb-confirm sb-adv-ask">
+						<span class="mg-note">
+							{restoreAsk === 'config'
+								? 'Replace config.yaml with the default? Every setting goes back to its default; your file is kept beside it.'
+								: "Put back MARGIE's workflow? Your edited file is kept beside it."}
+						</span>
+						<span class="sb-btns">
+							<button type="button" class="mg-link quiet" disabled={restoring} onclick={restoreDefault}>{restoring ? 'Restoring…' : 'Restore'}</button>
+							<button type="button" class="mg-link quiet" onclick={() => (restoreAsk = '')}>Cancel</button>
+						</span>
+					</div>
+				{/if}
 			</div>
 		{/if}
 		<!-- On the cluster, Files lists these same places. -->
@@ -973,6 +1033,25 @@
 	}
 	.sb-place:hover {
 		border-color: var(--mg-accent);
+	}
+	button.sb-place {
+		background: none;
+		font: inherit;
+		cursor: pointer;
+	}
+	.sb-place[aria-pressed='true'] {
+		border-color: var(--mg-accent);
+		background: color-mix(in srgb, var(--mg-accent) 8%, transparent);
+	}
+	/* Advanced: what the fields change, and how to edit the files themselves. */
+	.sb-adv-note {
+		flex-basis: 100%;
+		margin: 2px 0 0;
+		font-size: var(--mg-fs-xs);
+		color: var(--mg-text-2);
+	}
+	.sb-adv-ask {
+		flex-basis: 100%;
 	}
 	.sb-nav {
 		display: grid;
