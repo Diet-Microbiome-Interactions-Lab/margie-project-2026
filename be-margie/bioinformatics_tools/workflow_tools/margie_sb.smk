@@ -513,9 +513,8 @@ def _phase9_12_targets_for_genome(genome, include_llm=True):
         # Per-organism report figures (default on).
         if rc_bool('run_report_figures', True, config=config):
             targets.append(REPORT_FIGURES_ORGANISM_TOKEN.format(genome=genome))
-        # Interactive genome viewer (default on).
-        if rc_bool('run_genome_viewer', True, config=config):
-            targets.append(GENOME_VIEWER_TOKEN.format(genome=genome))
+        # The interactive genome map, drawn for each scored genome.
+        targets.append(GENOME_VIEWER_TOKEN.format(genome=genome))
         # Full operon atlas (~2-3 min per genome), off by default.
         if rc_bool('run_full_operon_map', _FULL_OPERON_MAP_DEFAULT, config=config):
             targets.append(COMPLETE_OPERON_MAP_TOKEN.format(genome=genome))

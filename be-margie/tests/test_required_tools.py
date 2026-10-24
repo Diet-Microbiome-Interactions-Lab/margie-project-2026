@@ -1,6 +1,6 @@
 """The tools every MARGIE(SB) run needs (workflow_registry.MARGIE_SB_REQUIRED_TOOLS) come with any choice:
-the seven C1 sources, InterPro (labeling's NCBIfam, HAMAP, PIRSF and CDD), dbCAN (a C4 EC source) and
-the operons C2 and C3 read. MEROPS, TCDB and GenProp stay optional."""
+the seven C1 sources, InterPro (labeling's NCBIfam, HAMAP, PIRSF and CDD), dbCAN (a C4 EC source),
+the operons C2 and C3 read, and MARGIE's envelope stage. MEROPS, TCDB and GenProp stay optional."""
 
 from unittest.mock import patch
 
@@ -11,7 +11,7 @@ SSH = "bioinformatics_tools.api.routers.ssh"
 
 
 def test_the_required_set_and_what_stays_optional():
-    assert MARGIE_SB_REQUIRED_TOOLS == {'cog', 'kegg', 'eggnog', 'uniprot', 'pfam', 'tigrfam', 'pgap', 'interpro', 'dbcan', 'operon'}
+    assert MARGIE_SB_REQUIRED_TOOLS == {'cog', 'kegg', 'eggnog', 'uniprot', 'pfam', 'tigrfam', 'pgap', 'interpro', 'dbcan', 'operon', 'envelope'}
     assert not {'merops', 'tcdb', 'geneprop'} & MARGIE_SB_REQUIRED_TOOLS
 
 
@@ -48,3 +48,11 @@ def test_a_commercial_user_without_a_kegg_licence_is_told_so(authed_client):  # 
     resp, runner = _run(authed_client, ["geneprop"], usage="commercial")
     assert resp.status_code == 403 and "kegg" in resp.json()["detail"]
     runner.submit_job.assert_not_called()
+
+
+def test_a_run_without_a_localization_tool_still_runs_the_envelope_stage(authed_client):  # noqa: F811
+    resp, runner = _run(authed_client, ["tcdb"])
+    assert resp.status_code == 200, resp.json()
+    command = runner.submit_job.call_args.kwargs.get("command") or runner.submit_job.call_args.args[1]
+    chosen = command.split("margie_sb.selected_tools:", 1)[1].split()[0].split(",")
+    assert "envelope" in chosen

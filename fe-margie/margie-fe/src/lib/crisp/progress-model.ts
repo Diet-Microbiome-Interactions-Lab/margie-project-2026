@@ -107,7 +107,6 @@ export interface ProgressInput {
    blank, so the whole pipeline stays in view. */
 const FUNCTION = ['kegg', 'cog', 'pfam', 'pgap', 'tigrfam', 'dbcan', 'eggnog', 'merops', 'tcdb', 'uniprot', 'interpro', 'geneprop'];
 const LOCATION = ['tmbed', 'phobius', 'envelope', 'psortb', 'deepsig', 'signalp4', 'signalp6'];
-const GRAM_AFTER = new Set(['psortb', 'deepsig', 'signalp4']);
 const CALLERS = ['rasttk', 'prodigal'];
 /** Parts of the scoring and fingerprint stages, listed as tools: their stage's column stands for them. */
 const PARTS = new Set(['scoring_heuristic', 'fingerprint_database']);
@@ -261,8 +260,8 @@ export function buildProgress(i: ProgressInput): Progress {
 		const c = fromClock(col, genome);
 		if (c) return c;
 		if (now?.genome === genome && now?.tool === col) return { state: 'wait', pct: null, say: 'running now', left: null };
-		const used = col === 'envelope' ? [...planned].some((t) => GRAM_AFTER.has(t)) : planned.has(col);
-		if (!used) return NA(col === 'envelope' ? 'not needed: no tool reads the cell envelope in this run' : 'not chosen for this run');
+		// The envelope stage runs in each run, as MARGIE's own part of the annotation.
+		if (col !== 'envelope' && !planned.has(col)) return NA('not chosen for this run');
 		// Its folder is there but nothing says it finished: under way while the job goes, cut short once it has ended.
 		if (has(col) === 'partial')
 			return run

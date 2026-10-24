@@ -311,15 +311,14 @@ class WorkflowBase(ProgramBase):
             if partition:
                 default_resources.append(f'slurm_partition={partition}')
 
-            # Optional: default runtime and memory
-            if 'default_runtime' in compute_config:
-                runtime_value = compute_config.get('default_runtime')
-                try:
-                    runtime_minutes = int(runtime_value)
-                except (TypeError, ValueError):
-                    runtime_minutes = min_runtime_minutes
-                runtime_minutes = max(min_runtime_minutes, runtime_minutes)
-                default_resources.append(f'runtime={runtime_minutes}')
+            # Default runtime (at least 4 hours) and memory. The runtime carries its unit: Snakemake
+            # reads a bare number on the command line as seconds, so runtime=240 gave 4-minute jobs.
+            try:
+                runtime_minutes = int(compute_config.get('default_runtime', min_runtime_minutes))
+            except (TypeError, ValueError):
+                runtime_minutes = min_runtime_minutes
+            runtime_minutes = max(min_runtime_minutes, runtime_minutes)
+            default_resources.append(f'runtime={runtime_minutes}m')
 
             if 'default_mem_mb' in compute_config:
                 default_resources.append(f'mem_mb={compute_config["default_mem_mb"]}')

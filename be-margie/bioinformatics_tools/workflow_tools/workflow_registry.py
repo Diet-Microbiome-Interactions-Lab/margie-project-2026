@@ -151,7 +151,9 @@ def workflow_path_params(wf_id: str, include_sif: bool = True, include_db_root: 
 # the operons C2 and C3 read. Leaving one out lowers or empties a score, so runs would not compare.
 # MEROPS, TCDB and GenProp stay optional: labeling and C1 do not depend on them.
 MARGIE_SB_REQUIRED_TOOLS = frozenset({
-    'cog', 'kegg', 'eggnog', 'uniprot', 'pfam', 'tigrfam', 'pgap', 'interpro', 'dbcan', 'operon'})
+    'cog', 'kegg', 'eggnog', 'uniprot', 'pfam', 'tigrfam', 'pgap', 'interpro', 'dbcan', 'operon',
+    # MARGIE's own envelope stage: part of the standard annotation, and read by the localization tools.
+    'envelope'})
 
 # 'database': reads a reference database from db.<key>, else <db_root>/<key>.
 MARGIE_SB_PHASED_TOOLS = [
