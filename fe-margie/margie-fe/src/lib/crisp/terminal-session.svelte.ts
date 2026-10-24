@@ -94,6 +94,13 @@ class TerminalSession {
 		this.#sock?.close();
 	}
 
+	/** Types `text` at the prompt without pressing Enter, so it can be finished or changed first. */
+	type(text: string): void {
+		if (this.#sock?.readyState !== WebSocket.OPEN) return;
+		this.#sock.send(JSON.stringify({ type: 'input', data: text }));
+		this.#term?.focus();
+	}
+
 	async #make(): Promise<XTerm> {
 		if (this.#term) return this.#term;
 		this.#starting ??= (async () => {
