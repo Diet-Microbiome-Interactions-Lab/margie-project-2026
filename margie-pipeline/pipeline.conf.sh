@@ -189,12 +189,13 @@ all_dbs=(
 )
 
 # section 6 — optional large AI models (empty skips)
-# A HuggingFace id ("org/name") downloads into $LLM_ROOT/<slot>/ on
-# ./setup.sh --tool llm; an absolute path is used as is.
-: "${LLM_BASE_MODEL:=meta-llama/Meta-Llama-3-8B}"            # foundation model (e.g. meta-llama/Meta-Llama-3-8B)
-: "${LLM_TRAINED_MODEL:=}"         # fine-tuned model
+# The models sit beside the databases: $LLM_ROOT/base-model and $LLM_ROOT/trained-model
+# (Hugging Face format: config.json and its weights). A HuggingFace id ("org/name")
+# downloads into $LLM_ROOT/<slot>/ on ./setup.sh --tool llm; an absolute path is used as is.
+: "${LLM_ROOT:=$DB_ROOT/llm}"      # the models' folder
+: "${LLM_BASE_MODEL:=$LLM_ROOT/base-model}"        # foundation model
+: "${LLM_TRAINED_MODEL:=$LLM_ROOT/trained-model}"  # trained model, used before the base one when it holds a model
 : "${LLM_TRAINED_ADAPTERS:=}"      # LoRA / PEFT adapters
-: "${LLM_ROOT:=$DB_ROOT/llm}"      # local cache folder
 
 # section 7 — per-tool overrides (uncomment only when needed)
 # format: TOOL_<name>_<KEY>=value  (KEY: IMAGE | DB | INPUT | OUTPUT | POSTPROC | THREADS)

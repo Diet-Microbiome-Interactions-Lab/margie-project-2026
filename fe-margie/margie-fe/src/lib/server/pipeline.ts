@@ -170,9 +170,9 @@ export const SETTINGS: SettingDef[] = [
 	{ key: 'MARGIE_DB', label: 'Results cache (SQLite)', group: 'Folders', type: 'path', description: 'One file holding each tool\'s output under the hash of the genome it came from, so the same genome is never computed twice. Copy the file and its cache travels with it.' },
 	{ key: 'PHOBIUS_TARBALL', label: 'Phobius download', group: 'Setup', type: 'path', description: "Phobius cannot be redistributed, so its image builds only from your own copy: the phobius101_linux.tgz you downloaded from phobius.sbc.su.se, or the folder you unpacked it into. Left empty, phobius is skipped." },
 	// The built-in model (not set up yet): where it lives, and which one. Chat with the genome points here.
-	{ key: 'LLM_ROOT', label: 'Model folder', group: 'LLM', type: 'path', description: 'Where the built-in language model is kept (./setup.sh --databases-only --tool llm downloads it here).' },
-	{ key: 'LLM_BASE_MODEL', label: 'Base model', group: 'LLM', type: 'text', description: 'A Hugging Face id (e.g. meta-llama/Meta-Llama-3-8B) or a folder on this computer.' },
-	{ key: 'LLM_TRAINED_MODEL', label: 'Fine-tuned model', group: 'LLM', type: 'text', description: 'Optional: a fine-tuned model, as a Hugging Face id or a folder.' },
+	{ key: 'LLM_ROOT', label: 'Model folder', group: 'LLM', type: 'path', description: 'Where the language models are kept, beside the databases: base-model and trained-model inside it.' },
+	{ key: 'LLM_BASE_MODEL', label: 'Base model', group: 'LLM', type: 'text', description: "The base model's folder (Hugging Face format: config.json and its weights), or a Hugging Face id to download." },
+	{ key: 'LLM_TRAINED_MODEL', label: 'Trained model', group: 'LLM', type: 'text', description: "Your trained model's folder; genome chat uses it before the base model when it holds a model." },
 	{ key: 'LLM_TRAINED_ADAPTERS', label: 'Adapters (LoRA)', group: 'LLM', type: 'text', description: 'Optional: LoRA or PEFT adapters for the model, as a Hugging Face id or a folder.' },
 	{ key: 'INPUT_RASTTK', label: 'Prepared genomes', group: 'Other folders', type: 'path', description: 'Where each run copies the genomes, with genomes.tsv: each genome\'s domain, genetic code and gene caller.' },
 	{ key: 'GENOME_RESULTS_DIR', label: 'Per-genome results', group: 'Other folders', type: 'path', description: "One folder per genome in margie-backend's layout: FINAL table, Excel copy, genome viewer, diagrams. Inside the results folder by default." },

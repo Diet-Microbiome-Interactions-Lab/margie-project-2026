@@ -184,10 +184,28 @@ export function updateSettings(body: Partial<ChatSettings> & { key?: string | nu
 	return publicSettings();
 }
 
-/** Returns the built-in model's LLM settings and whether it is set up. */
+/** Whether a folder holds a Hugging Face model: config.json and its weights. */
+function holdsModel(folder: string): boolean {
+	try {
+		return fs.existsSync(path.join(folder, 'config.json')) && fs.readdirSync(folder).some((n) => /\.(safetensors|bin)$/.test(n));
+	} catch {
+		return false;
+	}
+}
+
+/**
+ * The built-in model on this computer: the trained one when its folder holds a model, else the base one
+ * (Settings → LLM, by default beside the databases). It runs in the LLM container, which is not ready yet.
+ */
 function builtinStatus() {
-	const model = setting('LLM_TRAINED_MODEL') || setting('LLM_BASE_MODEL');
-	return { ready: false, model, note: 'The built-in model is not set up yet. Its location is in Settings (LLM).' };
+	const folders = { trained: setting('LLM_TRAINED_MODEL'), base: setting('LLM_BASE_MODEL') };
+	const which = holdsModel(folders.trained) ? 'trained' : holdsModel(folders.base) ? 'base' : '';
+	const model = which ? folders[which] : '';
+	const where = [folders.trained, folders.base].filter((f) => f.startsWith('/')).join(' or ') || 'the folders in Settings → LLM';
+	const note = model
+		? `Model found (${which}): ${model}. The LLM container is not ready yet, so the built-in model cannot run on this computer.`
+		: `No model found. Put one (Hugging Face format: config.json and its weights) in ${where}, or point Settings → LLM at its folder.`;
+	return { ready: false, model, folders, state: 'off' as const, note };
 }
 
 // ------------------------------------------------------------------ the genome's results, and nothing else
