@@ -38,6 +38,7 @@ from cryptography.hazmat.primitives import hashes
 from cryptography.hazmat.primitives.kdf.hkdf import HKDF
 
 from bioinformatics_tools.utilities import ssh_sftp
+from bioinformatics_tools.api.services import cluster_llm
 
 LOGGER = logging.getLogger(__name__)
 
@@ -249,6 +250,14 @@ def save_key(conn, home: str, provider: str, key: str | None, days: int = KEY_DA
     _write(conn, path, json.dumps(stored, indent=1) + '\n', private=True)
 
 
+def _builtin_status(conn, home: str) -> dict:
+    try:
+        return cluster_llm.status(conn, home)
+    except Exception as e:  # the panel still opens; the built-in choice says why
+        LOGGER.warning('built-in model status failed: %s', e)
+        return {'ready': False, 'model': '', 'state': 'off', 'note': f'Could not check the built-in model: {e}'}
+
+
 def public_settings(conn, home: str) -> dict:
     """What the page may see: the choices, and each key only as its last four characters and expiry."""
     usable, expired = _keys(conn, home)
@@ -260,7 +269,7 @@ def public_settings(conn, home: str) -> dict:
         'expired': expired,
         'keyDays': list(KEY_DAYS),
         'providers': PROVIDERS,
-        'builtin': {'ready': False, 'model': '', 'note': 'The built-in model runs only in the MARGIE app on your own computer.'},
+        'builtin': _builtin_status(conn, home),
     }
 
 
@@ -647,6 +656,56 @@ def ask_openai(kit: Toolkit, s: dict, p: str, key: str, system: str, history: li
     return KEPT_READING
 
 
+# ---------------------------------------------------------------- the built-in model on the cluster
+
+# Words a table search would match everywhere.
+_COMMON = set(
+    'what which where when does this that these those there their with from have about into gene genes genome protein '
+    'proteins annotation annotated tell show list give explain could would should please many much more most than they '
+    'them then also only between other some each'.split())
+
+
+def builtin_evidence(kit: Toolkit, question: str, context: str, searches: int = 4) -> str:
+    """The report-table rows that match the question's terms (gene ids first), read with the kit's budget."""
+    terms: list[str] = []
+    for t in re.findall(r'fig\|[\w.|]+|[A-Za-z][\w.-]{3,}', f'{context} {question}'):
+        if t.lower() not in _COMMON and t.lower() not in (x.lower() for x in terms):
+            terms.append(t)
+    found = [kit.search_table(t, 15) for t in terms[:searches]]
+    return '\n\n'.join(found) or 'Nothing in the report table matched the question.'
+
+
+def ask_builtin(conn, home: str, kit: Toolkit, history: list, asked: dict, s: dict) -> tuple[str, str]:
+    """Asks the user's own model on a GPU node, starting it when it is off; returns (answer, model)."""
+    try:
+        return _ask_builtin(conn, home, kit, history, asked, s)
+    except cluster_llm.LlmError as e:
+        raise ChatError(str(e), e.status)
+
+
+def _ask_builtin(conn, home: str, kit: Toolkit, history: list, asked: dict, s: dict) -> tuple[str, str]:
+    cfg = cluster_llm.read_config(conn, home)
+    st = cluster_llm.status(conn, home, cfg)
+    if not st['ready']:
+        raise ChatError(st['note'], 400)
+    if st['state'] == 'off':
+        job = cluster_llm.start(conn, home, cfg, st['model'])
+        raise ChatError(f'Starting the built-in model on a GPU node (job {job}). Ask again in a few minutes.', 503)
+    if st['state'] == 'starting':
+        raise ChatError(f'{st["note"]} Ask again in a minute or two.', 503)
+    evidence = builtin_evidence(kit, asked['text'], asked.get('context', ''))
+    system = (f'You help a researcher understand the annotation of one prokaryotic genome, "{kit.genome}", produced by MARGIE '
+              '(gene calling, a dozen annotation tools, operons, and confidence tiers highest/high/medium/fair/low). '
+              'Answer only from the evidence given with the question, which MARGIE read from the genome\'s report table, '
+              'and cite its tags such as [E1]. If the evidence does not settle the question, say so and say what would. '
+              'Answer in short Markdown.')
+    past = '\n'.join(f"{'Researcher' if t['role'] == 'user' else 'You'}: {_with_context(t)}" for t in history[-6:])
+    prompt = (f'{"Earlier in this conversation:" + chr(10) + past + chr(10) + chr(10) if past else ""}'
+              f'Evidence:\n{evidence}\n\nQuestion: {_with_context(asked)}')
+    text = cluster_llm.generate(conn, st['host'], st['port'], system, prompt, min(int(s['answerTokens']), 4000))
+    return text or '_No answer came back._', st['model']
+
+
 # ---------------------------------------------------------------- one question
 
 def ask(conn, home: str, genome_in, question: str, context_in, remote: dict | None) -> dict:
@@ -658,13 +717,11 @@ def ask(conn, home: str, genome_in, question: str, context_in, remote: dict | No
         raise ChatError('Ask a question first.', 400)
     s = load_settings(conn, home)
     p = s['provider'] if s.get('provider') in PROVIDERS else 'anthropic'
-    if p == 'builtin':
-        raise ChatError('The built-in model runs only in the MARGIE app on your own computer.', 400)
-    if p not in s.get('consented', []):
+    if p != 'builtin' and p not in s.get('consented', []):
         raise ChatError('Read and accept the data notice for this provider first.', 400)
     usable, expired = _keys(conn, home)
     key = usable.get(p, {}).get('key', '')
-    if not key and p != 'custom':
+    if not key and p not in ('custom', 'builtin'):
         if p in expired:
             raise ChatError(f'Your {PROVIDERS[p]["label"]} key expired and was removed. Paste it again (or a new one) in the chat settings.', 400)
         raise ChatError(f'Add your {PROVIDERS[p]["label"]} API key first.', 400)
@@ -675,9 +732,14 @@ def ask(conn, home: str, genome_in, question: str, context_in, remote: dict | No
     table = kit.src.rel(kit.src.table) if kit.src.table else f'{genome}/scoring/FINAL_ANNOTATION_WITH_CONFIDENCE.tsv (not made yet)'
     system = system_prompt(genome, [kit.src.rel(r) for r in kit.src.roots], table)
     asked = {'role': 'user', 'text': q, 'at': _iso(time.time()), **({'context': context} if context else {})}
-    text = (ask_claude(kit, s, key, system, history, _with_context(asked)) if p == 'anthropic'
-            else ask_openai(kit, s, p, key, system, history, _with_context(asked)))
+    model = s.get('model', '')
+    if p == 'builtin':
+        text, model = ask_builtin(conn, home, kit, history, asked, s)
+    elif p == 'anthropic':
+        text = ask_claude(kit, s, key, system, history, _with_context(asked))
+    else:
+        text = ask_openai(kit, s, p, key, system, history, _with_context(asked))
     answer = {'role': 'assistant', 'text': text, 'at': _iso(time.time()), 'evidence': kit.evidence,
-              'provider': p, 'model': s.get('model', ''), 'read': kit.used}
+              'provider': p, 'model': model, 'read': kit.used}
     _write(conn, _history_file(home, genome), json.dumps([*read_history(conn, home, genome), asked, answer], indent=1) + '\n')
     return answer

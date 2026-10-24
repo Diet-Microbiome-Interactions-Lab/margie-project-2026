@@ -10,6 +10,8 @@
 #SBATCH --output=%x-%j.log
 #
 # The account is your default SLURM account, or SBATCH_ACCOUNT when set.
+# The website's built-in genome chat submits it with -p gpu --gres=gpu:1 -c 10 and --mem at 80% of a
+# GPU node's memory (api/services/cluster_llm.py); the lines above are for submitting it by hand.
 # ---------------------------------------------------------------------------
 # Long-lived inference endpoint for "Chat about the genome".
 #
