@@ -210,6 +210,17 @@ async function dressWindow(target) {
 			.crisp > header.bar :is(a, button, input, select, textarea, label, [role='menu'], [role='menuitem'], .hist, .jumps) {
 				-webkit-app-region: no-drag;
 			}
+			/* A drag region stays draggable under whatever covers it, so a full-screen view, a dialog or a
+			   menu over the header takes its own clicks, and the header is no handle while one is full screen. */
+			:fullscreen, dialog, [role='dialog'], [role='alertdialog'], [aria-modal='true'], [role='menu'], [role='listbox'], [role='tooltip'], [popover] {
+				-webkit-app-region: no-drag;
+			}
+			html:has(:fullscreen) .crisp > header.bar {
+				-webkit-app-region: no-drag;
+			}
+			html:has(:fullscreen) body::before {
+				display: none;
+			}
 			body:not(:has(.crisp > header.bar)) {
 				--mg-titlebar: ${TITLEBAR}px;
 			}
