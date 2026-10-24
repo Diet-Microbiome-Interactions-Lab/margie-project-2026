@@ -2553,6 +2553,38 @@ def _base_output_dir_from(path: str) -> str:
     return re.sub(r'/\d{4}-\d{2}-\d{2}-\d{4}$', '', path)
 
 
+
+# A SLURM job id: a number, or an array task (123_4, 123_[1-5]).
+_SLURM_ID = re.compile(r"^\d+(_(\d+|\[[0-9,\-%]+\]))?$")
+
+
+@router.post("/cancel_slurm_job/{slurm_id}")
+def cancel_slurm_job(slurm_id: str, current_user: dict = Depends(get_current_user)):
+    """Resources → Your jobs: cancels one of the user's SLURM jobs (scancel), asked first on the page.
+
+    A MARGIE run's driver job is cancelled as its run (cancel_job), so the run is recorded as
+    cancelled and its other jobs stop too."""
+    if not _SLURM_ID.match(slurm_id):
+        raise HTTPException(status_code=400, detail="A SLURM job id is a number, or number_task for an array task.")
+    conn = _build_connection(current_user)
+    base = slurm_id.split("_")[0]
+    _, out = _run_remote_check(conn, f"squeue -h -u {shlex.quote(current_user['cluster_username'])} -j {base} -o %i 2>/dev/null")
+    if not out.split():
+        raise HTTPException(status_code=404, detail=f"Job {slurm_id} has left SLURM (it ended), or belongs to another account.")
+    for run_id in job_store.going_for(current_user["user_id"]):
+        try:
+            driver = ssh_slurm.driver_job_id(run_id, connection=conn)
+        except Exception as exc:
+            LOGGER.warning("Could not look up the driver job for %s: %s", run_id, exc)
+            continue
+        if driver == slurm_id:
+            cancel_job(run_id, current_user)
+            read_cache.drop(current_user["user_id"], "cluster", "jobs")
+            return {"cancelled": slurm_id, "run": run_id}
+    ssh_slurm.cancel_slurm_jobs([slurm_id], connection=conn)
+    read_cache.drop(current_user["user_id"], "cluster")
+    return {"cancelled": slurm_id, "run": None}
+
 @router.post("/resume_job/{job_id}")
 def resume_job(job_id: str, current_user: dict = Depends(get_current_user)):
     """Resumes a failed or stale job: copies its work_dir into a new timestamped
