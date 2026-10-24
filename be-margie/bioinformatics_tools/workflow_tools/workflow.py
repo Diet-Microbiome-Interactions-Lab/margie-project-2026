@@ -15,6 +15,8 @@ import uuid
 from datetime import datetime
 from pathlib import Path
 
+import yaml
+
 from bioinformatics_tools.file_classes.base_classes import command
 from bioinformatics_tools.workflow_tools.bapptainer import (
     CacheSifError, cache_sif_files, locate_local_sif_files)
@@ -634,6 +636,34 @@ class WorkflowBase(ProgramBase):
         return [f"{prefix}rasttk/rast.tsv", f"{prefix}rasttk/rast.faa", f"{prefix}rasttk/rast.gff",
                 f"{prefix}rasttk/rasttk_db.tkn"]
 
+    def _margie_sb_dict(self) -> dict:
+        '''The account's margie_sb settings as plain nested dicts, read from the config files
+        themselves (later ones over earlier ones, as caragols loads them), as margie_sb.smk reads
+        them. self.conf, a caragols Condex, splits keys at dots, so margie_sb.genome_info's file
+        names (g1.fna) do not come through it whole: genome_calls found no domain or genetic code
+        there and sent such genomes to Prodigal.'''
+        def merge(into: dict, more: dict) -> None:
+            for k, v in more.items():
+                if isinstance(v, dict) and isinstance(into.get(k), dict):
+                    merge(into[k], v)
+                else:
+                    into[k] = v
+        paths = getattr(self, 'config_paths', None) or []
+        if not paths:
+            # No files to read (a config given as a plain dict): its own margie_sb.
+            node = self.conf.get('margie_sb', {}) if self.conf else {}
+            return node if isinstance(node, dict) else {}
+        settings: dict = {}
+        for path in paths:
+            try:
+                data = yaml.safe_load(Path(path).read_text()) or {}
+            except Exception as exc:
+                LOGGER.warning('Could not read %s for margie_sb settings: %s', path, exc)
+                continue
+            if isinstance(data, dict) and isinstance(data.get('margie_sb'), dict):
+                merge(settings, data['margie_sb'])
+        return settings
+
     def _quast_at_once(self, smk_config: dict) -> int:
         '''How many genomes QUAST checks at a time: margie_sb.quast.at_once from the run or the
         account's config (Settings), else QUAST_AT_ONCE; at least 1.'''
@@ -663,7 +693,7 @@ class WorkflowBase(ProgramBase):
         {genome: rasttk restored}).
         '''
         # As do_margie_sb: a domain or genetic code the config names is the config's.
-        calls = genome_calls(genome_files, {'run_gtdbtk': True, 'margie_sb': self.conf.get('margie_sb', {}) if self.conf else {}})
+        calls = genome_calls(genome_files, {'run_gtdbtk': True, 'margie_sb': self._margie_sb_dict()})
         gtdbtk, rasttk = {}, {}
         for genome, fasta_path in genome_files.items():
             prefix = get_workflow_prefix_for(genome, smk_config)
@@ -1588,7 +1618,7 @@ class WorkflowBase(ProgramBase):
 
         # Prodigal genomes (GTDB-Tk off, no genome_info entry) never touch output_cache.
         _calls = genome_calls(genomes, {'run_gtdbtk': config_overrides.get('run_gtdbtk', True),
-                                        'margie_sb': self.conf.get('margie_sb', {})})
+                                        'margie_sb': self._margie_sb_dict()})
         prodigal_genomes = {g for g, c in _calls.items() if c['gene_caller'] == 'prodigal'}
         if prodigal_genomes:
             LOGGER.info('Prodigal calls the genes of %d genome(s) with no domain or genetic code: %s',
