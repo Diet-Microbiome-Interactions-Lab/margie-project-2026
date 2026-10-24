@@ -157,6 +157,23 @@
 	}
 	/** A tool the website does not offer in a run yet (lib/license NOT_YET), from its settings' keys. */
 	const notYet = (r: Row) => NOT_YET.has([...r.at.values()][0]?.s.key.split('.')[1] ?? '');
+	/** A phase card's number, from its heading ("Phase 14"). */
+	const phaseNum = (r: Row) => Number(r.head.replace(/\D+/g, '')) || 0;
+	/** The phases whose tools the website does not offer in a run yet: every tool in them NOT_YET (from the per-tool settings). */
+	const laterPhases = $derived.by(() => {
+		const all = new Set<number>();
+		const wired = new Set<number>();
+		for (const s of ws.settings) {
+			const p = phaseOf(s);
+			const tool = s.key.split('.')[1] ?? '';
+			if (!p || s.group !== 'Per tool') continue;
+			all.add(p);
+			if (!NOT_YET.has(tool)) wired.add(p);
+		}
+		return new Set([...all].filter((p) => !wired.has(p)));
+	});
+	/** A card the website does not run yet: a tool not offered, or a phase of such tools only. */
+	const later = (id: string, r: Row) => (id === 'per-tool' ? notYet(r) : id === 'phases' && laterPhases.has(phaseNum(r)));
 
 	function table(id: string, items: Setting[]) {
 		const all = chunks(id, items);
@@ -182,8 +199,8 @@
 		}
 		// Per tool: the tools in the order the pipeline runs them, under their phase; the ones not wired yet last.
 		if (id === 'per-tool') rows.sort((a, b) => Number(notYet(a)) - Number(notYet(b)) || (a.phase ?? 99) - (b.phase ?? 99));
-		// Phases in their own order: 1, 2, ... 15.
-		if (id === 'phases') rows.sort((a, b) => Number(a.head.replace(/\D+/g, '')) - Number(b.head.replace(/\D+/g, '')));
+		// Phases in their own order: 1, 2, ... 15; the ones not wired yet last.
+		if (id === 'phases') rows.sort((a, b) => Number(later(id, a)) - Number(later(id, b)) || phaseNum(a) - phaseNum(b));
 		// The columns in the order of the fullest row, then any the others add; a partition first.
 		for (const r of [...rows].sort((a, b) => b.at.size - a.at.size)) for (const k of r.at.keys()) if (!cols.includes(k)) cols.push(k);
 		cols.sort((a, b) => Number(b === 'Partition') - Number(a === 'Partition'));
@@ -693,8 +710,8 @@
 						{/if}
 						{#each t.rows as row, i (row.head)}
 							{@const n = tools ? row.phase : Number(row.head.replace(/\D+/g, '')) || null}
-							{@const later = tools && notYet(row)}
-							{#if later && !(i > 0 && notYet(t.rows[i - 1]))}
+							{@const notWired = later(g.id, row)}
+							{#if notWired && !(i > 0 && later(g.id, t.rows[i - 1]))}
 								<p class="sb-later" role="listitem">Not wired yet: you can ignore these.</p>
 							{/if}
 							<!-- A tool shows the fields it has: no Database or Container where it uses none. -->
@@ -702,7 +719,7 @@
 							{@const key = `${g.id}:${row.head}`}
 							{@const shut = cards && folded.has(key)}
 							{@const changed = shut ? toolChanged(row.at) : ''}
-							<article class="sb-tc" class:shut class:later role="listitem" aria-label={row.head}>
+							<article class="sb-tc" class:shut class:later={notWired} role="listitem" aria-label={row.head}>
 								<header class="sb-tc-head">
 									{#if tools}
 										<button type="button" class="sb-tc-fold" aria-expanded={!shut} title={shut ? `Show the settings for ${row.head}` : `Fold the settings for ${row.head}`} onclick={() => foldCard(key)}>
