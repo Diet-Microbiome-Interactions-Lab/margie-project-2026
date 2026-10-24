@@ -1208,7 +1208,8 @@ def get_config(current_user: dict = Depends(get_current_user)):
         try:
             # Genomes and results folders left empty get their defaults on scratch (user_stores.DEFAULT_FOLDERS),
             # and an empty partition the cluster's default (a cluster may refuse a job without one).
-            if isinstance(config, dict):
+            # A missing config reads as {} and stays missing, so Settings offers the default config.
+            if isinstance(config, dict) and config:
                 changed = user_stores.fill_default_folders(conn, config)
                 changed = user_stores.fill_default_partition(conn, config) or changed
                 if changed:

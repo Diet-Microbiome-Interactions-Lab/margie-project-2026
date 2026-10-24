@@ -99,7 +99,8 @@ const HAND_MADE: Preset[] = [
 		name: 'Modern',
 		note: 'White boxes on cool grey',
 		light: { bg: '#F5F6F8', surface: '#FFFFFF', surface2: '#F4F5F7', border: '#E2E4E8', borderStrong: '#C4C8CE', text: '#15181D', text2: '#454C57', text3: '#646B76' },
-		dark: { bg: '#121418', surface: '#191C22', surface2: '#20242B', border: '#2C3139', borderStrong: '#424955', text: '#ECEEF1', text2: '#B7BDC6', text3: '#959CA7' }
+		// Charcoal at night, lifted off black so boxes, lines and the bars stay readable.
+		dark: { bg: '#1C1F25', surface: '#23272E', surface2: '#2A2F37', border: '#373D47', borderStrong: '#4D5461', text: '#ECEEF1', text2: '#BEC4CD', text3: '#A1A8B2' }
 	},
 	{
 		// Dane's pages as they were: the Skeleton theme's grey cards and colours (AppShell applies them).

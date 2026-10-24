@@ -60,8 +60,8 @@ export function crispVars(p: UiPrefs, dark: boolean): Record<string, string> {
 		'--mg-r-sm': `${Math.max(2, radius(p) - 2)}px`,
 		'--mg-shadow-sm': dark ? '0 1px 2px rgba(0, 0, 0, 0.4)' : '0 1px 2px rgba(16, 24, 40, 0.06)',
 		// The top bar and the sidebar: white over the grey page in the default look; in dark mode
-		// a step below the page, so the boxes are the brightest part and the frame the quietest.
-		'--cr-frame': dark ? `color-mix(in srgb, #000 24%, ${base['--mg-bg']})` : pure ? '#FFFFFF' : 'var(--color-surface-100-900)',
+		// a small step below the page, so the boxes are the brightest part and the frame the quietest.
+		'--cr-frame': dark ? `color-mix(in srgb, #000 10%, ${base['--mg-bg']})` : pure ? '#FFFFFF' : 'var(--color-surface-100-900)',
 		'--cr-frame-edge': dark ? `color-mix(in srgb, ${ink} 8%, transparent)` : pure ? '#E4E7EB' : 'transparent',
 		'--mg-shadow-lg': dark ? '0 8px 24px rgba(0, 0, 0, 0.5)' : '0 8px 24px rgba(16, 24, 40, 0.12)',
 		// Boxes sit just off the page: a hairline and the softest shadow.
