@@ -82,6 +82,8 @@ export interface UiPrefs {
 	/** How much the next run annotates (Custom uses the hand-picked tools), kept across restarts. */
 	toolDepth: 'quick' | 'standard' | 'licensed' | 'custom';
 	toolPick: string[] | null;
+	/** QUAST checks each assembly in the next run: off until switched on (Analyze). */
+	quast: boolean;
 	panels: PanelPref[];
 	/** Which arrangement of the board the saved panels belong to (see BOARD). */
 	board: number;
@@ -171,6 +173,7 @@ export const DEFAULT_PREFS: UiPrefs = {
 	backdrop: 'plain',
 	toolDepth: 'standard',
 	toolPick: null,
+	quast: false,
 	panels: LAYOUTS.default(),
 	board: BOARD,
 	step: 0
@@ -310,6 +313,7 @@ export function sanitizePrefs(raw: unknown, base: UiPrefs = DEFAULT_PREFS): UiPr
 		marks: typeof r.marks === 'boolean' ? r.marks : base.marks,
 		backdrop: oneOf(r.backdrop, ['glow', 'plain'] as const, base.backdrop),
 		toolDepth: oneOf(r.toolDepth, ['quick', 'standard', 'licensed', 'custom'] as const, base.toolDepth),
+		quast: typeof r.quast === 'boolean' ? r.quast : base.quast,
 		toolPick: Array.isArray(r.toolPick)
 			? [...new Set(r.toolPick.filter((t): t is string => typeof t === 'string' && /^[\w.-]{1,40}$/.test(t)))].slice(0, 80)
 			: r.toolPick === null

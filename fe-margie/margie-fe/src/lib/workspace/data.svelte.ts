@@ -247,6 +247,13 @@ class Workspace {
 	set custom(v: string[]) {
 		ui.update({ toolPick: [...v] });
 	}
+	/** QUAST in the next run: its own switch beside the tool depth, off until switched on. */
+	get quast(): boolean {
+		return ui.prefs.quast;
+	}
+	set quast(v: boolean) {
+		ui.update({ quast: v });
+	}
 
 	summaries = $state<Record<string, GenomeSummary>>({});
 
@@ -385,7 +392,9 @@ class Workspace {
 					: this.depth === 'licensed'
 						? [...usable]
 						: this.custom.filter((t) => usable.has(t));
-		return [...new Set([...required, ...pick])];
+		// QUAST comes from its own switch, whatever the depth.
+		const quast = this.quast && usable.has('quast') ? ['quast'] : [];
+		return [...new Set([...required, ...pick.filter((t) => t !== 'quast'), ...quast])];
 	});
 
 	/** Images and databases the chosen depth needs that are not there yet. */

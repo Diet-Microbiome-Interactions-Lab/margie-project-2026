@@ -144,7 +144,7 @@
 			<div class="rs-row">
 				<b>QUAST</b>
 				<span class="mg-grow"></span>
-				{#if quast}<Switch label="Check assembly quality with QUAST" checked={quastOn} onchange={() => toggle('quast')} />{:else}<span class="mg-note">not offered</span>{/if}
+				{#if quast}<Switch label="Check assembly quality with QUAST" checked={quastOn} onchange={() => (ws.quast = !ws.quast)} />{:else}<span class="mg-note">not offered</span>{/if}
 			</div>
 			<p class="mg-note mg-explain">Assembly statistics (contigs, N50, length) for each genome. Optional; nothing later depends on it.</p>
 		</li>

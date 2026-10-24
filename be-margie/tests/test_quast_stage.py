@@ -2,7 +2,8 @@
 it as a Snakemake of its own beside Stage 1 and 2, a few genomes at a time with few cores each
 (Settings: margie_sb.quast.at_once, 3, and margie_sb.quast.threads, 2). Gene calling does not wait
 for it in Stage 1's one-job-at-a-time waves. It runs fresh each run: it measures the assembly
-submitted, which differs between assemblies of a strain."""
+submitted, which differs between assemblies of a strain. It runs only when picked (run_quast,
+off by default)."""
 
 import re
 from pathlib import Path
@@ -32,7 +33,7 @@ def _run(wf, tmp_path, **config):  # noqa: F811
 
 
 def test_quast_runs_on_its_own_three_genomes_at_a_time(wf, tmp_path):  # noqa: F811
-    rec = _run(wf, tmp_path)
+    rec = _run(wf, tmp_path, run_quast=True)
     quast = [c for c in rec['stage1'] if _is_quast(c)]
     waves = [c for c in rec['stage1'] if not _is_quast(c)]
     assert len(quast) == 1 and '--jobs=3' in quast[0]
@@ -41,12 +42,17 @@ def test_quast_runs_on_its_own_three_genomes_at_a_time(wf, tmp_path):  # noqa: F
 
 
 def test_how_many_at_a_time_comes_from_the_settings(wf, tmp_path):  # noqa: F811
-    rec = _run(wf, tmp_path, **{'margie_sb.quast.at_once': 5})
+    rec = _run(wf, tmp_path, run_quast=True, **{'margie_sb.quast.at_once': 5})
     assert '--jobs=5' in next(c for c in rec['stage1'] if _is_quast(c))
 
 
 def test_quast_off_starts_nothing(wf, tmp_path):  # noqa: F811
     rec = _run(wf, tmp_path, run_quast=False)
+    assert not any(_is_quast(c) for c in rec['stage1'])
+
+
+def test_quast_is_off_unless_picked(wf, tmp_path):  # noqa: F811
+    rec = _run(wf, tmp_path)
     assert not any(_is_quast(c) for c in rec['stage1'])
 
 
