@@ -103,9 +103,10 @@ def _dry(tmp_path, files: dict[str, float], targets: list[str], cached: str = ''
         f'input_fasta: {genomes}\noutput_dir: {out}\nmain_database: {tmp_path}/main.db\nrun_quast: false\n'
         f'run_gtdbtk: true\nmargie_sb:\n  stores_root: {tmp_path}/stores\n'
         + ''.join(f'{k}: {v}\n' for k, v in (('cached_gtdbtk', cached), ('cached_rasttk', cached)) if v))
+    # The Snakefile wants the repository's .venv Python unless MARGIE_PYTHON names one.
     r = subprocess.run([sys.executable, '-m', 'snakemake', '-s', str(SMK), '--cores', '1', '--nolock', '-n',
                         '--configfile', str(tmp_path / 'config.yaml'), '--', *[str(out / t) for t in targets]],
-                       capture_output=True, text=True, timeout=300)
+                       capture_output=True, text=True, timeout=300, env={**os.environ, 'MARGIE_PYTHON': sys.executable})
     text = r.stdout + r.stderr
     assert r.returncode == 0, text[-2000:]
     return ([] if 'Nothing to be done' in text else re.findall(r'^rule (\w+):', text, re.M)), text
