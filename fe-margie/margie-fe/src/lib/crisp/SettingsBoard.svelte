@@ -5,7 +5,7 @@
 	import { tick, untrack } from 'svelte';
 	import { beforeNavigate } from '$app/navigation';
 	import { page } from '$app/state';
-	import { Bot, CircleHelp, Cpu, FileCode, Database, Folder, FolderOpen, Folders, HardDrive, Layers, ListChecks, Lock, MemoryStick, RotateCcw, ScrollText, Server, SlidersHorizontal, Wrench } from 'lucide-svelte';
+	import { Bot, ChevronRight, ChevronsDownUp, ChevronsUpDown, CircleHelp, Cpu, FileCode, Database, Folder, FolderOpen, Folders, HardDrive, Layers, ListChecks, Lock, MemoryStick, RotateCcw, ScrollText, Server, SlidersHorizontal, Wrench } from 'lucide-svelte';
 	import { api, formatBytes } from '$lib/api';
 	import { LICENCE_LEGAL_NOTICE, LICENCE_STATEMENT, statementMatches } from '$lib/licence';
 	import Switch from '$lib/workspace/Switch.svelte';
@@ -325,6 +325,52 @@
 		if (added) ui.notify(added.length ? `Accepted: ${added.join(', ')}` : 'Licences saved', 'ok');
 	}
 
+	// ------------------------------------------------ Per tool: each card folds
+	const FOLDED = 'margie.settings.tools.folded';
+	let folded = $state<Set<string>>(
+		(() => {
+			try {
+				return new Set<string>(JSON.parse(localStorage.getItem(FOLDED) ?? '[]'));
+			} catch {
+				return new Set<string>();
+			}
+		})()
+	);
+	function setFolded(next: Set<string>) {
+		folded = next;
+		try {
+			localStorage.setItem(FOLDED, JSON.stringify([...next]));
+		} catch {
+			// not remembered
+		}
+	}
+	function foldTool(head: string) {
+		const next = new Set(folded);
+		if (!next.delete(head)) next.add(head);
+		setFolded(next);
+	}
+	/** A folded tool's settings on one line: "cpu | 8 threads | 4000 MB | 240 min". */
+	function toolLine(at: Map<string, { s: Setting }>): string {
+		const value = (col: string) => {
+			const it = at.get(col);
+			return it ? String(draft[it.s.key] ?? it.s.value) || it.s.default : '';
+		};
+		return [
+			[value('Partition'), ''],
+			[value('Threads'), ' threads'],
+			[value('Memory (MB)'), ' MB'],
+			[value('Time (min)'), ' min']
+		]
+			.filter(([v]) => v)
+			.map(([v, unit]) => v + unit)
+			.join(' | ');
+	}
+	/** Whether any of a tool's settings is changed: not saved yet ('unsaved'), or from the default ('changed'). */
+	function toolChanged(at: Map<string, { s: Setting }>): '' | 'unsaved' | 'changed' {
+		const all = [...at.values()].map((it) => it.s);
+		return all.some(edited) ? 'unsaved' : all.some((x) => x.overridden) ? 'changed' : '';
+	}
+
 	// ------------------------------------------------ going to one setting
 	/** Opens the group holding `id` (a setting, a group or "licences"), scrolls to it and lights it up. */
 	function reveal(id: string) {
@@ -334,6 +380,10 @@
 		const group = real === 'licences' ? 'licences' : (GROUPS.find((g) => g.id === real || ws.settings.some((s) => s.key === real && g.match(s)))?.id ?? '');
 		const wasShut = !!group && !isOpen(group);
 		if (group) openId = group;
+		// A tool's card opens first when it is folded.
+		const one = group === 'per-tool' ? ws.settings.find((x) => x.key === real) : null;
+		const tool = one ? one.label.slice(0, one.label.indexOf(': ')) : '';
+		if (tool && folded.has(tool)) foldTool(tool);
 		const ready = wasShut ? new Promise((r) => setTimeout(r, ui.ms(420) + 40)) : tick();
 		ready.then(() => {
 			const el = document.getElementById(real);
@@ -548,6 +598,12 @@
 			<span class="sb-count">{g.items.length} setting{g.items.length === 1 ? '' : 's'}</span>
 			{#if pending}<span class="sb-pending">{pending} unsaved</span>{/if}
 			<span class="mg-grow"></span>
+			{#if g.id === 'per-tool' && t && t.rows.length}
+				<span class="sb-folds" role="group" aria-label="Tool cards">
+					<button type="button" class="sb-reset" disabled={!folded.size} onclick={() => setFolded(new Set())}><ChevronsUpDown size={12} aria-hidden="true" />Expand all</button>
+					<button type="button" class="sb-reset" disabled={t.rows.every((r) => folded.has(r.head))} onclick={() => setFolded(new Set(t.rows.map((r) => r.head)))}><ChevronsDownUp size={12} aria-hidden="true" />Collapse all</button>
+				</span>
+			{/if}
 			{@render helpButton(g.id)}
 		</header>
 		<div class="sb-body">
@@ -576,17 +632,26 @@
 						{/if}
 						{#each t.rows as row (row.head)}
 							{@const n = tools ? row.phase : Number(row.head.replace(/\D+/g, '')) || null}
-							{@const mine = tools ? [...numbers, ...paths] : t.cols.filter((c) => row.at.has(c))}
-							<article class="sb-tc" role="listitem" aria-label={row.head}>
+							<!-- A tool shows the fields it has: no Database or Container where it uses none. -->
+							{@const mine = tools ? [...numbers, ...paths].filter((c) => row.at.has(c)) : t.cols.filter((c) => row.at.has(c))}
+							{@const shut = tools && folded.has(row.head)}
+							{@const changed = shut ? toolChanged(row.at) : ''}
+							<article class="sb-tc" class:shut role="listitem" aria-label={row.head}>
 								<header class="sb-tc-head">
 									{#if tools}
-										<b>{row.head}</b>
+										<button type="button" class="sb-tc-fold" aria-expanded={!shut} title={shut ? `Show the settings for ${row.head}` : `Fold the settings for ${row.head}`} onclick={() => foldTool(row.head)}>
+											<ChevronRight size={14} aria-hidden="true" /><b>{row.head}</b>
+										</button>
+										{#if changed}<span class="sb-dot" class:sb-unsaved={changed === 'unsaved'} title={changed === 'unsaved' ? 'Changed, not saved yet' : 'Changed from the default'}></span>{/if}
 										<span class="mg-grow"></span>
 										{#if n}<span class="sb-tc-phase" title="Phase {n}"><span class="sb-tc-num">{n}</span>{PHASE_NAMES[n] ?? ''}</span>{/if}
 									{:else}
 										<span class="sb-tc-num">{n ?? '·'}</span><b>{(n && PHASE_NAMES[n]) || row.head}</b>
 									{/if}
 								</header>
+								{#if shut}
+									<p class="sb-tc-line">{toolLine(row.at)}</p>
+								{:else}
 								<div class="sb-tc-fields">
 									{#each mine as col (col)}
 										{@const it = row.at.get(col)}
@@ -595,14 +660,10 @@
 												<span class="sb-tf-lbl"><span>{col}</span>{@render dot(it.s)}<span class="mg-grow"></span>{@render undo(it.s)}</span>
 												<div class="sb-field">{@render control(it.s, true)}</div>
 											</div>
-										{:else}
-											<div class="sb-tf sb-tf-none" class:path={paths.has(col)} aria-label="{col}: not used by {row.head}">
-												<span class="sb-tf-lbl"><span>{col}</span></span>
-												<span class="sb-tf-dash" aria-hidden="true">not used</span>
-											</div>
 										{/if}
 									{/each}
 								</div>
+								{/if}
 							</article>
 						{/each}
 					</div>
@@ -1441,6 +1502,52 @@
 		font-size: var(--mg-fs-sm);
 		font-weight: 650;
 	}
+	/* A tool's name folds its card; folded, the card is its head and one line. */
+	.sb-tc-fold {
+		display: inline-flex;
+		align-items: center;
+		gap: 6px;
+		min-width: 0;
+		padding: 0;
+		border: none;
+		background: none;
+		color: inherit;
+		font: inherit;
+		cursor: pointer;
+	}
+	.sb-tc-fold :global(svg) {
+		flex: none;
+		color: var(--mg-text-3);
+		transition: transform 160ms ease;
+	}
+	.sb-tc-fold[aria-expanded='true'] :global(svg) {
+		transform: rotate(90deg);
+	}
+	.sb-tc-fold:hover b {
+		color: var(--mg-accent-ink, var(--mg-accent));
+	}
+	.sb-tc.shut {
+		align-self: start;
+		gap: 6px;
+	}
+	.sb-tc-line {
+		margin: 0;
+		padding-left: 20px;
+		overflow: hidden;
+		font-size: var(--mg-fs-xs);
+		font-variant-numeric: tabular-nums;
+		color: var(--mg-text-2);
+		white-space: nowrap;
+		text-overflow: ellipsis;
+	}
+	.sb-folds {
+		display: inline-flex;
+		gap: 6px;
+	}
+	.sb-folds .sb-reset:disabled {
+		opacity: 0.45;
+		cursor: default;
+	}
 	/* A phase's few fields side by side; a tool's one under another, each name at the left of
 	   its box and every name one width, so the boxes line up in every card. */
 	.sb-tc-fields {
@@ -1463,7 +1570,7 @@
 	}
 	.tools .sb-tf {
 		display: grid;
-		grid-template-columns: var(--tf-name, 118px) minmax(0, 1fr);
+		grid-template-columns: var(--tf-name, 136px) minmax(0, 1fr);
 		align-items: center;
 		column-gap: 10px;
 	}
@@ -1523,16 +1630,6 @@
 	/* The field's name carries the unit ("Memory (MB)"). */
 	.sb-tf .sb-unit {
 		display: none;
-	}
-	.sb-tf-none .sb-tf-dash {
-		display: flex;
-		align-items: center;
-		height: var(--mg-ctl-sm, 30px);
-		padding: 0 10px;
-		border: 1px dashed var(--mg-border);
-		border-radius: var(--mg-r-sm);
-		font-size: var(--mg-fs-xs);
-		color: var(--mg-text-3);
 	}
 	.sb-path-area {
 		display: block;

@@ -783,7 +783,8 @@ const FIELD: Record<string, string> = {
 	runtime: 'time (min)',
 	partition: 'partition',
 	db: 'database',
-	sif: 'container'
+	sif: 'container',
+	at_once: 'genomes at once'
 };
 const DEFAULTS: Record<string, string> = {
 	default_threads: 'Threads per tool',
