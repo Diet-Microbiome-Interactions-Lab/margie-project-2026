@@ -384,6 +384,14 @@
 	border-color: var(--mg-accent);
 	box-shadow: 0 0 0 2px color-mix(in srgb, var(--mg-accent) 18%, transparent);
 }
+.crisp .mg-input:-webkit-autofill {
+	box-shadow: 0 0 0 1000px var(--mg-surface) inset;
+}
+.crisp .mg-input:-webkit-autofill:focus {
+	box-shadow:
+		0 0 0 1000px var(--mg-surface) inset,
+		0 0 0 2px color-mix(in srgb, var(--mg-accent) 18%, transparent);
+}
 .crisp :is(.mg-input, .mg-select):disabled {
 	opacity: 0.55;
 	cursor: not-allowed;

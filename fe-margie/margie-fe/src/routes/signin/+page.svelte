@@ -1,6 +1,6 @@
 <script lang="ts">
 	/**
-	 * Sign-in for the hosted site (lib/hosted.ts): MARGIE's own look, one card.
+	 * Sign-in for the hosted site (lib/hosted.ts): MARGIE's own look and colours in each browser, one card.
 	 * Signs in to the cluster API, or creates an account there with the cluster
 	 * login and SSH key the API will use; then opens the interface. People outside
 	 * Purdue (reviewers, collaborators) ask for an account by email instead. MARGIE's logo
@@ -27,7 +27,7 @@
 	import { crispVars } from '$lib/crisp/theme';
 	import { isLoggedIn, setToken } from '$lib/auth';
 	import { getApiUrl } from '$lib/config';
-	import { styleString } from '$lib/workspace/prefs';
+	import { DEFAULT_PREFS, sanitizePrefs, styleString } from '$lib/workspace/prefs';
 	import { ui } from '$lib/workspace/ui.svelte';
 
 	let mode = $state<'signin' | 'create' | 'request'>('signin');
@@ -148,7 +148,15 @@
 	const canRequest = $derived(!!req.name.trim() && !!req.institution.trim() && /\S+@\S+\.\S+/.test(req.email.trim()) && !!req.purpose.trim());
 
 	const canSubmit = $derived(!!username && !!password && (mode === 'signin' || (!!clusterHost.trim() && !!clusterUser.trim() && !!privateKey.trim())));
-	const vars = $derived(styleString(crispVars(ui.prefs, ui.dark)) + '; --cr-page: var(--mg-accent); ' + ui.motionStyle);
+	/** MARGIE's own colours, the same in each browser; light or dark, text and the reading aids as chosen. */
+	const look = $derived(
+		sanitizePrefs({
+			...DEFAULT_PREFS,
+			interface: 'crisp',
+			...Object.fromEntries((['theme', 'textSize', 'textScale', 'fieldScale', 'typeface', 'monoface', 'contrast', 'vision'] as const).map((k) => [k, ui.prefs[k]]))
+		})
+	);
+	const vars = $derived(styleString(crispVars(look, ui.dark)) + '; --cr-page: var(--mg-accent); ' + ui.motionStyle);
 </script>
 
 <svelte:head><title>Sign in | MARGIE</title></svelte:head>
@@ -164,7 +172,7 @@
 	<header class="bar">
 		<span class="brand"><CrispMark size={22} /><span class="word">MARGIE</span><span class="platform">Bioinformatics Supercomputing Platform</span></span>
 		<span class="grow"></span>
-		<Corner base="crisp" account={false}>
+		<Corner base="crisp" colours={false} account={false}>
 			{#snippet customize()}
 				<SizeSliders />
 			{/snippet}

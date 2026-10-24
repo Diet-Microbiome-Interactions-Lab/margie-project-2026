@@ -81,6 +81,9 @@ def init_db() -> None:
         # Emails about the user's runs (services/run_mail.py), on unless turned off on the profile.
         if 'notify_runs' not in _user_cols:
             conn.execute("ALTER TABLE users ADD COLUMN notify_runs INTEGER NOT NULL DEFAULT 1")
+        # The website's look kept with the account (JSON: prefs and default), so each browser shows the same.
+        if 'ui_look' not in _user_cols:
+            conn.execute("ALTER TABLE users ADD COLUMN ui_look TEXT NOT NULL DEFAULT ''")
         # Adds columns older tables lack; SQLite has no ADD COLUMN IF NOT EXISTS.
         _existing = {row[1] for row in conn.execute("PRAGMA table_info(license_acceptances)")}
         for _col in ("usage_type", "licensed_tools"):

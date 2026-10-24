@@ -1,9 +1,12 @@
 /**
  * Workspace state: saved preferences (theme, layout, mode) plus unsaved UI state
  * (arrange mode, Customize drawer, notices). Preferences are debounced into
- * localStorage and the local server's file (lib/server/ui.ts).
+ * localStorage and the local server's file (lib/server/ui.ts); on the website, into
+ * the account (LOOK_API), so each browser signed in to it shows the same look.
  */
 
+import { authHeaders, getToken } from '$lib/auth';
+import { getApiUrl } from '$lib/config';
 import { HOSTED } from '$lib/hosted';
 import {
 	LAYOUTS,
@@ -19,15 +22,29 @@ import {
 	type UiPrefs
 } from './prefs';
 
-const PREFS_KEY = 'margie.ui.prefs';
+/**
+ * Browser storage. The website's copy of the account's look has names of its own, so a look
+ * kept in one browser before the account kept it is left behind.
+ */
+const PREFS_KEY = HOSTED ? 'margie.ui.account-prefs' : 'margie.ui.prefs';
 /** The default look, also kept here for when there is no local server. */
-const DEFAULT_KEY = 'margie.ui.default';
+const DEFAULT_KEY = HOSTED ? 'margie.ui.account-default' : 'margie.ui.default';
 /** Local server route that keeps both on disk (lib/server/ui.ts). */
 const UI_API = '/api/local/ui';
 /** Hosted: no server file, so browser storage is the only copy (see lib/hosted.ts). */
 const NO_SERVER = HOSTED;
 /** Set once the server's copy has been read in this window. */
 let fromServer = false;
+/** Website: the look kept with the account (routers/auth.py), read once per window. */
+const LOOK_API = '/v1/auth/look';
+let fromAccount = false;
+
+/** Reads the account's look (no body) or saves parts of it; null while nobody is signed in to the website. */
+function accountLook(body?: unknown): Promise<Response> | null {
+	if (!HOSTED || !getToken()) return null;
+	const url = `${getApiUrl()}${LOOK_API}`;
+	return body === undefined ? fetch(url, { headers: authHeaders() }) : fetch(url, { method: 'PUT', headers: authHeaders(), body: JSON.stringify(body) });
+}
 
 /** Interface the app opens with until one is picked in Customize (prefs.ts holds the pipeline GUI's). */
 const FIRST_INTERFACE: UiPrefs['interface'] = 'crisp';
@@ -96,6 +113,12 @@ class Ui {
 		} catch {
 			// Storage blocked: the server file still keeps them.
 		}
+		if (NO_SERVER) {
+			await accountLook({ prefs: $state.snapshot(this.prefs) })?.catch(() => {
+				// Unreachable: this browser's copy stands, and the next change tries again.
+			});
+			return;
+		}
 		try {
 			await fetch(UI_API, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ prefs: $state.snapshot(this.prefs) }) });
 		} catch {
@@ -105,7 +128,7 @@ class Ui {
 
 	/**
 	 * Restores saved preferences under the default look: browser storage first,
-	 * then, once per window, the copy on disk.
+	 * then, once per window, the copy on disk (on the website, the account's).
 	 */
 	restore() {
 		try {
@@ -119,7 +142,8 @@ class Ui {
 		} catch {
 			// Unreadable: the defaults stand.
 		}
-		if (fromServer || NO_SERVER) return;
+		if (NO_SERVER) return this.#fromAccount();
+		if (fromServer) return;
 		fromServer = true;
 		fetch(UI_API)
 			.then((r) => (r.ok ? r.json() : null))
@@ -135,6 +159,40 @@ class Ui {
 			})
 			.catch(() => {
 				// No local server: browser storage stands.
+			});
+	}
+
+	/**
+	 * Website, signed in: the look kept with the account, once per window. Before one is kept,
+	 * this browser's look (MARGIE's own, unless changed since) becomes the account's.
+	 */
+	#fromAccount() {
+		if (fromAccount) return;
+		const asked = accountLook();
+		if (!asked) return;
+		fromAccount = true;
+		asked
+			.then((r) => (r.ok ? r.json() : null))
+			.then((d: { prefs?: Partial<UiPrefs>; default?: Partial<UiPrefs> } | null) => {
+				if (!d) return;
+				if (!d.prefs) {
+					accountLook({ prefs: $state.snapshot(this.prefs) })?.catch(() => {
+						// Unreachable: the next change keeps it.
+					});
+					return;
+				}
+				const look = lookOf(d.default ?? {});
+				this.hasDefault = Object.keys(look).length > 0;
+				this.init({ interface: FIRST_INTERFACE, ...d.prefs, ...look } as UiPrefs);
+				try {
+					localStorage.setItem(PREFS_KEY, JSON.stringify(this.prefs));
+					localStorage.setItem(DEFAULT_KEY, JSON.stringify(look));
+				} catch {
+					// Storage blocked: the account keeps it.
+				}
+			})
+			.catch(() => {
+				// Unreachable: this browser's copy stands.
 			});
 	}
 
@@ -165,6 +223,8 @@ class Ui {
 		} catch {
 			// The file below keeps it instead.
 		}
+		const toAccount = accountLook({ default: look });
+		if (toAccount) kept = (await toAccount.then((r) => r.ok).catch(() => false)) || kept;
 		try {
 			if (NO_SERVER) throw new Error('no server');
 			const r = await fetch(`${UI_API}/default`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ prefs: look }) });
