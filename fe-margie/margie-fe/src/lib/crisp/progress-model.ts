@@ -191,6 +191,12 @@ export function buildProgress(i: ProgressInput): Progress {
 		return { state: 'wait', pct: null, say: 'running now', left: null };
 	};
 
+	/** Done when the cache report says the step's whole output was restored or kept: it is in place before the run goes on. */
+	const inPlace = (col: string, genome: string): Cell | null => {
+		const s = sourceOf.get(`${col}\t${genome}`)?.source;
+		return s === 'restored' || s === 'kept' ? done() : null;
+	};
+
 	/** A cell: its state, how far it is (0-100; null when that cannot be told), and a line for its tooltip. */
 	function cell(col: string, genome: string): Cell {
 		const r = results.get(genome);
@@ -201,6 +207,8 @@ export function buildProgress(i: ProgressInput): Progress {
 				return has(col) === 'done' ? done() : NA(col === 'quast' ? 'not part of the pipeline on this computer' : 'not part of the pipeline yet');
 			case 'gtdbtk': {
 				if (has('gtdbtk') === 'done') return done();
+				const kept = inPlace('gtdbtk', genome);
+				if (kept) return kept;
 				const c = fromClock('gtdbtk', genome);
 				if (c) return c;
 				if (i.setting('RUN_GTDBTK') !== '1') return NA('switched off in Settings');
@@ -209,6 +217,8 @@ export function buildProgress(i: ProgressInput): Progress {
 			}
 			case 'genes': {
 				for (const t of CALLERS) if (has(t) === 'done') return done(`done, 100% (${t === 'rasttk' ? 'RASTtk' : 'Prodigal'})`);
+				const kept = inPlace('genes', genome);
+				if (kept) return kept;
 				for (const t of CALLERS) {
 					const c = fromClock(t, genome);
 					if (c) return { ...c, say: `${t === 'rasttk' ? 'RASTtk' : 'Prodigal'}: ${c.say}` };
@@ -221,6 +231,8 @@ export function buildProgress(i: ProgressInput): Progress {
 				return fromLog('figures', genome)?.state === 'wait' ? { state: 'wait', pct: null, say: 'being written', left: null } : none(col);
 		}
 		if ((RESULT_STAGES as readonly string[]).includes(col) || (COMPARE_TOOLS as readonly string[]).includes(col)) {
+			const kept = inPlace(col, genome);
+			if (kept) return kept;
 			const l = fromLog(col, genome) ?? fromClock(col, genome);
 			// Not in the log but the report is there: done before (a cache hands it back without running it).
 			if (l && !(l.state === 'na' && r?.final?.table)) return l;
@@ -229,12 +241,18 @@ export function buildProgress(i: ProgressInput): Progress {
 		}
 		// An annotation tool, the operon finder or the envelope stage.
 		if (has(col) === 'done') return done();
+		const kept = inPlace(col, genome);
+		if (kept) return kept;
 		const c = fromClock(col, genome);
 		if (c) return c;
 		if (now?.genome === genome && now?.tool === col) return { state: 'wait', pct: null, say: 'running now', left: null };
 		const used = col === 'envelope' ? [...planned].some((t) => GRAM_AFTER.has(t)) : planned.has(col);
 		if (!used) return NA(col === 'envelope' ? 'not needed: no tool reads the cell envelope in this run' : 'not chosen for this run');
-		if (has(col) === 'partial') return { state: 'partial', pct: 0, say: 'started before, not finished', left: run ? (usualOf(col) ?? null) : 0 };
+		// Its folder is there but nothing says it finished: under way while the job goes, cut short once it has ended.
+		if (has(col) === 'partial')
+			return run
+				? { state: 'wait', pct: null, say: 'started, not finished yet', left: usualOf(col) ?? null }
+				: { state: 'partial', pct: 0, say: 'started before, not finished', left: 0 };
 		return none(col);
 	}
 
