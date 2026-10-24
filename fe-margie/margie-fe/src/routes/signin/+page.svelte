@@ -17,7 +17,7 @@
 	import '$lib/crisp/crisp.css';
 	import { onMount } from 'svelte';
 	import { fade, slide } from 'svelte/transition';
-	import { ChevronRight, CircleAlert, Copy, KeyRound, LoaderCircle, Mail, Server } from 'lucide-svelte';
+	import { Check, ChevronRight, CircleAlert, Copy, KeyRound, LoaderCircle, Mail, Server } from 'lucide-svelte';
 	import CrispMark from '$lib/crisp/CrispMark.svelte';
 	import Corner from '$lib/workspace/Corner.svelte';
 	import GenomePuzzle from '$lib/workspace/GenomePuzzle.svelte';
@@ -116,9 +116,16 @@
 		installWin: `type $env:USERPROFILE\\.ssh\\margie_ed25519.pub | ssh ${who}@${host} "mkdir -p ~/.ssh && cat >> ~/.ssh/authorized_keys"`,
 		show: 'cat ~/.ssh/margie_ed25519'
 	});
+	/** The text just copied: its button shows a tick and Copied for a moment, once the copy worked. */
+	let copied = $state('');
+	let copiedTimer: ReturnType<typeof setTimeout> | undefined;
 	function copy(text: string) {
 		navigator.clipboard?.writeText(text).then(
-			() => ui.notify('Copied', 'ok'),
+			() => {
+				copied = text;
+				clearTimeout(copiedTimer);
+				copiedTimer = setTimeout(() => (copied = ''), 1800);
+			},
 			() => {}
 		);
 	}
@@ -145,6 +152,13 @@
 </script>
 
 <svelte:head><title>Sign in | MARGIE</title></svelte:head>
+
+{#snippet copyButton(text: string, label: string)}
+	<button type="button" class="mg-icon-btn" aria-label={label} onclick={() => copy(text)}>
+		{#if copied === text}<Check size={14} />{:else}<Copy size={14} />{/if}
+	</button>
+	{#if copied === text}<span class="copied" role="status" transition:fade={{ duration: ui.ms(120) }}>Copied</span>{/if}
+{/snippet}
 
 <div class="crisp signin" data-mg-root data-theme={ui.dark ? 'dark' : 'light'} data-motion={ui.motion} style={vars}>
 	<header class="bar">
@@ -211,10 +225,7 @@
 								</div>
 								<address class="contact">
 									<span class="contact-head">Contact</span>
-									<span>{LAB.pi}, PhD</span>
-									<span>{LAB.name}</span>
-									<span>Purdue University</span>
-									<span class="addr"><a class="mg-link" href="mailto:{CONTACT}">{CONTACT}</a><button type="button" class="mg-icon-btn" aria-label="Copy the address" onclick={() => copy(CONTACT)}><Copy size={14} /></button></span>
+									<span class="addr"><a class="mg-link" href="mailto:{CONTACT}">{CONTACT}</a>{@render copyButton(CONTACT, 'Copy the address')}</span>
 								</address>
 								<div class="fields">
 									<label class="field">
@@ -280,17 +291,17 @@
 												<ol class="kh-steps">
 													<li>
 														<span>Make a key just for MARGIE</span>
-														<span class="kh-cmd"><code>{keyCmds.make}</code><button type="button" class="mg-icon-btn" aria-label="Copy" onclick={() => copy(keyCmds.make)}><Copy size={14} /></button></span>
+														<span class="kh-cmd"><code>{keyCmds.make}</code>{@render copyButton(keyCmds.make, 'Copy the command')}</span>
 													</li>
 													<li>
 														<span>Put its public half on the cluster (asks for your cluster password, and Duo, once)</span>
-														<span class="kh-cmd"><code>{keyCmds.install}</code><button type="button" class="mg-icon-btn" aria-label="Copy" onclick={() => copy(keyCmds.install)}><Copy size={14} /></button></span>
+														<span class="kh-cmd"><code>{keyCmds.install}</code>{@render copyButton(keyCmds.install, 'Copy the command')}</span>
 														<span class="hint">Windows PowerShell has no ssh-copy-id; use this instead:</span>
-														<span class="kh-cmd"><code>{keyCmds.installWin}</code><button type="button" class="mg-icon-btn" aria-label="Copy" onclick={() => copy(keyCmds.installWin)}><Copy size={14} /></button></span>
+														<span class="kh-cmd"><code>{keyCmds.installWin}</code>{@render copyButton(keyCmds.installWin, 'Copy the command')}</span>
 													</li>
 													<li>
 														<span>Show the private key and paste all of it, from BEGIN to END, into the box above</span>
-														<span class="kh-cmd"><code>{keyCmds.show}</code><button type="button" class="mg-icon-btn" aria-label="Copy" onclick={() => copy(keyCmds.show)}><Copy size={14} /></button></span>
+														<span class="kh-cmd"><code>{keyCmds.show}</code>{@render copyButton(keyCmds.show, 'Copy the command')}</span>
 													</li>
 												</ol>
 												<p class="hint">To take MARGIE's access away later, delete the line ending in <code>margie_ed25519</code> from <code>~/.ssh/authorized_keys</code> on the cluster.</p>
@@ -572,11 +583,12 @@
 	.request p {
 		margin: 0;
 	}
-	/* Who to write to, as a letter's address block. */
+	/* Who to write to: the address, with a copy button. */
 	.contact {
 		display: flex;
-		flex-direction: column;
-		gap: 2px;
+		flex-wrap: wrap;
+		align-items: center;
+		gap: 4px 12px;
 		padding: 10px 14px;
 		border: 1px solid var(--mg-border);
 		border-radius: var(--mg-r-sm);
@@ -586,9 +598,14 @@
 		color: var(--mg-text-2);
 	}
 	.contact-head {
-		margin-bottom: 2px;
 		font-weight: 600;
 		color: var(--mg-text);
+	}
+	.copied {
+		font-size: var(--cr-fs-micro);
+		font-weight: 600;
+		color: var(--mg-ok);
+		white-space: nowrap;
 	}
 	.addr {
 		display: inline-flex;
