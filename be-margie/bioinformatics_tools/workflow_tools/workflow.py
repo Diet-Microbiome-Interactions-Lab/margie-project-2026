@@ -936,6 +936,8 @@ class WorkflowBase(ProgramBase):
         pending = set(genome_files.keys())
         queue: list[str] = []
         skipped: list[str] = []
+        # Genomes whose Stage 2 failed; the queue goes on with the others.
+        failed: list[str] = []
         processed = 0
         last_proc = None
         progress_memo: dict[str, tuple[int, int]] = {}  # genome -> completeness, for most-complete-first ordering
@@ -1150,8 +1152,7 @@ class WorkflowBase(ProgramBase):
 
             if proc is None or proc.returncode != 0:
                 rc = proc.returncode if proc else None
-                LOGGER.error('Stage 2 (phase4-10) failed for genome "%s" (rc=%s) -- halting the sequential queue; '
-                             'later genomes (even ones already RASTtk-ready) will not be processed this run.',
+                LOGGER.error('Stage 2 (phase4-10) failed for genome "%s" (rc=%s); going on with the next genome.',
                              genome, rc)
                 result = (self._build_result(key_name, proc) if proc else
                           {'workflow': key_name, 'returncode': rc, 'rules_summary': {}, 'stdout_tail': '', 'stderr_tail': ''})
@@ -1161,8 +1162,8 @@ class WorkflowBase(ProgramBase):
                 if db_path:
                     log_workflow_run(db_path, run_id, genome_files[genome], key_name,
                                      result['rules_summary'].get('completed', 0), status='failed')
-                self.failed(msg=f'Workflow "{key_name}" failed on genome "{genome}" (phase4-10)', dex=result)
-                return rc or 1
+                failed.append(genome)
+                continue
 
             if db_path:
                 tools_to_store = {tool: paths for tool, paths in genome_cache_map.items()
@@ -1203,10 +1204,14 @@ class WorkflowBase(ProgramBase):
 
         if skipped:
             LOGGER.warning('%d genome(s) skipped (RASTtk/GTDB-Tk did not finish): %s', len(skipped), sorted(skipped))
+        if failed:
+            LOGGER.warning('%d genome(s) failed in Stage 2 (phase4-10): %s', len(failed), sorted(failed))
+        # The finalize steps below wait for a run with no gaps, as before.
+        gaps = bool(skipped or failed)
 
         run_scoring_enabled = smk_config.get('run_scoring', True) not in (False, 'false', '0', 'no')
         queue_sqlite_backup_enabled = smk_config.get('run_sqlite_snapshot_queue', True) not in (False, 'false', '0', 'no')
-        if run_scoring_enabled and queue_sqlite_backup_enabled and processed > 0 and not skipped:
+        if run_scoring_enabled and queue_sqlite_backup_enabled and processed > 0 and not gaps:
             LOGGER.info('=== FINALIZE: queue background sqlite snapshot backup ===')
             finalize_command = self.build_executable(
                 selected_wf,
@@ -1228,7 +1233,7 @@ class WorkflowBase(ProgramBase):
 
         # Pangenome report figures in an isolated subprocess; a failure only warns.
         report_figures_enabled = smk_config.get('run_report_figures', True) not in (False, 'false', '0', 'no')
-        if run_scoring_enabled and report_figures_enabled and processed > 0 and not skipped:
+        if run_scoring_enabled and report_figures_enabled and processed > 0 and not gaps:
             LOGGER.info('=== FINALIZE: generate pangenome report figures ===')
             figures_command = self.build_executable(
                 selected_wf,
@@ -1251,7 +1256,7 @@ class WorkflowBase(ProgramBase):
         # FINALIZE: reorganises organism folders outside the DAG; a failure only warns.
         reorganize_enabled = smk_config.get('run_reorganize_outputs', True) not in (False, 'false', '0', 'no')
         output_dir = (smk_config.get('output_dir') or self.conf.get('output_dir', '') or '').rstrip('/')
-        if run_scoring_enabled and reorganize_enabled and processed > 0 and not skipped and output_dir:
+        if run_scoring_enabled and reorganize_enabled and processed > 0 and not gaps and output_dir:
             LOGGER.info('=== FINALIZE: reorganize per-organism output folders ===')
             reorg_script = str(WORKFLOW_DIR / 'reorganize_outputs.py')
             excel_script = str(WORKFLOW_DIR / 'fingerprint' / 'make-final-excel.py')
@@ -1282,15 +1287,19 @@ class WorkflowBase(ProgramBase):
         result = self._build_result(key_name, last_proc) if last_proc else {'workflow': key_name, 'rules_summary': {}}
         stage1_rc = stage1.poll()
         result['stage1_returncode'] = stage1_rc
+        done = processed - len(failed)
+        failed_names = ', '.join(sorted(failed))
         result['genomes_total'] = total
-        result['genomes_processed'] = processed
+        result['genomes_processed'] = done
         result['genomes_skipped'] = sorted(skipped)
+        result['genomes_failed'] = sorted(failed)
 
-        summary = (f'{processed}/{total} genome(s) processed'
+        summary = (f'{done}/{total} genome(s) processed'
+                   f'{f", {len(failed)} failed ({failed_names})" if failed else ""}'
                    f'{f", {len(skipped)} skipped" if skipped else ""}')
 
         # No output: reported as a failure, since the GUI decides by exit code.
-        if total > 0 and processed == 0:
+        if total > 0 and done == 0:
             self.failed(
                 msg=f'Workflow "{key_name}" produced nothing ({summary})'
                     f'{f" -- Stage 1 (rasttk_all) exited rc={stage1_rc}" if stage1_rc else ""}',
@@ -1299,7 +1308,7 @@ class WorkflowBase(ProgramBase):
             return stage1_rc or 1
 
         # Partial run: outputs stand, but reported as inconclusive (exit 0, no banner).
-        if skipped or stage1_rc:
+        if gaps or stage1_rc:
             self.finished(
                 msg=f'Workflow "{key_name}" completed with gaps ({summary})'
                     f'{f" -- Stage 1 (rasttk_all) exited rc={stage1_rc}" if stage1_rc else ""}',
@@ -1681,6 +1690,8 @@ class WorkflowBase(ProgramBase):
         max_parallel_tools = self.conf.get('margie_sb', {}).get('phase4', {}).get('max_parallel_tools', 4)
         extra_resources = {
             'margie_sb_phase4_slot': max_parallel_tools,
+            # One database load at a time (margie_sb.smk, LOAD_RUNTIME).
+            'margie_sb_db_writer': 1,
         }
 
         # Set by resume_job's relaunch; mtime-only triggers treat copied outputs as done.
