@@ -10,7 +10,7 @@
 	import { cubicOut } from 'svelte/easing';
 	import { fade, fly } from 'svelte/transition';
 	import { page } from '$app/state';
-	import { BookOpen, ChartPie, Check, Eye, FlaskConical, FolderOpen, Gauge, HeartHandshake, House, ListChecks, LogOut, Menu, Monitor, MonitorDown, Moon, Package, Palette, Play, SlidersHorizontal, SquareTerminal, Sun, UserRound, Users, X } from 'lucide-svelte';
+	import { BookOpen, ChartPie, Check, Eye, FlaskConical, FolderOpen, Gauge, HeartHandshake, House, ListChecks, LogOut, Menu, Monitor, MonitorDown, Moon, Package, Palette, Play, RotateCcw, SlidersHorizontal, SquareTerminal, Sun, UserRound, Users, X } from 'lucide-svelte';
 	import { DESKTOP_URL } from './about';
 	import { AppBar } from '@skeletonlabs/skeleton-svelte';
 	import avatar from '$lib/assets/neuromancer.jpg';
@@ -316,6 +316,15 @@
 									open('colours');
 								}}><SlidersHorizontal size={14} /> More colours, type and layout</button
 							>
+							<button
+								type="button"
+								class="mg-theme-reset"
+								title="Back to MARGIE's recommended colours, type and layout"
+								onclick={() => {
+									themeOpen = false;
+									ui.resetLook();
+								}}><RotateCcw size={14} /> Reset theme</button
+							>
 						</div>
 					{/if}
 				</span>
@@ -465,7 +474,10 @@
 				<div class="foot-line">
 					<span class="saved-dot" aria-hidden="true"></span>
 					<span class="note">{ui.hasDefault ? 'MARGIE opens with your default look.' : 'Changes apply now. Keep them as your default to open with them every time.'}</span>
-					{#if ui.hasDefault}<button type="button" class="mg-link" onclick={() => ui.resetToDefault()}>Back to default</button>{/if}
+					<span class="foot-acts">
+						{#if ui.hasDefault}<button type="button" class="mg-link" onclick={() => ui.resetToDefault()}>Back to default</button>{/if}
+						<button type="button" class="mg-link" title="Back to MARGIE's recommended colours, type and layout" onclick={() => ui.resetLook()}>Reset theme</button>
+					</span>
 				</div>
 			</footer>
 		</div>
@@ -916,9 +928,21 @@
 		font-weight: 500;
 		color: var(--color-primary-600-400);
 	}
-	.mg-theme-more:hover {
+	.mg-theme-more:hover,
+	.mg-theme-reset:hover {
 		text-decoration: underline;
 		text-underline-offset: 3px;
+	}
+	.mg-theme-reset {
+		display: flex;
+		align-items: center;
+		justify-content: center;
+		gap: 8px;
+		width: 100%;
+		height: 30px;
+		font-size: 0.85rem;
+		font-weight: 500;
+		color: var(--mg-text-2);
 	}
 
 	/* ------------------------------------------------ Customize */
@@ -1032,9 +1056,13 @@
 		align-items: center;
 		gap: 8px;
 	}
-	.foot-line .mg-link {
+	.foot-acts {
+		display: inline-flex;
+		gap: 12px;
 		margin-left: auto;
 		flex-shrink: 0;
+	}
+	.foot-acts .mg-link {
 		font-size: var(--mg-fs-xs);
 	}
 	.saved-dot {

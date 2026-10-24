@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { SunMoon } from 'lucide-svelte';
+	import { RotateCcw, SunMoon } from 'lucide-svelte';
 	import MenuButton from './MenuButton.svelte';
 	import SizeSliders from './SizeSliders.svelte';
 	import type { UiPrefs } from './prefs';
@@ -8,7 +8,8 @@
 
 	/**
 	 * Theme button in the corner: light or dark, plus colour presets, text size and face where the
-	 * interface supports them. Everything else is in Customize (`onmore`).
+	 * interface supports them, and Reset theme (MARGIE's recommended look). Everything else is in
+	 * Customize (`onmore`).
 	 */
 	let {
 		base = 'paper',
@@ -87,6 +88,15 @@
 				}}>More in Customize</button
 			>
 		{/if}
+		<button
+			type="button"
+			class="tm-reset"
+			title="Back to MARGIE's recommended colours, type and layout"
+			onclick={() => {
+				close();
+				ui.resetLook();
+			}}><RotateCcw size={14} /> Reset theme</button
+		>
 	{/snippet}
 </MenuButton>
 
@@ -214,5 +224,24 @@
 	}
 	.tm-more:hover {
 		border-color: var(--mg-accent-base, var(--mg-accent, #0f766e));
+	}
+	.tm-reset {
+		display: inline-flex;
+		align-items: center;
+		justify-content: center;
+		gap: 7px;
+		height: 30px;
+		border: none;
+		background: none;
+		color: var(--mg-text-2, #454c57);
+		font: inherit;
+		font-size: var(--cr-fs-meta, var(--mg-fs-sm, 14px));
+		font-weight: 500;
+		cursor: pointer;
+	}
+	.tm-reset:hover {
+		color: var(--mg-text, #15181d);
+		text-decoration: underline;
+		text-underline-offset: 3px;
 	}
 </style>
