@@ -938,6 +938,7 @@ class WorkflowBase(ProgramBase):
         skipped: list[str] = []
         # Genomes whose Stage 2 failed; the queue goes on with the others.
         failed: list[str] = []
+        finished: list[str] = []
         processed = 0
         last_proc = None
         progress_memo: dict[str, tuple[int, int]] = {}  # genome -> completeness, for most-complete-first ordering
@@ -1164,6 +1165,7 @@ class WorkflowBase(ProgramBase):
                                      result['rules_summary'].get('completed', 0), status='failed')
                 failed.append(genome)
                 continue
+            finished.append(genome)
 
             if db_path:
                 tools_to_store = {tool: paths for tool, paths in genome_cache_map.items()
@@ -1206,7 +1208,8 @@ class WorkflowBase(ProgramBase):
             LOGGER.warning('%d genome(s) skipped (RASTtk/GTDB-Tk did not finish): %s', len(skipped), sorted(skipped))
         if failed:
             LOGGER.warning('%d genome(s) failed in Stage 2 (phase4-10): %s', len(failed), sorted(failed))
-        # The finalize steps below wait for a run with no gaps, as before.
+        # The run-wide finalize steps wait for a run with no gaps; the finished genomes' folders are
+        # reorganized either way, and a failed genome's stay as they are for a rerun.
         gaps = bool(skipped or failed)
 
         run_scoring_enabled = smk_config.get('run_scoring', True) not in (False, 'false', '0', 'no')
@@ -1256,15 +1259,15 @@ class WorkflowBase(ProgramBase):
         # FINALIZE: reorganises organism folders outside the DAG; a failure only warns.
         reorganize_enabled = smk_config.get('run_reorganize_outputs', True) not in (False, 'false', '0', 'no')
         output_dir = (smk_config.get('output_dir') or self.conf.get('output_dir', '') or '').rstrip('/')
-        if run_scoring_enabled and reorganize_enabled and processed > 0 and not gaps and output_dir:
+        if run_scoring_enabled and reorganize_enabled and finished and output_dir:
             LOGGER.info('=== FINALIZE: reorganize per-organism output folders ===')
             reorg_script = str(WORKFLOW_DIR / 'reorganize_outputs.py')
             excel_script = str(WORKFLOW_DIR / 'fingerprint' / 'make-final-excel.py')
-            reorg_workers = str(min(4, max(1, len(genome_files))))
+            reorg_workers = str(min(4, max(1, len(finished))))
             reorg_command = [
                 sys.executable, reorg_script,
                 '--run-root', output_dir,
-                '--genomes', *genome_files.keys(),
+                '--genomes', *finished,
                 '--figures-dirname', 'diagrams',
                 '--excel-script', excel_script,
                 '--python', sys.executable,

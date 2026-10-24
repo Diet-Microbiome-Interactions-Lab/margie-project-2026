@@ -543,11 +543,12 @@ class TestRunPipelineBatchSequential:
     @patch('bioinformatics_tools.workflow_tools.workflow.cache_sif_files')
     @patch('bioinformatics_tools.workflow_tools.workflow.locate_local_sif_files')
     @patch('bioinformatics_tools.workflow_tools.workflow.time.sleep')
-    def test_a_failed_genome_does_not_stop_the_others(self, mock_sleep, mock_locate, mock_cache, wf):
+    def test_a_failed_genome_does_not_stop_the_others(self, mock_sleep, mock_locate, mock_cache, wf, caplog):
         """Checks that a Stage 2 failure on one genome lets the queue go on: the third genome
         still runs, the finalize steps wait for a run without gaps, and the run ends with gaps."""
         genome_files = {'genome1': '/g1.fa', 'genome2': '/g2.fa', 'genome3': '/g3.fa'}
 
+        caplog.set_level('INFO', logger='bioinformatics_tools.workflow_tools.workflow')
         with patch('bioinformatics_tools.workflow_tools.workflow.Path') as mock_path_cls, \
              _fake_launchers(wf, stage2_returncodes=(0, 1, 0)) as rec:
             mock_path_cls.return_value.exists.return_value = True  # each genome is RASTtk-ready
@@ -555,12 +556,16 @@ class TestRunPipelineBatchSequential:
                                                      cache_map_fn=lambda s: {}, mode='dev')
 
         assert len(rec['stage2']) == 3
-        assert rec['run'] == []  # no finalize with a gap
+        assert rec['run'] == []  # no run-wide finalize with a gap
         assert ret is None  # finished(), not failed()
         assert not wf.report.status.indicates_failure
         failed = _target_genome_of(rec['stage2'][1])
         assert wf.report.data['genomes_failed'] == [failed]
         assert wf.report.data['genomes_processed'] == 2
+        # The finished genomes' folders are reorganized; the failed one's stay for a rerun.
+        reorg = next(r.getMessage() for r in caplog.records if 'reorganize_outputs.py' in r.getMessage()).split()
+        named = reorg[reorg.index('--genomes') + 1:reorg.index('--figures-dirname')]
+        assert sorted(named) == sorted(g for g in genome_files if g != failed)
 
     @patch('bioinformatics_tools.workflow_tools.workflow.cache_sif_files')
     @patch('bioinformatics_tools.workflow_tools.workflow.locate_local_sif_files')
