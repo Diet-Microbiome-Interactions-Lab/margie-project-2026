@@ -956,7 +956,9 @@ echo '@@host'; hostname -f 2>/dev/null || hostname
 echo '@@assoc'; sacctmgr -nP show assoc user="$USER" format=Account,Partition,QOS,MaxJobs,MaxSubmit 2>/dev/null
 accts=$(sacctmgr -nP show assoc user="$USER" format=Account 2>/dev/null | sort -u)
 echo '@@accounts'; for a in $accts; do sacctmgr -nP show assoc account="$a" format=Account,User,GrpTRES,GrpJobs 2>/dev/null | awk -F'|' '$2==""'; done
-echo '@@qos'; for q in $(sacctmgr -nP show assoc user="$USER" format=QOS 2>/dev/null | tr ',' '\n' | sort -u); do sacctmgr -nP show qos "$q" format=Name,GrpTRES,MaxTRESPU,MaxJobsPU,MaxWall 2>/dev/null; done
+pq=$(scontrol show partition -o 2>/dev/null | grep -o ' QoS=[^ ]*' | cut -d= -f2 | grep -v '^N/A$')
+echo '@@qos'; for q in $({ sacctmgr -nP show assoc user="$USER" format=QOS 2>/dev/null | tr ',' '\n'; echo "$pq"; } | sort -u); do sacctmgr -nP show qos "$q" format=Name,GrpTRES,MaxTRESPU,MaxJobsPU,MaxWall 2>/dev/null; done
+echo '@@partqos'; scontrol show partition -o 2>/dev/null | awk '{p=q=d=""; for(i=1;i<=NF;i++){split($i,kv,"="); if(kv[1]=="PartitionName")p=kv[2]; if(kv[1]=="QoS")q=kv[2]; if(kv[1]=="DefaultTime")d=kv[2]} if(p!="") print p "|" q "|" d}'
 echo '@@usage'; for a in $accts; do squeue -h -A "$a" -t R -O 'UserName:40,tres-alloc:400' 2>/dev/null | awk -v a="$a" '{print a "|" $1 "|" $2}'; done
 echo '@@waiting'; for a in $accts; do squeue -h -A "$a" -t PD -o '%u|%C' 2>/dev/null | awk -v a="$a" '{print a "|" $0}'; done
 echo '@@jobs'; squeue -h -u "$USER" -o '%i|%j|%P|%T|%M|%l|%D|%C|%N|%r|%a|%o' 2>/dev/null
@@ -986,6 +988,20 @@ def _tres(text: str) -> dict[str, float]:
             number *= {"K": 1 / 1024, "M": 1, "G": 1024, "T": 1024 * 1024, "": 1}.get(unit, 1)
         out[key] = out.get(key, 0) + number
     return out
+
+
+def _minutes(limit: str) -> float:
+    """A SLURM time (D-HH:MM:SS, HH:MM:SS, MM:SS, MM) in minutes; infinite for UNLIMITED or none."""
+    text = (limit or "").strip()
+    if not text or text.lower() in ("infinite", "unlimited", "n/a", "none"):
+        return float("inf")
+    days, _, clock = text.rpartition("-")
+    parts = [int(x) for x in clock.split(":") if x.isdigit()]
+    if not parts:
+        return float("inf")
+    # One number is minutes; two are MM:SS; three are HH:MM:SS.
+    h, m, sec = (0, parts[0], 0) if len(parts) == 1 else ([0] + parts)[-3:]
+    return (int(days) if days.isdigit() else 0) * 1440 + h * 60 + m + sec / 60
 
 
 def _cpus(field: str) -> dict[str, int]:
@@ -1090,14 +1106,20 @@ def parse_cluster(out: str, user: str) -> dict:
             if state in ("idle", "mixed", "mix"):
                 p["mem_free_mb"] += free
                 p["cpus_idle"] += _cpus(f[3])["idle"]
+    # A partition's own QOS (cpu-qpart, ...) caps a job's time where the partition says infinite.
+    walls = {q["name"]: q["max_wall"] for q in qos}
+    part_qos = {f[0]: {"qos": f[1] if len(f) > 1 and f[1] != "N/A" else "", "default": f[2] if len(f) > 2 else ""} for f in rows("partqos") if f and f[0]}
     partitions = []
     for f in rows("partitions"):
         if len(f) < 7:
             continue
         name = f[0].rstrip("*")
         nodes = by_part.get(name, {})
+        pq = part_qos.get(name, {})
+        limit = min((f[2], walls.get(pq.get("qos", ""), "")), key=_minutes)
         partitions.append({
-            "name": name, "default": f[0].endswith("*"), "up": f[1] == "up", "time_limit": f[2],
+            "name": name, "default": f[0].endswith("*"), "up": f[1] == "up", "time_limit": limit,
+            "default_time": pq.get("default", ""),
             "nodes": int(f[3]) if f[3].isdigit() else 0, "cpus": _cpus(f[4]),
             "mem_per_node_mb": int(f[5].rstrip("+")) if f[5].rstrip("+").isdigit() else 0,
             "gres": "" if f[6] == "(null)" else f[6],

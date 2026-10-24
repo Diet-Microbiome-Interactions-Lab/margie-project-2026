@@ -44,7 +44,10 @@
 		name: string;
 		default: boolean;
 		up: boolean;
+		/** The longest a job may run: the partition's limit or its own QOS's, whichever is shorter. */
 		time_limit: string;
+		/** What a job that names no time gets. */
+		default_time?: string;
 		nodes: number;
 		cpus: { allocated: number; idle: number; other: number; total: number };
 		mem_per_node_mb: number;
@@ -120,6 +123,15 @@
 	const downOf = (p: Partition) => Object.entries(p.node_states).reduce((n, [s, c]) => n + (DOWN.includes(s) ? c : 0), 0);
 	const statesOf = (p: Partition) => Object.entries(p.node_states).map(([s, c]) => `${c} ${s}`).join(', ');
 	const qosOf = (name: string) => data?.qos.find((q) => q.name === name);
+	/** A SLURM time in words: 14-00:00:00 is 14 days, 04:00:00 is 4 h, 00:30:00 is 30 min. */
+	function span(t: string): string {
+		if (!t || /^(infinite|unlimited)$/i.test(t)) return 'unlimited';
+		const [dd, clock] = t.includes('-') ? t.split('-') : ['0', t];
+		const n = clock.split(':').map(Number);
+		const [h, m] = n.length === 3 ? [n[0], n[1]] : [0, n[0]];
+		const days = Number(dd) || 0;
+		return [days ? `${days} day${days === 1 ? '' : 's'}` : '', h ? `${h} h` : '', m ? `${m} min` : ''].filter(Boolean).join(' ') || t;
+	}
 	const ago = $derived(at ? Math.max(0, Math.round((now - at) / 1000)) : 0);
 </script>
 
@@ -156,7 +168,7 @@
 					<span class="mg-grow"></span>
 					{#each a.qos as q (q)}
 						{@const info = qosOf(q)}
-						<span class="cb-chip" title={info?.max_wall ? `Longest job: ${info.max_wall}` : 'No time limit of its own'}>{q}{info?.max_wall ? ` | ${info.max_wall}` : ''}</span>
+						<span class="cb-chip" title={info?.max_wall ? `Longest job: ${span(info.max_wall)}` : "The partition's time limit applies"}>{q}{info?.max_wall ? ` | ${span(info.max_wall)}` : ''}</span>
 					{/each}
 				</header>
 				<div class="cb-bars">
@@ -244,7 +256,7 @@
 							{@const down = downOf(p)}
 							<tr class:off={!p.up || !yours(p.name)}>
 								<td><b>{p.name}</b>{#if p.default}<span class="cb-chip">default</span>{/if}{#if !p.up}<span class="cb-chip bad">down</span>{:else if !yours(p.name)}<span class="cb-chip">not your account's</span>{/if}</td>
-								<td class="mg-mono">{p.time_limit}</td>
+								<td title={p.default_time ? `A job that names no time gets ${span(p.default_time)}` : undefined}>{span(p.time_limit)}</td>
 								<td title={statesOf(p)}>{p.nodes}{#if down}<span class="cb-down">({down} out)</span>{/if}</td>
 								<td>
 									<div class="cb-cell">
