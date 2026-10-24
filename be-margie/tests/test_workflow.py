@@ -155,6 +155,17 @@ class TestBuildExecutable:
         assert 'foo=bar' in cmd[idx + 1:]
         assert 'baz=42' in cmd[idx + 1:]
 
+    @pytest.mark.parametrize('compute, minutes', [({'account': 'lab', 'default_runtime': 240}, 240),
+                                                  ({'account': 'lab', 'default_runtime': 600}, 600),
+                                                  ({'account': 'lab'}, 240)])
+    def test_default_runtime_is_passed_in_minutes(self, wf, compute, minutes):
+        # Snakemake reads a bare runtime=240 as 240 seconds (4-minute SLURM jobs), so it carries its unit.
+        cmd = wf.build_executable(WORKFLOWS['selftest'], mode='notdev', compute_config=compute)
+        assert f'runtime={minutes}m' in cmd
+        from snakemake.resources import Resources
+        parsed = Resources.parse([f'runtime={minutes}m'], allow_expressions=True)['runtime']
+        assert parsed == minutes
+
     def test_dev_mode_no_default_resources(self, wf):
         key = WORKFLOWS['selftest']
         cmd = wf.build_executable(key, mode='dev')

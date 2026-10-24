@@ -560,7 +560,7 @@
 							{:else if circular}
 								<ImageViewer src={fileUrl(circular, true)} alt="Circular map of {summary.genome}" />
 							{:else}
-								<p class="rb-state">No genome map. Turn on Genome viewer in Settings to draw one next run.</p>
+								<p class="rb-state">No genome map yet: MARGIE draws it once scoring has finished for this genome.</p>
 							{/if}
 						{:else if tab === 'table' && summary.final.table}
 							<DataGrid path={summary.final.table} {preset} />

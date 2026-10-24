@@ -21,11 +21,11 @@ import type { ChatRemote } from '$lib/workspace/cluster-parts';
 export const WORKFLOW = 'margie_sb';
 const GENOME_EXT = /\.(fasta|fa|fna)(\.gz)?$/i;
 /**
- * Stages every run includes. "rasttk" is phase 3's key whichever gene caller
- * the genome gets (RASTtk or Prodigal).
+ * Stages a run includes, chosen or not. "rasttk" is phase 3's key whichever gene caller
+ * the genome gets (RASTtk or Prodigal); the envelope stage is MARGIE's own, part of the standard annotation.
  */
-const ALWAYS = ['rasttk', 'operon', 'consolidation', 'labeling', 'fingerprint', 'fingerprint_database', 'scoring_heuristic'];
-/** Tools the envelope stage reads; it runs when a later tool needs it. */
+const ALWAYS = ['rasttk', 'operon', 'envelope', 'consolidation', 'labeling', 'fingerprint', 'fingerprint_database', 'scoring_heuristic'];
+/** Tools the envelope stage reads. */
 const ENVELOPE_INPUTS = ['tigrfam', 'pgap', 'pfam', 'uniprot'];
 const ENVELOPE_PHASE = 7;
 
@@ -413,10 +413,8 @@ async function startRun(body: { kind?: string; tools?: string[]; all?: boolean; 
 	// GTDB-Tk follows its switch only, never the tool list.
 	chosen.delete('gtdbtk');
 	if (useGtdbtk(cfg)) chosen.add('gtdbtk');
-	// Tools after the envelope stage need it and its inputs.
-	if ([...chosen].some((k) => (known.get(k)?.phase ?? 0) > ENVELOPE_PHASE && !ALWAYS.includes(k))) {
-		for (const k of ['envelope', ...ENVELOPE_INPUTS]) chosen.add(k);
-	}
+	// The envelope stage reads these.
+	for (const k of ENVELOPE_INPUTS) chosen.add(k);
 	// Always sent as a list: with none, the pipeline would run config.yaml's default_selected_tools
 	// (or its own defaults) instead of the tools picked here.
 	const selected = [...chosen].filter((k) => known.has(k) && !disabled.has(k) && !LATER.has(k));
