@@ -5,6 +5,9 @@
 	import { ui } from '../ui.svelte';
 	import ProgressBar from '../ProgressBar.svelte';
 	import { ArrowRight, CircleAlert } from 'lucide-svelte';
+	import { onMount } from 'svelte';
+	import Switch from '../Switch.svelte';
+	import { runEmails } from '../run-emails.svelte';
 
 	/**
 	 * Start button with a sentence on what it will do; when blocked, it is replaced by the
@@ -60,6 +63,11 @@
 	/** True while the user's databases are still being copied. */
 	const copying = $derived(ws.storesBusy && !ws.storesOp?.op?.startsWith('backup:'));
 
+	// The emails about runs are the cluster website's (services/run_mail.py), switched as on the User profile.
+	onMount(() => {
+		if (backend.cluster && !runEmails.loaded) runEmails.load();
+	});
+
 	async function start() {
 		starting = true;
 		const run = await ws.annotate();
@@ -104,6 +112,21 @@
 	</div>
 {:else}
 	<p class="under mg-note">{under}</p>
+{/if}
+{#if backend.cluster}
+	<div class="mail">
+		<Switch label="Email me about my runs" checked={runEmails.on && !!runEmails.to} disabled={!runEmails.loaded || !runEmails.to} onchange={(on) => runEmails.set(on)} />
+		<span>
+			<b>Email me about my runs</b>
+			{#if !runEmails.loaded}
+				<small>when a run completes, fails, or has been pending for more than an hour</small>
+			{:else if runEmails.to}
+				<small>when a run completes, fails, or has been pending for more than an hour; to {runEmails.to}</small>
+			{:else}
+				<small>Set an email on your <a class="mg-link" href={uiBase.to('/profile')}>User profile</a> to get them.</small>
+			{/if}
+		</span>
+	</div>
 {/if}
 
 <style>
@@ -151,6 +174,28 @@
 	.under {
 		margin-top: 8px;
 		text-align: center;
+	}
+	.mail {
+		display: flex;
+		align-items: center;
+		justify-content: center;
+		gap: 10px;
+		margin-top: 10px;
+		font-size: var(--mg-fs-sm);
+	}
+	.mail span {
+		display: flex;
+		flex-wrap: wrap;
+		align-items: baseline;
+		gap: 2px 8px;
+		min-width: 0;
+	}
+	.mail b {
+		font-weight: 600;
+	}
+	.mail small {
+		font-size: var(--mg-fs-xs);
+		color: var(--mg-text-3);
 	}
 	/* What stops a run: one line in the warning colour, with its fix (the bell lists it too). */
 	.blocked p {
