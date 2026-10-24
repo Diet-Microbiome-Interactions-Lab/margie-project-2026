@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { Database, Dna, ExternalLink, FileText, Folder, FolderCheck, HardDrive, House, Monitor, Package, Server, X } from 'lucide-svelte';
+	import { Database, Dna, ExternalLink, FileText, Folder, FolderCheck, HardDrive, House, Monitor, Package, PanelRightClose, PanelRightOpen, Server, X } from 'lucide-svelte';
 	import FolderView, { type FolderRoot } from '$lib/workspace/FolderView.svelte';
 	import FileViewer from '$lib/workspace/viewers/FileViewer.svelte';
 	import '$lib/workspace/viewers/tools.css';
@@ -10,6 +10,7 @@
 	/**
 	 * Crisp's Files page: places as pills, the open folder as a tree (FolderView),
 	 * and the selected file previewed beside it, with a draggable divider between.
+	 * The preview can be hidden, giving the tree the width, and shown again.
 	 */
 	let {
 		roots,
@@ -76,7 +77,28 @@
 
 	function preview(p: string) {
 		picked = p;
-		if (pane && matchMedia('(max-width: 900px)').matches) requestAnimationFrame(() => pane?.scrollIntoView({ behavior: 'smooth', block: 'start' }));
+		if (!hidden && pane && matchMedia('(max-width: 900px)').matches) requestAnimationFrame(() => pane?.scrollIntoView({ behavior: 'smooth', block: 'start' }));
+	}
+
+	// Hidden, the tree takes the width and a strip at the right shows the preview again.
+	const HIDDEN = 'margie.crisp.files.hidden';
+	let hidden = $state(
+		(() => {
+			try {
+				return localStorage.getItem(HIDDEN) === '1';
+			} catch {
+				return false;
+			}
+		})()
+	);
+	function setHidden(h: boolean) {
+		hidden = h;
+		try {
+			if (h) localStorage.setItem(HIDDEN, '1');
+			else localStorage.removeItem(HIDDEN);
+		} catch {
+			// not remembered
+		}
 	}
 	const viewer = $derived(uiBase.to('/view'));
 	const pickedName = $derived(picked?.split('/').pop() ?? '');
@@ -142,54 +164,65 @@
 		{/each}
 	</nav>
 
-	<div class="fb-body" bind:this={body} style={left ? `--fb-left: ${left}px` : undefined}>
+	<div class="fb-body" class:solo={hidden} bind:this={body} style={left ? `--fb-left: ${left}px` : undefined}>
 		<div class="fb-tree" bind:this={tree}>
 			<FolderView bind:this={view} bind:here {roots} {start} {memory} {empty} {picked} onpick={preview} fill />
 		</div>
 
-		<!-- svelte-ignore a11y_no_noninteractive_tabindex, a11y_no_noninteractive_element_interactions -->
-		<div
-			class="fb-split"
-			role="separator"
-			aria-orientation="vertical"
-			aria-label="Resize the tree and the preview"
-			aria-valuenow={left ?? undefined}
-			title="Drag to resize. Double-click to reset."
-			tabindex="0"
-			onpointerdown={drag}
-			onkeydown={nudge}
-			ondblclick={() => {
-				left = null;
-				try {
-					localStorage.removeItem(SPLIT);
-				} catch {
-					// not remembered
-				}
-			}}
-		><span></span></div>
+		{#if hidden}
+			<button type="button" class="fb-rail" aria-expanded="false" title={pickedName ? `Show the preview of ${pickedName}` : 'Show the preview'} onclick={() => setHidden(false)}>
+				<PanelRightOpen size={15} />
+				<span>{pickedName || 'Preview'}</span>
+			</button>
+		{:else}
+			<!-- svelte-ignore a11y_no_noninteractive_tabindex, a11y_no_noninteractive_element_interactions -->
+			<div
+				class="fb-split"
+				role="separator"
+				aria-orientation="vertical"
+				aria-label="Resize the tree and the preview"
+				aria-valuenow={left ?? undefined}
+				title="Drag to resize. Double-click to reset."
+				tabindex="0"
+				onpointerdown={drag}
+				onkeydown={nudge}
+				ondblclick={() => {
+					left = null;
+					try {
+						localStorage.removeItem(SPLIT);
+					} catch {
+						// not remembered
+					}
+				}}
+			><span></span></div>
 
-		<section class="fb-preview" bind:this={pane} aria-label="Preview">
-			{#if picked}
-				{#key picked}
-					<div class="fb-file">
-						<FileViewer path={picked}>
-							{#snippet actions()}
-								<div class="vw-group" role="group" aria-label="Preview">
-									<a class="vw-btn" href="{viewer}?path={encodeURIComponent(picked ?? '')}" title="Open {pickedName} on its own page"><ExternalLink size={14} /><span class="vw-lbl">Full view</span></a>
-									<button type="button" class="vw-btn icon" title="Close the preview" aria-label="Close the preview" onclick={() => (picked = null)}><X size={15} /></button>
-								</div>
-							{/snippet}
-						</FileViewer>
+			<section class="fb-preview" bind:this={pane} aria-label="Preview">
+				{#if picked}
+					{#key picked}
+						<div class="fb-file">
+							<FileViewer path={picked}>
+								{#snippet actions()}
+									<div class="vw-group" role="group" aria-label="Preview">
+										<a class="vw-btn" href="{viewer}?path={encodeURIComponent(picked ?? '')}" title="Open {pickedName} on its own page"><ExternalLink size={14} /><span class="vw-lbl">Full view</span></a>
+										<button type="button" class="vw-btn icon" title="Hide the preview" aria-label="Hide the preview" aria-expanded="true" onclick={() => setHidden(true)}><PanelRightClose size={15} /></button>
+										<button type="button" class="vw-btn icon" title="Close {pickedName}" aria-label="Close {pickedName}" onclick={() => (picked = null)}><X size={15} /></button>
+									</div>
+								{/snippet}
+							</FileViewer>
+						</div>
+					{/key}
+				{:else}
+					<div class="vw-group fb-hide" role="group" aria-label="Preview">
+						<button type="button" class="vw-btn icon" title="Hide the preview" aria-label="Hide the preview" aria-expanded="true" onclick={() => setHidden(true)}><PanelRightClose size={15} /></button>
 					</div>
-				{/key}
-			{:else}
-				<div class="fb-empty">
-					<FileText size={26} strokeWidth={1.4} />
-					<strong>No file open</strong>
-					<span>Pick a file on the left to preview it here: tables, text, logs, web pages and images.</span>
-				</div>
-			{/if}
-		</section>
+					<div class="fb-empty">
+						<FileText size={26} strokeWidth={1.4} />
+						<strong>No file open</strong>
+						<span>Pick a file on the left to preview it here: tables, text, logs, web pages and images.</span>
+					</div>
+				{/if}
+			</section>
+		{/if}
 	</div>
 </div>
 
@@ -313,12 +346,56 @@
 	.fb-split:focus-visible {
 		outline: none;
 	}
+	/* The preview hidden: the tree across, and a strip that shows the preview again. */
+	.fb-body.solo {
+		grid-template-columns: minmax(0, 1fr) 36px;
+	}
+	.fb-rail {
+		display: flex;
+		flex-direction: column;
+		align-items: center;
+		gap: 10px;
+		min-width: 0;
+		min-height: 0;
+		padding: 12px 0;
+		border: none;
+		background: var(--mg-surface);
+		color: var(--mg-text-2);
+		font: inherit;
+		font-size: var(--mg-fs-xs);
+		cursor: pointer;
+		overflow: hidden;
+		transition:
+			background-color 140ms ease,
+			color 140ms ease;
+	}
+	.fb-rail span {
+		flex: 0 1 auto;
+		min-height: 0;
+		overflow: hidden;
+		text-overflow: ellipsis;
+		white-space: nowrap;
+		writing-mode: vertical-rl;
+	}
+	.fb-rail :global(svg) {
+		flex-shrink: 0;
+	}
+	.fb-rail:hover {
+		background: color-mix(in srgb, var(--mg-accent) 8%, transparent);
+		color: var(--mg-accent-ink, var(--mg-accent));
+	}
 	.fb-preview {
+		position: relative;
 		display: flex;
 		flex-direction: column;
 		min-width: 0;
 		min-height: 0;
 		background: var(--mg-surface);
+	}
+	.fb-hide {
+		position: absolute;
+		top: 14px;
+		right: var(--mg-pad);
 	}
 	.fb-file {
 		display: flex;
@@ -399,6 +476,15 @@
 		}
 		.fb-split {
 			display: none;
+		}
+		.fb-rail {
+			flex-direction: row;
+			justify-content: center;
+			height: 40px;
+			padding: 0 12px;
+		}
+		.fb-rail span {
+			writing-mode: horizontal-tb;
 		}
 		.fb-preview {
 			flex: none;
