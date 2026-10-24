@@ -87,11 +87,11 @@
 			<blockquote class="lock-statement" oncopy={(e) => e.preventDefault()}>{INSTALL_STATEMENT}</blockquote>
 			{#if !backend.cluster}
 				<p class="mg-note">
-					Open to everyone: RASTtk, Prodigal, Pfam, COG, PGAP, GTDB-Tk, QUAST, the operon finder, the envelope and MARGIE's own scripts. The
+					Open to use: RASTtk, Prodigal, Pfam, COG, PGAP, GTDB-Tk, QUAST, the operon finder, the envelope stage and MARGIE's own scripts. The
 					other tools install and run once you also accept their licences in Settings → Licences.
 				</p>
 			{/if}
-			<!-- What is being agreed to: every tool's licence, and MARGIE's own terms. -->
+			<!-- What is being agreed to: each tool's licence, and MARGIE's own terms. -->
 			<details class="lock-read" ontoggle={(e) => e.currentTarget.open && readTerms()}>
 				<summary>Read the licences first</summary>
 				{#if termsError}

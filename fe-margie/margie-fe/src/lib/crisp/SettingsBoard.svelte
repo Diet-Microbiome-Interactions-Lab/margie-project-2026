@@ -948,7 +948,7 @@
 				<div class="sb-body">
 					<div class="sb-lic">
 						<p class="sb-desc">
-							Open to everyone: RASTtk, Prodigal, Pfam, COG, PGAP, GTDB-Tk, QUAST, the operon finder, the envelope and MARGIE's own scripts.
+							Open to use: RASTtk, Prodigal, Pfam, COG, PGAP, GTDB-Tk, QUAST, the operon finder, the envelope stage and MARGIE's own scripts.
 							The tools below install and run once you accept their licence terms here; read each tool's terms in
 							<a class="mg-link" href={uiBase.to('/install')}>Install</a>
 							first.

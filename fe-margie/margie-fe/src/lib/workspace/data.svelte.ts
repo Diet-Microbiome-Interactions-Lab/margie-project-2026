@@ -207,7 +207,7 @@ const STORES_NOT_READY = 'stores-not-ready';
  * SignalP and the like) are left for a user to add.
  */
 export const STANDARD_TOOLS = ['cog', 'kegg', 'eggnog', 'uniprot', 'pfam', 'tigrfam', 'dbcan', 'pgap', 'geneprop', 'interpro'];
-/** What the envelope stage reads, run whenever a gram-dependent tool is chosen. */
+/** What the envelope stage reads; it runs in each annotation run (annotate.sh). */
 export const ENVELOPE_INPUTS = ['tigrfam', 'pgap', 'pfam', 'uniprot'];
 
 export type Depth = 'quick' | 'standard' | 'licensed' | 'custom';
@@ -405,8 +405,12 @@ class Workspace {
 	needs = $derived.by(() => {
 		// With nothing chosen only the gene caller runs, so not even operon is needed.
 		const chosen = new Set(this.chosenTools.length ? [...this.chosenTools, 'operon'] : []);
-		const gram = this.tools.filter((t) => t.gramDependent).some((t) => chosen.has(t.name));
-		if (gram) for (const t of [...ENVELOPE_INPUTS, 'envelope']) chosen.add(t);
+		// The envelope stage, with the inputs this computer may use (the gated ones once accepted).
+		if (chosen.size) {
+			const usable = new Set(this.tools.filter((t) => t.licensed).map((t) => t.name));
+			for (const t of ENVELOPE_INPUTS) if (usable.has(t)) chosen.add(t);
+			chosen.add('envelope');
+		}
 		// Prodigal for all when chosen; otherwise RASTtk where domain and code are
 		// known (or GTDB-Tk will find them) and Prodigal for the rest.
 		const caller = this.setting('GENE_CALLER') || 'prodigal';
