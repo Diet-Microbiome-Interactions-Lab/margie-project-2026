@@ -18,6 +18,7 @@ from bioinformatics_tools.api import access
 
 from bioinformatics_tools.api.auth import (
     create_access_token,
+    decrypt_private_key,
     encrypt_private_key,
     get_current_user,
     hash_password,
@@ -36,7 +37,12 @@ from bioinformatics_tools.api.models import (
     UserRegister,
     UpdateProfile,
 )
-from bioinformatics_tools.utilities.ssh_connection import ensure_remote_dane_wf, make_user_connection
+from bioinformatics_tools.utilities.ssh_connection import (
+    close_user_connections,
+    ensure_remote_dane_wf,
+    make_user_connection,
+    remove_margie_files,
+)
 
 LOGGER = logging.getLogger(__name__)
 
@@ -290,9 +296,11 @@ def update_profile(body: UpdateProfile, current_user: dict = Depends(get_current
 @router.post('/delete-account')
 def delete_account(body: DeleteAccount, current_user: dict = Depends(get_current_user)):
     """
-    Deletes the MARGIE account: its sign-in, profile and stored cluster key. The files on the
-    cluster stay as they are (config.yaml, the copy of MARGIE, databases, results); signing up
-    again makes a new account. Asks for the password again, and waits while a run is going.
+    Deletes the MARGIE account: its sign-in, profile and stored cluster key, and in the cluster
+    account's home the stored language-model keys and the copy of MARGIE (remove_margie_files);
+    config.yaml, databases and results stay. Those files stay too while another MARGIE account
+    uses the same cluster account, and in local mode. Asks for the password again, waits while
+    a run is going, and deletes nothing when the files cannot be removed.
     """
     with get_db() as db:
         row = db.execute('SELECT password_hash FROM users WHERE id = ?', (current_user['user_id'],)).fetchone()
@@ -302,12 +310,25 @@ def delete_account(body: DeleteAccount, current_user: dict = Depends(get_current
     if going:
         raise HTTPException(status_code=status.HTTP_409_CONFLICT,
                             detail=f'A run is going ({going[0]}): stop it, or wait for it to finish, before deleting the account.')
+    host, cluster_user = current_user['cluster_host'], current_user['cluster_username']
+    with get_db() as db:
+        shared = db.execute('SELECT count(*) FROM users WHERE cluster_host = ? AND cluster_username = ? AND id != ?',
+                            (host, cluster_user, current_user['user_id'])).fetchone()[0]
+    removed = False
+    if not shared and not is_local_mode():
+        conn = make_user_connection(host, cluster_user, decrypt_private_key(current_user['private_key_encrypted']))
+        problem = remove_margie_files(conn)
+        if problem:
+            raise HTTPException(status_code=status.HTTP_502_BAD_GATEWAY,
+                                detail=f"Could not remove MARGIE's files from your home on the cluster ({problem}). Nothing was deleted; try again.")
+        removed = True
     with get_db() as db:
         db.execute('DELETE FROM users WHERE id = ?', (current_user['user_id'],))
         db.commit()
     read_cache.drop(current_user['user_id'])
-    LOGGER.info('Deleted the account %r', current_user['username'])
-    return {'deleted': True}
+    close_user_connections(host, cluster_user)
+    LOGGER.info('Deleted the account %r (files in the cluster home %s)', current_user['username'], 'removed' if removed else 'kept')
+    return {'deleted': True, 'cluster_files_removed': removed}
 
 
 @router.put('/update-credentials')
