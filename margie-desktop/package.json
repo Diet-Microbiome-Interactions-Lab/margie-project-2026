@@ -1,7 +1,7 @@
 {
 	"name": "margie-desktop",
 	"productName": "MARGIE",
-	"version": "2.0.0",
+	"version": "1.0.0",
 	"description": "MARGIE as a desktop application for macOS, Windows and Linux: run analyses on this computer or on your HPC cluster.",
 	"private": true,
 	"type": "module",
