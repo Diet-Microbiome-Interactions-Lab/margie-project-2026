@@ -537,7 +537,7 @@ def _phase9_12_targets_for_genome(genome, include_llm=True):
 rule all:
     # Every selected tool's db token for every genome.
     input:
-        (expand(QUAST_TOKEN, genome=list(GENOMES.keys())) if rc_bool('run_quast', True, config=config) else []),
+        (expand(QUAST_TOKEN, genome=list(GENOMES.keys())) if rc_bool('run_quast', False, config=config) else []),
         (expand(GTDBTK_TOKEN, genome=list(GENOMES.keys())) if rc_bool('run_gtdbtk', True, config=config) else []),
         (expand(RASTTK_TOKEN, genome=list(GENOMES.keys())) if rc_bool('run_rasttk', True, config=config) else []),
         [_phase4_8_targets_for_genome(genome) for genome in GENOMES.keys()],

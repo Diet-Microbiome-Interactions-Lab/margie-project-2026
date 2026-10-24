@@ -777,8 +777,8 @@ class WorkflowBase(ProgramBase):
         db_path = smk_config.get('main_database')
         # Off: nothing reads GTDB-Tk, so its batch is neither restored nor run.
         run_gtdbtk_enabled = smk_config.get('run_gtdbtk', True) not in (False, 'false', '0', 'no')
-        # QUAST (phase 1) runs in Stage 1 with the gene calls; rule all is never asked for here.
-        run_quast_enabled = smk_config.get('run_quast', True) not in (False, 'false', '0', 'no')
+        # QUAST runs beside Stage 1 and 2 when picked (run_quast, off by default).
+        run_quast_enabled = smk_config.get('run_quast', False) not in (False, 'false', '0', 'no', None)
 
         restored: dict[str, dict[str, bool]] = {}
         gtdbtk_restored: dict[str, bool] = {}
