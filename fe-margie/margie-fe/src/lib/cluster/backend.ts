@@ -200,9 +200,9 @@ const genomeInfo = (cfg: Config): GenomeInfo => {
 	return v && typeof v === 'object' ? (v as GenomeInfo) : {};
 };
 const genomeStem = (n: string) => n.replace(/\.gz$/i, '').replace(/\.(fasta|fna|fa)$/i, '');
-/** Switch for running GTDB-Tk first; off by default as it needs a highmem node. */
+/** Switch for running GTDB-Tk first; on unless config.yaml turns it off. */
 const USE_GTDBTK = `${WORKFLOW}.use_gtdbtk`;
-const useGtdbtk = (cfg: Config) => ['1', 'true'].includes(str(dig(cfg, USE_GTDBTK)).toLowerCase());
+const useGtdbtk = (cfg: Config) => !['0', 'false', 'no', 'off'].includes(str(dig(cfg, USE_GTDBTK)).toLowerCase());
 /** Draws the operon map for every gene, not only examples; read by the API when it starts a run. */
 const FULL_OPERON_MAP = `${WORKFLOW}.run_full_operon_map`;
 
@@ -868,7 +868,7 @@ async function settingsList(): Promise<{ settings: Setting[]; configMissing: boo
 	// Automatic: RASTtk where domain and code are known, Prodigal otherwise.
 	settings.push({ key: 'GENE_CALLER', label: 'Gene caller', group: '', type: 'text', description: '', value: 'auto', default: 'auto', overridden: false });
 	const gtdbtk = useGtdbtk(cfg) ? '1' : '0';
-	settings.push({ key: 'RUN_GTDBTK', label: 'Classify with GTDB-Tk', group: '', type: 'flag', description: '', value: gtdbtk, default: '0', overridden: gtdbtk === '1' });
+	settings.push({ key: 'RUN_GTDBTK', label: 'Classify with GTDB-Tk', group: '', type: 'flag', description: '', value: gtdbtk, default: '1', overridden: gtdbtk === '0' });
 	const operons = ['1', 'true'].includes(str(dig(cfg, FULL_OPERON_MAP)).toLowerCase()) ? '1' : '0';
 	settings.push({
 		key: 'FULL_OPERON_MAP',
