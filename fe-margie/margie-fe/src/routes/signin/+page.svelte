@@ -4,7 +4,9 @@
 	 * Signs in to the cluster API, or creates an account there with the cluster
 	 * login and SSH key the API will use; then opens the interface. People outside
 	 * Purdue (reviewers, collaborators) ask for an account by email instead. MARGIE's logo
-	 * turns in on the left, the sign-in sits on the right (the logo on top on a phone).
+	 * turns in on the left and turns again on a click (back on a double-click), the sign-in sits
+	 * on the right (the logo on top on a phone); under the logo, a link opens a small game
+	 * (GenomePuzzle). Washes of the logo's colours sit behind.
 	 */
 	import '@fontsource/ibm-plex-sans/400.css';
 	import '@fontsource/ibm-plex-sans/500.css';
@@ -14,12 +16,14 @@
 	import '$lib/workspace/workspace.css';
 	import '$lib/crisp/crisp.css';
 	import { onMount } from 'svelte';
-	import { fade } from 'svelte/transition';
-	import { ChevronRight, CircleAlert, Copy, KeyRound, LoaderCircle, Mail, Server } from 'lucide-svelte';
+	import { fade, slide } from 'svelte/transition';
+	import { ChevronRight, CircleAlert, Copy, KeyRound, LoaderCircle, Mail, Puzzle, Server } from 'lucide-svelte';
 	import CrispMark from '$lib/crisp/CrispMark.svelte';
 	import Corner from '$lib/workspace/Corner.svelte';
+	import GenomePuzzle from '$lib/workspace/GenomePuzzle.svelte';
 	import MargieLogo from '$lib/workspace/MargieLogo.svelte';
 	import SizeSliders from '$lib/workspace/SizeSliders.svelte';
+	import { LAB } from '$lib/crisp/about';
 	import { crispVars } from '$lib/crisp/theme';
 	import { isLoggedIn, setToken } from '$lib/auth';
 	import { getApiUrl } from '$lib/config';
@@ -102,6 +106,8 @@
 
 	// How to make a key, with the cluster and account filled in as they are typed.
 	let keyHelp = $state(false);
+	/** The genome puzzle under the logo, folded until asked for. */
+	let game = $state(false);
 	const host = $derived(clusterHost.trim() || 'cluster.address.edu');
 	const who = $derived(clusterUser.trim() || 'your-username');
 	const keyCmds = $derived({
@@ -118,7 +124,7 @@
 	}
 
 	// ------------------------------------------------ outside Purdue: an account on request
-	const CONTACT = 'lindems@purdue.edu';
+	const CONTACT = LAB.email;
 	let req = $state({ name: '', institution: '', email: '', purpose: '', message: '' });
 	/** The request as typed, nothing added: their mail app sends it to CONTACT. */
 	const mailto = $derived.by(() => {
@@ -142,7 +148,7 @@
 
 <div class="crisp signin" data-mg-root data-theme={ui.dark ? 'dark' : 'light'} data-motion={ui.motion} style={vars}>
 	<header class="bar">
-		<span class="brand"><CrispMark size={22} /><span class="word">MARGIE</span></span>
+		<span class="brand"><CrispMark size={22} /><span class="word">MARGIE</span><span class="platform">Bioinformatics Supercomputing Platform</span></span>
 		<span class="grow"></span>
 		<Corner base="crisp" account={false}>
 			{#snippet customize()}
@@ -154,9 +160,17 @@
 	<main class="content">
 		<div class="page">
 			<section class="welcome" aria-label="MARGIE">
-				<MargieLogo size="var(--logo-size)" />
+				<MargieLogo size="var(--logo-size)" turn="click" float={false} />
 				<p class="full">Mostly Automated Rapid Genome Inference Environment</p>
 				<p class="motto">Annotate with confidence: a genome-centric, context-dependent approach</p>
+				<span class="rule" aria-hidden="true"></span>
+				<button type="button" class="bored" aria-expanded={game} onclick={() => (game = !game)}>
+					<Puzzle size={15} />
+					{game ? 'Hide the puzzle' : 'Bored? Enjoy the puzzle game'}
+				</button>
+				{#if game}
+					<div class="game" transition:slide={{ duration: ui.ms(240) }}><GenomePuzzle /></div>
+				{/if}
 			</section>
 
 			<div class="side">
@@ -183,12 +197,28 @@
 						{#if mode === 'request'}
 							<!-- No cluster account: a request for one to sign in with. -->
 							<div class="form">
-								<p class="hint">
-									MARGIE runs on Purdue's HPC cluster, so it needs an account there. To ask for a username and password, send this
-									request, or write to
-									<span class="addr"><a class="mg-link" href="mailto:{CONTACT}">{CONTACT}</a><button type="button" class="mg-icon-btn" aria-label="Copy the address" onclick={() => copy(CONTACT)}><Copy size={14} /></button></span>.
-									Then sign in with them under Sign in.
-								</p>
+								<div class="hint request">
+									<p>
+										MARGIE runs on Purdue's HPC cluster, so it needs an account there. If you are not affiliated with Purdue, or are a
+										collaborator or a reviewer, please email the address below to get a username and password to sign in.
+									</p>
+									<p>
+										You can fill in the form below or request access from your institutional email. Legitimate requests should get a
+										username and password in less than 72 hours.
+									</p>
+									<p>
+										Please note: requests from personal email addresses may not get a reply. Once MARGIE is released to the public,
+										everyone will be able to access and use the site. Cheers!
+									</p>
+								</div>
+								<address class="contact">
+									<span class="contact-head">Contact</span>
+									<span>Prof. Dr. {LAB.pi}, PI</span>
+									<span>{LAB.name}</span>
+									<span>Department of Food Science</span>
+									<span>Purdue University</span>
+									<span class="addr"><a class="mg-link" href="mailto:{CONTACT}">{CONTACT}</a><button type="button" class="mg-icon-btn" aria-label="Copy the address" onclick={() => copy(CONTACT)}><Copy size={14} /></button></span>
+								</address>
 								<div class="fields">
 									<label class="field">
 										<span class="label">Your name</span>
@@ -291,6 +321,12 @@
 
 <style>
 	.signin {
+		/* The logo's colours: its strands and its rungs. */
+		--dna-blue: #1464f0;
+		--dna-orange: #f07814;
+		--dna-cyan: #14c8f0;
+		--dna-green: #8cdc28;
+		--dna-rainbow: linear-gradient(90deg, var(--dna-blue), var(--dna-cyan), var(--dna-green), #ffc83c, var(--dna-orange));
 		display: flex;
 		flex-direction: column;
 		height: 100vh;
@@ -313,6 +349,16 @@
 		background: var(--cr-bar-bg);
 		backdrop-filter: saturate(1.4) blur(12px);
 	}
+	.bar::after {
+		content: '';
+		position: absolute;
+		left: 0;
+		right: 0;
+		bottom: -1px;
+		height: 2px;
+		background: var(--dna-rainbow);
+		opacity: 0.75;
+	}
 	.brand {
 		display: flex;
 		align-items: center;
@@ -323,14 +369,39 @@
 		font-weight: 700;
 		letter-spacing: 0.06em;
 	}
+	/* As in the app's top bar: the platform's name after a hairline, from tablet width up. */
+	.platform {
+		display: none;
+		margin-left: 2px;
+		padding-left: 11px;
+		border-left: 1px solid var(--mg-border);
+		color: var(--mg-text-2);
+		font-size: var(--cr-fs-body);
+		font-weight: 400;
+	}
+	@media (min-width: 640px) {
+		.platform {
+			display: inline;
+		}
+	}
 	.grow {
 		flex-grow: 1;
 	}
+	/* Soft washes of the logo's colours behind the page, one from each corner. */
 	.content {
+		--wash: 13%;
 		flex-grow: 1;
 		min-height: 0;
 		overflow: auto;
-		background: var(--mg-bg);
+		background:
+			radial-gradient(60rem 40rem at 6% 10%, color-mix(in srgb, var(--dna-blue) var(--wash), transparent), transparent 62%),
+			radial-gradient(52rem 36rem at 94% 92%, color-mix(in srgb, var(--dna-orange) var(--wash), transparent), transparent 62%),
+			radial-gradient(40rem 30rem at 90% 6%, color-mix(in srgb, var(--dna-cyan) calc(var(--wash) * 0.8), transparent), transparent 62%),
+			radial-gradient(40rem 30rem at 10% 94%, color-mix(in srgb, var(--dna-green) calc(var(--wash) * 0.7), transparent), transparent 62%),
+			var(--mg-bg);
+	}
+	[data-theme='dark'] .content {
+		--wash: 17%;
 	}
 	/* Two columns of one width, both centred: the logo on the left, the sign-in on the right. */
 	.page {
@@ -367,6 +438,13 @@
 		background: var(--cr-card);
 		box-shadow: var(--cr-card-shadow);
 		overflow: hidden;
+	}
+	/* The logo's colours along the top of the box. */
+	.card::before {
+		content: '';
+		flex-shrink: 0;
+		height: 3px;
+		background: var(--dna-rainbow);
 	}
 	.card-head {
 		display: flex;
@@ -521,6 +599,33 @@
 	.wide {
 		grid-column: 1 / -1;
 	}
+	.request {
+		display: flex;
+		flex-direction: column;
+		gap: 8px;
+		line-height: 1.5;
+	}
+	.request p {
+		margin: 0;
+	}
+	/* Who to write to, as a letter's address block, with the logo's colours down its edge. */
+	.contact {
+		display: flex;
+		flex-direction: column;
+		gap: 2px;
+		padding: 10px 14px;
+		border-left: 3px solid transparent;
+		border-image: linear-gradient(180deg, var(--dna-blue), var(--dna-cyan), var(--dna-green), var(--dna-orange)) 1;
+		background: color-mix(in srgb, var(--mg-text) 3%, var(--mg-surface));
+		font-size: var(--cr-fs-meta);
+		font-style: normal;
+		color: var(--mg-text-2);
+	}
+	.contact-head {
+		margin-bottom: 2px;
+		font-weight: 600;
+		color: var(--mg-text);
+	}
 	.addr {
 		display: inline-flex;
 		align-items: center;
@@ -560,7 +665,7 @@
 	}
 	/* The logo, MARGIE's full name and its motto, rising in after it. */
 	.welcome {
-		--logo-size: clamp(240px, 27vw, 340px);
+		--logo-size: clamp(190px, 19vw, 240px);
 		display: flex;
 		flex-direction: column;
 		align-items: center;
@@ -581,6 +686,37 @@
 		text-wrap: balance;
 		color: var(--mg-text-2);
 		animation-delay: 520ms;
+	}
+	.rule {
+		width: 96px;
+		height: 3px;
+		margin: 8px 0 2px;
+		border-radius: 3px;
+		background: var(--dna-rainbow);
+	}
+	.bored {
+		display: inline-flex;
+		align-items: center;
+		gap: 7px;
+		padding: 6px 14px;
+		border: 1px solid color-mix(in srgb, var(--dna-cyan) 45%, var(--mg-border));
+		border-radius: 999px;
+		background: color-mix(in srgb, var(--dna-cyan) 8%, var(--mg-surface));
+		color: var(--mg-accent-ink, var(--mg-accent-base));
+		font: inherit;
+		font-size: var(--cr-fs-meta);
+		font-weight: 600;
+		cursor: pointer;
+		transition: background 120ms ease-out;
+	}
+	.bored:hover {
+		background: color-mix(in srgb, var(--dna-cyan) 16%, var(--mg-surface));
+	}
+	.game {
+		display: flex;
+		justify-content: center;
+		width: 100%;
+		padding-top: 10px;
 	}
 	@keyframes rise {
 		from {
