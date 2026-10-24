@@ -57,9 +57,9 @@ const TYPES: Record<string, string> = {
 	pdf: 'application/pdf'
 };
 
-/** Cluster files already fetched this visit, by URL: shown again at once (the newest 80 kept). */
+/** Cluster files already fetched this visit, by URL: shown again at once (the newest 24 kept, a map being up to about 8 MB). */
 const fetched = new Map<string, Promise<string>>();
-const KEPT = 80;
+const KEPT = 24;
 
 /** Returns a URL an <img> or <iframe> can load: `url` itself, or a blob copy of a cluster file. */
 export async function viewableUrl(url: string): Promise<string> {
