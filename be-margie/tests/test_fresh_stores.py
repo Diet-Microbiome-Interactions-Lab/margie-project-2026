@@ -41,3 +41,23 @@ def test_the_copy_script_knows_the_empty_reference_step():
 def test_fresh_needs_the_build_password(authed_client):  # noqa: F811
     r = authed_client.post("/v1/ssh/stores/setup", json={"fresh": True, "build_password": "wrong"})
     assert r.status_code == 403
+
+
+def test_a_first_run_without_a_base_it_reads_starts_new_ones():
+    """Outside the lab (no backup, no base the account reads): the operon reference from MARGIE's
+    starter in the backend copy, the other stores new and empty; nothing from depot."""
+    stores = [{"version": None, "found": None} for _ in user_stores.STORES]
+    got = {}
+    run = lambda conn, cmd, timeout=60.0: (0, "/home/u") if cmd.startswith("printf") else (0, "")  # noqa: E731
+    with patch.object(user_stores, "status", return_value={"root": "/scratch/c/u/margie/margie-databases", "op": None, "stores": stores}), \
+         patch.object(user_stores, "_start", side_effect=lambda conn, root, kind, plan, after, cfg: got.update(plan=plan, after=after)), \
+         patch.object(user_stores, "_backups", return_value=[]), \
+         patch.object(user_stores, "resolve_base", return_value=""), \
+         patch.object(user_stores, "_size", return_value=1), \
+         patch.object(user_stores, "_run", side_effect=run):
+        user_stores.start_setup(None, {}, "u")
+    plan = got["plan"]
+    copies = [p for p in plan if p[0] in ("copy", "files")]
+    assert len(copies) == 1 and copies[0][2] == f"/home/u/{user_stores.STARTER_OCC}"
+    assert all(v == 1 for v in got["after"]["versions"].values()) and len(got["after"]["versions"]) == len(user_stores.STORES)
+    assert [p for p in plan if p[0] == "new"]

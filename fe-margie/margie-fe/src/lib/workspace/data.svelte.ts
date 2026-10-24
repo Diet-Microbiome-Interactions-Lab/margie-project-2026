@@ -670,7 +670,7 @@ class Workspace {
 			// On a cluster's first run the databases are copied to scratch first; the run starts after.
 			if (message(e).startsWith(STORES_NOT_READY)) {
 				this.#runAfterSetup = body;
-				ui.notify('Setting up your databases first (a one-time copy). The run starts when it finishes.', 'ok');
+				ui.notify('Setting up your databases first (once). The run starts when it finishes.', 'ok');
 				if (!this.storesBusy) await this.setupStores();
 				else this.#watchStores();
 				return null;
@@ -715,10 +715,18 @@ class Workspace {
 			await this.loadStores();
 			const todo = (this.stores?.stores ?? []).filter((x) => !x.version);
 			const mine = todo.filter((x) => x.found?.ready).map((x) => x.label);
-			const missing = todo.filter((x) => !x.found?.ready).map((x) => x.label);
+			// Each one missing comes from your newest backup, else the group's base, else starts new (no base your account reads).
+			const missing = todo.filter((x) => !x.found?.ready);
+			const fromBackup = missing.filter((x) => x.backup).map((x) => x.label);
+			const fromBase = missing.filter((x) => !x.backup && x.base).map((x) => x.label);
+			const fresh = missing.filter((x) => !x.backup && !x.base).map((x) => x.label);
+			const into = where.replace(' in ', ' into ');
 			const said = [
 				mine.length && `Your own ${mine.join(', ')}${where} ${mine.length === 1 ? 'is' : 'are'} used where ${mine.length === 1 ? 'it is' : 'they are'} (given MARGIE's names; nothing copied).`,
-				missing.length && `A one-time copy of ${missing.join(', ')} from your group's folder${where.replace(' in ', ' into ')}, as a short SLURM job.`
+				fromBackup.length && `A copy of ${fromBackup.join(', ')} from your newest backup${into}.`,
+				fromBase.length && `A one-time copy of ${fromBase.join(', ')} from your group's folder${into}.`,
+				fresh.length && `New ${fresh.join(', ')}${where}, made for you (the operon reference from MARGIE's starter, the others empty); runs add to them.`,
+				missing.length && 'It runs as a short SLURM job, with its progress shown on Analyze.'
 			].filter(Boolean);
 			if (!confirm(`Set up your databases? ${said.join(' ') || 'Nothing needs copying.'} Nothing is overwritten.`)) {
 				this.#runAfterSetup = null;

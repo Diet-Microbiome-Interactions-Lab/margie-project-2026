@@ -33,7 +33,10 @@
 	// ------------------------------------------------ the folders a run uses
 	const folder = $derived(ws.genomeFolder || ws.setting('USER_INPUT_DIR'));
 	const output = $derived(ws.setting('OUTPUT_ROOT') || ws.resultRoots.outputRoot);
-	const working = $derived(ws.setting('margie_sb.stores_root'));
+	const working = $derived(ws.setting('margie_sb.working_folder'));
+	/** The databases folder: as set, or margie-databases in the working folder. */
+	const stores = $derived(ws.setting('margie_sb.stores_root'));
+	const storesShown = $derived(stores || (working ? `${working.replace(/\/+$/, '')}/margie-databases` : ''));
 	/** The folders' last names for the one-line summary; the whole path shows on hover. */
 	const last = (p: string) => p.replace(/\/+$/, '').split('/').pop() || p;
 	/** The three folder fields: folded under the genomes' title, open while no genomes folder is set. */
@@ -98,28 +101,42 @@
 	<div class="gb-where">
 		<span>
 			From <b class="mg-mono" title={folder}>{folder ? last(folder) : 'no folder yet'}</b> | results to
-			<b class="mg-mono" title={output}>{output ? last(output) : 'your home folder'}</b>{#if backend.cluster}{' | '}databases in
-				<b class="mg-mono" title={working}>{working ? last(working) : 'margie-databases'}</b>{/if}
+			<b class="mg-mono" title={output}>{output ? last(output) : 'your home folder'}</b>{#if backend.cluster}{' | '}working folder
+				<b class="mg-mono" title={working}>{working ? last(working) : 'margie'}</b>{' | '}databases in
+				<b class="mg-mono" title={storesShown}>{storesShown ? last(storesShown) : 'margie-databases'}</b>{/if}
 		</span>
 		{#if folder}<button type="button" class="mg-link quiet" aria-expanded={foldersOpen} onclick={() => (foldersOpen = !foldersOpen)}>{foldersOpen ? 'Done' : 'Change folders'}</button>{/if}
 	</div>
 	{#if showFolders}
-		<div class="gb-folders" class:three={backend.cluster}>
+		<div class="gb-folders">
 			<FolderField label="Genomes folder" key="USER_INPUT_DIR" value={folder} placeholder="/path/to/genomes" />
 			<FolderField label="Results folder" key="OUTPUT_ROOT" value={output} placeholder="/path/to/results" />
 			{#if backend.cluster}
-				<FolderField label="MARGIE-generated databases" key="margie_sb.stores_root" value={working} placeholder="/scratch/cluster/you/margie/margie-databases">
+				<FolderField label="MARGIE working folder" key="margie_sb.working_folder" value={working} placeholder="/scratch/cluster/you/margie">
 					{#snippet help()}
 						<p>
-							These are not the reference databases the annotation tools search (Pfam, KEGG, COG and the others, set up on Install). They are the
-							databases MARGIE builds from your own runs and adds to with every genome: the MARGIE database (SQLite: results, cached tool outputs
-							and job history), the operon reference, the fingerprint databases and the genome pool. You can back them up to depot from
-							<a class="mg-link" href={uiBase.to('/settings#databases')}>Settings</a>.
+							MARGIE's own folder on the cluster. The folders left empty go in it: margie-databases (MARGIE's databases), margie-input (genomes)
+							and margie-output (results). A new path here points the next runs at those in the new folder; the old folder keeps its files.
+						</p>
+					{/snippet}
+				</FolderField>
+				<FolderField
+					label="MARGIE databases"
+					key="margie_sb.stores_root"
+					value={stores}
+					placeholder={working ? `${working.replace(/\/+$/, '')}/margie-databases` : '/scratch/cluster/you/margie/margie-databases'}
+				>
+					{#snippet help()}
+						<p>
+							The databases MARGIE builds from your runs and adds to with each genome: the MARGIE database (SQLite: results, cached tool outputs
+							and job history), the operon reference, the fingerprint databases and the genome pool. Left empty, MARGIE makes margie-databases in
+							the working folder. You can back them up to depot from <a class="mg-link" href={uiBase.to('/settings#databases')}>Settings</a>; the
+							reference databases the annotation tools search (Pfam, KEGG, COG and the others) are set up on Install.
 						</p>
 						<p>
-							They live in this working folder on the cluster, and runs need them; change the path here to use another folder. When none are found
-							here, the first run copies the lab's base databases from the group's folder on depot and works from those, unless you set up fresh,
-							empty ones in <a class="mg-link" href={uiBase.to('/settings#databases')}>Settings → Databases</a>.
+							The first run sets them up, as a short SLURM job with its progress shown here: it copies the lab's base databases from the group's
+							folder on depot, or, where your account reads no base, makes new ones (MARGIE's starter operon reference, the others empty). Fresh,
+							empty ones can also be set up in <a class="mg-link" href={uiBase.to('/settings#databases')}>Settings → Databases</a>.
 						</p>
 						<p>
 							Scoring compares each genome with what the SQLite database, the operon reference and the fingerprint databases already hold. Starting
@@ -131,7 +148,7 @@
 		</div>
 		<p class="gb-note mg-explain">
 			Genomes are read from the first folder and results written to the second.{backend.cluster
-				? ' The third holds the databases MARGIE generates from your runs (not the tools\' reference databases); its ? says more.'
+				? ' The working folder holds MARGIE\'s own folders, and the databases folder the databases MARGIE builds from your runs (left empty: margie-databases in the working folder); each ? says more.'
 				: ''}
 		</p>
 	{/if}
@@ -261,9 +278,6 @@
 		grid-template-columns: repeat(2, minmax(0, 1fr));
 		gap: 12px;
 	}
-	.gb-folders.three {
-		grid-template-columns: repeat(3, minmax(0, 1fr));
-	}
 	.gb-src {
 		display: grid;
 		grid-template-columns: minmax(0, 1fr);
@@ -368,8 +382,7 @@
 		transition: none !important;
 	}
 	@media (max-width: 900px) {
-		.gb-folders,
-		.gb-folders.three {
+		.gb-folders {
 			grid-template-columns: minmax(0, 1fr);
 		}
 	}
