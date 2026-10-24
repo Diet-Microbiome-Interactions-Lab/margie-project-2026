@@ -16,6 +16,7 @@ import {
 	styleString,
 	themeVars,
 	DEFAULT_PREFS,
+	LOOK_KEYS,
 	lookOf,
 	type LayoutName,
 	type PanelId,
@@ -252,6 +253,30 @@ class Ui {
 			}
 		}
 		this.update(Object.keys(look).length ? look : lookOf({ ...DEFAULT_PREFS, interface: FIRST_INTERFACE }));
+	}
+
+	/**
+	 * Reset theme: back to MARGIE's recommended look (colours, type, sizes, layout and the reading
+	 * aids as MARGIE ships them), asked first; light or dark and Simple or Guided stay as chosen. A
+	 * default look kept before is cleared too, so MARGIE opens with its own.
+	 */
+	async resetLook() {
+		if (!confirm("Reset the theme to MARGIE's recommended look? Your colours, type and layout, and any default look you kept, go back to MARGIE's own; light or dark stays as it is.")) return;
+		const keep: string[] = ['interface', 'mode', 'theme'];
+		this.update(Object.fromEntries(LOOK_KEYS.filter((k) => !keep.includes(k)).map((k) => [k, structuredClone(DEFAULT_PREFS[k])])) as Partial<UiPrefs>);
+		this.hasDefault = false;
+		try {
+			localStorage.removeItem(DEFAULT_KEY);
+		} catch {
+			// Storage blocked: nothing kept there.
+		}
+		const saving = NO_SERVER
+			? accountLook({ default: {} })
+			: fetch(`${UI_API}/default`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ prefs: {} }) });
+		await saving?.catch(() => {
+			// Unreachable: the next change saves the look.
+		});
+		this.notify("Back to MARGIE's recommended look.", 'ok');
 	}
 
 	/** The front page of the interface this browser opens with. */
