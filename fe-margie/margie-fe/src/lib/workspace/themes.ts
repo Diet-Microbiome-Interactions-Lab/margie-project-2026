@@ -98,7 +98,8 @@ const HAND_MADE: Preset[] = [
 		accent: 'blue',
 		name: 'Modern',
 		note: 'White boxes on cool grey',
-		light: { bg: '#F5F6F8', surface: '#FFFFFF', surface2: '#F4F5F7', border: '#E2E4E8', borderStrong: '#C4C8CE', text: '#15181D', text2: '#454C57', text3: '#646B76' },
+		// Lines (hairlines between rows) a faint blue-white, so rows part without ruling the page.
+		light: { bg: '#F5F6F8', surface: '#FFFFFF', surface2: '#F4F5F7', border: '#F5F8FF', borderStrong: '#C4C8CE', text: '#15181D', text2: '#454C57', text3: '#646B76' },
 		// Charcoal at night, lifted off black so boxes, lines and the bars stay readable.
 		dark: { bg: '#1C1F25', surface: '#23272E', surface2: '#2A2F37', border: '#373D47', borderStrong: '#4D5461', text: '#ECEEF1', text2: '#BEC4CD', text3: '#A1A8B2' }
 	},
