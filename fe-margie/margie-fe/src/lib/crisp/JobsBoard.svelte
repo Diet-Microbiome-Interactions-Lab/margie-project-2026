@@ -6,7 +6,7 @@
 	import { ui } from '$lib/workspace/ui.svelte';
 	import { page } from '$app/state';
 	import { genomeList, stemOf } from '$lib/crisp/genomes';
-	import { buildProgress, leftText, span, toolsOfRun, UNTIMED_FLOOR } from '$lib/crisp/progress-model';
+	import { buildProgress, span, toolsOfRun } from '$lib/crisp/progress-model';
 	import type { ToolClock } from '$lib/workspace/data.svelte';
 	import '$lib/workspace/viewers/tools.css';
 	import { api, type Run } from '$lib/api';
@@ -87,8 +87,10 @@
 		}
 		if (shown?.id === id && shown.status === 'running') timer = setTimeout(() => follow(id, false), 2000);
 	}
+	/** The picked job's id: the job list's 3 s refresh brings new run objects but the same id, so the log is kept and followed, not read again. */
+	const shownId = $derived(shown?.id ?? null);
 	$effect(() => {
-		const id = shown?.id;
+		const id = shownId;
 		if (!id) return;
 		untrack(() => {
 			if (timer) clearTimeout(timer);
@@ -267,9 +269,12 @@
 			{#if shown}
 				<header class="job">
 					<div class="job-what">
-						<span class="job-name">{title(shown)}</span>
+						<h2 class="job-name" title={title(shown)}>{title(shown)}</h2>
 						<span class="job-meta">
-							<span class="mg-mono">{shown.id}</span> | <span class="st {shown.status}">{statusWord(shown)}</span> | started {ago(shown.started, tickAt)}{shown.finished ? ` | took ${duration(shown, tickAt)}` : ''}
+							<span class="pill {shown.status}">{statusWord(shown)}</span>
+							<span>started {ago(shown.started, tickAt)}</span>
+							<span class="sep" aria-hidden="true">|</span>
+							<span class="mg-mono" title={shown.id}>{shortId(shown.id)}</span>
 						</span>
 					</div>
 					<div class="job-acts">
@@ -285,15 +290,32 @@
 					</div>
 				</header>
 				{#if shown.reason}<p class="why" title={shown.reason}>{shown.reason}</p>{/if}
+				<!-- One bar, then four tiles of one size: how far, how many steps, how long, and the time left (or when it ended). -->
 				<div class="sum">
 					{#if prog}
 						<span class="bar" role="progressbar" aria-valuenow={prog.overall} aria-valuemin="0" aria-valuemax="100" aria-label="Progress"><span style="width: {prog.overall}%"></span></span>
-						<span class="sum-line">
-							<b>{prog.overall}%</b> | {prog.counts.done} of {prog.counts.all} steps | {going ? `${duration(shown, tickAt)} so far` : `took ${duration(shown, tickAt)}`}{going && leftText(prog.left, prog.unknown, UNTIMED_FLOOR) ? ` | ${leftText(prog.left, prog.unknown, UNTIMED_FLOOR)}` : ''}
-						</span>
+						<div class="stats">
+							<div class="stat"><span class="k">Progress</span><span class="v">{prog.overall}%</span></div>
+							<div class="stat"><span class="k">Steps</span><span class="v">{prog.counts.done} of {prog.counts.all}</span></div>
+							<div class="stat"><span class="k">{going ? 'Running for' : 'Took'}</span><span class="v">{duration(shown, tickAt)}</span></div>
+							{#if going}
+								<div class="stat" title={prog.untimed.length ? `On their first run here, so not in the estimate yet: ${prog.untimed.join(', ')}` : undefined}>
+									<span class="k">Time left</span>
+									<span class="v">{prog.left > 0 ? `about ${span(prog.left)}` : prog.untimed.length ? 'first run here' : 'finishing'}</span>
+									{#if prog.untimed.length && prog.left > 0}<span class="n">+ {prog.untimed.length} step{prog.untimed.length === 1 ? '' : 's'} on a first run</span>{/if}
+								</div>
+							{:else}
+								<div class="stat"><span class="k">Finished</span><span class="v">{shown.finished ? when(shown.finished) : statusWord(shown)}</span></div>
+							{/if}
+						</div>
 					{:else}
 						<span class="bar" role="progressbar" aria-valuenow={plainPct} aria-valuemin="0" aria-valuemax="100" aria-label="Progress"><span style="width: {Math.max(going ? 3 : 0, plainPct)}%"></span></span>
-						<span class="sum-line"><b>{plainPct}%</b> | {shown.progressText || log?.step || statusWord(shown)}</span>
+						<div class="stats">
+							<div class="stat"><span class="k">Progress</span><span class="v">{plainPct}%</span></div>
+							<div class="stat"><span class="k">Step</span><span class="v" title={shown.progressText || log?.step || statusWord(shown)}>{shown.progressText || log?.step || statusWord(shown)}</span></div>
+							<div class="stat"><span class="k">{going ? 'Running for' : 'Took'}</span><span class="v">{duration(shown, tickAt)}</span></div>
+							<div class="stat"><span class="k">Started</span><span class="v">{when(shown.started)}</span></div>
+						</div>
 					{/if}
 				</div>
 				{#if srcShown.length}
@@ -310,24 +332,29 @@
 				{/if}
 				<details class="facts">
 					<summary>Details</summary>
+					<!-- One label column and one value column, each fact on its own row. -->
 					<dl>
-						<div><dt>Job ID</dt><dd class="mg-mono">{shown.id}</dd></div>
-						<div><dt>Started</dt><dd>{when(shown.started)}</dd></div>
-						<div><dt>{shown.finished ? 'Finished' : 'Running for'}</dt><dd>{shown.finished ? when(shown.finished) : duration(shown, tickAt)}</dd></div>
-						{#if shown.exitCode != null}<div><dt>Exit code</dt><dd class:bad={shown.exitCode !== 0}>{shown.exitCode}</dd></div>{/if}
-						{#if log?.step}<div><dt>Step</dt><dd>{log.step}</dd></div>{/if}
-						{#if shown.outputDir}<div class="wide"><dt>Output folder</dt><dd><a class="mg-link mg-mono" href={folderHref(shown.outputDir)}>{shown.outputDir}</a></dd></div>{/if}
+						<dt>Job ID</dt><dd class="mg-mono">{shown.id}</dd>
+						<dt>Started</dt><dd>{when(shown.started)}</dd>
+						<dt>{shown.finished ? 'Finished' : 'Running for'}</dt><dd>{shown.finished ? when(shown.finished) : duration(shown, tickAt)}</dd>
+						{#if shown.exitCode != null}<dt>Exit code</dt><dd class:bad={shown.exitCode !== 0}>{shown.exitCode}</dd>{/if}
+						{#if log?.step}<dt>Step</dt><dd>{log.step}</dd>{/if}
+						{#if shown.outputDir}<dt>Output folder</dt><dd><a class="mg-link mg-mono" href={folderHref(shown.outputDir)}>{shown.outputDir}</a></dd>{/if}
 						{#if shown.files?.length}
-							<div class="wide"><dt>Genomes <b>{shown.files.length}</b></dt><dd class="chips">{#each shown.files.slice(0, 24) as f (f)}<span class="mg-mono">{f}</span>{/each}{#if shown.files.length > 24}<span>+{shown.files.length - 24}</span>{/if}</dd></div>
+							<dt>Genomes <span class="count">{shown.files.length}</span></dt>
+							<dd class="chips">{#each shown.files.slice(0, 24) as f (f)}<span class="mg-mono">{f}</span>{/each}{#if shown.files.length > 24}<span>+{shown.files.length - 24}</span>{/if}</dd>
 						{/if}
 						{#if shown.tools?.length}
-							<div class="wide"><dt>Tools <b>{shown.tools.length}</b></dt><dd class="chips">{#each shown.tools as t (t)}<span class="mg-mono">{t}</span>{/each}</dd></div>
+							<dt>Tools <span class="count">{shown.tools.length}</span></dt>
+							<dd class="chips">{#each shown.tools as t (t)}<span class="mg-mono">{t}</span>{/each}</dd>
 						{/if}
 						{#if slurm.length}
-							<div class="wide"><dt>SLURM jobs <b>{slurm.length}</b></dt><dd class="chips">{#each slurm as j (j)}<span class="mg-mono">{j}</span>{/each}</dd></div>
+							<dt>SLURM jobs <span class="count">{slurm.length}</span></dt>
+							<dd class="chips">{#each slurm as j (j)}<span class="mg-mono">{j}</span>{/each}</dd>
 						{/if}
 						{#if containers.length}
-							<div class="wide"><dt>Containers <b>{containers.length}</b></dt><dd class="chips">{#each containers as c (c)}<span class="mg-mono">{c}</span>{/each}</dd></div>
+							<dt>Containers <span class="count">{containers.length}</span></dt>
+							<dd class="chips">{#each containers as c (c)}<span class="mg-mono">{c}</span>{/each}</dd>
 						{/if}
 					</dl>
 				</details>
@@ -364,12 +391,19 @@
 
 <style>
 	/* The jobs beside the picked one's line, its progress across the width, then its log.
-	   Each part scrolls on its own; the page scrolls past them. */
+	   Each part scrolls on its own; the page scrolls past them. One type scale throughout:
+	   --cr-fs-section for the job's name, --cr-fs-body for its figures, --cr-fs-meta for
+	   labels and lines, --cr-fs-micro for chips; monospaced text a touch smaller, to sit level. */
 	.board {
 		display: flex;
 		flex-direction: column;
 		gap: 12px;
 		color: var(--mg-text);
+		font-size: var(--cr-fs-meta);
+	}
+	.list :global(.mg-mono),
+	.side :global(.mg-mono) {
+		font-size: 0.94em;
 	}
 	/* As tall as the job's lines need; a long list scrolls inside it. */
 	.top {
@@ -401,8 +435,11 @@
 		display: flex;
 		align-items: center;
 		justify-content: space-between;
-		padding: 6px 6px 2px 14px;
-		font-size: var(--mg-fs-xs);
+		padding: 8px 8px 2px 14px;
+		font-size: var(--cr-fs-micro);
+		font-weight: 600;
+		letter-spacing: 0.04em;
+		text-transform: uppercase;
 		color: var(--mg-text-3);
 	}
 	.pane-btn {
@@ -422,7 +459,7 @@
 	}
 	.shut-count {
 		writing-mode: vertical-rl;
-		font-size: var(--mg-fs-xs);
+		font-size: var(--cr-fs-micro);
 		color: var(--mg-text-3);
 	}
 	/* ---- the list: one line per job ---- */
@@ -438,14 +475,14 @@
 		align-items: center;
 		gap: 6px;
 		width: 100%;
-		height: 26px;
-		padding: 0 8px;
+		height: 32px;
+		padding: 0 10px;
 		border: none;
 		border-radius: var(--mg-r-sm);
 		background: none;
 		color: var(--mg-text-2);
 		font: inherit;
-		font-size: var(--mg-fs-sm);
+		font-size: var(--cr-fs-meta);
 		text-align: left;
 		white-space: nowrap;
 		cursor: pointer;
@@ -492,11 +529,11 @@
 	}
 	.r-id {
 		flex: none;
-		font-size: 0.92em;
 		color: var(--mg-text-3);
 	}
 	.r-st {
 		flex: none;
+		font-size: var(--cr-fs-micro);
 	}
 	.row.failed .r-st {
 		color: var(--mg-danger);
@@ -522,37 +559,56 @@
 		display: flex;
 		flex-wrap: wrap;
 		align-items: center;
-		gap: 6px 12px;
-		padding: 8px var(--mg-pad);
+		gap: 8px 16px;
+		padding: 12px var(--mg-pad);
 		border-bottom: 1px solid var(--mg-border);
 	}
 	.job-what {
 		display: flex;
 		flex-direction: column;
+		gap: 5px;
 		flex: 1 1 260px;
 		min-width: 0;
 	}
 	.job-name {
+		margin: 0;
 		overflow: hidden;
 		text-overflow: ellipsis;
 		white-space: nowrap;
-		font-weight: 700;
+		font-size: var(--cr-fs-section);
+		font-weight: 650;
+		line-height: 1.25;
 	}
 	.job-meta {
+		display: flex;
+		align-items: center;
+		gap: 8px;
+		min-width: 0;
 		overflow: hidden;
-		text-overflow: ellipsis;
 		white-space: nowrap;
-		font-size: var(--mg-fs-xs);
 		color: var(--mg-text-3);
 	}
-	.st.failed {
-		color: var(--mg-danger);
+	/* The job's status as a pill, coloured by how it stands. */
+	.pill {
+		flex: none;
+		padding: 1px 9px;
+		border-radius: 999px;
+		background: color-mix(in srgb, var(--mg-text) 8%, transparent);
+		color: var(--mg-text-2);
+		font-size: var(--cr-fs-micro);
+		font-weight: 600;
 	}
-	.st.running {
-		color: var(--mg-accent-ink);
+	.pill.running {
+		background: color-mix(in srgb, var(--mg-accent) 14%, transparent);
+		color: var(--mg-accent-ink, var(--mg-accent));
 	}
-	.st.completed {
+	.pill.completed {
+		background: color-mix(in srgb, var(--mg-ok) 14%, transparent);
 		color: var(--mg-ok);
+	}
+	.pill.failed {
+		background: color-mix(in srgb, var(--mg-danger) 12%, transparent);
+		color: var(--mg-danger);
 	}
 	.job-acts {
 		display: flex;
@@ -568,7 +624,7 @@
 		overflow: hidden;
 		text-overflow: ellipsis;
 		white-space: nowrap;
-		font-size: var(--mg-fs-xs);
+		font-size: var(--cr-fs-meta);
 		color: var(--mg-danger);
 		border-bottom: 1px solid var(--mg-border);
 	}
@@ -582,13 +638,12 @@
 	}
 	.sum {
 		display: flex;
-		align-items: center;
+		flex-direction: column;
 		gap: 12px;
-		padding: 10px var(--mg-pad) 4px;
+		padding: 14px var(--mg-pad) 6px;
 	}
 	.bar {
 		display: block;
-		flex: 1 1 auto;
 		height: 6px;
 		overflow: hidden;
 		border-radius: 99px;
@@ -601,12 +656,54 @@
 		background: var(--mg-accent);
 		transition: width 600ms ease;
 	}
-	.sum-line {
-		flex: none;
-		font-size: var(--mg-fs-sm);
-		font-variant-numeric: tabular-nums;
-		color: var(--mg-text-2);
+	/* Four tiles of one width, a hairline between them. */
+	.stats {
+		display: grid;
+		grid-template-columns: repeat(4, minmax(0, 1fr));
+	}
+	.stat {
+		display: flex;
+		flex-direction: column;
+		gap: 2px;
+		min-width: 0;
+		padding: 0 14px;
+		border-left: 1px solid var(--mg-border);
+	}
+	.stat:first-child {
+		padding-left: 0;
+		border-left: none;
+	}
+	.stat .k {
+		font-size: var(--cr-fs-micro);
+		font-weight: 600;
+		letter-spacing: 0.04em;
+		text-transform: uppercase;
+		color: var(--mg-text-3);
+	}
+	.stat .v {
+		overflow: hidden;
+		text-overflow: ellipsis;
 		white-space: nowrap;
+		font-size: var(--cr-fs-body);
+		font-weight: 600;
+		font-variant-numeric: tabular-nums;
+	}
+	.stat .n {
+		overflow: hidden;
+		text-overflow: ellipsis;
+		white-space: nowrap;
+		font-size: var(--cr-fs-micro);
+		color: var(--mg-text-3);
+	}
+	@media (max-width: 760px) {
+		.stats {
+			grid-template-columns: repeat(2, minmax(0, 1fr));
+			row-gap: 10px;
+		}
+		.stat:nth-child(3) {
+			padding-left: 0;
+			border-left: none;
+		}
 	}
 	.srcs {
 		display: flex;
@@ -614,8 +711,8 @@
 		align-items: center;
 		gap: 4px 8px;
 		margin: 0;
-		padding: 4px var(--mg-pad);
-		font-size: var(--mg-fs-xs);
+		padding: 6px var(--mg-pad);
+		font-size: var(--cr-fs-micro);
 		color: var(--mg-text-2);
 	}
 	.src-n {
@@ -633,7 +730,7 @@
 		display: inline-block;
 		padding: 1px 8px;
 		border-radius: 999px;
-		font-size: var(--mg-fs-xs);
+		font-size: var(--cr-fs-micro);
 		font-weight: 600;
 		white-space: nowrap;
 	}
@@ -653,35 +750,45 @@
 		background: color-mix(in srgb, var(--mg-text) 8%, transparent);
 		color: var(--mg-text-2);
 	}
-	/* Its details, folded under a line. */
+	/* Its details, folded under a line: a label column and a value column. */
 	.facts {
-		margin: 4px var(--mg-pad) 10px;
-		font-size: var(--mg-fs-sm);
+		margin: 6px var(--mg-pad) 14px;
 	}
 	.facts summary {
 		width: max-content;
+		font-weight: 600;
 		color: var(--mg-text-2);
 		cursor: pointer;
 	}
 	.facts dl {
 		display: grid;
-		grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
-		gap: 8px 16px;
-		margin: 8px 0 0;
-	}
-	.facts dl > div {
-		min-width: 0;
-	}
-	.facts .wide {
-		grid-column: 1 / -1;
+		grid-template-columns: 9.5em minmax(0, 1fr);
+		align-items: baseline;
+		gap: 9px 18px;
+		margin: 12px 0 0;
+		padding: 12px 14px;
+		border: 1px solid var(--mg-border);
+		border-radius: var(--mg-r);
+		background: color-mix(in srgb, var(--mg-text) 2%, var(--mg-surface));
 	}
 	.facts dt {
-		font-size: var(--mg-fs-xs);
+		display: flex;
+		align-items: center;
+		gap: 6px;
 		color: var(--mg-text-3);
 	}
 	.facts dd {
+		min-width: 0;
 		margin: 0;
 		overflow-wrap: anywhere;
+	}
+	.count {
+		padding: 0 6px;
+		border-radius: 999px;
+		background: color-mix(in srgb, var(--mg-text) 7%, transparent);
+		font-size: var(--cr-fs-micro);
+		font-weight: 600;
+		color: var(--mg-text-2);
 	}
 	.facts dd.bad {
 		color: var(--mg-danger);
@@ -695,7 +802,7 @@
 		padding: 1px 6px;
 		border-radius: var(--mg-r-sm);
 		background: color-mix(in srgb, var(--mg-text) 6%, transparent);
-		font-size: var(--mg-fs-xs);
+		font-size: var(--cr-fs-micro);
 	}
 
 	/* The log: dark in either theme, most of the window tall, and taller or shorter by its bottom edge. */
@@ -725,7 +832,7 @@
 		overflow: hidden;
 		text-overflow: ellipsis;
 		white-space: nowrap;
-		font-size: var(--mg-fs-xs);
+		font-size: var(--cr-fs-meta);
 		font-weight: 600;
 		color: #c9d0d6;
 	}
@@ -740,7 +847,7 @@
 		background: none;
 		color: #c9d0d6;
 		font: inherit;
-		font-size: 12px;
+		font-size: var(--cr-fs-micro);
 		cursor: pointer;
 	}
 	.term-btn:hover:not(:disabled) {
@@ -761,8 +868,8 @@
 		margin: 0;
 		padding: 8px var(--mg-pad) 14px;
 		overflow: auto;
-		font-size: 11.5px;
-		line-height: 1.5;
+		font-size: var(--cr-fs-micro);
+		line-height: 1.55;
 		white-space: pre-wrap;
 		word-break: break-word;
 		color: color-mix(in srgb, var(--tm-ink) 85%, transparent);
@@ -774,7 +881,7 @@
 		color: color-mix(in srgb, var(--mg-danger) 75%, #fff);
 	}
 	.term-n {
-		font-size: 11px;
+		font-size: var(--cr-fs-micro);
 		color: #8b949e;
 		white-space: nowrap;
 	}
@@ -782,7 +889,7 @@
 		display: inline-flex;
 		align-items: center;
 		gap: 5px;
-		font-size: 11px;
+		font-size: var(--cr-fs-micro);
 		color: color-mix(in srgb, var(--mg-ok) 75%, #fff);
 	}
 	.live i {
@@ -798,7 +905,7 @@
 	.term-err {
 		margin: 0;
 		padding: 4px var(--mg-pad);
-		font-size: var(--mg-fs-xs);
+		font-size: var(--cr-fs-micro);
 		color: color-mix(in srgb, var(--mg-danger) 75%, #fff);
 	}
 	.out:not(.wrap) {

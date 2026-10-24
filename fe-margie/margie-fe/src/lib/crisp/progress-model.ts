@@ -41,9 +41,10 @@ export interface RowProgress {
 	running: string[];
 	done: number;
 	of: number;
-	/** Seconds still needed; `unknown` when a step has no usual time (then it is a lower bound). */
+	/** Seconds still needed for the steps with a usual time; `untimed` names the others (their first run here). */
 	left: number;
 	unknown: boolean;
+	untimed: string[];
 }
 
 export interface ColumnProgress {
@@ -62,9 +63,10 @@ export interface Progress {
 	columns: ColumnProgress[];
 	overall: number;
 	counts: { done: number; all: number };
-	/** The whole job: seconds still needed, and whether that is a lower bound. */
+	/** The whole job: seconds still needed for the timed steps, and the steps on their first run here. */
 	left: number;
 	unknown: boolean;
+	untimed: string[];
 }
 
 export interface ProgressInput {
@@ -114,17 +116,16 @@ export function span(seconds: number): string {
 	const h = Math.floor(m / 60);
 	return `${h} h${m % 60 ? ` ${m % 60} min` : ''}`;
 }
-/** A whole job's estimate when some of its steps have never been timed here: at least this. */
-export const UNTIMED_FLOOR = 12 * 3600;
-
 /**
- * "about 12 min left", "at least 12 h left", or '' when nothing is left. When a step has no
- * usual time, the known part is only a lower bound; `floor` (UNTIMED_FLOOR unless given)
- * keeps that bound from reading like a few seconds.
+ * "about 12 min left"; with steps on their first run here (no usual time yet), "about 12 min
+ * left, plus gtdbtk (first run here)" or "time left: gtdbtk (first run here)"; '' when nothing
+ * is left. Each step's usual time comes from earlier runs, so a step is timed once it has run.
  */
-export function leftText(left: number, unknown: boolean, floor = UNTIMED_FLOOR): string {
-	if (unknown) return left > 0 || floor > 0 ? `at least ${span(Math.max(left, floor))} left` : 'time left unknown';
-	return left > 0 ? `about ${span(left)} left` : '';
+export function leftText(left: number, untimed: readonly string[] = []): string {
+	const known = left > 0 ? `about ${span(left)} left` : '';
+	if (!untimed.length) return known;
+	const named = untimed.length > 3 ? `${untimed.slice(0, 3).join(', ')} and ${untimed.length - 3} more` : untimed.join(', ');
+	return known ? `${known}, plus ${named} (first run here)` : `time left: ${named} (first run here)`;
 }
 
 export function phasesOf(tools: string[], offered: string[]) {
@@ -300,11 +301,11 @@ export function buildProgress(i: ProgressInput): Progress {
 		const pct = Math.round(avg(cs) ?? 0);
 		// Phases one after another; within one, the longest step counts.
 		let left = 0;
-		let unknown = false;
+		const untimed: string[] = [];
 		if (run) {
 			const byPhase = new Map<number, number>();
 			for (const c of on) {
-				if (c.left === null) unknown = true;
+				if (c.left === null && c.state !== 'done') untimed.push(c.t);
 				const k = phaseOf.get(c.t) ?? 0;
 				byPhase.set(k, Math.max(byPhase.get(k) ?? 0, c.left ?? 0));
 			}
@@ -328,7 +329,7 @@ export function buildProgress(i: ProgressInput): Progress {
 						: running.length || doneN
 							? 'running'
 							: 'queued';
-		return { g, cells: cs, pct, state, running, done: doneN, of: on.length, left, unknown };
+		return { g, cells: cs, pct, state, running, done: doneN, of: on.length, left, unknown: untimed.length > 0, untimed };
 	});
 
 	const columns = cols.map((t, j) => {
@@ -353,7 +354,8 @@ export function buildProgress(i: ProgressInput): Progress {
 		counts: { done: columns.reduce((a, c) => a + c.done, 0), all: columns.reduce((a, c) => a + c.of, 0) },
 		// Genomes one after another (the cluster's Stage 2 takes one at a time).
 		left: rows.reduce((a, r) => a + (r.state === 'done' ? 0 : r.left), 0),
-		unknown: rows.some((r) => r.state !== 'done' && r.unknown)
+		unknown: rows.some((r) => r.state !== 'done' && r.unknown),
+		untimed: [...new Set(rows.flatMap((r) => (r.state === 'done' ? [] : r.untimed)))]
 	};
 }
 

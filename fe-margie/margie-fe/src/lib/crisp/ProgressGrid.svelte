@@ -1,7 +1,7 @@
 <script lang="ts">
 	import { Check, X } from 'lucide-svelte';
 	import { cachedOn, sourceSay } from '$lib/crisp/cache-report';
-	import { leftText, span, UNTIMED_FLOOR, type Progress, type RowProgress } from '$lib/crisp/progress-model';
+	import { leftText, span, type Progress, type RowProgress } from '$lib/crisp/progress-model';
 	import { uiBase } from '$lib/workspace/base.svelte';
 
 	/**
@@ -209,12 +209,12 @@
 					{/if}
 					{#if going && (c.state === 'run' || c.state === 'wait' || c.state === 'none')}
 						<dt>Left</dt>
-						<dd>{c.left === null ? `at least ${span(UNTIMED_FLOOR)} (no earlier run of this tool to go by)` : `about ${span(c.left)}`}</dd>
+						<dd>{c.left === null ? 'its first run here: timed once it has run' : `about ${span(c.left)}`}</dd>
 					{/if}
 					<dt>This genome</dt>
-					<dd>{row.pct}%, {row.done} of {row.of} steps{going && leftText(row.left, row.unknown) ? `, ${leftText(row.left, row.unknown)}` : ''}</dd>
+					<dd>{row.pct}%, {row.done} of {row.of} steps{going && leftText(row.left, row.untimed) ? `, ${leftText(row.left, row.untimed)}` : ''}</dd>
 					<dt>Whole job</dt>
-					<dd>{prog.overall}%, {prog.counts.done} of {prog.counts.all} steps{going && leftText(prog.left, prog.unknown, UNTIMED_FLOOR) ? `, ${leftText(prog.left, prog.unknown, UNTIMED_FLOOR)}` : ''}</dd>
+					<dd>{prog.overall}%, {prog.counts.done} of {prog.counts.all} steps{going && leftText(prog.left, prog.untimed) ? `, ${leftText(prog.left, prog.untimed)}` : ''}</dd>
 				</dl>
 				<div class="pop-acts">
 					{#if c.state === 'failed' && onLog}
@@ -237,7 +237,7 @@
 					<dd>{ROW_WORD[row.state]}, {row.pct}% | {row.done} of {row.of} steps</dd>
 					{#if row.running.length}<dt>Running now</dt><dd>{row.running.join(' | ')}</dd>{/if}
 					{#if elapsedOf(row.g)}<dt>Time so far</dt><dd>{elapsedOf(row.g)}</dd>{/if}
-					{#if going && row.state !== 'done' && leftText(row.left, row.unknown)}<dt>Left</dt><dd>{leftText(row.left, row.unknown)}</dd>{/if}
+					{#if going && row.state !== 'done' && leftText(row.left, row.untimed)}<dt>Left</dt><dd>{leftText(row.left, row.untimed)}</dd>{/if}
 					{#if from.restored + from.partly + from.fresh + from.kept}
 						<dt>Results</dt>
 						<dd>
