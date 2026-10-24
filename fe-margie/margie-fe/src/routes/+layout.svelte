@@ -1,7 +1,9 @@
 <script lang="ts">
 	import './layout.css';
 	import { onMount } from 'svelte';
-	import { afterNavigate, goto } from '$app/navigation';
+	import { afterNavigate, beforeNavigate, goto } from '$app/navigation';
+	import { updated } from '$app/state';
+	import { ui } from '$lib/workspace/ui.svelte';
 	import favicon from '$lib/assets/favicon.svg';
 	import { backend } from '$lib/workspace/backend.svelte';
 	import { isLoggedIn } from '$lib/auth.js';
@@ -12,6 +14,18 @@
 
 	// Rechecked on every navigation (including the one after signing in).
 	afterNavigate(() => backend.refresh());
+
+	// A new version deployed while this tab was open: said once, and the next click loads it whole.
+	let toldUpdated = false;
+	$effect(() => {
+		if (updated.current && !toldUpdated) {
+			toldUpdated = true;
+			ui.notify('MARGIE has a new version: it loads with your next click.', 'info');
+		}
+	});
+	beforeNavigate(({ willUnload, to }) => {
+		if (updated.current && !willUnload && to?.url) location.href = to.url.href;
+	});
 
 	// The website: every page needs a signed-in cluster account, except signing in.
 	// The pages bring their own top bar (routes/(app)/+layout.svelte); sign-in has none.
