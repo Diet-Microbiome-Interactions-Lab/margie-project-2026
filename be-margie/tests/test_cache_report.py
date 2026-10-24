@@ -59,6 +59,11 @@ def test_the_log_line_names_each_level_and_the_database():
     assert 'merops' not in line and DB in line
 
 
+def test_quast_runs_beside_the_pipeline():
+    assert cr.stage_of('quast') == 'beside the pipeline'
+    assert cr.stage_of('gtdbtk') == 'before gene calling'
+
+
 def test_no_folder_no_file():
     cr.CacheReport('', DB).write()  # nothing to write to, and no error
 

@@ -98,10 +98,8 @@ QUAST_RESULTS = f"{GENOME_PREFIX}quast/quast.tsv"
 QUAST_TOKEN = f"{GENOME_PREFIX}quast/quast_db.tkn"
 
 # Batch staging and aggregation paths for QUAST.
-QUAST_BATCH_PREFIX = f"{_OUTPUT_ROOT}/original_container_outputs/quast" if _OUTPUT_ROOT else "original_container_outputs/quast"
-QUAST_BATCH_STAGE_DIR = f"{QUAST_BATCH_PREFIX}/stage"
-QUAST_BATCH_OUTPUT_DIR = f"{QUAST_BATCH_PREFIX}/container_outputs"
-QUAST_BATCH_DONE = f"{QUAST_BATCH_PREFIX}/quast_batch.done"
+# QUAST's own container output, one folder per genome.
+QUAST_CONTAINER_PREFIX = f"{_OUTPUT_ROOT}/original_container_outputs/quast" if _OUTPUT_ROOT else "original_container_outputs/quast"
 
 # GTDB-Tk outputs
 GTDBTK_RESULTS = f"{GENOME_PREFIX}gtdbtk/gtdbtk_results.tsv"
@@ -612,14 +610,13 @@ rule all:
 
 
 rule rasttk_all:
-    """Stage 1 of workflow.py's sequential run: phase1-3 for every genome.
+    """Stage 1 of workflow.py's sequential run: GTDB-Tk and gene calling for every genome.
 
-    run_gtdbtk and run_quast gate their database loads here.
+    run_gtdbtk gates its database load here. QUAST runs on its own (rule run_quast).
     """
     input:
         expand(RASTTK_TOKEN, genome=list(GENOMES.keys())),
-        (expand(GTDBTK_TOKEN, genome=list(GENOMES.keys())) if rc_bool('run_gtdbtk', True, config=config) else []),
-        (expand(QUAST_TOKEN, genome=list(GENOMES.keys())) if rc_bool('run_quast', True, config=config) else [])
+        (expand(GTDBTK_TOKEN, genome=list(GENOMES.keys())) if rc_bool('run_gtdbtk', True, config=config) else [])
 
 
 rule phase4_8_one_genome:
@@ -1620,66 +1617,37 @@ rule load_closest_to_db:
         """
 
 
-rule run_quast_batch:
-    """Phase1: runs QUAST once over a staged directory of all genomes."""
+rule run_quast:
+    """Phase1: QUAST on one genome's assembly.
+
+    QUAST stands apart from the annotation: it reads only the genome's FASTA, and no step reads
+    its results. workflow.py runs it as its own Snakemake beside Stage 1 and 2, a few genomes at
+    a time (margie_sb.quast.at_once, 3) with few cores each (margie_sb.quast.threads, 2): it is
+    for information, not a priority.
+    """
     input:
-        list(GENOMES.values())
+        fasta=lambda wildcards: GENOMES[wildcards.genome]
     output:
-        done=QUAST_BATCH_DONE
+        results=QUAST_RESULTS
     group: "quast"
-    threads: rc('quast.threads', 8, config=config)
+    threads: rc('margie_sb.quast.threads', rc('quast.threads', 2, config=config), config=config)
     resources:
-        mem_mb=rc('quast.mem_mb', 4000, config=config),
-        runtime=runtime_min('quast.runtime', 120, config=config)
+        mem_mb=rc('margie_sb.quast.mem_mb', rc('quast.mem_mb', 4000, config=config), config=config),
+        runtime=runtime_min('margie_sb.quast.runtime', rc('quast.runtime', 120, config=config), config=config)
     params:
-        stage_dir=QUAST_BATCH_STAGE_DIR,
-        output_dir=rc('quast.output_dir', QUAST_BATCH_OUTPUT_DIR, config=config),
-        genome_count=len(GENOMES)
+        stage_dir=lambda wildcards: f"{QUAST_CONTAINER_PREFIX}/stage/{wildcards.genome}",
+        output_dir=lambda wildcards: f"{QUAST_CONTAINER_PREFIX}/container_outputs/{wildcards.genome}"
     container: sif_path('quast.sif', config=config, workflow_id='margie_sb')
     shell:
         """
-        echo "=== MARGIE_SB PHASE 1: QUAST (batch {params.genome_count} genomes) ==="
-        rm -rf {params.stage_dir}
+        echo "=== MARGIE_SB PHASE 1: QUAST ({wildcards.genome}) ==="
+        rm -rf {params.stage_dir} {params.output_dir}
         mkdir -p {params.stage_dir}
-
-        # Stage all discovered genomes into one folder for a single QUAST run.
-        i=0
-        for src in {input}; do
-            base=$(basename "$src")
-            dest="{params.stage_dir}/$base"
-            if [[ -e "$dest" ]]; then
-                stem="${{base%.*}}"
-                ext="${{base##*.}}"
-                dest="{params.stage_dir}/${{stem}}_dup${{i}}.${{ext}}"
-            fi
-            cp -f "$src" "$dest"
-            i=$((i + 1))
-        done
-
+        cp -f {input.fasta} {params.stage_dir}/
         /usr/local/bin/run -i {params.stage_dir} -o {params.output_dir} -t {threads}
-        touch {output.done}
+        mkdir -p $(dirname {output.results})
+        cp "$(find {params.output_dir} -path '*/processed/quast.tsv' | head -n 1)" {output.results}
         """
-
-
-rule split_quast_batch_per_genome:
-    """Copies each genome's batched QUAST output to its per-genome path."""
-    input:
-        done=QUAST_BATCH_DONE
-    output:
-        results=expand(QUAST_RESULTS, genome=list(GENOMES.keys()))
-    params:
-        output_dir=rc('quast.output_dir', QUAST_BATCH_OUTPUT_DIR, config=config)
-    run:
-        from pathlib import Path
-
-        for out_file in output.results:
-            target = Path(out_file)
-            genome = target.parts[-3]  # .../<genome>/quast/quast.tsv
-            source = Path(params.output_dir) / genome / 'processed' / 'quast.tsv'
-            if not source.exists():
-                raise ValueError(f"Missing QUAST processed output for genome '{genome}': {source}")
-            target.parent.mkdir(parents=True, exist_ok=True)
-            target.write_text(source.read_text())
 
 
 rule load_quast_to_db:

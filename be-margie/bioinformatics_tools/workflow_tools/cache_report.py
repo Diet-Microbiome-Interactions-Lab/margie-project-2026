@@ -38,6 +38,8 @@ UNFINISHED = 'the run stopped before this finished'
 
 
 def stage_of(step: str) -> str:
+    if step == 'quast':
+        return 'beside the pipeline'
     if step == 'gtdbtk':
         return 'before gene calling'
     if step in ('rasttk', 'prodigal'):

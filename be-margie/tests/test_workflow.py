@@ -448,9 +448,11 @@ class TestRunPipelineBatchSequential:
             wf._run_pipeline_batch_sequential('margie_sb', dict(self.SMK_CONFIG), genome_files,
                                               cache_map_fn=lambda s: {}, mode='dev')
 
-        # Stage 1: GTDB-Tk is already available, so a single RASTtk wave over file targets.
-        assert len(rec['stage1']) == 1
-        stage1_cmd = rec['stage1'][0]
+        # Stage 1: GTDB-Tk is already available, so a single RASTtk wave over file targets;
+        # QUAST runs on its own beside it (tests/test_quast_stage.py).
+        waves = [c for c in rec['stage1'] if not any(t.endswith('/quast/quast_db.tkn') for t in c)]
+        assert len(waves) == 1
+        stage1_cmd = waves[0]
         assert '--jobs=1' in stage1_cmd
         assert '--nolock' in stage1_cmd
         assert any(tok.endswith('/genome1/rasttk/rasttk_db.tkn') for tok in stage1_cmd)
@@ -519,8 +521,8 @@ class TestRunPipelineBatchSequential:
 
         assert [_target_genome_of(cmd) for cmd in rec['stage2']] == ['genome2', 'genome1', 'genome3']
         # Three waves: the GTDB-Tk batch, RASTtk for genome2 (already had
-        # GTDB-Tk outputs), then RASTtk for genome1/genome3 after the batch.
-        assert len(rec['stage1']) == 3
+        # GTDB-Tk outputs), then RASTtk for genome1/genome3 after the batch (QUAST apart).
+        assert len([c for c in rec['stage1'] if not any(t.endswith('/quast/quast_db.tkn') for t in c)]) == 3
         assert wf.report.status.indicates_success
 
     @patch('bioinformatics_tools.workflow_tools.workflow.cache_sif_files')

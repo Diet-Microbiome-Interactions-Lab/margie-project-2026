@@ -180,9 +180,15 @@ MARGIE_SB_PHASED_TOOLS = [
 ]
 
 
+# QUAST jobs at once unless the config says otherwise: it is for information, so it takes little.
+QUAST_AT_ONCE = 3
+
+
 def _margie_sb_default_threads(tool_key: str) -> int:
     if tool_key == 'gtdbtk':
         return 64
+    if tool_key == 'quast':
+        return 2  # for information, so it takes little: see margie_sb.quast.at_once
     if tool_key in {'kegg', 'eggnog'}:
         return 16
     return 8
@@ -288,6 +294,13 @@ def _margie_sb_tool_params() -> list[dict]:
                 'type': 'string'
             },
         ])
+    # QUAST runs on its own, beside the annotation (workflow.py): how many genomes at a time.
+    params.append({
+        'param': 'margie_sb.quast.at_once',
+        'default': QUAST_AT_ONCE,
+        'description': 'Phase 1: genomes QUAST checks at a time; it runs on its own, beside the annotation',
+        'type': 'int'
+    })
     return params
 
 

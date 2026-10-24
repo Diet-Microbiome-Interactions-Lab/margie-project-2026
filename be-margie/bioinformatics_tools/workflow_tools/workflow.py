@@ -31,6 +31,7 @@ from bioinformatics_tools.workflow_tools.workflow_helpers import (
 from bioinformatics_tools.workflow_tools.workflow_registry import (
     MARGIE_SB_PHASED_TOOLS,
     MARGIE_SB_REQUIRED_TOOLS,
+    QUAST_AT_ONCE,
     WORKFLOWS,
     margie_sb_sif_files,
 )
@@ -633,6 +634,20 @@ class WorkflowBase(ProgramBase):
         return [f"{prefix}rasttk/rast.tsv", f"{prefix}rasttk/rast.faa", f"{prefix}rasttk/rast.gff",
                 f"{prefix}rasttk/rasttk_db.tkn"]
 
+    def _quast_at_once(self, smk_config: dict) -> int:
+        '''How many genomes QUAST checks at a time: margie_sb.quast.at_once from the run or the
+        account's config (Settings), else QUAST_AT_ONCE; at least 1.'''
+        value = smk_config.get('margie_sb.quast.at_once')
+        if value in (None, ''):
+            try:
+                value = ((self.conf.get('margie_sb', {}) if self.conf else {}) or {}).get('quast', {}).get('at_once')
+            except Exception:
+                value = None
+        try:
+            return max(1, int(value))
+        except (TypeError, ValueError):
+            return QUAST_AT_ONCE
+
     def _restore_gene_calls(self, db_path: str, genome_files: dict[str, str], smk_config: dict,
                             prodigal_genomes: set[str]) -> tuple[dict[str, bool], dict[str, bool]]:
         '''Takes each genome's GTDB-Tk and RASTtk outputs from the MARGIE database, genome by genome.
@@ -798,16 +813,13 @@ class WorkflowBase(ProgramBase):
         # Stage 1: phases 1-3 in waves with --jobs=1, one BV-BRC submission at a time.
         def _stage1_targets(genome: str) -> list[str]:
             '''Returns Stage 1's files for one genome: its genome_info.tsv and RASTtk DB
-            token, plus the GTDB-Tk and QUAST ones when they are selected (QUAST runs
-            once over every genome, then is split per genome).'''
+            token, plus GTDB-Tk's when it is selected. QUAST is not here: it runs on its own.'''
             prefix = get_workflow_prefix_for(genome, smk_config)
             # genome_info.tsv too: for a genome whose gene calls came from the database it is
             # not made on the way to RASTtk, and Stage 2's restored tool outputs must be newer.
             targets = [f"{prefix}genome_info/genome_info.tsv", f"{prefix}rasttk/rasttk_db.tkn"]
             if run_gtdbtk_enabled:
                 targets.append(f"{prefix}gtdbtk/gtdbtk_db.tkn")
-            if run_quast_enabled:
-                targets.append(f"{prefix}quast/quast_db.tkn")
             return targets
 
         # "Ready": per-genome GTDB-Tk outputs on disk, or always when GTDB-Tk is off.
@@ -840,6 +852,23 @@ class WorkflowBase(ProgramBase):
             [t for g in gtdbtk_ready for t in _stage1_targets(g)],
             [t for g in gtdbtk_pending for t in _stage1_targets(g)],
         )
+
+        # QUAST reads only the genomes and no step reads its results: its own Snakemake, beside
+        # Stage 1 and 2, three genomes at a time (two cores each, rule run_quast). The run waits
+        # for it at the end; a QUAST failure leaves the annotations as they are.
+        quast_proc = None
+        if run_quast_enabled and genome_files:
+            quast_targets = [f"{get_workflow_prefix_for(g, smk_config)}quast/quast_db.tkn" for g in genome_files]
+            at_once = self._quast_at_once(smk_config)
+            quast_command = self.build_executable(selected_wf, config_overrides=smk_config, mode=mode,
+                                                  compute_config=compute_config, extra_resources=extra_resources,
+                                                  rerun_triggers=rerun_triggers, target=quast_targets,
+                                                  max_jobs_override=at_once)
+            LOGGER.info('Starting QUAST on its own over %d genome(s), %d at a time: %s',
+                        len(quast_targets), at_once, ' '.join(quast_command))
+            quast_proc = self._start_background_subprocess(quast_command)
+            if quast_proc is None:
+                LOGGER.warning('QUAST could not be started; the annotation goes on without it')
 
         def _rasttk_token_path(genome: str) -> str:
             return f"{get_workflow_prefix_for(genome, smk_config)}rasttk/rasttk_db.tkn"
@@ -1113,6 +1142,9 @@ class WorkflowBase(ProgramBase):
         stage1.wait()
         if stage1.poll() != 0:
             LOGGER.warning('Stage 1 (rasttk_all) exited with rc=%s after Stage 2/3 finished draining', stage1.poll())
+        if quast_proc is not None and quast_proc.wait() != 0:
+            LOGGER.warning('QUAST exited rc=%s: assembly quality is missing for some genomes; '
+                           'the annotations are complete without it', quast_proc.poll())
 
         if skipped:
             LOGGER.warning('%d genome(s) skipped (RASTtk/GTDB-Tk did not finish): %s', len(skipped), sorted(skipped))
