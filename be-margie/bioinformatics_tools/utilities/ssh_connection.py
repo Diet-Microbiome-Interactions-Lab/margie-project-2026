@@ -144,6 +144,40 @@ def close_pooled_connections():
                     pass
         _POOL.clear()
 
+def close_user_connections(host: str, username: str) -> None:
+    """Closes and forgets one cluster account's pooled clients (its MARGIE account was deleted)."""
+    with _POOL_LOCK:
+        for key in [k for k in _POOL if k[0] == host and k[1] == username]:
+            for client in _POOL.pop(key)['slots']:
+                if client is None:
+                    continue
+                try:
+                    client.close()
+                except Exception:
+                    pass
+
+
+def remove_margie_files(conn: 'SSHConnection', timeout: float = 300.0) -> str:
+    """Removes what the website keeps in the account's home: the stored keys
+    (~/.config/bioinformatics-tools/secrets, the language-model API keys) and its copy of MARGIE
+    (~/margie-project-2026, with the ~/bioinformatics-tools link to it). config.yaml, databases and
+    results stay. Returns '' when done, else what went wrong."""
+    command = f'''repo="$HOME/{_CLONE_DIR}"; link="$HOME/bioinformatics-tools"
+rm -rf -- "$HOME/.config/bioinformatics-tools/secrets" || exit 1
+if [ -L "$link" ] && [ "$(readlink -f "$link")" = "$(readlink -f "$repo/{_BACKEND_DIR}")" ]; then rm -f -- "$link" || exit 1; fi
+rm -rf -- "$repo" || exit 1
+echo REMOVED'''
+    try:
+        ssh = conn.connect()
+        _, stdout, stderr = ssh.exec_command(command, timeout=timeout)
+        stdout.channel.settimeout(timeout)
+        code = stdout.channel.recv_exit_status()
+        out = stdout.read().decode(errors='replace') + stderr.read().decode(errors='replace')
+    except Exception as exc:
+        return str(exc) or type(exc).__name__
+    return '' if code == 0 and 'REMOVED' in out else (out.strip() or f'exit {code}')
+
+
 _KEY_CLASSES = (
     paramiko.RSAKey,
     paramiko.Ed25519Key,

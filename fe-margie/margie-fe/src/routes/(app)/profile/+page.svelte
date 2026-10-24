@@ -223,8 +223,9 @@
 	<section class="pf-box pf-delete" aria-labelledby="pf-del">
 		<header class="pf-head"><h2 id="pf-del">Delete account</h2></header>
 		<p class="pf-del-text">
-			Deletes your MARGIE account: your sign-in, your details here and the stored cluster key. Your files on the cluster stay as they are
-			(config.yaml, your copy of MARGIE, databases and results). To use MARGIE again, sign up again.
+			Deletes your MARGIE account: your sign-in, your details here and the stored cluster key; and in your home on the cluster, the stored
+			language-model API keys and MARGIE's copy (~/margie-project-2026, with any edits to its workflow). Your config.yaml, databases and
+			results stay. To use MARGIE again, sign up again.
 		</p>
 		{#if deleting}
 			<form
