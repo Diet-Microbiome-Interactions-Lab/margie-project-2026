@@ -1181,19 +1181,19 @@ const resultList = new Cache(async () => {
 	if (!runs.length) return [];
 	// The runs' genome folders, three levels deep, in one trip to the cluster (/v1/ssh/tree).
 	const { trees } = await call<{ trees: Record<string, Kid[]> }>('POST', '/v1/ssh/tree', { paths: runs, depth: 3, prune: [...RUN_LEVEL] });
-	// Newest run first, so a genome annotated twice shows its latest result.
-	const seen = new Set<string>();
-	const organisms: (OrganismResult & { jobDir: string })[] = [];
+	// Newest run first: a genome annotated more than once shows its latest finished result, so a run still
+	// working on it (or one that stopped before it) leaves the earlier map and figures in view.
+	const picked = new Map<string, OrganismResult & { jobDir: string }>();
 	for (const run of runs) {
 		const entries = trees[run] ?? [];
 		for (const [kind, name] of entries) {
-			if (kind !== 'd' || name.includes('/') || name.startsWith('.') || RUN_LEVEL.has(name) || seen.has(name)) continue;
-			seen.add(name);
+			if (kind !== 'd' || name.includes('/') || name.startsWith('.') || RUN_LEVEL.has(name) || picked.get(name)?.final) continue;
 			const kids = entries.filter(([, r]) => r.startsWith(`${name}/`)).map(([k, r, size]) => [k, r.slice(name.length + 1), size] as Kid);
-			organisms.push(genomeFrom(`${run}/${name}`, kids));
+			const found = genomeFrom(`${run}/${name}`, kids);
+			if (!picked.has(name) || found.final) picked.set(name, found);
 		}
 	}
-	return organisms.sort((a, b) => a.organism.localeCompare(b.organism));
+	return [...picked.values()].sort((a, b) => a.organism.localeCompare(b.organism));
 }, 20_000);
 
 /** Returns the Results page listing. */
