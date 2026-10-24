@@ -29,7 +29,13 @@ export interface Cell {
 	left: number | null;
 }
 /** src: where its results came from (the run's cache report), when the run has one. */
-export type GridCell = Cell & { t: string; href?: string; src?: SourceRow };
+/** Where a step's results stand on disk: its main results file, and whether they are in the MARGIE database (a *_db.tkn beside them). */
+export interface Store {
+	file?: { name: string; size: number };
+	loaded: boolean;
+}
+
+export type GridCell = Cell & { t: string; href?: string; src?: SourceRow; store?: Store };
 
 export interface RowProgress {
 	g: string;
@@ -266,6 +272,16 @@ export function buildProgress(i: ProgressInput): Progress {
 	}
 
 	/** Where a cell's results are: its folder for the Files page, or the run's log for one that failed. */
+	/** A step's folder in the genome's results: its main results file (<step>_results.tsv, rast.tsv for the genes, else the largest) and its database token. */
+	function storeOf(col: string, genome: string): Store | undefined {
+		const files = results.get(genome)?.files;
+		const list = files?.[col === 'genes' ? (files.rasttk ? 'rasttk' : 'prodigal') : col];
+		if (!list?.length) return undefined;
+		const data = list.filter((f) => !f.name.endsWith('.tkn') && !/\.(log|err)$/.test(f.name));
+		const file = data.find((f) => f.name === `${col}_results.tsv` || f.name === 'rast.tsv') ?? [...data].sort((a, b) => b.size - a.size)[0];
+		return { file, loaded: list.some((f) => f.name.endsWith('_db.tkn')) };
+	}
+
 	function hrefOf(col: string, genome: string, c: Cell): string | undefined {
 		if (c.state === 'na' || c.state === 'none') return undefined;
 		if (c.state === 'failed') return i.run ? uiBase.to(`/jobs/${i.run.id}`) : undefined;
@@ -291,11 +307,14 @@ export function buildProgress(i: ProgressInput): Progress {
 
 	const rows: RowProgress[] = i.genomes.map((g) => {
 		const cs: GridCell[] = cols.map((t) => {
-			const c = cell(t, g);
+			const store = storeOf(t, g);
+			// Its results in the database (a *_db.tkn is written once they are loaded): the step is through.
+			const shown = cell(t, g);
+			const c = store?.loaded && ['run', 'wait', 'partial', 'none'].includes(shown.state) ? done() : shown;
 			const src = sourceOf.get(`${t}\t${g}`);
 			// The tooltip says where a step's results came from too, once the report has it.
 			const say = src && src.source !== 'not run' && c.state !== 'na' ? `${c.say}; ${sourceSay(src)}` : c.say;
-			return { t, ...c, say, href: hrefOf(t, g, c), src };
+			return { t, ...c, say, href: hrefOf(t, g, c), src, store };
 		});
 		const on = cs.filter((c) => c.state !== 'na');
 		const pct = Math.round(avg(cs) ?? 0);

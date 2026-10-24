@@ -1,6 +1,7 @@
 <script lang="ts">
 	import { Check, X } from 'lucide-svelte';
 	import { cachedOn, sourceSay } from '$lib/crisp/cache-report';
+	import { formatBytes } from '$lib/api';
 	import { leftText, span, type Progress, type RowProgress } from '$lib/crisp/progress-model';
 	import { uiBase } from '$lib/workspace/base.svelte';
 
@@ -184,6 +185,12 @@
 				<dl class="pop-rows">
 					<dt>This step</dt>
 					<dd>{STATE_WORD[c.state] ?? c.state}{c.state === 'run' && c.pct !== null ? `, ${Math.round(c.pct)}%` : ''}</dd>
+					{#if c.store}
+						<dt>Results file</dt>
+						<dd class="pop-file">{#if c.store.file}<span class="mg-mono">{c.store.file.name}</span>, {formatBytes(c.store.file.size)}{:else}being written{/if}</dd>
+						<dt>In the database</dt>
+						<dd class:pop-yes={c.store.loaded}>{c.store.loaded ? 'yes, loaded into the MARGIE database (SQLite)' : 'waiting to be loaded'}</dd>
+					{/if}
 					{#if c.src && c.src.source !== 'not run'}
 						<dt>Results</dt>
 						<dd>{sourceSay(c.src)}</dd>

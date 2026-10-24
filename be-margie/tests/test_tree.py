@@ -7,7 +7,8 @@ from bioinformatics_tools.api.services import read_cache
 from tests.test_api import FAKE_USER, authed_client, client  # noqa: F401 (fixtures)
 
 SSH = "bioinformatics_tools.api.routers.ssh"
-OUT = "@@/r/run2\nd\tg1\nf\tg1/FINAL_ANNOTATION_WITH_CONFIDENCE.tsv\nd\tg1/cog\n@@/r/run1\nd\tg2\nd\tg2/scoring\nf\tg2/scoring/x.tsv\n"
+OUT = ("@@/r/run2\nd\t4096\tg1\nf\t52113\tg1/FINAL_ANNOTATION_WITH_CONFIDENCE.tsv\nd\t4096\tg1/cog\n"
+       "@@/r/run1\nd\t4096\tg2\nd\t4096\tg2/scoring\nf\t12\tg2/scoring/x.tsv\n")
 
 
 @patch(f"{SSH}._build_connection")
@@ -18,8 +19,10 @@ def test_several_folders_in_one_command(_conn, authed_client):  # noqa: F811
     assert run.call_count == 1
     command = run.call_args[0][1]
     assert "-maxdepth 3" in command and "-path /r/run2/original_container_outputs" in command and "-name '.*'" in command
-    assert d["trees"]["/r/run2"] == [["d", "g1"], ["f", "g1/FINAL_ANNOTATION_WITH_CONFIDENCE.tsv"], ["d", "g1/cog"]]
-    assert d["trees"]["/r/run1"][-1] == ["f", "g2/scoring/x.tsv"]
+    assert "%y\\t%s\\t%P" in command
+    # Type and path first, as before, then the size in bytes.
+    assert d["trees"]["/r/run2"] == [["d", "g1", 4096], ["f", "g1/FINAL_ANNOTATION_WITH_CONFIDENCE.tsv", 52113], ["d", "g1/cog", 4096]]
+    assert d["trees"]["/r/run1"][-1] == ["f", "g2/scoring/x.tsv", 12]
 
 
 @patch(f"{SSH}._build_connection")

@@ -2971,8 +2971,9 @@ def tree(payload: dict, current_user: dict = Depends(get_current_user)):
     read many folders (Results: a run's genome folders, their scoring and tool folders).
 
     Body: {"paths": [...], "depth": 1-4, "prune": [names of first-level folders to skip]}.
-    Returns {"trees": {path: [[type, relative path], ...]}}, type "d" or "f"; hidden entries are
-    left out. Reused for 30 s, and answered from that copy while refreshed for 5 min."""
+    Returns {"trees": {path: [[type, relative path, bytes], ...]}}, type "d" or "f" (a file's size
+    in bytes; a folder's is its own entry's); hidden entries are left out. Reused for 30 s, and
+    answered from that copy while refreshed for 5 min."""
     paths = payload.get("paths")
     depth = payload.get("depth", 3)
     prune = payload.get("prune") or []
@@ -2992,7 +2993,7 @@ def tree(payload: dict, current_user: dict = Depends(get_current_user)):
         parts = []
         for p in resolved:
             skip = " -o ".join([f"-path {q(f'{p}/{n}')}" for n in prune] + ["-name '.*'"])
-            parts.append(f"echo @@{q(p)}; find {q(p)} -mindepth 1 -maxdepth {depth} \\( {skip} \\) -prune -o -printf '%y\\t%P\\n' 2>/dev/null")
+            parts.append(f"echo @@{q(p)}; find {q(p)} -mindepth 1 -maxdepth {depth} \\( {skip} \\) -prune -o -printf '%y\\t%s\\t%P\\n' 2>/dev/null")
         _, out = _run_remote_check(conn, "; ".join(parts))
         trees: dict[str, list] = {p: [] for p in resolved}
         at = None
@@ -3000,9 +3001,9 @@ def tree(payload: dict, current_user: dict = Depends(get_current_user)):
             if line.startswith("@@"):
                 at = line[2:]
                 continue
-            kind, _, rel = line.partition("\t")
+            kind, size, rel = (line.split("\t", 2) + ["", ""])[:3]
             if at in trees and rel and kind in ("d", "f"):
-                trees[at].append([kind, rel])
+                trees[at].append([kind, rel, int(size) if size.isdigit() else 0])
         return {"trees": trees}
 
     key = (current_user["user_id"], "tree", tuple(resolved), depth, tuple(prune))
