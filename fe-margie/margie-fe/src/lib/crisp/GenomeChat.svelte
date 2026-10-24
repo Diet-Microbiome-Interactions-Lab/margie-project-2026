@@ -54,7 +54,8 @@
 		expired?: Provider[];
 		keyDays?: number[];
 		providers: Record<Provider, { label: string; base: string; models: string[]; policy: string; keys: string }>;
-		builtin: { ready: boolean; model: string; note: string };
+		/** The user's own model: on the website, on a cluster GPU node; in the desktop app, on this computer. */
+		builtin: { ready: boolean; model: string; note: string; state?: 'online' | 'starting' | 'off'; folders?: { trained: string; base: string } };
 		history: Turn[];
 	}
 
@@ -79,7 +80,11 @@
 	const meta = $derived(info?.providers[p]);
 	const hasKey = $derived(!!info?.keys[p]?.saved);
 	const consented = $derived(!!s?.consented.includes(p));
-	const ready = $derived(!!s && p !== 'builtin' && consented && (hasKey || p === 'custom') && !!s.model && (p !== 'custom' || !!s.baseUrl));
+	const ready = $derived(
+		!!s && (p === 'builtin' ? !!info?.builtin.ready : consented && (hasKey || p === 'custom') && !!s.model && (p !== 'custom' || !!s.baseUrl))
+	);
+	/** The Settings row for the model folders: the cluster's, or this computer's. */
+	const llmSetting = $derived(backend.cluster ? 'margie_sb.llm.base_model' : 'LLM_BASE_MODEL');
 
 	async function load() {
 		loadError = '';
@@ -313,8 +318,13 @@
 				{#if p === 'builtin'}
 					<div class="gc-box">
 						<p>{info.builtin.note}</p>
-						{#if info.builtin.model}<p class="gc-small">Configured: <code>{info.builtin.model}</code></p>{/if}
-						<a class="gc-btn" href={uiBase.to('/settings#LLM_BASE_MODEL')}>Open Settings → LLM <ExternalLink size={13} /></a>
+						{#if info.builtin.folders}
+							<p class="gc-small">Trained model: <code>{info.builtin.folders.trained || 'not set'}</code></p>
+							<p class="gc-small">Base model: <code>{info.builtin.folders.base || 'not set'}</code></p>
+						{:else if info.builtin.model}
+							<p class="gc-small">Configured: <code>{info.builtin.model}</code></p>
+						{/if}
+						<a class="gc-btn" href={uiBase.to(`/settings#${llmSetting}`)}>Open Settings → LLM <ExternalLink size={13} /></a>
 					</div>
 				{:else}
 					{#if p === 'custom'}
