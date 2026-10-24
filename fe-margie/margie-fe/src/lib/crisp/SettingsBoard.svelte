@@ -10,6 +10,7 @@
 	import { LICENCE_LEGAL_NOTICE, LICENCE_STATEMENT, statementMatches } from '$lib/licence';
 	import Switch from '$lib/workspace/Switch.svelte';
 	import FolderPick from '$lib/workspace/FolderPick.svelte';
+	import { advanced } from '$lib/workspace/advanced-lock.svelte';
 	import { ws, type Setting } from '$lib/workspace/data.svelte';
 	import { ui } from '$lib/workspace/ui.svelte';
 	import { CONFIRMED, GUARDED, isConfirmed, isGuarded, unlocks } from '$lib/workspace/guarded';
@@ -250,8 +251,8 @@
 	/** The files behind the settings and the runs, for editing by hand (Advanced). */
 	const CONFIG_FILE = '~/.config/bioinformatics-tools/config.yaml';
 	const WORKFLOW_FILE = '~/bioinformatics-tools/bioinformatics_tools/workflow_tools/margie_sb.smk';
-	/** The two files open for editing (Unlock), for this visit to Settings. */
-	let filesOpen = $state(false);
+	/** The two files open for editing (Unlock): advanced.open, shared with the viewer and the editor. */
+	const filesOpen = $derived(advanced.open);
 	/** The workflow has edits by hand: the copy of MARGIE takes updates again once it is restored. */
 	let workflowEdited = $state(false);
 	/** Which default is about to be put back, once confirmed. */
@@ -269,7 +270,7 @@
 		if (backend.cluster) untrack(() => checkFiles());
 	});
 	async function openFiles() {
-		filesOpen = true;
+		advanced.set(true);
 		await checkFiles();
 	}
 	async function restoreDefault() {
@@ -786,7 +787,7 @@
 					<a class="sb-place" href={uiBase.to(`/edit?path=${encodeURIComponent(WORKFLOW_FILE)}`)} title="Edit {WORKFLOW_FILE} by hand"><FileCode size={13} />Edit the workflow (Snakemake)</a>
 					<button type="button" class="sb-place" aria-pressed={restoreAsk === 'config'} onclick={() => (restoreAsk = 'config')}><RotateCcw size={13} />Restore the default config.yaml</button>
 					<button type="button" class="sb-place" aria-pressed={restoreAsk === 'workflow'} onclick={() => (restoreAsk = 'workflow')}><RotateCcw size={13} />Restore the default workflow</button>
-					<button type="button" class="mg-link quiet" onclick={() => ((filesOpen = false), (restoreAsk = ''))}><Lock size={13} aria-hidden="true" />Lock</button>
+					<button type="button" class="mg-link quiet" onclick={() => (advanced.set(false), (restoreAsk = ''))}><Lock size={13} aria-hidden="true" />Lock</button>
 				{:else}
 					<a class="sb-place" href={uiBase.to(`/view?path=${encodeURIComponent(CONFIG_FILE)}`)} title="Read {CONFIG_FILE}"><FileCode size={13} />View config.yaml</a>
 					<a class="sb-place" href={uiBase.to(`/view?path=${encodeURIComponent(WORKFLOW_FILE)}`)} title="Read {WORKFLOW_FILE}"><FileCode size={13} />View the workflow (Snakemake)</a>

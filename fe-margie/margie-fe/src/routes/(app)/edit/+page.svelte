@@ -6,6 +6,7 @@
 	import { uiBase } from '$lib/workspace/base.svelte';
 	import { ws } from '$lib/workspace/data.svelte';
 	import { ui } from '$lib/workspace/ui.svelte';
+	import { advanced, lockedFile } from '$lib/workspace/advanced-lock.svelte';
 
 	/**
 	 * For advanced users: a text file on the cluster edited by hand (?path=), such as config.yaml
@@ -17,6 +18,8 @@
 	const yamlFile = $derived(page.url.searchParams.get('check') === 'yaml' || /\.ya?ml$/i.test(name));
 	const config = $derived(/\/\.config\/bioinformatics-tools\/config\.ya?ml$/.test(path) || path.endsWith('config.yaml'));
 	const workflow = $derived(/\.smk$/i.test(name) || name === 'Snakefile');
+	/** config.yaml and MARGIE's workflow read only until Unlock (Settings → Advanced). */
+	const locked = $derived(lockedFile(path) && !advanced.open);
 
 	let saved = $state('');
 	let text = $state('');
@@ -45,7 +48,7 @@
 	});
 
 	async function save() {
-		if (!changed || saving) return;
+		if (!changed || saving || locked) return;
 		saving = true;
 		try {
 			const d = await post<{ path: string; backup: string | null }>('/files/edit', { path, content: text, check: yamlFile ? 'yaml' : null });
@@ -89,14 +92,19 @@
 
 <div class="cr-page ed" data-shade="page-edit">
 	<div class="cr-head">
-		<h1 class="cr-title">Edit {name}</h1>
+		<h1 class="cr-title">{locked ? name : `Edit ${name}`}</h1>
 		<div class="cr-head-acts acts">
 			<a class="mg-btn small" href={uiBase.to(config || workflow ? '/settings' : `/files?path=${encodeURIComponent(path.split('/').slice(0, -1).join('/') || '/')}`)}><ArrowLeft size={14} /> Back</a>
 			<button type="button" class="mg-btn small" disabled={!changed || saving} onclick={() => (text = saved)}><RotateCcw size={14} /> Discard</button>
-			<button type="button" class="mg-btn small primary" disabled={!changed || saving} onclick={save}><Save size={14} /> {saving ? 'Saving…' : 'Save'}</button>
+			<button type="button" class="mg-btn small primary" disabled={!changed || saving || locked} onclick={save}><Save size={14} /> {saving ? 'Saving…' : 'Save'}</button>
 		</div>
 	</div>
 
+	{#if locked}
+		<p class="note warn">
+			Read only: {name} opens to edit after Unlock, under <a class="mg-link" href={uiBase.to('/settings')}>Settings → Advanced</a>.
+		</p>
+	{/if}
 	<p class="note" class:warn={workflow}>
 		<span class="mg-mono">{path}</span>
 		{#if config}
@@ -118,6 +126,7 @@
 			<textarea
 				class="mg-mono"
 				bind:value={text}
+				readonly={locked}
 				spellcheck="false"
 				autocapitalize="off"
 				autocomplete="off"
