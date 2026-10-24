@@ -6,7 +6,7 @@
 	 * Purdue (reviewers, collaborators) ask for an account by email instead. MARGIE's logo
 	 * turns in on the left and turns again on a click (back on a double-click), the sign-in sits
 	 * on the right (the logo on top on a phone); under the logo, a link opens a small game
-	 * (GenomePuzzle). Washes of the logo's colours sit behind.
+	 * (GenomePuzzle).
 	 */
 	import '@fontsource/ibm-plex-sans/400.css';
 	import '@fontsource/ibm-plex-sans/500.css';
@@ -17,7 +17,7 @@
 	import '$lib/crisp/crisp.css';
 	import { onMount } from 'svelte';
 	import { fade, slide } from 'svelte/transition';
-	import { ChevronRight, CircleAlert, Copy, KeyRound, LoaderCircle, Mail, Puzzle, Server } from 'lucide-svelte';
+	import { ChevronRight, CircleAlert, Copy, KeyRound, LoaderCircle, Mail, Server } from 'lucide-svelte';
 	import CrispMark from '$lib/crisp/CrispMark.svelte';
 	import Corner from '$lib/workspace/Corner.svelte';
 	import GenomePuzzle from '$lib/workspace/GenomePuzzle.svelte';
@@ -163,9 +163,7 @@
 				<MargieLogo size="var(--logo-size)" turn="click" float={false} />
 				<p class="full">Mostly Automated Rapid Genome Inference Environment</p>
 				<p class="motto">Annotate with confidence: a genome-centric, context-dependent approach</p>
-				<span class="rule" aria-hidden="true"></span>
 				<button type="button" class="bored" aria-expanded={game} onclick={() => (game = !game)}>
-					<Puzzle size={15} />
 					{game ? 'Hide the puzzle' : 'Bored? Enjoy the puzzle game'}
 				</button>
 				{#if game}
@@ -321,12 +319,6 @@
 
 <style>
 	.signin {
-		/* The logo's colours: its strands and its rungs. */
-		--dna-blue: #1464f0;
-		--dna-orange: #f07814;
-		--dna-cyan: #14c8f0;
-		--dna-green: #8cdc28;
-		--dna-rainbow: linear-gradient(90deg, var(--dna-blue), var(--dna-cyan), var(--dna-green), #ffc83c, var(--dna-orange));
 		display: flex;
 		flex-direction: column;
 		height: 100vh;
@@ -348,16 +340,6 @@
 		border-bottom: 1px solid var(--mg-border);
 		background: var(--cr-bar-bg);
 		backdrop-filter: saturate(1.4) blur(12px);
-	}
-	.bar::after {
-		content: '';
-		position: absolute;
-		left: 0;
-		right: 0;
-		bottom: -1px;
-		height: 2px;
-		background: var(--dna-rainbow);
-		opacity: 0.75;
 	}
 	.brand {
 		display: flex;
@@ -387,21 +369,11 @@
 	.grow {
 		flex-grow: 1;
 	}
-	/* Soft washes of the logo's colours behind the page, one from each corner. */
 	.content {
-		--wash: 13%;
 		flex-grow: 1;
 		min-height: 0;
 		overflow: auto;
-		background:
-			radial-gradient(60rem 40rem at 6% 10%, color-mix(in srgb, var(--dna-blue) var(--wash), transparent), transparent 62%),
-			radial-gradient(52rem 36rem at 94% 92%, color-mix(in srgb, var(--dna-orange) var(--wash), transparent), transparent 62%),
-			radial-gradient(40rem 30rem at 90% 6%, color-mix(in srgb, var(--dna-cyan) calc(var(--wash) * 0.8), transparent), transparent 62%),
-			radial-gradient(40rem 30rem at 10% 94%, color-mix(in srgb, var(--dna-green) calc(var(--wash) * 0.7), transparent), transparent 62%),
-			var(--mg-bg);
-	}
-	[data-theme='dark'] .content {
-		--wash: 17%;
+		background: var(--mg-bg);
 	}
 	/* Two columns of one width, both centred: the logo on the left, the sign-in on the right. */
 	.page {
@@ -438,13 +410,6 @@
 		background: var(--cr-card);
 		box-shadow: var(--cr-card-shadow);
 		overflow: hidden;
-	}
-	/* The logo's colours along the top of the box. */
-	.card::before {
-		content: '';
-		flex-shrink: 0;
-		height: 3px;
-		background: var(--dna-rainbow);
 	}
 	.card-head {
 		display: flex;
@@ -608,14 +573,14 @@
 	.request p {
 		margin: 0;
 	}
-	/* Who to write to, as a letter's address block, with the logo's colours down its edge. */
+	/* Who to write to, as a letter's address block. */
 	.contact {
 		display: flex;
 		flex-direction: column;
 		gap: 2px;
 		padding: 10px 14px;
-		border-left: 3px solid transparent;
-		border-image: linear-gradient(180deg, var(--dna-blue), var(--dna-cyan), var(--dna-green), var(--dna-orange)) 1;
+		border: 1px solid var(--mg-border);
+		border-radius: var(--mg-r-sm);
 		background: color-mix(in srgb, var(--mg-text) 3%, var(--mg-surface));
 		font-size: var(--cr-fs-meta);
 		font-style: normal;
@@ -687,21 +652,14 @@
 		color: var(--mg-text-2);
 		animation-delay: 520ms;
 	}
-	.rule {
-		width: 96px;
-		height: 3px;
-		margin: 8px 0 2px;
-		border-radius: 3px;
-		background: var(--dna-rainbow);
-	}
 	.bored {
 		display: inline-flex;
 		align-items: center;
-		gap: 7px;
+		margin-top: 8px;
 		padding: 6px 14px;
-		border: 1px solid color-mix(in srgb, var(--dna-cyan) 45%, var(--mg-border));
+		border: 1px solid color-mix(in srgb, var(--mg-accent-base) 35%, var(--mg-border));
 		border-radius: 999px;
-		background: color-mix(in srgb, var(--dna-cyan) 8%, var(--mg-surface));
+		background: var(--mg-surface);
 		color: var(--mg-accent-ink, var(--mg-accent-base));
 		font: inherit;
 		font-size: var(--cr-fs-meta);
@@ -710,7 +668,7 @@
 		transition: background 120ms ease-out;
 	}
 	.bored:hover {
-		background: color-mix(in srgb, var(--dna-cyan) 16%, var(--mg-surface));
+		background: color-mix(in srgb, var(--mg-accent-base) 8%, var(--mg-surface));
 	}
 	.game {
 		display: flex;
