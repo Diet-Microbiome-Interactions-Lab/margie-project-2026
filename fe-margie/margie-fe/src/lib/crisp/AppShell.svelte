@@ -46,14 +46,14 @@
 	uiBase.set('');
 
 	/** The pages, in the order work goes: annotate and follow it up, set up the cluster, your account. */
-	const GROUPS = [
+	const ALL_GROUPS = [
 		{
 			name: 'Annotate',
 			items: [
 				{ href: '/analyze', label: 'Analyze', icon: Play, note: 'Add genomes, choose the tools, start a run' },
 				{ href: '/jobs', label: 'Jobs', icon: ListChecks, note: 'Progress and the log of every run' },
 				{ href: '/results', label: 'Results', icon: ChartPie, note: 'Annotations, maps and reports' },
-				{ href: '/files', label: 'Files', icon: FolderOpen, note: 'Browse folders on the cluster' }
+				{ href: '/files', label: 'Files', icon: FolderOpen, note: 'Browse your folders' }
 			]
 		},
 		{
@@ -72,6 +72,11 @@
 			]
 		}
 	];
+	/** On this computer (the desktop app's local mode): the cluster's own pages drop out. */
+	const CLUSTER_ONLY = new Set(['/cluster', '/terminal', '/profile']);
+	const GROUPS = $derived(
+		backend.cluster ? ALL_GROUPS : ALL_GROUPS.map((g) => ({ ...g, name: g.name === 'Cluster' ? 'Setup' : g.name, items: g.items.filter((n) => !CLUSTER_ONLY.has(n.href)) }))
+	);
 	/** About MARGIE, at the foot of the sidebar; the desktop app opens its download page. */
 	const ABOUT: { href: string; label: string; icon: typeof Users; external?: boolean }[] = [
 		{ href: '/methods', label: 'Methods', icon: FlaskConical },
@@ -242,6 +247,13 @@
 					<a class="mg-running btn btn-sm preset-tonal-warning" href="/jobs/{ws.active.id}" transition:fade={{ duration: ui.ms(150) }} title="Watch the log">
 						<RunRing progress={ws.progress} size={20} compact />
 						<span>{running}</span>
+					</a>
+				{/if}
+				{#if clusterParts.switchHref && !backend.cluster}
+					<!-- The desktop app on this computer: where MARGIE runs, and the way to the HPC. -->
+					<a class="mg-conn on" href={clusterParts.switchHref} title="MARGIE runs on this computer. Choose the HPC instead.">
+						<span class="led" aria-hidden="true"></span>
+						<span>This computer</span>
 					</a>
 				{/if}
 				{#if backend.cluster}

@@ -41,9 +41,10 @@
 		if (updated.current && !willUnload && to?.url) location.href = to.url.href;
 	});
 
-	// The website: every page needs a signed-in cluster account, except signing in.
+	// The website: every page needs a signed-in cluster account, except signing in. The desktop
+	// app runs on this computer with no account, and signs in to the HPC from /start.
 	// The pages bring their own top bar (routes/(app)/+layout.svelte); sign-in has none.
-	const PUBLIC_PATHS = HOSTED ? ['/signin'] : ['/signin', '/login', '/register'];
+	const PUBLIC_PATHS = ['/signin'];
 
 	onMount(() => {
 		// Clears stored settings from older versions that pointed at a local backend.
@@ -53,7 +54,7 @@
 			location.replace('/signin');
 			return;
 		}
-		if (!PUBLIC_PATHS.some((p) => path.startsWith(p)) && !isLoggedIn()) goto(HOSTED ? '/signin' : '/login');
+		if (HOSTED && !PUBLIC_PATHS.some((p) => path.startsWith(p)) && !isLoggedIn()) goto('/signin');
 	});
 </script>
 

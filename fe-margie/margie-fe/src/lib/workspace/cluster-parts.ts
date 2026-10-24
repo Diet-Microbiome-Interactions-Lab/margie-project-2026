@@ -1,10 +1,14 @@
 /**
- * Cluster parts of the interface. The website has no start page, tunnel or local chat
- * server, so only the cluster Setup block is here; the Install lock lives in the browser.
+ * Cluster parts of the interface (see backend.svelte.ts). The website has no start page,
+ * tunnel or local chat server, so it carries only the cluster Setup block and keeps the
+ * Install lock in the browser; the desktop app has them all.
  */
 
 import type { Component } from 'svelte';
 import ClusterSetup from '$lib/cluster/ClusterSetup.svelte';
+import { chatLink, chatRemote } from '$lib/cluster/backend';
+import ComputeToggle from '$lib/cluster/ComputeToggle.svelte';
+import { HOSTED } from '$lib/hosted';
 
 /** A genome's cluster results as genome chat reads them (lib/server/genome-chat's Remote). */
 export interface ChatRemote {
@@ -13,6 +17,20 @@ export interface ChatRemote {
 	roots: string[];
 	table?: string | null;
 	jobs?: { id: string; dir: string }[];
+}
+
+/** Stops the HPC tunnel and server via /api/connect; cluster runs keep going. */
+async function disconnect(): Promise<boolean> {
+	try {
+		const r = await fetch('/api/connect', {
+			method: 'POST',
+			headers: { 'Content-Type': 'application/json' },
+			body: JSON.stringify({ action: 'hpc-stop' })
+		});
+		return r.ok;
+	} catch {
+		return false;
+	}
 }
 
 export const clusterParts: {
@@ -27,4 +45,7 @@ export const clusterParts: {
 	chat?: { url: string; remote: (genome: string) => Promise<ChatRemote | null>; link?: () => { api: string; token: string } | null };
 	/** Header control in HPC mode choosing where the server runs (login or compute node). */
 	Compute?: Component;
-} = { Setup: ClusterSetup, lockApi: '' };
+} = HOSTED
+	// The website: no start page, tunnel or local chat server; the lock lives in the browser.
+	? { Setup: ClusterSetup, lockApi: '' }
+	: { Compute: ComputeToggle, Setup: ClusterSetup, switchHref: '/start', disconnect, lockApi: '/api/local/install-lock', chat: { url: '/api/local/genome-chat', remote: chatRemote, link: chatLink } };
