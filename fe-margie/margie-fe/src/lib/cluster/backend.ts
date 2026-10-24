@@ -908,6 +908,18 @@ async function saveSettings(body: { values?: Record<string, string> }) {
 	const w = await workflow();
 	const types = new Map(w.configurable_params.map((p) => [p.param, p.type]));
 	const cfg = structuredClone(await get<Config>('/v1/ssh/config'));
+	// A new working folder takes its margie-databases, margie-input and margie-output along: settings
+	// pointing at those in the old one point at the new one (a path chosen apart from it stays; files stay put).
+	const wf = `${WORKFLOW}.working_folder`;
+	const given = new Set(Object.keys(values).map((k) => ALIASES[k] ?? k));
+	const before = str(dig(cfg, wf)).replace(/\/+$/, '');
+	const after = String(values[wf] ?? '').trim().replace(/\/+$/, '');
+	if (before && after && after !== before) {
+		for (const [key, sub] of [['stores_root', 'margie-databases'], ['input_path', 'margie-input'], ['output_path', 'margie-output']]) {
+			const at = `${WORKFLOW}.${key}`;
+			if (!given.has(at) && str(dig(cfg, at)).replace(/\/+$/, '') === `${before}/${sub}`) place(cfg, at, `${after}/${sub}`);
+		}
+	}
 	for (const [key0, raw] of Object.entries(values)) {
 		if (key0 === 'GENE_CALLER') continue;
 		if (key0 === 'RUN_GTDBTK') {
