@@ -495,11 +495,13 @@ def load_csv_to_db(csv_path: str, db_path: str, table_name: str,
         conn = _get_connection(db_path)
         try:
             conn.execute(create_sql)
-            # Adds columns present in the TSV but missing from the table.
-            existing = {row[1] for row in conn.execute(f"PRAGMA table_info({table_name})")}
+            # Adds columns present in the TSV but missing from the table. SQLite's column
+            # names ignore case, so an older table's SIGNALP6_prediction is signalp6_prediction.
+            existing = {row[1].lower() for row in conn.execute(f"PRAGMA table_info({table_name})")}
             for h, t in zip(headers, col_types):
-                if h not in existing:
+                if h.lower() not in existing:
                     conn.execute(f'ALTER TABLE {table_name} ADD COLUMN "{h}" {t}')
+                    existing.add(h.lower())
             conn.executemany(insert_sql, rows)
             conn.commit()
         finally:
