@@ -10,22 +10,20 @@ export function viewable(src: () => string) {
 	let error = $state('');
 	$effect(() => {
 		const from = src();
-		let made = '';
 		let live = true;
 		url = '';
 		error = '';
+		// The copy belongs to viewableUrl's cache, which releases it when it lets it go, so a
+		// figure seen again shows at once.
 		viewableUrl(from)
 			.then((u) => {
-				if (u.startsWith('blob:')) made = u;
 				if (live) url = u;
-				else if (made) URL.revokeObjectURL(made);
 			})
 			.catch((e) => {
 				if (live) error = e instanceof Error ? e.message : String(e);
 			});
 		return () => {
 			live = false;
-			if (made) URL.revokeObjectURL(made);
 		};
 	});
 	return {

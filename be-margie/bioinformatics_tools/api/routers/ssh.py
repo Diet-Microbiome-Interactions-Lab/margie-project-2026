@@ -18,6 +18,7 @@ import shlex
 import threading
 import time
 import uuid
+import zlib
 from datetime import datetime, timezone
 
 import pandas as pd
@@ -539,16 +540,24 @@ def _validate_margie_sb_shared_paths(user_config: dict, conn, home_dir: str) -> 
         _assert_remote_writable(conn, expanded, label=f"Shared path '{key_name}'", treat_as_file=treat_as_file)
 
 
+# Each job's folder from its history row, by (user, job): it does not change, so a page of figures
+# asks the cluster once after the API starts rather than once a file.
+_history_work_dirs: dict[tuple, str] = {}
+
+
 def _resolve_job_work_dir(job_id: str, current_user: dict, conn) -> str:
     """Resolves a job's work_dir from job_store, falling back to persistent history.
 
     Raises HTTPException(404) if the job is unknown, or 400 if it has no work_dir yet.
     """
     job = job_store.get(job_id)
+    remembered = _history_work_dirs.get((current_user["user_id"], job_id))
     if job is not None:
         if job.get("user_id") != current_user["user_id"]:
             raise HTTPException(status_code=403, detail="Access denied")
         work_dir = job.get("work_dir")
+    elif remembered:
+        work_dir = remembered
     else:
         try:
             user_config = ssh_sftp.read_remote_yaml(_config_path(current_user["home_dir"]), connection=conn)
@@ -569,6 +578,8 @@ def _resolve_job_work_dir(job_id: str, current_user: dict, conn) -> str:
         if row is None:
             raise HTTPException(status_code=404, detail="Job not found")
         work_dir = row.get("work_dir")
+        if work_dir:
+            _history_work_dirs[(current_user["user_id"], job_id)] = work_dir
 
     if not work_dir:
         raise HTTPException(status_code=400, detail="No working directory available for this job")
@@ -2778,6 +2789,7 @@ def get_job_files(
 def download_file(
     job_id: str,
     path: str,
+    request: Request,
     format: str = Query("raw", pattern="^(raw|excel)$"),
     current_user: dict = Depends(get_current_user),
 ):
@@ -2839,11 +2851,7 @@ def download_file(
         )
 
     try:
-        return StreamingResponse(
-            ssh_sftp.stream_remote_file(remote_path, connection=conn),
-            media_type="application/octet-stream",
-            headers={"Content-Disposition": f'attachment; filename="{filename}"'},
-        )
+        return _file_response(request, conn, remote_path, filename)
     except FileNotFoundError:
         raise HTTPException(status_code=404, detail="File not found on remote")
     except Exception as e:
@@ -3195,8 +3203,44 @@ def _attachment(name: str) -> dict:
     return {"Content-Disposition": f'attachment; filename="{safe}"'}
 
 
+# Text the browser takes gzipped (a genome map's HTML shrinks about five times); images are compressed already.
+_GZIP_NAMES = re.compile(r"\.(html?|svg|tsv|csv|txt|json|gff3?|tbl|log|md|faa|fna|fa|fasta)$", re.IGNORECASE)
+
+
+def _gzip_chunks(chunks):
+    z = zlib.compressobj(6, zlib.DEFLATED, 31)
+    for chunk in chunks:
+        out = z.compress(chunk)
+        if out:
+            yield out
+    yield z.flush()
+
+
+def _file_response(request: Request, conn, remote_path: str, filename: str):
+    """Streams one cluster file, gzipped when it is text and the browser takes gzip. Its ETag (size and
+    modification time) lets the browser keep it and ask only whether it changed (304)."""
+    sftp = conn.connect().open_sftp()
+    try:
+        st = sftp.stat(remote_path)
+    finally:
+        sftp.close()
+    size, mtime = int(st.st_size), int(st.st_mtime)
+    gz = bool(_GZIP_NAMES.search(filename)) and "gzip" in request.headers.get("accept-encoding", "")
+    tag = f'W/"{size:x}-{mtime:x}{"-gz" if gz else ""}"'
+    headers = {"ETag": tag, "Cache-Control": "private, no-cache", "Vary": "Accept-Encoding"}
+    if tag in (t.strip() for t in request.headers.get("if-none-match", "").split(",")):
+        return Response(status_code=304, headers=headers)
+    chunks = ssh_sftp.stream_remote_file(remote_path, connection=conn)
+    if gz:
+        headers["Content-Encoding"] = "gzip"
+        chunks = _gzip_chunks(chunks)
+    else:
+        headers["Content-Length"] = str(size)
+    return StreamingResponse(chunks, media_type="application/octet-stream", headers={**_attachment(filename), **headers})
+
+
 @router.get("/download_path")
-def download_path(path: str, current_user: dict = Depends(get_current_user)):
+def download_path(path: str, request: Request, current_user: dict = Depends(get_current_user)):
     """Streams any file the account can read, whole; a folder is zipped on the cluster as it streams.
 
     Unlike download_file, the path need not be inside a job's folder."""
@@ -3212,12 +3256,11 @@ def download_path(path: str, current_user: dict = Depends(get_current_user)):
     name = posixpath.basename(path.rstrip("/")) or "cluster"
     if kind != "directory":
         try:
-            chunks = ssh_sftp.stream_remote_file(path, connection=conn)
+            return _file_response(request, conn, path, name)
         except FileNotFoundError:
             raise HTTPException(status_code=404, detail="File not found on remote")
         except Exception as exc:
             raise HTTPException(status_code=_permission_status(exc), detail=f"Failed to read file: {exc}")
-        return StreamingResponse(chunks, media_type="application/octet-stream", headers=_attachment(name))
 
     has_zip = _run_remote_check(conn, "command -v zip >/dev/null 2>&1")[0] == 0
     command, filename, media = _archive_command(posixpath.dirname(path.rstrip("/")) or "/", name, has_zip)

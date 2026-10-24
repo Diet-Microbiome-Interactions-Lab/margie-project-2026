@@ -7,7 +7,7 @@
 	import { chatGet } from '$lib/workspace/chat-api';
 	import { cubicOut } from 'svelte/easing';
 	import { fly } from 'svelte/transition';
-	import { api, fileUrl } from '$lib/api';
+	import { api, fileUrl, viewableUrl } from '$lib/api';
 	import CountUp from '$lib/crisp/CountUp.svelte';
 	import ResultsRing from '$lib/crisp/ResultsRing.svelte';
 	import FolderView, { type FolderRoot } from '$lib/workspace/FolderView.svelte';
@@ -134,12 +134,15 @@
 	/** On the cluster: the genome's map made again with the viewer the backend has now (maps from earlier runs lack newer features). */
 	let remaking = $state(false);
 	let mapVersion = $state(0);
-	async function remakeMap(viewer: string) {
+	/** Draws the genome's whole interactive map again from its report table, or for the first time. */
+	async function remakeMap(folder: string) {
+		const first = !summary?.final.viewer;
 		remaking = true;
 		try {
-			await api('/results/refresh-map', { method: 'POST', body: JSON.stringify({ folder: viewer.slice(0, viewer.lastIndexOf('/')).replace(/\/scoring$/, '') }) });
+			const d = await api<{ viewer: string }>('/results/refresh-map', { method: 'POST', body: JSON.stringify({ folder }) });
+			if (summary && d.viewer) summary = { ...summary, final: { ...summary.final, viewer: d.viewer } };
 			mapVersion = Date.now();
-			ui.notify('The map was made again with the current viewer.', 'ok');
+			ui.notify(first ? 'The map was drawn.' : 'The map was drawn again.', 'ok');
 		} catch (e) {
 			ui.notify(e instanceof Error ? e.message : String(e), 'error');
 		} finally {
@@ -236,6 +239,13 @@
 
 	$effect(() => {
 		for (const r of ws.finished.slice(0, 30)) ws.loadSummary(r.organism);
+	});
+
+	// The next two figures load in the background, so stepping through them does not wait.
+	$effect(() => {
+		const list = tab === 'figures' ? (summary?.figures ?? []) : [];
+		const at = Math.max(0, list.indexOf(figure));
+		for (const f of list.slice(at + 1, at + 3)) viewableUrl(fileUrl(f, true)).catch(() => {});
 	});
 
 	const caller = $derived(summary ? callerName(summary) : '');
@@ -546,11 +556,15 @@
 					<div class="rb-body" in:tabIn>
 						{#if tab === 'map'}
 							{#if summary.final.viewer}
-								{#if backend.cluster && summary.mapCurrent === false && !mapVersion}
+								{#if backend.cluster}
 									<p class="rb-remake">
-										<span>This map was drawn by an earlier version of MARGIE; making it again brings in what has been added since.</span>
-										<button type="button" class="rb-btn" disabled={remaking} onclick={() => remakeMap(summary!.final.viewer!)}>
-											{remaking ? 'Making it again…' : 'Make this map again'}
+										<span>
+											{summary.mapCurrent === false && !mapVersion
+												? 'This map was drawn by an earlier version of MARGIE; drawing it again brings in what has been added since.'
+												: "Drawing the map again rebuilds the whole interactive map from this genome's report table."}
+										</span>
+										<button type="button" class="rb-btn" disabled={remaking} onclick={() => remakeMap(summary!.final.dir)}>
+											{remaking ? 'Drawing…' : 'Redraw the map'}
 										</button>
 									</p>
 								{/if}
@@ -559,6 +573,13 @@
 								{/key}
 							{:else if circular}
 								<ImageViewer src={fileUrl(circular, true)} alt="Circular map of {summary.genome}" />
+							{:else if backend.cluster && summary.final.table}
+								<p class="rb-state">
+									No genome map yet.
+									<button type="button" class="rb-btn" disabled={remaking} onclick={() => remakeMap(summary!.final.dir)}>
+										{remaking ? 'Drawing…' : 'Draw the map'}
+									</button>
+								</p>
 							{:else}
 								<p class="rb-state">No genome map yet: MARGIE draws it once scoring has finished for this genome.</p>
 							{/if}
@@ -586,7 +607,7 @@
 									</div>
 								</div>
 							{:else}
-								<p class="rb-state">No figures. Turn on Report figures in Settings to draw them next run.</p>
+								<p class="rb-state">No figures yet: MARGIE draws them once scoring has finished for this genome.</p>
 							{/if}
 						{:else if tab === 'files'}
 							{#key selected}<FolderView roots={genomeRoots(selected)} memory="genome:{selected}" />{/key}
