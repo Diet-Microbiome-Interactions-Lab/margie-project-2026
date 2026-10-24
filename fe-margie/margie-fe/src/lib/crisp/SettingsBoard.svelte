@@ -9,6 +9,7 @@
 	import { api, formatBytes, post } from '$lib/api';
 	import { LICENCE_LEGAL_NOTICE, LICENCE_STATEMENT, statementMatches } from '$lib/licence';
 	import Switch from '$lib/workspace/Switch.svelte';
+	import FolderPick from '$lib/workspace/FolderPick.svelte';
 	import { ws, type Setting } from '$lib/workspace/data.svelte';
 	import { ui } from '$lib/workspace/ui.svelte';
 	import { CONFIRMED, GUARDED, isConfirmed, isGuarded, unlocks } from '$lib/workspace/guarded';
@@ -242,6 +243,10 @@
 	/** Sections whose ? is pressed: their explanations show in Simple mode too. */
 	let help = $state<Record<string, boolean>>({});
 
+	/** The path setting whose folder icon was pressed: its folder (or file) picker is open. */
+	let pickFor = $state<Setting | null>(null);
+	const isFilePath = (p: string) => /\.[a-z0-9]{1,8}$/i.test(p.trim());
+
 	/** The files behind the settings and the runs, for editing by hand (Advanced). */
 	const CONFIG_FILE = '~/.config/bioinformatics-tools/config.yaml';
 	const WORKFLOW_FILE = '~/bioinformatics-tools/bioinformatics_tools/workflow_tools/margie_sb.smk';
@@ -252,13 +257,20 @@
 	/** Which default is about to be put back, once confirmed. */
 	let restoreAsk = $state<'' | 'config' | 'workflow'>('');
 	let restoring = $state(false);
-	async function openFiles() {
-		filesOpen = true;
+	/** Brings the account's copy of MARGIE up to date (as before a run) and learns whether its workflow has edits. */
+	async function checkFiles() {
 		try {
 			workflowEdited = (await api<{ workflow_edited: boolean }>('/settings/advanced')).workflow_edited;
 		} catch {
 			workflowEdited = false;
 		}
+	}
+	$effect(() => {
+		if (backend.cluster) untrack(() => checkFiles());
+	});
+	async function openFiles() {
+		filesOpen = true;
+		await checkFiles();
 	}
 	async function restoreDefault() {
 		const which = restoreAsk;
@@ -487,11 +499,9 @@
 	{:else if s.type === 'path'}
 		{@const p = String(draft[s.key] || s.default || '')}
 		<div class="sb-path">
-			{#if p.startsWith('/')}
-				<a class="sb-folder" href={folderHref(p)} title="Open {p} in Files"><Folder size={15} /></a>
-			{:else}
-				<span class="sb-folder" aria-hidden="true"><Folder size={15} /></span>
-			{/if}
+			<button type="button" class="sb-folder" title={isFilePath(p) ? 'Pick the file' : 'Pick the folder'} aria-label="Pick {s.label}" disabled={locked(s)} onclick={() => (pickFor = s)}>
+				<Folder size={15} />
+			</button>
 			{#if wrap}
 				<!-- In a card: the whole path, wrapping, never cut off. -->
 				<textarea
@@ -896,6 +906,17 @@
 
 	{#each groups.filter((g) => g.wide) as g, k (g.id)}{@render card(g, k + groups.length)}{/each}
 </div>
+
+{#if pickFor}
+	{@const value = String(draft[pickFor.key] || pickFor.default || '')}
+	<FolderPick
+		start={value}
+		files={isFilePath(value)}
+		title={`${isFilePath(value) ? 'Pick a file' : 'Pick a folder'}: ${pickFor.label}`}
+		onpick={(path) => pickFor && (draft[pickFor.key] = path)}
+		onclose={() => (pickFor = null)}
+	/>
+{/if}
 
 <style>
 	/* No frame of its own: the chips, where MARGIE runs, and the section shown are boxes side by side. */
@@ -1347,11 +1368,19 @@
 		display: grid;
 		place-items: center;
 		width: 34px;
+		padding: 0;
+		border: none;
 		border-radius: var(--mg-r-sm) 0 0 var(--mg-r-sm);
+		background: none;
 		color: var(--mg-accent-ink, var(--mg-accent));
+		cursor: pointer;
 	}
-	a.sb-folder:hover {
+	.sb-folder:hover:not(:disabled) {
 		background: color-mix(in srgb, var(--mg-accent) 14%, transparent);
+	}
+	.sb-folder:disabled {
+		color: var(--mg-text-3);
+		cursor: default;
 	}
 	.sb-path input {
 		width: 100%;

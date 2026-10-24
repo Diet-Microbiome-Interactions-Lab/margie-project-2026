@@ -3468,9 +3468,14 @@ _WORKFLOW_FILE = "~/bioinformatics-tools/bioinformatics_tools/workflow_tools/mar
 
 @router.get("/advanced_files")
 def advanced_files(current_user: dict = Depends(get_current_user)):
-    """Tells whether the workflow file has edits by hand; sync_remote_dane_wf updates the copy of
-    MARGIE once it has none."""
+    """Brings the copy of MARGIE up to the deployed version (sync_remote_dane_wf, as before a run),
+    so Settings shows the workflow runs use, and tells whether the workflow file has edits by hand,
+    which hold the copy where it is."""
     conn = _build_connection(current_user)
+    try:
+        sync_remote_dane_wf(conn)
+    except Exception as exc:
+        LOGGER.warning("dane_wf version-sync for Settings failed, using the copy as it is: %s", exc)
     path = _resolve_browse_path(_WORKFLOW_FILE, current_user)
     folder, name = posixpath.split(path)
     code, out = _run_remote_check(conn, f"cd {shlex.quote(folder)} && git status --porcelain -- {shlex.quote(name)}")
