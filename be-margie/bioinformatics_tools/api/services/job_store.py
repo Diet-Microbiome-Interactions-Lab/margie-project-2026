@@ -222,6 +222,11 @@ class JobStore:
         job = self._jobs.get(job_id)
         return job.get("slurm_jobs", []) if job else []
 
+    def going_for(self, user_id: int) -> list[str]:
+        """The user's runs this API is watching that are still going."""
+        return [j["job_id"] for j in self._jobs.values()
+                if j.get("user_id") == user_id and j.get("status") in ("pending", "running")]
+
     def get_status(self, job_id: str) -> str | None:
         """Get just the status field for a job."""
         job = self._jobs.get(job_id)

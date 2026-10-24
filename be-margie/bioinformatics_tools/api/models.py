@@ -81,6 +81,11 @@ class UpdateProfile(BaseModel):
     notify_runs: bool | None = None
 
 
+class DeleteAccount(BaseModel):
+    """The password again, to delete the MARGIE account (User profile)."""
+    password: str = Field(min_length=1, max_length=200)
+
+
 class UpdateClusterCredentials(BaseModel):
     cluster_host: str | None = None
     cluster_username: str | None = None

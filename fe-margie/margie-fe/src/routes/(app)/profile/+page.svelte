@@ -73,6 +73,31 @@
 	}
 
 	/** Sends only what changed; the backend tries the new credentials before keeping them. */
+	// ------------------------------------------------ deleting the account
+	let deleting = $state(false);
+	let delPassword = $state('');
+	let delBusy = $state(false);
+	let delError = $state('');
+	async function deleteAccount() {
+		delBusy = true;
+		delError = '';
+		try {
+			const res = await fetch(`${API_URL}/v1/auth/delete-account`, {
+				method: 'POST',
+				headers: { ...authHeaders(), 'Content-Type': 'application/json' },
+				body: JSON.stringify({ password: delPassword })
+			});
+			const d = await res.json().catch(() => ({}));
+			if (!res.ok) throw new Error(typeof d.detail === 'string' ? d.detail : 'The account could not be deleted.');
+			clearToken();
+			goto('/signin');
+		} catch (e) {
+			delError = e instanceof Error ? e.message : String(e);
+		} finally {
+			delBusy = false;
+		}
+	}
+
 	async function saveCredentials() {
 		credError = '';
 		credDone = '';
@@ -194,6 +219,33 @@
 			{/if}
 		</section>
 	</div>
+
+	<section class="pf-box pf-delete" aria-labelledby="pf-del">
+		<header class="pf-head"><h2 id="pf-del">Delete account</h2></header>
+		<p class="pf-del-text">
+			Deletes your MARGIE account: your sign-in, your details here and the stored cluster key. Your files on the cluster stay as they are
+			(config.yaml, your copy of MARGIE, databases and results). To use MARGIE again, sign up again.
+		</p>
+		{#if deleting}
+			<form
+				class="pf-del-form"
+				onsubmit={(e) => {
+					e.preventDefault();
+					deleteAccount();
+				}}
+			>
+				<label>
+					<span>Your MARGIE password</span>
+					<input class="mg-input" type="password" autocomplete="current-password" bind:value={delPassword} disabled={delBusy} />
+				</label>
+				<button type="submit" class="mg-btn small danger" disabled={!delPassword || delBusy}>{delBusy ? 'Deleting…' : 'Delete my account'}</button>
+				<button type="button" class="mg-btn small" disabled={delBusy} onclick={() => ((deleting = false), (delPassword = ''), (delError = ''))}>Cancel</button>
+			</form>
+			{#if delError}<p class="pf-msg bad" role="alert">{delError}</p>{/if}
+		{:else}
+			<div><button type="button" class="mg-btn small" onclick={() => (deleting = true)}>Delete account…</button></div>
+		{/if}
+	</section>
 </div>
 
 <style>
@@ -206,6 +258,29 @@
 	}
 	.pf-pair > :global(*) {
 		min-width: 0;
+	}
+	.pf-delete {
+		margin-top: var(--cr-gutter, 16px);
+	}
+	.pf-del-text {
+		margin: 0;
+		font-size: var(--mg-fs-sm);
+		color: var(--mg-text-2);
+	}
+	.pf-del-form {
+		display: flex;
+		flex-wrap: wrap;
+		align-items: flex-end;
+		gap: 8px 10px;
+	}
+	.pf-del-form label {
+		display: flex;
+		flex-direction: column;
+		gap: 4px;
+		min-width: min(100%, 260px);
+		font-size: var(--mg-fs-xs);
+		font-weight: 600;
+		color: var(--mg-text-2);
 	}
 	.pf-box {
 		display: flex;
