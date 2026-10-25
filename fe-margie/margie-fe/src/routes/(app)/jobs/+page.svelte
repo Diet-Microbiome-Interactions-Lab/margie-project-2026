@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { Eraser } from 'lucide-svelte';
+	import { Eraser, Lightbulb } from 'lucide-svelte';
 	import JobsBoard from '$lib/crisp/JobsBoard.svelte';
 	import RefreshButton from '$lib/workspace/blocks/RefreshButton.svelte';
 	import { ws } from '$lib/workspace/data.svelte';
@@ -46,6 +46,7 @@
 					<Eraser size={14} />{clearing ? 'Clearing…' : 'Clear history'}
 				</button>
 			{/if}
+			<a class="mg-btn small" href="/quiz" title="Questions on microbes, metabolism, bioinformatics and the gut"><Lightbulb size={14} />Bored while waiting? Try Quizzes!</a>
 			<RefreshButton title="Read the jobs again" run={() => ws.loadRuns()} />
 		</div>
 	</div>
