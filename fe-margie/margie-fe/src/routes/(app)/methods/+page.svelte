@@ -1,12 +1,11 @@
 <script lang="ts">
 	import '$lib/crisp/about.css';
-	import { ArrowRight, CircleQuestionMark, FileCode, Gauge, LockKeyhole } from 'lucide-svelte';
-	import FaqList from '$lib/crisp/FaqList.svelte';
+	import { ArrowRight, CircleQuestionMark, FileCode } from 'lucide-svelte';
 	import { FAQS } from '$lib/crisp/faq';
 
 	/**
-	 * Methods: what MARGIE does, phase by phase (margie_sb.smk), then the FAQ (FaqList), which explains
-	 * each step with its references and code.
+	 * Methods: what MARGIE does, phase by phase (margie_sb.smk). The FAQ, which explains each step with
+	 * its references and code, is on its own page (/faq).
 	 */
 	const PHASES: { n: string; step: string; tools: string; does: string }[] = [
 		{ n: '1', step: 'Quality', tools: 'QUAST (optional)', does: 'Assembly statistics for each genome: contigs, N50, total length.' },
@@ -61,6 +60,14 @@
 	</div>
 
 	<div class="ab mt-read">
+		<a class="ab-go mt-faq-go" href="/faq">
+			<CircleQuestionMark size={26} />
+			<span class="ab-go-text">
+				<b>Frequently asked questions</b>
+				<span>{FAQS.length} questions on how each step works, with the papers each rests on and the code that does it | Reading the scores.</span>
+			</span>
+			<span class="ab-go-to">Open the FAQ <ArrowRight size={15} /></span>
+		</a>
 		<section class="ab-box">
 			<h2>Overview</h2>
 			<p>
@@ -92,26 +99,6 @@
 			<p class="ab-lab">Phase 14 (genome comparison: ANI, AAI, closest genomes, synteny) and the LLM layer are being worked on and do not run yet.</p>
 		</section>
 
-		{#if FAQS.length}
-		<section id="faq" class="mt-faq" aria-labelledby="faq-title">
-			<div class="mt-faq-head">
-				<CircleQuestionMark size={24} />
-				<div>
-					<h2 id="faq-title">Frequently asked questions</h2>
-					<p>How each step works, with the papers it rests on and the code that does it.</p>
-				</div>
-			</div>
-			<a class="ab-go" href="/methods/scores">
-				<Gauge size={26} />
-				<span class="ab-go-text">
-					<b>Reading the scores</b>
-					<span>C3's two channels | the genome pool it compares against | what each tier means | a gene scored in five genomes | the check against EcoCyc. Opens with a password the lab gives on request.</span>
-				</span>
-				<span class="ab-go-to"><LockKeyhole size={14} /> Open <ArrowRight size={15} /></span>
-			</a>
-			<FaqList />
-		</section>
-		{/if}
 
 	</div>
 </div>
@@ -131,33 +118,9 @@
 	.mt-read :global(.ab-go-text) {
 		font-size: var(--mg-fs);
 	}
-	/* The FAQ: coloured so it stands out on the page. */
-	.mt-faq {
-		display: flex;
-		flex-direction: column;
-		gap: 12px;
-		padding: 16px 18px 18px;
-		border: 1px solid color-mix(in srgb, var(--mg-accent) 40%, var(--mg-border));
+	/* The FAQ's card, coloured so it stands out. */
+	.mt-faq-go {
 		border-top: 4px solid var(--mg-accent);
-		border-radius: var(--mg-r);
-		background: color-mix(in srgb, var(--mg-accent) 8%, var(--mg-surface));
-		scroll-margin-top: 12px;
-	}
-	.mt-faq-head {
-		display: flex;
-		align-items: center;
-		gap: 12px;
-		color: var(--mg-accent);
-	}
-	.mt-faq-head h2 {
-		margin: 0;
-		color: var(--mg-accent);
-		font-size: var(--mg-fs-xl);
-		font-weight: 700;
-	}
-	.mt-faq-head p {
-		margin: 2px 0 0;
-		color: var(--mg-text-2);
-		font-size: var(--mg-fs);
+		background: color-mix(in srgb, var(--mg-accent) 10%, var(--mg-surface));
 	}
 </style>
