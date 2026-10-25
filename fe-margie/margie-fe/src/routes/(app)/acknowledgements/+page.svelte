@@ -7,8 +7,7 @@
 
 	/**
 	 * Acknowledgements: the tools and databases MARGIE runs (credits.ts, checked against their own
-	 * pages): each one's version, licence, source code and data sources, and the papers it asks to be
-	 * cited; then the software MARGIE herself is built with, and the research computing she runs on.
+	 * pages): each one's version, licence, source code and data sources, and the papers to cite; then the software MARGIE is built with, and the research computing MARGIE runs on.
 	 */
 
 	/** A download entry: its URL as a link, and any note after it ("register; tarball ..."). */
@@ -45,7 +44,7 @@
 					>wintermutant</a
 				>) for his mentoring, and for the design and development of the engine and GUI orchestration platform,
 				<a class="mg-link" href="https://github.com/wintermutant/bioinformatics-tools" target="_blank" rel="noreferrer">BSP</a>, on which MARGIE was built.
-				Special thanks go to Dr. {LAB.pi} for his vision, supervision and support throughout her development, and to the members of the
+				Special thanks go to Dr. {LAB.pi} for his vision, supervision and support throughout MARGIE's development, and to the members of the
 				{LAB.name} for their feedback and ideas.
 			</p>
 			<p>
@@ -53,7 +52,7 @@
 				Please cite RCAC's computing as it asks, below.
 			</p>
 			<p class="ab-lab">
-				If you publish results from MARGIE, please cite the tools and databases she ran for you, below, as well as MARGIE herself
+				If you publish results from MARGIE, please cite MARGIE and the tools and databases she ran for you, below
 				(<a class="mg-link" href="/contributors">how to cite</a>).
 			</p>
 		</section>
@@ -71,7 +70,7 @@
 		</section>
 
 		<section class="ab-box">
-			<h2>Tools and databases she runs</h2>
+			<h2>Tools and databases MARGIE runs</h2>
 			<p class="ab-lab">
 				The version each step uses, its licence as its provider states it, its source code and where its data comes from. Tools for
 				academic use only are fetched from their providers by each user, under the provider's licence.
@@ -109,7 +108,7 @@
 		</section>
 
 		<section class="ab-box">
-			<h2>Software she is built with</h2>
+			<h2>Software MARGIE is built with</h2>
 			<p class="ab-lab">MARGIE runs on open-source software that others write and share. Thank you to each of these projects.</p>
 			<div class="sw">
 				{#each SOFTWARE as g (g.group)}
@@ -137,7 +136,7 @@
 
 		<section class="ab-box">
 			<h2>Computing</h2>
-			<p class="ab-lab">The research computing MARGIE runs on, to cite beside her (as RCAC asks).</p>
+			<p class="ab-lab">The research computing MARGIE runs on, cited with MARGIE.</p>
 			<ol class="refs">
 				{#each COMPUTING.refs as r (r.id)}
 					<li>{r.apa} <a class="mg-link" href={r.url} target="_blank" rel="noreferrer">{r.url}</a></li>
@@ -155,8 +154,6 @@
 				{#each [...RUN_TOOLS.filter((t) => t.cite.length), ...CITED_SOFTWARE] as t ('id' in t ? t.id : t.name)}
 					<li>
 						<b>{t.name}</b>
-						{#if t.citeRequired}<span class="cite-req">asks to be cited</span>{/if}
-						{#if t.citeRule}<span class="ab-lab cite-rule">“{t.citeRule}”{#if t.citeRuleUrl} (<a class="mg-link" href={t.citeRuleUrl} target="_blank" rel="noreferrer">its page</a>){/if}</span>{/if}
 						<ol>
 							{#each t.cite as c (c.key)}
 								<li>{c.apa}{#if c.doi} <a class="mg-link" href="https://doi.org/{c.doi}" target="_blank" rel="noreferrer">doi:{c.doi}</a>{/if}</li>
@@ -224,19 +221,6 @@
 	.refs a,
 	.sw-l a {
 		overflow-wrap: anywhere;
-	}
-	.cite-req {
-		margin-left: 6px;
-		padding: 1px 7px;
-		border-radius: 999px;
-		background: color-mix(in srgb, var(--mg-accent) 14%, transparent);
-		color: var(--mg-accent);
-		font-size: var(--mg-fs-xs);
-		font-weight: 600;
-	}
-	.cite-rule {
-		display: block;
-		font-size: var(--mg-fs-sm);
 	}
 	.sw {
 		display: grid;

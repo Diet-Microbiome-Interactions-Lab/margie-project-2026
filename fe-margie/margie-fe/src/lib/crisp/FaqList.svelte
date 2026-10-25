@@ -28,10 +28,10 @@
 
 	/** Each group's icon and what its questions cover. */
 	const META: Record<string, { icon: typeof Server; blurb: string }> = {
-		'Running MARGIE': { icon: Server, blurb: 'How she reaches your cluster, calls genes, writes results, and which versions and licences she works under.' },
+		'Running MARGIE': { icon: Server, blurb: 'How MARGIE reaches your cluster, calls genes and writes results, and the versions and licences behind each step.' },
 		'Inside the pipeline': { icon: Workflow, blurb: 'Hashing, consolidation, labels, envelopes, operons and fingerprints: what each step does and why.' },
 		'Databases and provenance': { icon: Database, blurb: 'What MARGIE keeps, how it grows with each genome, and how each result can be traced.' },
-		Scoring: { icon: Gauge, blurb: 'How confident she is in each label: the four measures, C3 in depth, and how it was checked.' }
+		Scoring: { icon: Gauge, blurb: 'How confident MARGIE is in each label: the four measures, C3 in depth, and how it was checked.' }
 	};
 	const slug = (g: string) => 'g-' + g.toLowerCase().replace(/[^a-z]+/g, '-');
 
@@ -162,7 +162,7 @@
 			</ol>
 		</details>
 		<p class="ab-lab">
-			To cite MARGIE herself, see <a class="mg-link" href="/contributors">Contributors</a>; the tools and databases she runs, with their versions and
+			To cite MARGIE, see <a class="mg-link" href="/contributors">Contributors</a>; the tools and databases MARGIE runs, with their versions and
 			licences, are on <a class="mg-link" href="/acknowledgements">Acknowledgements</a>.
 		</p>
 	</section>

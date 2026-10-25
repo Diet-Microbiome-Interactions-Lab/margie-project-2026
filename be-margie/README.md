@@ -4,7 +4,7 @@
 
 **Mostly Automated Rapid Genome Inference Environment**
 
-Annotates prokaryotic genomes, finds operons, and scores how confident she is about each gene.
+Annotates prokaryotic genomes, finds operons, and scores how confident MARGIE is about each gene.
 
 <img src="docs/img/Sedimenticola_thiotaurini_GCF_001007875.1.png" width="820" alt="Sedimenticola_thiotaurini_GCF_001007875.1 circular genome map: Operon mode">
 <img src="docs/img/operon_0313_operon_map.png" width="820" alt="Operon map for Operon_0313 in Sedimenticola_thiotaurini_GCF_001007875.1 ">
@@ -194,7 +194,7 @@ APA 7th (base architecture on which MARGIE was built, by Dane Deemer):
 - Deemer, D. (2020). *bioinformatics-tools* [Computer software]. GitHub. https://github.com/wintermutant/bioinformatics-tools (the backend that be-margie grew from: API, command line and workflow engine)
 - Deemer, D. (2025). *biolab-fe* [Computer software]. GitHub. https://github.com/wintermutant/biolab-fe (the web interface that fe-margie grew from)
 
-APA 7th (research computing, as RCAC asks it to be cited):
+APA 7th (research computing):
 
 - McCartney, G., Hacker, T., & Yang, B. (2014). Empowering faculty: A campus cyberinfrastructure strategy for research communities. *EDUCAUSE Review*. https://er.educause.edu/articles/2014/7/empowering-faculty-a-campus-cyberinfrastructure-strategy-for-research-communities
 - Smith, P. M., Gough, E., Younts, A., Werts, B., Hacker, T. J., Neumeister, N., & Wisecaver, J. (2020). The “Geddes” composable platform: An evolution of community clusters for a composable world. *2020 IEEE/ACM International Workshop on Interoperability of Supercomputing and Cloud Technologies (SuperCompCloud)*, 33–38. https://doi.org/10.1109/SuperCompCloud51944.2020.00011

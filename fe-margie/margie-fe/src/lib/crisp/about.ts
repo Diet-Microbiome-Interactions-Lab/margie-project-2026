@@ -1,5 +1,5 @@
 /**
- * Who makes MARGIE, how to cite her and where the desktop app is: one copy, for the
+ * Who makes MARGIE, how to cite MARGIE and where the desktop app is: one copy, for the
  * Contributors, Acknowledgements, README and Home pages.
  */
 
@@ -110,7 +110,7 @@ url = "https://github.com/wintermutant/biolab-fe"
 }`;
 
 /**
- * The computing MARGIE runs on, acknowledged and cited as RCAC asks
+ * The computing MARGIE runs on, acknowledged and cited
  * (https://www.rcac.purdue.edu/about/acknowledge): its community cluster paper (BibTeX as RCAC gives
  * it), the Geddes platform paper (BibTeX from its DOI) and the Negishi cluster's own page.
  */
@@ -181,7 +181,7 @@ export const FUNDING: { funder: string; award: string; title: string; url: strin
 /** Where the desktop app is downloaded from (its releases, for now). */
 export const DESKTOP_URL = `${CITE_URL}/releases`;
 
-/** The open-source software MARGIE herself is built with (be-margie/pyproject.toml, fe-margie/margie-fe/package.json). */
+/** The open-source software MARGIE is built with (be-margie/pyproject.toml, fe-margie/margie-fe/package.json). */
 export const SOFTWARE: {
 	group: string;
 	items: { name: string; what: string; href: string; version?: string; licence?: string; licenceUrl?: string; source?: string }[];
