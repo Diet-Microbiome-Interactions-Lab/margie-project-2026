@@ -594,6 +594,75 @@ class TestRunPipelineBatchSequential:
         assert wf.report.data['genomes_skipped'] == ['genome1']
 
 
+class _SlowStage2:
+    """A Stage 2 process that runs for `polls` polls, counting how many are running together."""
+
+    running = 0
+    most = 0
+
+    def __init__(self, polls: int = 3):
+        self.proc = MagicMock(returncode=0)
+        self.stdout_lines: list[str] = []
+        self.stderr_lines: list[str] = []
+        self._left = polls
+        _SlowStage2.running += 1
+        _SlowStage2.most = max(_SlowStage2.most, _SlowStage2.running)
+
+    def poll(self):
+        if self._left > 0:
+            self._left -= 1
+            return None
+        if self._left == 0:
+            self._left = -1
+            _SlowStage2.running -= 1
+        return 0
+
+    def wait(self):
+        return 0
+
+
+class TestStage2AtOnce:
+    """Stage 2 takes several genomes at a time (margie_sb.stage2.at_once): each starts once its gene
+    calls are in and a place is free."""
+
+    SMK_CONFIG = {'output_dir': '/tmp/seqtest', 'main_database': ''}
+
+    def _run(self, wf, at_once):
+        _SlowStage2.running = _SlowStage2.most = 0
+        genome_files = {f'genome{k}': f'/g{k}.fa' for k in range(1, 6)}
+        started = []
+
+        def fake_start_background(cmd):
+            if _target_genome_of(cmd) is None:
+                return _FakeBackground()
+            started.append(_target_genome_of(cmd))
+            return _SlowStage2()
+
+        config = {**self.SMK_CONFIG, 'margie_sb.stage2.at_once': at_once}
+        with patch('bioinformatics_tools.workflow_tools.workflow.cache_sif_files'), \
+                patch('bioinformatics_tools.workflow_tools.workflow.locate_local_sif_files'), \
+                patch('bioinformatics_tools.workflow_tools.workflow.time.sleep'), \
+                patch('bioinformatics_tools.workflow_tools.workflow.Path') as mock_path_cls, \
+                patch.object(wf, '_start_background_subprocess', side_effect=fake_start_background), \
+                patch.object(wf, '_run_subprocess', return_value=subprocess.CompletedProcess(args=[], returncode=0, stdout='', stderr='')), \
+                patch('bioinformatics_tools.workflow_tools.workflow.subprocess.run',
+                      return_value=subprocess.CompletedProcess(args=[], returncode=0, stdout='', stderr='')):
+            mock_path_cls.return_value.exists.return_value = True  # each genome's gene calls are in
+            wf._run_pipeline_batch_sequential('margie_sb', config, genome_files, cache_map_fn=lambda s: {}, mode='dev')
+        return started
+
+    def test_three_genomes_go_through_stage2_together(self, wf):
+        started = self._run(wf, 3)
+        assert sorted(started) == [f'genome{k}' for k in range(1, 6)]
+        assert _SlowStage2.most == 3
+        assert wf.report.status.indicates_success
+        assert wf.report.data['genomes_processed'] == 5
+
+    def test_one_at_a_time_when_set_to_one(self, wf):
+        self._run(wf, 1)
+        assert _SlowStage2.most == 1
+
+
 # ---- do_margie_sb ----
 
 class TestDoMargieSb:
