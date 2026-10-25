@@ -10,6 +10,7 @@ over SSH so history survives restarts; persistence is opt-in per job and never r
 """
 import datetime
 import logging
+import threading
 import time
 
 from bioinformatics_tools.api.services import job_history_client
@@ -32,6 +33,10 @@ class JobStore:
         self._persistence: dict[str, tuple[str, object]] = {}
         # Last provenance write per job, for checkpoint()'s throttle.
         self._last_checkpoint: dict[str, float] = {}
+        # Log lines not yet joined into job["logs"]: joined when the job is read, so each line
+        # costs its own length (appending to the string copied the whole log each time).
+        self._log_parts: dict[str, list[str]] = {}
+        self._log_lock = threading.Lock()
 
     def create(self, job_id: str, genome_path: str, user_id: int | None = None,
                workflow: str | None = None, output_dir: str | None = None,
@@ -87,7 +92,16 @@ class JobStore:
 
     def get(self, job_id: str) -> dict | None:
         """Get a job by ID, or None if not found."""
+        self._join_log(job_id)
         return self._jobs.get(job_id)
+
+    def _join_log(self, job_id: str) -> None:
+        """Adds the lines appended since the last read to job["logs"]."""
+        with self._log_lock:
+            parts = self._log_parts.pop(job_id, None)
+            job = self._jobs.get(job_id)
+            if parts and job is not None:
+                job["logs"] = job.get("logs", "") + "".join(parts)
 
     def exists(self, job_id: str) -> bool:
         return job_id in self._jobs
@@ -97,6 +111,10 @@ class JobStore:
         job = self._jobs.get(job_id)
         if job is None:
             return
+        if "logs" in fields:
+            # A new log replaces the lines not yet joined too.
+            with self._log_lock:
+                self._log_parts.pop(job_id, None)
 
         changed_persisted = {
             k: v for k, v in fields.items()
@@ -150,6 +168,7 @@ class JobStore:
         detection would miss (same object). The full log is written only here;
         a run that dies mid-way keeps its log in ~/.local/share/bsp/jobs/<job_id>.log.
         """
+        self._join_log(job_id)
         job = self._jobs.get(job_id)
         if job is None:
             return
@@ -174,7 +193,8 @@ class JobStore:
     def append_log(self, job_id: str, line: str):
         """Append a line to a job's log output."""
         if job_id in self._jobs:
-            self._jobs[job_id]["logs"] = self._jobs[job_id].get("logs", "") + line + "\n"
+            with self._log_lock:
+                self._log_parts.setdefault(job_id, []).append(line + "\n")
 
     def add_slurm_job(self, job_id: str, slurm_id: str, rule: str, genome: str = "", source: str = "fresh run", log_path: str = ""):
         """Registers a newly discovered SLURM sub-job. log_path (internal) is read
