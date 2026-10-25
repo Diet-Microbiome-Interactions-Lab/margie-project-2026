@@ -30,6 +30,12 @@ How a run annotates and scores is set out under **Methods**.
 - `FINAL_ANNOTATION_WITH_CONFIDENCE.tsv`: every gene's label, its source, location and topology, the four scoring measures with their reasoning, its 0 to 1 confidence and tier.
 - A GFF of the annotation, each tool's own results, gene and operon fingerprints, and a genome map.
 
+## How does MARGIE work
+
+Each genome's genes are called (RASTtk, or Prodigal) and annotated by the chosen tools, each on its own. MARGIE's own steps then take over: **consolidation** joins the tools' results into one row per gene, **labeling** gives each gene one label, the **operon database** adds the genome's operon contexts to the reference that C3 scores against, **scoring** measures how much the evidence agrees (C1 to C4, then a 0 to 1 confidence), **fingerprinting** writes each gene's and operon's fingerprint and the final tables, and the **fingerprint databases** take in the genome's fingerprints. **Methods** describes each phase.
+
+<!-- code-card -->
+
 ## The desktop app
 
 MARGIE also runs as a desktop app that looks and works like this site, on your own computer or against a cluster. Download it from the [releases](https://github.com/Diet-Microbiome-Interactions-Lab/margie-project-2026/releases).
