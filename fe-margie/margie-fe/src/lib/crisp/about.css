@@ -98,4 +98,55 @@
 			grid-template-columns: minmax(0, 1fr);
 		}
 	}
+	/* A link card that stands out in a page: the Code page from the README, the scores page from Methods. */
+	.ab-go {
+		display: flex;
+		align-items: center;
+		gap: 14px;
+		max-width: 920px;
+		margin: 4px 0 14px;
+		padding: 14px 18px;
+		border: 1px solid color-mix(in srgb, var(--mg-accent) 45%, var(--mg-border));
+		border-left: 4px solid var(--mg-accent);
+		border-radius: var(--mg-r);
+		background: color-mix(in srgb, var(--mg-accent) 7%, var(--mg-surface));
+		color: var(--mg-text);
+		text-decoration: none;
+	}
+	.ab-go:hover {
+		background: color-mix(in srgb, var(--mg-accent) 12%, var(--mg-surface));
+	}
+	.ab-go > svg {
+		flex: 0 0 auto;
+		color: var(--mg-accent);
+	}
+	.ab-go-text {
+		display: flex;
+		flex: 1;
+		flex-direction: column;
+		gap: 3px;
+		min-width: 0;
+		font-size: var(--mg-fs-sm);
+		line-height: 1.5;
+	}
+	.ab-go-text b {
+		font-size: var(--mg-fs);
+	}
+	.ab-go-text span {
+		color: var(--mg-text-2);
+	}
+	.ab-go-to {
+		display: inline-flex;
+		flex: 0 0 auto;
+		align-items: center;
+		gap: 6px;
+		color: var(--mg-accent);
+		font-weight: 600;
+		white-space: nowrap;
+	}
+	@media (max-width: 640px) {
+		.ab-go {
+			flex-wrap: wrap;
+		}
+	}
 }

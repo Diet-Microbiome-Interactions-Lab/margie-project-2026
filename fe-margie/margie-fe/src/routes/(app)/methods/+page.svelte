@@ -1,5 +1,6 @@
 <script lang="ts">
 	import '$lib/crisp/about.css';
+	import { ArrowRight, Gauge, LockKeyhole } from 'lucide-svelte';
 
 	/**
 	 * Methods: how MARGIE annotates a genome and scores each gene, phase by phase, as the
@@ -121,8 +122,10 @@
 				<p>The mean UniOP probability that the gene shares an operon with its neighbours; 0.5 where there is none.</p>
 				<h3>C3, operon context</h3>
 				<p>
-					How often the gene's operon neighbourhood recurs across the reference genomes, as a Bayesian estimate per adjacency; 0.5 for
-					single genes and operons of hypothetical proteins, and 0 for an operon whose neighbours have no support in the reference.
+					How often the gene's operon neighbourhood recurs across the genome pool, in two channels: adjacency (the operon as a unit, the
+					geometric mean over its adjacent pairs; the default) and membership (the gene's strongest partner anywhere in its operon; the
+					hybrid score). Each pair is a Bayesian estimate weighted against chance. 0.5 for single genes and operons of hypothetical
+					proteins, and 0 for an operon whose pairs have no support in the pool.
 				</p>
 				<h3>C4, EC agreement</h3>
 				<p>Whether the tools that give an EC number agree; conflicts lower the score.</p>
@@ -137,6 +140,14 @@
 				above 0.5, <b>fair</b> above 0.3, and <b>low</b> otherwise. A gene is flagged for review when its tools' EC numbers conflict, its
 				confidence is below 0.5, it sits in an operon with C2 below 0.5, or its operon is ambiguous and gave no boost.
 			</p>
+			<a class="ab-go" href="/methods/scores">
+				<Gauge size={26} />
+				<span class="ab-go-text">
+					<b>Reading the scores</b>
+					<span>C3's two channels | the genome pool it compares against | what each tier means | a gene scored in five genomes | the check against EcoCyc. Opens with a password the lab gives on request.</span>
+				</span>
+				<span class="ab-go-to"><LockKeyhole size={14} /> Open <ArrowRight size={15} /></span>
+			</a>
 		</section>
 
 		<section class="ab-box">
