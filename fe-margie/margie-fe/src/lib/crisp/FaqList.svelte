@@ -7,7 +7,7 @@
 	import { LockedError, alreadyOpen, openLocked, type LockedPage } from './locked';
 
 	/**
-	 * The FAQ (on Methods): how MARGIE works, question by question. Each answer names the papers it
+	 * The FAQ (its own page, /faq): how MARGIE works, question by question. Each answer names the papers it
 	 * rests on and can show the code that does what it says; a thesis panel (under embargo) opens
 	 * with the password. A link to #<question id> opens that question.
 	 */
