@@ -10,6 +10,8 @@ import DOMPurify from 'dompurify';
 export interface LockedPage {
 	/** Sanitized HTML, its figures as object URLs. */
 	html: string;
+	/** A page in parts (the FAQ's thesis panels, by question id), sanitized the same way. */
+	sections: Record<string, string>;
 }
 
 const MAGIC = 'MARGIEL1';
@@ -46,15 +48,17 @@ export async function openLocked(name: string, password: string): Promise<Locked
 	} catch {
 		throw new LockedError('That password does not open this page.', 'password');
 	}
-	const { html, figs } = JSON.parse(new TextDecoder().decode(plain)) as { html: string; figs: Record<string, string> };
-	// Sanitized with the figures still as __fig/<name> placeholders, then pointed at their object URLs.
-	let clean = DOMPurify.sanitize(html, { ADD_ATTR: ['target'] });
-	for (const [fig, b64] of Object.entries(figs)) {
+	const data = JSON.parse(new TextDecoder().decode(plain)) as { html?: string; sections?: Record<string, string>; figs: Record<string, string> };
+	const urls = Object.entries(data.figs).map(([fig, b64]) => {
 		const bytes = Uint8Array.from(atob(b64), (c) => c.charCodeAt(0));
-		const url = URL.createObjectURL(new Blob([bytes], { type: fig.endsWith('.webp') ? 'image/webp' : 'image/png' }));
-		clean = clean.replaceAll(`__fig/${fig}`, url);
-	}
-	const page = { html: clean };
+		return [fig, URL.createObjectURL(new Blob([bytes], { type: fig.endsWith('.webp') ? 'image/webp' : 'image/png' }))] as const;
+	});
+	// Sanitized with the figures still as __fig/<name> placeholders, then pointed at their object URLs.
+	const clean = (html: string) => urls.reduce((out, [fig, url]) => out.replaceAll(`__fig/${fig}`, url), DOMPurify.sanitize(html, { ADD_ATTR: ['target'] }));
+	const page = {
+		html: clean(data.html ?? ''),
+		sections: Object.fromEntries(Object.entries(data.sections ?? {}).map(([k, v]) => [k, clean(v)]))
+	};
 	opened.set(name, page);
 	return page;
 }

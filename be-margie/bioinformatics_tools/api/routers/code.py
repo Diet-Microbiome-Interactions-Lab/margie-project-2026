@@ -1,11 +1,13 @@
-"""The Python scripts behind MARGIE's own steps, under /v1/code (auth required), for the Code page.
+"""The Python scripts behind MARGIE's own steps, under /v1/code (auth required), for the Code and FAQ pages.
 
 The files are read from this server's installed copy of workflow_tools, the code a run executes,
-so the page shows each script as it stands. Routes: GET / (the steps and their files),
-GET /file?path=<path under workflow_tools> (one file's text).
+so the pages show each script as it stands. Routes: GET / (the steps and their files),
+GET /file?path=<path under workflow_tools> (one file's text), GET /snippet?path=&symbol= (one
+function, class, constant or Snakemake rule of a file, with its line numbers, for the FAQ).
 """
 import ast
 import hashlib
+import re
 from pathlib import Path
 
 from fastapi import APIRouter, Depends, HTTPException, Query
@@ -66,6 +68,15 @@ STEPS = [
 
 _LISTED = {f for step in STEPS for f in step["files"]}
 
+# Further files the FAQ quotes from: the pipeline's own bookkeeping. The API, its cluster access
+# and the run driver are left out.
+SNIPPET_FILES = _LISTED | {
+    "margie_sb.smk", "workflow_registry.py", "workflow_helpers.py", "genome_identity.py",
+    "protein_cache.py", "output_cache.py", "cache_report.py", "load_to_db.py", "license_gate.py",
+    "reorganize_outputs.py", "enrich_with_envelope.py", "process_signalp4.py", "process_signalp6.py",
+}
+_RULE_START = re.compile(r"^(?:rule|checkpoint) (\w+):")
+
 
 def _summary(text: str, path: str) -> str:
     """The first line of the module docstring, without a leading "<name> —" (or "-")."""
@@ -88,6 +99,48 @@ def _read(path: str) -> str:
         return (WORKFLOW_TOOLS / path).read_text(encoding="utf-8")
     except OSError:
         raise HTTPException(status_code=404, detail=f"{path} is not on this server.")
+
+
+def _with_comments(lines: list[str], start: int) -> int:
+    """The first line of the comment block directly above line `start` (1-based), or `start`."""
+    while start > 1 and lines[start - 2].lstrip().startswith("#"):
+        start -= 1
+    return start
+
+
+def snippet(text: str, path: str, symbol: str) -> tuple[int, int] | None:
+    """The 1-based first and last lines of `symbol` in `text`: a top-level function, class or
+    assignment, or "rule:<name>" in a .smk file; None when it is not there."""
+    lines = text.splitlines()
+    if path.endswith(".smk"):
+        # A rule, or a top-level def or assignment, runs to the next line at the left margin.
+        if symbol.startswith("rule:"):
+            name = symbol[len("rule:"):]
+            starts = lambda line: (m := _RULE_START.match(line)) is not None and m.group(1) == name  # noqa: E731
+        else:
+            head = re.compile(rf"^(?:def {re.escape(symbol)}\(|{re.escape(symbol)}\s*=)")
+            starts = lambda line: head.match(line) is not None  # noqa: E731
+        for i, line in enumerate(lines):
+            if starts(line):
+                end = i + 1
+                while end < len(lines) and (not lines[end].strip() or lines[end][0] in " \t)]}"):
+                    end += 1
+                while end > i + 1 and not lines[end - 1].strip():
+                    end -= 1
+                return _with_comments(lines, i + 1), end
+        return None
+    try:
+        tree = ast.parse(text)
+    except SyntaxError:
+        return None
+    for node in tree.body:
+        if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef, ast.ClassDef)) and node.name == symbol:
+            first = min([node.lineno] + [d.lineno for d in node.decorator_list])
+            return _with_comments(lines, first), node.end_lineno
+        targets = node.targets if isinstance(node, ast.Assign) else [node.target] if isinstance(node, ast.AnnAssign) else []
+        if any(isinstance(t, ast.Name) and t.id == symbol for t in targets):
+            return _with_comments(lines, node.lineno), node.end_lineno
+    return None
 
 
 @router.get("")
@@ -113,3 +166,22 @@ def read_code(path: str = Query(..., max_length=200), current_user: dict = Depen
     text = _read(path)
     return {"path": path, "name": Path(path).name, "text": text, "lines": len(text.splitlines()),
             "bytes": len(text.encode("utf-8")), "sha256": hashlib.sha256(text.encode("utf-8")).hexdigest()}
+
+
+@router.get("/snippet")
+def read_snippet(path: str = Query(..., max_length=200), symbol: str = Query(..., max_length=120),
+                 current_user: dict = Depends(get_current_user)):
+    """One function, class, constant or rule of a quoted file, as installed, with its line numbers."""
+    if path not in SNIPPET_FILES:
+        raise HTTPException(status_code=404, detail="That file is not one the FAQ quotes.")
+    try:
+        text = (WORKFLOW_TOOLS / path).read_text(encoding="utf-8")
+    except OSError:
+        raise HTTPException(status_code=404, detail=f"{path} is not on this server.")
+    span = snippet(text, path, symbol)
+    if span is None:
+        raise HTTPException(status_code=404, detail=f"{symbol} is not in {path}.")
+    start, end = span
+    return {"path": path, "name": Path(path).name, "symbol": symbol, "start": start, "end": end,
+            "text": "\n".join(text.splitlines()[start - 1:end]) + "\n", "file_lines": len(text.splitlines()),
+            "listed": path in _LISTED}

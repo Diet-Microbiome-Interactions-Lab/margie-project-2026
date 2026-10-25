@@ -5,8 +5,9 @@
 	import { fetchTerms, NOT_YET, type CatalogTool } from '$lib/license';
 
 	/**
-	 * Acknowledgements: the tools and databases MARGIE is built on, with their references,
-	 * from the licence catalog (the steps running now) and the few it does not carry.
+	 * Acknowledgements: the tools and databases MARGIE is built on, from the licence catalog (the
+	 * steps running now): each one's version, licence, source code and where its data comes from,
+	 * with its reference; then the software MARGIE itself is built with.
 	 */
 	let tools = $state<CatalogTool[]>([]);
 	let error = $state('');
@@ -17,6 +18,19 @@
 			error = e instanceof Error ? e.message : String(e);
 		}
 	});
+
+	/** The tools a run uses, in run order. */
+	const used = $derived(tools.filter((t) => !NOT_YET.has(t.id) && t.id !== 'llm').sort((a, b) => a.phase - b.phase || a.name.localeCompare(b.name)));
+
+	/** A download entry: its URL as a link, and any note after it ("register; tarball ..."). */
+	function download(entry: string): { url: string | null; label: string; note: string } {
+		const m = entry.match(/https?:\/\/\S+/);
+		if (!m) return { url: null, label: entry, note: '' };
+		const url = m[0].replace(/[),.;]+$/, '');
+		const u = new URL(url);
+		const tail = u.pathname.split('/').filter(Boolean).at(-1);
+		return { url, label: u.host + (tail ? ` | ${tail}` : ''), note: entry.replace(m[0], '').replace(/^[\s(]+|[\s)]+$/g, '') };
+	}
 
 	/** One reference per tool, in the order a run uses them; a catalog note ("Cite ...") gives way to the paper. */
 	const refs = $derived(
@@ -59,6 +73,49 @@
 		</section>
 
 		<section class="ab-box">
+			<h2>Tools and databases it runs</h2>
+			<p class="ab-lab">
+				The version each step uses, its licence, its source code and where its data comes from. Tools for academic use only are fetched
+				from their providers by each user, under the provider's licence.
+			</p>
+			{#if error}
+				<p class="ab-lab">The list could not be read: {error}</p>
+			{:else if !used.length}
+				<p class="ab-lab">Reading…</p>
+			{:else}
+				<div class="tl-scroll">
+					<table class="ab-table tl">
+						<thead><tr><th>Phase</th><th>Tool</th><th>Version</th><th>Licence</th><th>Source code</th><th>Data from</th></tr></thead>
+						<tbody>
+							{#each used as t (t.id)}
+								<tr>
+									<td class="ab-num">{t.phase}</td>
+									<td><b>{t.name}</b></td>
+									<td>{t.provenance?.version ?? ''}</td>
+									<td><a class="mg-link" href={t.license_url ?? t.obtain_url} target="_blank" rel="noreferrer">{t.license}</a></td>
+									<td>
+										{#if t.source_url}<a class="mg-link" href={t.source_url} target="_blank" rel="noreferrer">{new URL(t.source_url).host}</a>{/if}
+									</td>
+									<td>
+										<ul class="tl-dl">
+											{#each t.provenance?.downloaded_from ?? [] as d (d)}
+												{@const x = download(d)}
+												<li>
+													{#if x.url}<a class="mg-link" href={x.url} target="_blank" rel="noreferrer">{x.label}</a>{:else}{x.label}{/if}
+													{#if x.note}<span class="ab-lab"> ({x.note})</span>{/if}
+												</li>
+											{/each}
+										</ul>
+									</td>
+								</tr>
+							{/each}
+						</tbody>
+					</table>
+				</div>
+			{/if}
+		</section>
+
+		<section class="ab-box">
 			<h2>Software it is built with</h2>
 			<p class="ab-lab">MARGIE runs on open-source software that others write and share. Thank you to every one of these projects.</p>
 			<div class="sw">
@@ -67,7 +124,14 @@
 						<h3>{g.group}</h3>
 						<ul>
 							{#each g.items as it (it.name)}
-								<li><a class="mg-link" href={it.href} target="_blank" rel="noreferrer">{it.name}</a> <span>{it.what}</span></li>
+								<li>
+									<a class="mg-link" href={it.href} target="_blank" rel="noreferrer">{it.name}</a>{#if it.version}<span class="sw-v"> {it.version}</span>{/if}
+									<span>{it.what}</span>
+									{#if it.licence}<br /><span class="sw-l"
+											>{#if it.licenceUrl}<a class="mg-link" href={it.licenceUrl} target="_blank" rel="noreferrer">{it.licence}</a>{:else}{it.licence}{/if}{#if it.source}
+												| <a class="mg-link" href={it.source} target="_blank" rel="noreferrer">source</a>{/if}</span
+										>{/if}
+								</li>
 							{/each}
 						</ul>
 					</div>
@@ -93,6 +157,30 @@
 </div>
 
 <style>
+	.tl-scroll {
+		overflow-x: auto;
+	}
+	.tl td {
+		font-size: var(--mg-fs-xs);
+	}
+	.tl a {
+		overflow-wrap: anywhere;
+	}
+	.tl-dl {
+		margin: 0;
+		padding: 0;
+		list-style: none;
+	}
+	.tl-dl li + li {
+		margin-top: 2px;
+	}
+	.sw-v {
+		color: var(--mg-text-2);
+		font-variant-numeric: tabular-nums;
+	}
+	.sw-l {
+		font-size: var(--mg-fs-xs);
+	}
 	.refs li {
 		padding-left: 4px;
 	}

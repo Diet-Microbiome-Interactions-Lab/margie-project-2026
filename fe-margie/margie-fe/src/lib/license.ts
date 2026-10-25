@@ -35,6 +35,8 @@ export interface CatalogTool {
 	obtain_url: string;
 	/** Direct link to the licence text, when verified; the UI falls back to obtain_url. */
 	license_url?: string;
+	/** The tool's source code: its official repository or release page (Acknowledgements). */
+	source_url?: string;
 	allowed: string[];
 	not_allowed: string[];
 	citation?: string;

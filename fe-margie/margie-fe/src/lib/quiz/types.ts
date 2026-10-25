@@ -1,10 +1,10 @@
 /**
  * The quiz's questions (routes/(app)/quiz): bacterial and archaeal physiology, metabolism, applied
- * bioinformatics, and the gut microbiome with dietary polysaccharides, at three levels, in four kinds. The banks are JSON files in ./bank, one array each.
+ * bioinformatics, the gut microbiome with dietary polysaccharides, and how MARGIE works, at three levels, in four kinds. The banks are JSON files in ./bank, one array each.
  */
 
 export type Level = 'easy' | 'intermediate' | 'hard';
-export type Topic = 'physiology' | 'metabolism' | 'bioinformatics' | 'gut';
+export type Topic = 'physiology' | 'metabolism' | 'bioinformatics' | 'gut' | 'margie';
 
 interface Common {
 	/** Unique across the banks, e.g. "phys1-042". */
@@ -62,7 +62,8 @@ export const TOPICS: { id: Topic; label: string }[] = [
 	{ id: 'physiology', label: 'Physiology' },
 	{ id: 'metabolism', label: 'Metabolism' },
 	{ id: 'bioinformatics', label: 'Bioinformatics' },
-	{ id: 'gut', label: 'Gut microbiome' }
+	{ id: 'gut', label: 'Gut microbiome' },
+	{ id: 'margie', label: 'MARGIE' }
 ];
 export const KINDS: { id: Question['kind']; label: string }[] = [
 	{ id: 'choice', label: 'Multiple choice' },

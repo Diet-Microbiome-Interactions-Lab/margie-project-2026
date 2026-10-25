@@ -1,6 +1,8 @@
 <script lang="ts">
 	import '$lib/crisp/about.css';
-	import { ArrowRight, Gauge, LockKeyhole } from 'lucide-svelte';
+	import { ArrowRight, CircleQuestionMark, FileCode, Gauge, LockKeyhole } from 'lucide-svelte';
+	import FaqList from '$lib/crisp/FaqList.svelte';
+	import { FAQS } from '$lib/crisp/faq';
 
 	/**
 	 * Methods: how MARGIE annotates a genome and scores each gene, phase by phase, as the
@@ -78,7 +80,14 @@
 				many tools at once, groups genes into operons, works out where proteins sit in the cell, gives every gene one label, and scores
 				how much the evidence for that label agrees. Every step's output is kept, so each label can be traced to the hits behind it.
 			</p>
-			<p>The Python scripts behind MARGIE's own steps are on the <a class="mg-link" href="/code">Code</a> page, as the server runs them.</p>
+			<a class="ab-go" href="/code">
+				<FileCode size={26} />
+				<span class="ab-go-text">
+					<b>Read the code behind each step</b>
+					<span>Consolidation | Labeling | Operon database | Scoring | Fingerprinting | Fingerprint databases: the Python scripts as the server runs them, highlighted, with line numbers.</span>
+				</span>
+				<span class="ab-go-to">Open the code <ArrowRight size={15} /></span>
+			</a>
 		</section>
 
 		<section class="ab-box">
@@ -93,6 +102,19 @@
 			</table>
 			<p class="ab-lab">Phase 14 (genome comparison: ANI, AAI, closest genomes, synteny) and the LLM layer are being worked on and do not run yet.</p>
 		</section>
+
+		{#if FAQS.length}
+		<section id="faq" class="mt-faq" aria-labelledby="faq-title">
+			<div class="mt-faq-head">
+				<CircleQuestionMark size={24} />
+				<div>
+					<h2 id="faq-title">Frequently asked questions</h2>
+					<p>How each step works, with the papers it rests on and the code that does it.</p>
+				</div>
+			</div>
+			<FaqList />
+		</section>
+		{/if}
 
 		<div class="ab-pair">
 			<section class="ab-box">
@@ -193,3 +215,35 @@
 		</section>
 	</div>
 </div>
+
+<style>
+	/* The FAQ: coloured so it stands out on the page. */
+	.mt-faq {
+		display: flex;
+		flex-direction: column;
+		gap: 12px;
+		padding: 16px 18px 18px;
+		border: 1px solid color-mix(in srgb, var(--mg-accent) 40%, var(--mg-border));
+		border-top: 4px solid var(--mg-accent);
+		border-radius: var(--mg-r);
+		background: color-mix(in srgb, var(--mg-accent) 8%, var(--mg-surface));
+		scroll-margin-top: 12px;
+	}
+	.mt-faq-head {
+		display: flex;
+		align-items: center;
+		gap: 12px;
+		color: var(--mg-accent);
+	}
+	.mt-faq-head h2 {
+		margin: 0;
+		color: var(--mg-accent);
+		font-size: 1.2rem;
+		font-weight: 700;
+	}
+	.mt-faq-head p {
+		margin: 2px 0 0;
+		color: var(--mg-text-2);
+		font-size: var(--mg-fs-sm);
+	}
+</style>
