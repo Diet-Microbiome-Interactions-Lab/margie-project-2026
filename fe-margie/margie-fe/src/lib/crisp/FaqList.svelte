@@ -1,6 +1,6 @@
 <script lang="ts">
 	import { onMount, tick } from 'svelte';
-	import { ChevronRight, ChevronsDownUp, ChevronsUpDown, CodeXml, Database, Gauge, Library, Lightbulb, LockKeyhole, Search, Server, Workflow } from 'lucide-svelte';
+	import { ChevronRight, ChevronsDownUp, ChevronsUpDown, CodeXml, Database, Gauge, Library, LockKeyhole, Search, Server, Workflow } from 'lucide-svelte';
 	import { LAB } from './about';
 	import { FAQS, GROUPS, REFS, type Faq } from './faq';
 	import FaqCode from './FaqCode.svelte';
@@ -65,13 +65,6 @@
 </script>
 
 <div class="fq-list">
-	<nav class="fq-groups" aria-label="Groups of questions">
-		{#each GROUPS as g (g)}
-			{@const Icon = META[g]?.icon ?? Server}
-			<a class="fq-pill" href="#{slug(g)}"><Icon size={17} /><span>{g}</span><b>{FAQS.filter((f) => f.group === g).length}</b></a>
-		{/each}
-	</nav>
-
 	<div class="fq-bar">
 		<label class="fq-search">
 			<Search size={16} />
@@ -79,13 +72,12 @@
 		</label>
 		<button type="button" class="mg-btn small" onclick={() => setAll(true)}><ChevronsUpDown size={14} /> Expand all</button>
 		<button type="button" class="mg-btn small" onclick={() => setAll(false)}><ChevronsDownUp size={14} /> Collapse all</button>
-		<a class="mg-btn small" href="/quiz?topic=margie"><Lightbulb size={14} /> MARGIE quiz</a>
 	</div>
 	{#if words.length}<p class="ab-lab">{count} question{count === 1 ? '' : 's'} match.</p>{/if}
 
 	{#each shown as { g, faqs } (g)}
 		{@const Icon = META[g]?.icon ?? Server}
-		<section class="fq-group" id={slug(g)}>
+		<section class="fq-group" id={slug(g)} data-toc="{g} ({FAQS.filter((f) => f.group === g).length})">
 			<header class="fq-ghead">
 				<span class="fq-gicon" aria-hidden="true"><Icon size={24} /></span>
 				<div>
@@ -143,9 +135,9 @@
 		</section>
 	{/each}
 
-	{#if !count}<section class="fq-group"><p>No question matches “{query}”.</p></section>{/if}
+	{#if !count}<section class="fq-group"><p>0 questions match “{query}”.</p></section>{/if}
 
-	<section class="fq-group fq-allrefs">
+	<section class="fq-group fq-allrefs" id="faq-references" data-toc="References">
 		<header class="fq-ghead">
 			<span class="fq-gicon" aria-hidden="true"><Library size={24} /></span>
 			<div>
@@ -170,51 +162,11 @@
 
 <style>
 	.fq-list {
-		--fq-body: calc(var(--mg-fs) + 3px);
+		--fq-body: var(--rp-body, calc(var(--mg-fs) + 3px));
 		--fq-tint: color-mix(in srgb, var(--mg-accent) 9%, var(--mg-surface));
 		display: flex;
 		flex-direction: column;
 		gap: 18px;
-	}
-	/* Jump to a group. */
-	.fq-groups {
-		display: grid;
-		grid-template-columns: repeat(auto-fit, minmax(210px, 1fr));
-		gap: 10px;
-	}
-	.fq-pill {
-		display: flex;
-		align-items: center;
-		gap: 10px;
-		padding: 12px 14px;
-		border: 1px solid color-mix(in srgb, var(--mg-accent) 35%, var(--mg-border));
-		border-radius: var(--mg-r);
-		background: var(--fq-tint);
-		color: var(--mg-text);
-		font-size: var(--mg-fs);
-		font-weight: 600;
-		text-decoration: none;
-		transition: transform 120ms ease, box-shadow 120ms ease;
-	}
-	.fq-pill:hover {
-		transform: translateY(-1px);
-		box-shadow: 0 4px 14px color-mix(in srgb, var(--mg-accent) 18%, transparent);
-	}
-	.fq-pill :global(svg) {
-		flex: 0 0 auto;
-		color: var(--mg-accent);
-	}
-	.fq-pill span {
-		flex: 1;
-	}
-	.fq-pill b {
-		min-width: 1.8em;
-		padding: 1px 8px;
-		border-radius: 999px;
-		background: var(--mg-accent);
-		color: var(--mg-on-accent, #fff);
-		font-size: var(--mg-fs-sm);
-		text-align: center;
 	}
 	.fq-bar {
 		display: flex;
@@ -238,11 +190,12 @@
 	.fq-group {
 		display: flex;
 		flex-direction: column;
-		padding: 18px 20px 8px;
+		padding: 26px 30px 10px;
 		border: 1px solid var(--cr-card-edge, var(--mg-border));
-		border-radius: var(--mg-r);
+		border-radius: calc(var(--mg-r) + 4px);
 		background: var(--cr-card, var(--mg-surface));
-		scroll-margin-top: 12px;
+		box-shadow: var(--cr-card-shadow);
+		scroll-margin-top: 18px;
 	}
 	.fq-ghead {
 		display: flex;
@@ -262,15 +215,16 @@
 	}
 	.fq-ghead h2 {
 		margin: 0;
-		font-size: var(--mg-fs-xl);
-		font-weight: 700;
-		letter-spacing: -0.01em;
+		font-size: var(--rp-h2, var(--mg-fs-xl));
+		font-weight: 650;
+		letter-spacing: -0.016em;
 		color: var(--mg-text);
 	}
 	.fq-ghead p {
 		margin: 2px 0 0;
 		color: var(--mg-text-2);
-		font-size: var(--mg-fs);
+		font-size: var(--rp-small, var(--mg-fs));
+		line-height: 1.5;
 	}
 	/* A question. */
 	.fq {
@@ -311,9 +265,9 @@
 	}
 	.fq-q {
 		flex: 1;
-		font-size: calc(var(--mg-fs) + 4px);
-		font-weight: 650;
-		line-height: 1.35;
+		font-size: var(--rp-h3, calc(var(--mg-fs) + 4px));
+		font-weight: 600;
+		line-height: 1.38;
 	}
 	.fq[open] .fq-q {
 		color: var(--mg-accent);
@@ -332,19 +286,18 @@
 		display: flex;
 		flex-direction: column;
 		gap: 16px;
-		padding: 4px 6px 22px 54px;
+		padding: 4px 6px 24px 54px;
 	}
 	.fq-text {
 		display: flex;
 		flex-direction: column;
-		gap: 12px;
-		max-width: 78ch;
+		gap: 14px;
 		font-size: var(--fq-body);
-		line-height: 1.75;
+		line-height: 1.72;
 		color: var(--mg-text);
 	}
-	.fq-text > :global(p:first-child) {
-		font-size: calc(var(--fq-body) + 1px);
+	.fq-text :global(p) {
+		text-wrap: pretty;
 	}
 	.fq-text :global(p) {
 		margin: 0;
@@ -542,7 +495,7 @@
 			padding-left: 4px;
 		}
 		.fq-q {
-			font-size: calc(var(--mg-fs) + 2px);
+			font-size: calc(var(--mg-fs) * 1.1);
 		}
 	}
 </style>

@@ -1,126 +1,278 @@
 <script lang="ts">
-	import '$lib/crisp/about.css';
-	import { ArrowRight, CircleQuestionMark, FileCode } from 'lucide-svelte';
+	import { ArrowRight, Boxes, CircleQuestionMark, Dna, FileCode, Gauge, MapPin, Tag, Workflow } from 'lucide-svelte';
+	import ReadingPage from '$lib/crisp/ReadingPage.svelte';
 	import { FAQS } from '$lib/crisp/faq';
 
 	/**
 	 * Methods: what MARGIE does, phase by phase (margie_sb.smk). The FAQ, which explains each step with
 	 * its references and code, is on its own page (/faq).
 	 */
-	const PHASES: { n: string; step: string; tools: string; does: string }[] = [
-		{ n: '1', step: 'Quality', tools: 'QUAST (optional)', does: 'Assembly statistics for each genome: contigs, N50, total length.' },
+	type Phase = { n: string; step: string; tools: string[]; does: string; more?: { href: string; label: string } };
+	const STAGES: { title: string; blurb: string; phases: Phase[] }[] = [
 		{
-			n: '2',
-			step: 'Taxonomy',
-			tools: 'GTDB-Tk (optional)',
-			does: "Places each genome in the GTDB taxonomy, which gives its domain and genetic code. Without it, both come from the genome table."
+			title: 'Prepare each genome',
+			blurb: 'Quality, taxonomy and the gene calls that the later steps share.',
+			phases: [
+				{ n: '1', step: 'Quality', tools: ['QUAST (optional)'], does: 'Assembly statistics for each genome: contigs, N50 and total length.' },
+				{
+					n: '2',
+					step: 'Taxonomy',
+					tools: ['GTDB-Tk (optional)'],
+					does: "Places each genome in the GTDB taxonomy, which gives its domain and genetic code. The genome table on Analyze can give both instead."
+				},
+				{
+					n: '3',
+					step: 'Gene calling',
+					tools: ['RASTtk', 'Prodigal'],
+					does: "RASTtk calls and names the genes of each genome with a known domain and genetic code; Prodigal calls the others, in RASTtk's file layout, so the later steps are shared.",
+					more: { href: '/faq#gene-calling', label: 'How MARGIE calls genes' }
+				}
+			]
 		},
 		{
-			n: '3',
-			step: 'Gene calling',
-			tools: 'RASTtk, or Prodigal',
-			does: 'RASTtk calls and annotates the genes of every genome whose domain and genetic code are known; any other genome is called by Prodigal, written in the same layout so later steps are shared.'
+			title: 'Annotate and place the proteins',
+			blurb: 'Many tools, each on its own, then operons, topology, envelope and location.',
+			phases: [
+				{
+					n: '4',
+					step: 'Function',
+					tools: ['COG', 'KEGG (KofamScan)', 'eggNOG', 'UniProt Swiss-Prot', 'Pfam', 'TIGRFAM', 'PGAP', 'InterPro', 'dbCAN', 'Genome Properties', 'MEROPS', 'TCDB'],
+					does: 'Each tool annotates the predicted proteins on its own. The nine that labeling and scoring read run in each run, so scores compare across runs; Genome Properties, MEROPS and TCDB run when chosen. Results are stored per protein, so a protein annotated before comes back from the cache.'
+				},
+				{
+					n: '5',
+					step: 'Operons',
+					tools: ['UniOP'],
+					does: 'Pairwise operon probabilities between neighbouring genes, from intergenic distance, which group the genes into operons.',
+					more: { href: '/faq#operons', label: 'How operons are called' }
+				},
+				{ n: '6', step: 'Membrane topology', tools: ['Phobius', 'TMbed', 'SignalP 6'], does: 'Transmembrane helices and signal peptides. Phobius and SignalP 6 run once the user records a licence for them.' },
+				{
+					n: '7',
+					step: 'Envelope',
+					tools: ["MARGIE's own inference"],
+					does: 'Infers the cell envelope type (monoderm or diderm) from marker annotations in TIGRFAM, PGAP, Pfam and UniProt, and sets the model the localisation tools run with.',
+					more: { href: '/faq#envelope', label: 'How the envelope is inferred' }
+				},
+				{ n: '8', step: 'Localisation', tools: ['PSORTb', 'DeepSig', 'SignalP 4'], does: 'Subcellular location and signal peptides, run with the inferred envelope type. SignalP 4 runs once the user records a licence for it.' }
+			]
 		},
 		{
-			n: '4',
-			step: 'Function',
-			tools: 'COG, KEGG (KofamScan), eggNOG, UniProt Swiss-Prot, Pfam, TIGRFAM, PGAP, InterPro and dbCAN in every run; Genome Properties, MEROPS and TCDB when chosen',
-			does: 'Each tool annotates the predicted proteins on its own. The ones labeling and scoring read are part of every run, so scores compare across runs. Results are kept per protein, so a protein annotated in an earlier run is not searched again.'
+			title: 'Label, score and remember',
+			blurb: "MARGIE's own steps: one row per gene, one label, a confidence, and fingerprints that later genomes are compared with.",
+			phases: [
+				{
+					n: '9',
+					step: 'Consolidation',
+					tools: ["MARGIE's own"],
+					does: "Joins the tools' results into one table, one row per gene, with each column kept.",
+					more: { href: '/faq#consolidation', label: 'How consolidation works' }
+				},
+				{
+					n: '10',
+					step: 'Labeling',
+					tools: ["MARGIE's own"],
+					does: 'Gives each gene one product label by a fixed trust hierarchy, from curated family models down to domain models.',
+					more: { href: '/faq#label-derivation', label: 'How a label is derived' }
+				},
+				{
+					n: '11',
+					step: 'Fingerprints',
+					tools: ["MARGIE's own"],
+					does: "Hashes each gene's pattern of hits across the tools, and each operon's, into a fingerprint, so the same evidence is recognised in other genomes.",
+					more: { href: '/faq#fingerprints', label: 'What a fingerprint is' }
+				},
+				{
+					n: '12',
+					step: 'Scoring',
+					tools: ["MARGIE's own"],
+					does: 'A 0 to 1 confidence for each gene from four measures (C1 to C4), with a tier and a review flag.',
+					more: { href: '/faq#scoring', label: 'How scoring works' }
+				},
+				{
+					n: '13',
+					step: 'Fingerprint databases',
+					tools: ["MARGIE's own"],
+					does: "Adds the genome's gene and operon fingerprints to the shared databases that later genomes are compared with.",
+					more: { href: '/faq#pool-databases', label: 'How the shared databases grow' }
+				}
+			]
 		},
-		{ n: '5', step: 'Operons', tools: 'UniOP', does: 'Pairwise operon probabilities between neighbouring genes, from intergenic distance, grouping genes into operons.' },
-		{ n: '6', step: 'Membrane topology', tools: 'Phobius, TMbed, SignalP 6 (when licensed)', does: 'Transmembrane helices and signal peptides.' },
 		{
-			n: '7',
-			step: 'Envelope',
-			tools: "MARGIE's own inference",
-			does: 'Infers the cell envelope type (monoderm or diderm) from marker annotations in TIGRFAM, PGAP, Pfam and UniProt, so the localisation tools use the right model.'
-		},
-		{ n: '8', step: 'Localisation', tools: 'PSORTb, DeepSig, SignalP 4 (when licensed)', does: 'Subcellular location and signal peptides, run with the inferred envelope type.' },
-		{ n: '9', step: 'Consolidation', tools: "MARGIE's own", does: "Joins every tool's results into one table, one row per gene, every column kept." },
-		{ n: '10', step: 'Labeling', tools: "MARGIE's own", does: 'Gives each gene one product label by a fixed trust hierarchy (below).' },
-		{
-			n: '11',
-			step: 'Fingerprints',
-			tools: "MARGIE's own",
-			does: "Each gene's pattern of hits across the tools, and each operon's, is hashed into a fingerprint, so the same evidence can be recognised in other genomes."
-		},
-		{ n: '12', step: 'Scoring', tools: "MARGIE's own", does: 'A 0 to 1 confidence for every gene, from four measures (below), with a tier and a review flag.' },
-		{ n: '13', step: 'Fingerprint database', tools: "MARGIE's own", does: "Adds the genome's gene and operon fingerprints to the shared database that later genomes are scored against." },
-		{ n: '15', step: 'Gene report', tools: "MARGIE's own (optional)", does: 'A per-gene report of the evidence behind each annotation.' }
+			title: 'Report',
+			blurb: 'The evidence behind each annotation, gene by gene.',
+			phases: [{ n: '15', step: 'Gene report', tools: ["MARGIE's own (optional)"], does: 'A per-gene report of the evidence behind each annotation.' }]
+		}
 	];
-
+	const DOES = [
+		{ icon: Dna, title: 'Calls genes', text: 'RASTtk or Prodigal, genome by genome' },
+		{ icon: Boxes, title: 'Annotates proteins', text: 'with many tools at once, each on its own' },
+		{ icon: Workflow, title: 'Finds operons', text: 'from the spacing between neighbouring genes' },
+		{ icon: MapPin, title: 'Places proteins', text: 'in the cell, with the inferred envelope' },
+		{ icon: Tag, title: 'Labels each gene', text: 'with one product name, by a trust hierarchy' },
+		{ icon: Gauge, title: 'Scores the label', text: 'from 0 to 1, by how well the evidence agrees' }
+	];
 </script>
 
 <svelte:head><title>Methods | MARGIE</title></svelte:head>
 
-<div class="cr-page" data-shade="page-methods">
-	<div class="cr-head">
-		<h1 class="cr-title">Methods</h1>
-		<p class="cr-lede">How MARGIE annotates a genome and scores each gene.</p>
-	</div>
+<ReadingPage title="Methods" lede="How MARGIE annotates a genome, phase by phase, and scores each gene's label." shade="page-methods">
+	<section class="rp-sec" id="overview" data-toc="Overview">
+		<h2>Overview</h2>
+		<p class="rp-lead">
+			MARGIE is a Snakemake workflow that runs on an HPC cluster through SLURM, each tool in its own container. She takes genome
+			assemblies (FASTA) and, for each genome, its domain and genetic code when they are known.
+		</p>
+		<div class="rp-trio">
+			{#each DOES as d (d.title)}
+				<div class="rp-tile"><d.icon size={22} /><b>{d.title}</b><span>{d.text}</span></div>
+			{/each}
+		</div>
+		<p>She keeps each step's output, so each label traces back to the hits behind it.</p>
+	</section>
 
-	<div class="ab mt-read">
-		<a class="ab-go mt-faq-go" href="/faq">
-			<CircleQuestionMark size={26} />
-			<span class="ab-go-text">
-				<b>Frequently asked questions</b>
-				<span>{FAQS.length} questions on how each step works, with the papers each rests on and the code that does it | Reading the scores.</span>
-			</span>
-			<span class="ab-go-to">Open the FAQ <ArrowRight size={15} /></span>
+	<div class="rp-pair">
+		<a class="rp-link" href="/faq">
+			<span class="rp-link-icon"><CircleQuestionMark size={24} /></span>
+			<span class="rp-link-text"><b>Frequently asked questions</b><span>{FAQS.length} answers, with the papers and the code behind each step.</span></span>
+			<ArrowRight size={18} />
 		</a>
-		<section class="ab-box">
-			<h2>Overview</h2>
-			<p>
-				MARGIE is a Snakemake workflow that runs on an HPC cluster through SLURM, the tools in their own containers. She takes genome
-				assemblies (FASTA) and, for each genome, its domain and genetic code when known. She calls genes, annotates their proteins with
-				many tools at once, groups genes into operons, works out where proteins sit in the cell, gives each gene one label, and scores
-				how much the evidence for that label agrees. She keeps each step's output, so each label can be traced to the hits behind it.
-			</p>
-			<a class="ab-go" href="/code">
-				<FileCode size={26} />
-				<span class="ab-go-text">
-					<b>Read the code behind each step</b>
-					<span>Consolidation | Labeling | Operon database | Scoring | Fingerprinting | Fingerprint databases | Genome map | Reports: the Python scripts as the server runs them, highlighted, with line numbers.</span>
-				</span>
-				<span class="ab-go-to">Open the code <ArrowRight size={15} /></span>
-			</a>
-		</section>
-
-		<section class="ab-box">
-			<h2>The phases of a run</h2>
-			<table class="ab-table">
-				<thead><tr><th>Phase</th><th>Step</th><th>Tools</th><th>What it does</th></tr></thead>
-				<tbody>
-					{#each PHASES as p (p.n)}
-						<tr><td class="ab-num">{p.n}</td><td><b>{p.step}</b></td><td>{p.tools}</td><td>{p.does}</td></tr>
-					{/each}
-				</tbody>
-			</table>
-			<p class="ab-lab">Phase 14 (genome comparison: ANI, AAI, closest genomes, synteny) and the LLM layer are being worked on and do not run yet.</p>
-		</section>
-
-
+		<a class="rp-link" href="/code">
+			<span class="rp-link-icon"><FileCode size={24} /></span>
+			<span class="rp-link-text"><b>The code behind each step</b><span>The Python scripts as the server runs them, highlighted.</span></span>
+			<ArrowRight size={18} />
+		</a>
 	</div>
-</div>
+
+	<section class="rp-sec" id="phases" data-toc="The phases of a run">
+		<h2>The phases of a run</h2>
+		<p class="rp-note">A run moves through four stages. Each phase starts once the files it reads exist.</p>
+		{#each STAGES as s, k (s.title)}
+			<div class="mt-stage">
+				<header class="mt-stage-head">
+					<span class="mt-stage-k">Stage {k + 1}</span>
+					<h3>{s.title}</h3>
+					<p class="rp-note">{s.blurb}</p>
+				</header>
+				<ol class="mt-steps">
+					{#each s.phases as p (p.n)}
+						<li class="mt-step">
+							<span class="mt-n">{p.n}</span>
+							<div class="mt-body">
+								<b class="mt-name">{p.step}</b>
+								<div class="mt-tools">{#each p.tools as t (t)}<span>{t}</span>{/each}</div>
+								<p>{p.does}</p>
+								{#if p.more}<a class="mt-more" href={p.more.href}>{p.more.label} <ArrowRight size={14} /></a>{/if}
+							</div>
+						</li>
+					{/each}
+				</ol>
+			</div>
+		{/each}
+	</section>
+</ReadingPage>
 
 <style>
-	/* Easier reading: body text at the large size, tables at the base size (both follow Customize → text size). */
-	.mt-read :global(.ab-box) {
-		font-size: calc(var(--mg-fs) + 3px);
-		line-height: 1.75;
+	.mt-stage {
+		display: flex;
+		flex-direction: column;
+		gap: 12px;
+		padding-top: 18px;
+		border-top: 1px solid var(--mg-border);
 	}
-	.mt-read :global(.ab-table) {
-		font-size: calc(var(--mg-fs) + 1px);
+	.mt-stage:first-of-type {
+		padding-top: 6px;
+		border-top: none;
 	}
-	.mt-read :global(.ab-formula) {
+	.mt-stage-head {
+		display: flex;
+		flex-direction: column;
+		gap: 2px;
+	}
+	.mt-stage-k {
+		color: var(--rp-ink);
+		font-size: var(--mg-fs-xs);
+		font-weight: 700;
+		letter-spacing: 0.12em;
+		text-transform: uppercase;
+	}
+	.mt-stage-head h3 {
+		margin: 0;
+	}
+	/* The phases as a timeline: a numbered dot per phase on one line. */
+	.mt-steps {
+		position: relative;
+		display: flex;
+		flex-direction: column;
+		gap: 16px;
+		margin: 4px 0 6px;
+		padding: 0;
+		list-style: none;
+	}
+	.mt-steps::before {
+		position: absolute;
+		top: 18px;
+		bottom: 18px;
+		left: 17px;
+		width: 2px;
+		background: color-mix(in srgb, var(--mg-accent) 22%, transparent);
+		content: '';
+	}
+	.mt-step {
+		position: relative;
+		display: grid;
+		grid-template-columns: 36px minmax(0, 1fr);
+		gap: 16px;
+		margin: 0;
+	}
+	.mt-steps > li + li {
+		margin-top: 0;
+	}
+	.mt-n {
+		display: grid;
+		place-items: center;
+		width: 36px;
+		height: 36px;
+		border: 2px solid var(--mg-accent);
+		border-radius: 50%;
+		background: var(--mg-surface);
+		color: var(--rp-ink);
 		font-size: var(--mg-fs-sm);
+		font-weight: 700;
+		font-variant-numeric: tabular-nums;
 	}
-	.mt-read :global(.ab-go-text) {
-		font-size: var(--mg-fs);
+	.mt-body {
+		display: flex;
+		flex-direction: column;
+		gap: 6px;
+		min-width: 0;
+		padding-top: 4px;
 	}
-	/* The FAQ's card, coloured so it stands out. */
-	.mt-faq-go {
-		border-top: 4px solid var(--mg-accent);
-		background: color-mix(in srgb, var(--mg-accent) 10%, var(--mg-surface));
+	.mt-name {
+		font-size: var(--rp-h3);
+		font-weight: 650;
+		line-height: 1.3;
+	}
+	.mt-tools {
+		display: flex;
+		flex-wrap: wrap;
+		gap: 6px;
+	}
+	.mt-tools span {
+		padding: 2px 10px;
+		border: 1px solid color-mix(in srgb, var(--mg-accent) 25%, var(--mg-border));
+		border-radius: 999px;
+		background: var(--rp-tint);
+		color: var(--mg-text);
+		font-size: var(--mg-fs-sm);
+		line-height: 1.6;
+	}
+	.mt-more {
+		display: inline-flex;
+		align-self: flex-start;
+		align-items: center;
+		gap: 4px;
+		font-size: var(--rp-small);
+		font-weight: 600;
 	}
 </style>
