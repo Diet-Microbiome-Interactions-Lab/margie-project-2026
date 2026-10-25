@@ -4,7 +4,7 @@
 
 A product of the Diet-Microbiome Interactions Lab, Purdue University. PI: Stephen R Lindemann (lindems@purdue.edu).
 
-MARGIE annotates prokaryotic genomes with many tools at once and scores how much their evidence agrees, gene by gene. It is a Snakemake pipeline housed, among other tools, within the Bioinformatics Supercomputing Platform (BSP) developed by Dane Deemer. This website runs it on Purdue's clusters: you sign in, point it at your genomes, and follow the run; nothing is installed on your computer.
+MARGIE annotates prokaryotic genomes with many tools at once and scores how much their evidence agrees, gene by gene. She is a Snakemake pipeline housed, among other tools, within the Bioinformatics Supercomputing Platform (BSP) developed by Dane Deemer. This website runs her on Purdue's clusters: you sign in, point her at your genomes, and follow the run; nothing is installed on your computer.
 
 ## Getting an account
 
@@ -13,13 +13,13 @@ MARGIE annotates prokaryotic genomes with many tools at once and scores how much
 
 ## A first run
 
-1. **Install**: the first installation, database download or database setup asks you to type the install statement once, after reading the licences it refers to. Check that the cluster, SLURM account and partition are ready, and accept the licence terms.
+1. **Install**: the first installation, database download or database setup asks you to type the install statement once, after reading the licences it refers to. Check that the cluster, SLURM account and partition are ready.
 2. **Settings**: the one place for what a run reads: folders, databases, SLURM resources per phase and per tool. Changes apply to the next run.
 3. **Analyze**:
    1. *Genomes*: the folder they are in, or drop FASTA files; give each its domain and genetic code if you know them.
    2. *Gene calling*: QUAST, GTDB-Tk (if domain and genetic code are not known), then RASTtk or Prodigal for each genome.
    3. *Annotation tools*: the phase 4 tools are recommended; tools with licence terms stay off until you accept them.
-   4. Start. On a first run your databases are copied to your scratch folder once.
+   4. Start. Before a first run, accept the licence terms here, once; on a first run your databases are copied to your scratch folder once.
 4. **Jobs**: progress by genome and tool, the log, and the exact command that ran, to run again from a shell.
 5. **Results**: the annotation with its confidence, per genome, an interactive genome map, and every file in **Files**.
 
@@ -82,6 +82,12 @@ publisher = "GitHub",
 url = "https://github.com/wintermutant/biolab-fe"
 }
 ```
+
+Research computing, as RCAC asks it to be cited (MARGIE's runs use RCAC's Negishi community cluster and Geddes Community Composable Platform):
+
+- McCartney, G., Hacker, T., & Yang, B. (2014). Empowering faculty: A campus cyberinfrastructure strategy for research communities. *EDUCAUSE Review*. https://er.educause.edu/articles/2014/7/empowering-faculty-a-campus-cyberinfrastructure-strategy-for-research-communities
+- Smith, P. M., Gough, E., Younts, A., Werts, B., Hacker, T. J., Neumeister, N., & Wisecaver, J. (2020). The “Geddes” composable platform: An evolution of community clusters for a composable world. *2020 IEEE/ACM International Workshop on Interoperability of Supercomputing and Cloud Technologies (SuperCompCloud)*, 33–38. https://doi.org/10.1109/SuperCompCloud51944.2020.00011
+- Rosen Center for Advanced Computing. (n.d.). *Negishi* [Community cluster]. Purdue University. Retrieved October 25, 2026, from https://www.rcac.purdue.edu/compute/negishi
 
 Cite the version you ran, and each tool and database MARGIE ran for you; their references are under **Acknowledgements**.
 

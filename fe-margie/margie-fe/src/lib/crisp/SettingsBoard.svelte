@@ -850,7 +850,7 @@
 <div class="sb">
 	{#if backend.cluster && ws.configMissing}
 		<div class="sb-missing" role="status">
-			<span><b>No configuration on the cluster yet.</b> MARGIE reads its folders, databases and SLURM account from a config.yaml in your home folder; write the default one, then set your SLURM account under Cluster.</span>
+			<span><b>No configuration on the cluster yet.</b> MARGIE reads her folders, databases and SLURM account from a config.yaml in your home folder; write the default one, then set your SLURM account under Cluster.</span>
 			<button type="button" class="mg-btn small primary" disabled={creating} onclick={createConfig}>{creating ? 'Writing…' : 'Write the default configuration'}</button>
 		</div>
 	{/if}

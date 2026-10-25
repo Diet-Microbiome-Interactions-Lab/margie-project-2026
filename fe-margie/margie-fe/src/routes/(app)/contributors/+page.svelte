@@ -4,7 +4,7 @@
 	import { BASE_BIBTEX, BASE_CITATIONS, CITATION, CITE_URL, LAB, PEOPLE, THESIS_BIBTEX, THESIS_CITATION, THESIS_DOI } from '$lib/crisp/about';
 	import { ui } from '$lib/workspace/ui.svelte';
 
-	/** Contributors: who made MARGIE, the lab it comes from, and how to cite it. */
+	/** Contributors: who made MARGIE, the lab she comes from, and how to cite her. */
 	function copy(text: string, what = 'The citation') {
 		navigator.clipboard?.writeText(text).then(
 			() => ui.notify(`${what} is copied.`, 'ok'),

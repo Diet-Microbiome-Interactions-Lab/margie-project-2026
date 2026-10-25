@@ -1,5 +1,5 @@
 /**
- * Who makes MARGIE, how to cite it and where the desktop app is: one copy, for the
+ * Who makes MARGIE, how to cite her and where the desktop app is: one copy, for the
  * Contributors, Acknowledgements, README and Home pages.
  */
 
@@ -67,6 +67,59 @@ publisher = "GitHub",
 url = "https://github.com/wintermutant/biolab-fe"
 }`;
 
+/**
+ * The computing MARGIE runs on, acknowledged and cited as RCAC asks
+ * (https://www.rcac.purdue.edu/about/acknowledge): its community cluster paper (BibTeX as RCAC gives
+ * it), the Geddes platform paper (BibTeX from its DOI) and the Negishi cluster's own page.
+ */
+export const COMPUTING = {
+	thanks:
+		"MARGIE's runs use research computing resources of the Rosen Center for Advanced Computing (RCAC), Information Technology at Purdue University: the Negishi community cluster and the Geddes Community Composable Platform, which the National Science Foundation funded under award OAC-2018926 (CC* Compute: Private Campus Cloud for Data Analytics and Machine Learning). We thank RCAC and its staff for these resources and their support.",
+	award: 'https://www.nsf.gov/awardsearch/showAward?AWD_ID=2018926',
+	refs: [
+		{
+			id: 'mccartney2014',
+			apa: 'McCartney, G., Hacker, T., & Yang, B. (2014). Empowering faculty: A campus cyberinfrastructure strategy for research communities. EDUCAUSE Review.',
+			url: 'https://er.educause.edu/articles/2014/7/empowering-faculty-a-campus-cyberinfrastructure-strategy-for-research-communities'
+		},
+		{
+			id: 'smith2020geddes',
+			apa: 'Smith, P. M., Gough, E., Younts, A., Werts, B., Hacker, T. J., Neumeister, N., & Wisecaver, J. (2020). The “Geddes” composable platform: An evolution of community clusters for a composable world. 2020 IEEE/ACM International Workshop on Interoperability of Supercomputing and Cloud Technologies (SuperCompCloud), 33–38.',
+			url: 'https://doi.org/10.1109/SuperCompCloud51944.2020.00011'
+		},
+		{
+			id: 'rcacnegishi',
+			apa: 'Rosen Center for Advanced Computing. (n.d.). Negishi [Community cluster]. Purdue University. Retrieved October 25, 2026, from',
+			url: 'https://www.rcac.purdue.edu/compute/negishi'
+		}
+	],
+	bibtex: `@article{McCartney2014,
+author = {McCartney, Gerry and Hacker, Thomas and Yang, Baijian},
+journal = {Educause Review},
+title = {{Empowering Faculty: A Campus Cyberinfrastructure Strategy for Research Communities}},
+year = {2014},
+url = {https://er.educause.edu/articles/2014/7/empowering-faculty-a-campus-cyberinfrastructure-strategy-for-research-communities}
+}
+@inproceedings{Smith2020Geddes,
+title = {The “Geddes” Composable Platform - An Evolution of Community Clusters for a Composable World},
+url = {http://dx.doi.org/10.1109/SuperCompCloud51944.2020.00011},
+DOI = {10.1109/supercompcloud51944.2020.00011},
+booktitle = {2020 IEEE/ACM International Workshop on Interoperability of Supercomputing and Cloud Technologies (SuperCompCloud)},
+publisher = {IEEE},
+author = {Smith, Preston M. and Gough, Erik and Younts, Alexander and Werts, Brian and Hacker, Thomas J. and Neumeister, Norbert and Wisecaver, Jennifer},
+year = {2020},
+month = nov,
+pages = {33--38}
+}
+@misc{RCACNegishi,
+author = {{Rosen Center for Advanced Computing}},
+title = {Negishi community cluster},
+howpublished = {Purdue University},
+url = {https://www.rcac.purdue.edu/compute/negishi},
+note = {Accessed 2026-10-25}
+}`
+};
+
 /** Where the desktop app is downloaded from (its releases, for now). */
 export const DESKTOP_URL = `${CITE_URL}/releases`;
 
@@ -81,7 +134,7 @@ export const EXTRA_REFERENCES: { phase: number; what: string; text: string }[] =
 	}
 ];
 
-/** The open-source software MARGIE itself is built with (be-margie/pyproject.toml, fe-margie/margie-fe/package.json). */
+/** The open-source software MARGIE herself is built with (be-margie/pyproject.toml, fe-margie/margie-fe/package.json). */
 export const SOFTWARE: {
 	group: string;
 	items: { name: string; what: string; href: string; version?: string; licence?: string; licenceUrl?: string; source?: string }[];

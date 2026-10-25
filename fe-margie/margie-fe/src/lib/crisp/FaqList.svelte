@@ -130,7 +130,7 @@
 				{/each}
 			</ol>
 			<p class="ab-lab">
-				To cite MARGIE itself, see <a class="mg-link" href="/contributors">Contributors</a>; the tools and databases it runs, with their versions and
+				To cite MARGIE herself, see <a class="mg-link" href="/contributors">Contributors</a>; the tools and databases she runs, with their versions and
 				licences, are on <a class="mg-link" href="/acknowledgements">Acknowledgements</a>.
 			</p>
 		</section>
@@ -175,7 +175,7 @@
 		padding: 10px 2px;
 		cursor: pointer;
 		list-style: none;
-		font-size: var(--mg-fs);
+		font-size: var(--mg-fs-lg);
 		font-weight: 600;
 	}
 	.fq summary::-webkit-details-marker {
@@ -210,9 +210,42 @@
 	.fq-a :global(p) {
 		margin: 0;
 	}
-	.fq-a :global(ul) {
+	.fq-a :global(ul),
+	.fq-a :global(ol) {
 		margin: 0;
-		padding-left: 1.3em;
+		padding-left: 1.4em;
+	}
+	.fq-a :global(ul) {
+		list-style: disc;
+	}
+	.fq-a :global(ol) {
+		list-style: decimal;
+	}
+	.fq-a :global(li + li) {
+		margin-top: 3px;
+	}
+	/* Tables in an answer, as on the About pages. */
+	.fq-a :global(table) {
+		width: 100%;
+		border-collapse: collapse;
+		font-size: var(--mg-fs);
+	}
+	.fq-a :global(th) {
+		padding: 6px 8px;
+		border-bottom: 1px solid var(--mg-border);
+		color: var(--mg-text-3);
+		font-size: var(--mg-fs-sm);
+		font-weight: 600;
+		text-align: left;
+	}
+	.fq-a :global(td) {
+		padding: 6px 8px;
+		border-top: 1px solid var(--mg-border);
+		vertical-align: top;
+		overflow-wrap: anywhere;
+	}
+	.fq-a :global(tr:first-child td) {
+		border-top: none;
 	}
 	.fq-a :global(pre) {
 		margin: 0;
@@ -220,7 +253,7 @@
 		border-radius: var(--mg-r-sm);
 		background: var(--mg-surface-2);
 		font-family: var(--mg-mono);
-		font-size: var(--mg-fs-xs);
+		font-size: var(--mg-fs-sm);
 		white-space: pre-wrap;
 	}
 	.fq-a :global(code) {
@@ -232,7 +265,7 @@
 		align-items: center;
 		gap: 6px;
 		margin: 0;
-		font-size: var(--mg-fs-xs);
+		font-size: var(--mg-fs-sm);
 		font-weight: 650;
 		letter-spacing: 0.05em;
 		text-transform: uppercase;
@@ -272,7 +305,7 @@
 	.fq-thesis-body :global(figcaption) {
 		margin-top: 6px;
 		color: var(--mg-text-2);
-		font-size: var(--mg-fs-xs);
+		font-size: var(--mg-fs-sm);
 	}
 	.fq-form {
 		display: flex;
@@ -291,7 +324,7 @@
 		margin: 4px 0 0;
 		padding-left: 1.2em;
 		color: var(--mg-text-2);
-		font-size: var(--mg-fs-xs);
+		font-size: var(--mg-fs-sm);
 	}
 	.fq-refs a,
 	.fq-all a {
@@ -300,12 +333,12 @@
 	.fq-link {
 		align-self: flex-start;
 		color: var(--mg-text-3);
-		font-size: var(--mg-fs-xs);
+		font-size: var(--mg-fs-sm);
 	}
 	.fq-all {
 		margin: 0;
 		padding-left: 1.6em;
-		font-size: var(--mg-fs-xs);
+		font-size: var(--mg-fs-sm);
 	}
 	.fq-all li + li {
 		margin-top: 4px;

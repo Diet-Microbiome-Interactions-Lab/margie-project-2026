@@ -42,7 +42,7 @@
 	</div>
 
 	{#if page}
-		<div class="ab sc-body">{@html page.html}</div>
+		<div class="ab sc-body sc-read">{@html page.html}</div>
 	{:else}
 		<div class="ab">
 			<section class="ab-box sc-lock">
@@ -94,6 +94,17 @@
 	.sc-error {
 		color: var(--mg-danger, #c0392b);
 	}
+	/* Reading size, as on Methods. */
+	.sc-read :global(.ab-box) {
+		font-size: var(--mg-fs-lg);
+		line-height: 1.65;
+	}
+	.sc-read :global(.ab-table) {
+		font-size: var(--mg-fs);
+	}
+	.sc-read :global(.ab-formula) {
+		font-size: var(--mg-fs-sm);
+	}
 	/* The opened page's content (lib/crisp/locked.ts). */
 	.sc-body :global(.sc-cols) {
 		font-family: var(--mg-mono);
@@ -132,7 +143,7 @@
 	.sc-body :global(.sc-fig figcaption) {
 		margin-top: 6px;
 		color: var(--mg-text-2);
-		font-size: var(--mg-fs-xs);
+		font-size: var(--mg-fs-sm);
 	}
 	.sc-body :global(.sc-pool summary) {
 		cursor: pointer;

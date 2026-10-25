@@ -260,7 +260,7 @@ class Ui {
 	/**
 	 * Reset theme: back to MARGIE's recommended look (colours, type, sizes, layout and the reading
 	 * aids as MARGIE ships them), asked first; light or dark and Simple or Guided stay as chosen. A
-	 * default look kept before is cleared too, so MARGIE opens with its own.
+	 * default look kept before is cleared too, so MARGIE opens with her own.
 	 */
 	async resetLook() {
 		if (!confirm("Reset the theme to MARGIE's recommended look? Your colours, type and layout, and any default look you kept, go back to MARGIE's own; light or dark stays as it is.")) return;
