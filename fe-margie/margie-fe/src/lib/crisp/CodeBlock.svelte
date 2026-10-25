@@ -58,7 +58,7 @@
 		border-radius: var(--mg-r-sm);
 		background: var(--mg-surface);
 		font-family: var(--mg-mono);
-		font-size: 12.5px;
+		font-size: max(13px, var(--mg-fs-sm));
 		line-height: 1.55;
 		tab-size: 4;
 	}

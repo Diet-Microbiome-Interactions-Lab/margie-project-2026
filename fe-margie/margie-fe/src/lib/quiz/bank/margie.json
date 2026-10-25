@@ -4,7 +4,7 @@
 		"topic": "margie",
 		"level": "easy",
 		"kind": "choice",
-		"question": "How does MARGIE run its steps on an HPC cluster?",
+		"question": "How does MARGIE run her steps on an HPC cluster?",
 		"options": [
 			"As one Python script that runs each tool in turn on the login node",
 			"As Nextflow processes that run each tool in Docker on cloud machines",
@@ -108,7 +108,7 @@
 		"topic": "margie",
 		"level": "easy",
 		"kind": "truefalse",
-		"statement": "A copy of a genome FASTA with different line breaks and a different file name gets the same genome hash, so MARGIE recognises it as a genome it has seen before.",
+		"statement": "A copy of a genome FASTA with different line breaks and a different file name gets the same genome hash, so MARGIE recognises it as a genome she has seen before.",
 		"answer": true,
 		"explain": "The genome hash is a SHA-256 over each record's ID and its upper-case bases, so line breaks and the file name do not enter it. Renaming a record's ID does change the hash, since RASTtk's gene numbering depends on the IDs."
 	},
@@ -240,7 +240,7 @@
 		"topic": "margie",
 		"level": "intermediate",
 		"kind": "choice",
-		"question": "What does MARGIE write to its run_log table when it loads a step's table into the MARGIE database?",
+		"question": "What does MARGIE write to her run_log table when she loads a step's table into the MARGIE database?",
 		"options": [
 			"A compressed copy of the table's rows, so that a later run can restore them in one step",
 			"The genome's gene fingerprints, so that scoring can later leave the genome out by content",
@@ -303,7 +303,7 @@
 		"topic": "margie",
 		"level": "intermediate",
 		"kind": "case",
-		"scenario": "A researcher installs MARGIE and starts it from the command line inside a batch job, with no terminal attached, before accepting MARGIE's licensing terms. Several of the tools MARGIE runs, SignalP among them, are licensed by their authors for particular uses only.",
+		"scenario": "A researcher installs MARGIE and starts her from the command line inside a batch job, with no terminal attached, before accepting MARGIE's licensing terms. Several of the tools MARGIE runs, SignalP among them, are licensed by their authors for particular uses only.",
 		"parts": [
 			{
 				"question": "What does MARGIE do with this first run?",
@@ -529,7 +529,7 @@
 		"topic": "margie",
 		"level": "hard",
 		"kind": "choice",
-		"question": "Which operons does MARGIE count when it adds a genome's operons to the OCC reference?",
+		"question": "Which operons does MARGIE count when she adds a genome's operons to the OCC reference?",
 		"options": [
 			"Operons whose adjacent pairs each have a UniOP probability above 0.5",
 			"Operons whose informative members outnumber their uninformative ones",

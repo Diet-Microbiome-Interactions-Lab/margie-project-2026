@@ -76,7 +76,7 @@
 		border: 0;
 		background: none;
 		color: var(--mg-text);
-		font-size: var(--mg-fs-xs);
+		font-size: var(--mg-fs-sm);
 		text-align: left;
 		cursor: pointer;
 	}
@@ -110,7 +110,7 @@
 	.fc-links {
 		margin: 0;
 		color: var(--mg-text-2);
-		font-size: var(--mg-fs-xs);
+		font-size: var(--mg-fs-sm);
 	}
 	.fc-links :global(svg) {
 		vertical-align: -1px;

@@ -4,7 +4,7 @@
 
 **Mostly Automated Rapid Genome Inference Environment**
 
-Annotates prokaryotic genomes, finds operons, and scores how confident it is about each gene.
+Annotates prokaryotic genomes, finds operons, and scores how confident she is about each gene.
 
 <img src="docs/img/Sedimenticola_thiotaurini_GCF_001007875.1.png" width="820" alt="Sedimenticola_thiotaurini_GCF_001007875.1 circular genome map: Operon mode">
 <img src="docs/img/operon_0313_operon_map.png" width="820" alt="Operon map for Operon_0313 in Sedimenticola_thiotaurini_GCF_001007875.1 ">
@@ -188,6 +188,12 @@ APA 7th (base architecture on which MARGIE was built, by Dane Deemer):
 - Deemer, D. (2020). *bioinformatics-tools* [Computer software]. GitHub. https://github.com/wintermutant/bioinformatics-tools (the backend that be-margie grew from: API, command line and workflow engine)
 - Deemer, D. (2025). *biolab-fe* [Computer software]. GitHub. https://github.com/wintermutant/biolab-fe (the web interface that fe-margie grew from)
 
+APA 7th (research computing, as RCAC asks it to be cited):
+
+- McCartney, G., Hacker, T., & Yang, B. (2014). Empowering faculty: A campus cyberinfrastructure strategy for research communities. *EDUCAUSE Review*. https://er.educause.edu/articles/2014/7/empowering-faculty-a-campus-cyberinfrastructure-strategy-for-research-communities
+- Smith, P. M., Gough, E., Younts, A., Werts, B., Hacker, T. J., Neumeister, N., & Wisecaver, J. (2020). The “Geddes” composable platform: An evolution of community clusters for a composable world. *2020 IEEE/ACM International Workshop on Interoperability of Supercomputing and Cloud Technologies (SuperCompCloud)*, 33–38. https://doi.org/10.1109/SuperCompCloud51944.2020.00011
+- Rosen Center for Advanced Computing. (n.d.). *Negishi* [Community cluster]. Purdue University. Retrieved October 25, 2026, from https://www.rcac.purdue.edu/compute/negishi
+
 BibTeX:
 
 ```bibtex
@@ -213,6 +219,31 @@ year = "2025",
 publisher = "GitHub",
 url = "https://github.com/wintermutant/biolab-fe"
 }
+@article{McCartney2014,
+author = {McCartney, Gerry and Hacker, Thomas and Yang, Baijian},
+journal = {Educause Review},
+title = {{Empowering Faculty: A Campus Cyberinfrastructure Strategy for Research Communities}},
+year = {2014},
+url = {https://er.educause.edu/articles/2014/7/empowering-faculty-a-campus-cyberinfrastructure-strategy-for-research-communities}
+}
+@inproceedings{Smith2020Geddes,
+title = {The “Geddes” Composable Platform - An Evolution of Community Clusters for a Composable World},
+url = {http://dx.doi.org/10.1109/SuperCompCloud51944.2020.00011},
+DOI = {10.1109/supercompcloud51944.2020.00011},
+booktitle = {2020 IEEE/ACM International Workshop on Interoperability of Supercomputing and Cloud Technologies (SuperCompCloud)},
+publisher = {IEEE},
+author = {Smith, Preston M. and Gough, Erik and Younts, Alexander and Werts, Brian and Hacker, Thomas J. and Neumeister, Norbert and Wisecaver, Jennifer},
+year = {2020},
+month = nov,
+pages = {33--38}
+}
+@misc{RCACNegishi,
+author = {{Rosen Center for Advanced Computing}},
+title = {Negishi community cluster},
+howpublished = {Purdue University},
+url = {https://www.rcac.purdue.edu/compute/negishi},
+note = {Accessed 2026-10-25}
+}
 ```
 
 Use the exact version you ran by checking repository Releases, and include that release version number in your citation.
@@ -228,6 +259,6 @@ I (Sajal) gratefully acknowledge Dane Deemer ([wintermutant](https://github.com/
 Special thanks goes to Dr. Stephen R Lindemann for his vision, supervision  and support throughout this development.
 I also thank members of Diet-Microbiome-Interactions Laboratory for their feedbacks and intellectual inputs during this development.
 
-We thank Purdue RCAC for providing the research computing environment that supports this work.
+MARGIE's runs use research computing resources of the Rosen Center for Advanced Computing (RCAC), Information Technology at Purdue University: the Negishi community cluster and the Geddes Community Composable Platform, which the National Science Foundation funded under award [OAC-2018926](https://www.nsf.gov/awardsearch/showAward?AWD_ID=2018926) (CC* Compute: Private Campus Cloud for Data Analytics and Machine Learning). We thank RCAC and its staff for these resources and their support.
 
 We also thank the developers and maintainers of the upstream tools, databases, and scientific software used throughout the pipeline. Their contributions make reproducible computational biology more powerful, more accessible, and more exciting to do.

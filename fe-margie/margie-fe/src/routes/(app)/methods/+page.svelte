@@ -5,8 +5,8 @@
 	import { FAQS } from '$lib/crisp/faq';
 
 	/**
-	 * Methods: how MARGIE annotates a genome and scores each gene, phase by phase, as the
-	 * workflow (margie_sb.smk) and its scoring scripts (workflow_tools/scoring) do it.
+	 * Methods: what MARGIE does, phase by phase (margie_sb.smk), then the FAQ (FaqList), which explains
+	 * each step with its references and code.
 	 */
 	const PHASES: { n: string; step: string; tools: string; does: string }[] = [
 		{ n: '1', step: 'Quality', tools: 'QUAST (optional)', does: 'Assembly statistics for each genome: contigs, N50, total length.' },
@@ -50,17 +50,6 @@
 		{ n: '15', step: 'Gene report', tools: "MARGIE's own (optional)", does: 'A per-gene report of the evidence behind each annotation.' }
 	];
 
-	const TIERS = [
-		['1', 'PGAP, NCBIfam, TIGRFAM', 'curated prokaryotic family rules'],
-		['2', 'HAMAP, PIRSF, UniProt Swiss-Prot', 'family rules, whole-protein models, Swiss-Prot hits (identity at least 40%)'],
-		['3', 'KEGG', ''],
-		['4', 'eggNOG', ''],
-		['5', 'RASTtk', ''],
-		['6', 'Pfam', ''],
-		['7', 'CDD', ''],
-		['8', 'COG', ''],
-		['9', 'Fallback', 'the first tool with any description, else "No DB hits"']
-	];
 </script>
 
 <svelte:head><title>Methods | MARGIE</title></svelte:head>
@@ -71,14 +60,14 @@
 		<p class="cr-lede">How MARGIE annotates a genome and scores each gene.</p>
 	</div>
 
-	<div class="ab">
+	<div class="ab mt-read">
 		<section class="ab-box">
 			<h2>Overview</h2>
 			<p>
-				MARGIE is a Snakemake workflow that runs on an HPC cluster through SLURM, the tools in their own containers. A run takes genome
-				assemblies (FASTA) and, for each genome, its domain and genetic code when known. It calls genes, annotates their proteins with
-				many tools at once, groups genes into operons, works out where proteins sit in the cell, gives every gene one label, and scores
-				how much the evidence for that label agrees. Every step's output is kept, so each label can be traced to the hits behind it.
+				MARGIE is a Snakemake workflow that runs on an HPC cluster through SLURM, the tools in their own containers. She takes genome
+				assemblies (FASTA) and, for each genome, its domain and genetic code when known. She calls genes, annotates their proteins with
+				many tools at once, groups genes into operons, works out where proteins sit in the cell, gives each gene one label, and scores
+				how much the evidence for that label agrees. She keeps each step's output, so each label can be traced to the hits behind it.
 			</p>
 			<a class="ab-go" href="/code">
 				<FileCode size={26} />
@@ -112,56 +101,6 @@
 					<p>How each step works, with the papers it rests on and the code that does it.</p>
 				</div>
 			</div>
-			<FaqList />
-		</section>
-		{/if}
-
-		<div class="ab-pair">
-			<section class="ab-box">
-				<h2>Labeling: one label per gene</h2>
-				<p>
-					Each gene's label comes from the first tool, in this order, whose best hit is informative and passes its threshold. MEROPS, TCDB
-					and dbCAN confirm a label but do not set it.
-				</p>
-				<table class="ab-table">
-					<thead><tr><th>Tier</th><th>Tools</th><th></th></tr></thead>
-					<tbody>
-						{#each TIERS as [t, tools, note] (t)}
-							<tr><td class="ab-num">{t}</td><td>{tools}</td><td class="ab-lab">{note}</td></tr>
-						{/each}
-					</tbody>
-				</table>
-			</section>
-
-			<section class="ab-box">
-				<h2>Scoring: four measures</h2>
-				<h3>C1, tool coverage</h3>
-				<p>
-					How many of seven sources have an informative hit for the gene: RASTtk, KEGG, eggNOG, COG, Pfam, UniProt, and one slot for the
-					TIGRFAM family (PGAP, TIGRFAM and NCBIfam share models). C1 = sources with a hit / 7.
-				</p>
-				<h3>C2, operon probability</h3>
-				<p>The mean UniOP probability that the gene shares an operon with its neighbours; 0.5 where there is none.</p>
-				<h3>C3, operon context</h3>
-				<p>
-					How often the gene's operon neighbourhood recurs across the genome pool, in two channels: adjacency (the operon as a unit, the
-					geometric mean over its adjacent pairs; the default) and membership (the gene's strongest partner anywhere in its operon; the
-					hybrid score). Each pair is a Bayesian estimate weighted against chance. 0.5 for single genes and operons of hypothetical
-					proteins, and 0 for an operon whose pairs have no support in the pool.
-				</p>
-				<h3>C4, EC agreement</h3>
-				<p>Whether the tools that give an EC number agree; conflicts lower the score.</p>
-			</section>
-		</div>
-
-		<section class="ab-box">
-			<h2>The confidence score</h2>
-			<p class="ab-formula">preliminary = C1 × C4{'\n'}context     = C2 × C3 for genes in an operon, else 0{'\n'}confidence  = preliminary + context, kept between 0 and 1</p>
-			<p>
-				Operon context only raises a score. The confidence sets the tier: <b>highest</b> above 0.9, <b>high</b> above 0.7, <b>medium</b>
-				above 0.5, <b>fair</b> above 0.3, and <b>low</b> otherwise. A gene is flagged for review when its tools' EC numbers conflict, its
-				confidence is below 0.5, it sits in an operon with C2 below 0.5, or its operon is ambiguous and gave no boost.
-			</p>
 			<a class="ab-go" href="/methods/scores">
 				<Gauge size={26} />
 				<span class="ab-go-text">
@@ -170,53 +109,28 @@
 				</span>
 				<span class="ab-go-to"><LockKeyhole size={14} /> Open <ArrowRight size={15} /></span>
 			</a>
+			<FaqList />
 		</section>
+		{/if}
 
-		<section class="ab-box">
-			<h2>Caching and restoration</h2>
-			<p>
-				The MARGIE database keeps what earlier runs found, at two levels, so a genome or a protein seen before is not worked out again. Each run
-				writes <b>cache-report.tsv</b> in its folder, saying for every genome and step whether it ran or came back, and from which level; Jobs
-				shows it under the progress, and the progress grid marks restored steps.
-			</p>
-			<h3>Genome level</h3>
-			<p>
-				A genome is recognised by a SHA-256 hash of its records' names and bases, so a copy with different line breaks or file name is still the
-				same genome. For each step it has finished (GTDB-Tk, RASTtk's gene calls, every annotation tool, the operons, the location tools,
-				consolidation and labeling) its output files are stored under that hash. When the genome is run again, each step's files come back before
-				the step would start, and the step is skipped; restored tables are rewritten onto this run's RASTtk gene ids. Consolidation and labeling
-				come back only when the tool tables they merge are exactly the same as before, so a different set of tools, or a tool with new results,
-				merges again.
-			</p>
-			<h3>Protein level</h3>
-			<p>
-				After gene calling, a tool whose answer depends on the protein alone (COG, KEGG, eggNOG, UniProt, Pfam, PGAP, TIGRFAM, InterPro, MEROPS,
-				TCDB, dbCAN, Phobius, TMbed and SignalP 6) is given only the proteins it has not seen. Each protein is recognised by a SHA-256 hash of its
-				sequence, together with a key for the tool's container, database and settings; the rows for known proteins are merged back in under this
-				genome's gene ids. A new database release or changed settings change the key, and those proteins are annotated again. This is what speeds
-				up a new genome that shares many proteins with genomes already run.
-			</p>
-			<h3>Which applies when</h3>
-			<p>
-				The genome level is tried first; a tool it does not cover for this genome then uses the protein level. Genomes whose genes Prodigal calls
-				run each step fresh. Scoring, the fingerprints and the comparisons with other genomes run fresh in each run, as they depend on every
-				genome in the database at the time.
-			</p>
-		</section>
-
-		<section class="ab-box">
-			<h2>What comes out</h2>
-			<ul>
-				<li><b>FINAL_ANNOTATION_WITH_CONFIDENCE.tsv</b>: every gene's label, where it came from, its location and topology, C1 to C4 with their reasoning, its confidence and tier.</li>
-				<li>A GFF of the annotation, and each tool's own results.</li>
-				<li>Gene and operon fingerprints, and an interactive genome map coloured by operon (Results).</li>
-				<li>Everything is also kept in the MARGIE database, so later runs reuse what is known.</li>
-			</ul>
-		</section>
 	</div>
 </div>
 
 <style>
+	/* Easier reading: body text at the large size, tables at the base size (both follow Customize → text size). */
+	.mt-read :global(.ab-box) {
+		font-size: var(--mg-fs-lg);
+		line-height: 1.65;
+	}
+	.mt-read :global(.ab-table) {
+		font-size: var(--mg-fs);
+	}
+	.mt-read :global(.ab-formula) {
+		font-size: var(--mg-fs-sm);
+	}
+	.mt-read :global(.ab-go-text) {
+		font-size: var(--mg-fs);
+	}
 	/* The FAQ: coloured so it stands out on the page. */
 	.mt-faq {
 		display: flex;
@@ -238,12 +152,12 @@
 	.mt-faq-head h2 {
 		margin: 0;
 		color: var(--mg-accent);
-		font-size: 1.2rem;
+		font-size: var(--mg-fs-xl);
 		font-weight: 700;
 	}
 	.mt-faq-head p {
 		margin: 2px 0 0;
 		color: var(--mg-text-2);
-		font-size: var(--mg-fs-sm);
+		font-size: var(--mg-fs);
 	}
 </style>
