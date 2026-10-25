@@ -9,7 +9,7 @@ import { NOT_YET } from '$lib/license';
 import { BASE_BIBTEX, CITE_URL, COMPUTING, THESIS_BIBTEX, THESIS_DOI, THESIS_RECORDS_BIBTEX } from './about';
 import { SOFTWARE_CREDITS, TOOLS, type Cite } from './credits';
 
-/** MARGIE herself, as the repository's CITATION.cff gives her. */
+/** MARGIE's own entry, as the repository's CITATION.cff gives it. */
 export const MARGIE_BIBTEX = `@software{Bhattarai2026MARGIE,
 author = "Sajal Bhattarai and Dane Deemer and Stephen R. Lindemann",
 title = "{MARGIE: Mostly Automated Rapid Genome Inference Environment}",
@@ -21,7 +21,7 @@ url = "${CITE_URL}"
 /** The tools a run uses (steps being worked on are left out), in run order. */
 export const RUN_TOOLS = TOOLS.filter((t) => !NOT_YET.has(t.id)).sort((a, b) => a.phase - b.phase || a.name.localeCompare(b.name));
 
-/** The software whose authors ask to be cited (Snakemake, Apptainer). */
+/** The software with papers to cite (Snakemake, Apptainer, Python and its packages). */
 export const CITED_SOFTWARE = SOFTWARE_CREDITS.filter((s) => s.cite.length);
 
 /** The tools' and software's papers, each once (by DOI, else by its key). */
@@ -41,14 +41,14 @@ export function citedPapers(): Cite[] {
 /** The whole file. */
 export function allBibtex(): string {
 	const parts = [
-		'% MARGIE, the thesis in which she was first built, and the base architecture she was built on',
+		'% MARGIE, the thesis in which MARGIE was first built, and the base architecture MARGIE was built on',
 		MARGIE_BIBTEX,
 		THESIS_BIBTEX,
 		THESIS_RECORDS_BIBTEX,
 		BASE_BIBTEX,
-		'% The research computing she runs on, as RCAC asks it to be cited',
+		'% The research computing MARGIE runs on',
 		COMPUTING.bibtex,
-		'% The tools, databases and software she runs, as each asks to be cited',
+		'% The tools, databases and software MARGIE runs',
 		...citedPapers().map((c) => c.bibtex)
 	];
 	return parts.join('\n\n') + '\n';
