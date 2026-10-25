@@ -3,7 +3,7 @@
 	import { Maximize2, Scan, ZoomIn, ZoomOut } from 'lucide-svelte';
 	import { viewable } from './viewable.svelte';
 
-	/** Image viewer: fitted, then zoomed toward the pointer (buttons, keys, Ctrl/⌘ + wheel, pinch) and dragged. */
+	/** Image viewer: fitted to the width, then zoomed toward the pointer (buttons, keys, Ctrl/⌘ + wheel, pinch) and dragged. */
 	let { src, alt }: { src: string; alt: string } = $props();
 	const shown = viewable(() => src);
 
@@ -21,13 +21,13 @@
 	const MIN = 0.02;
 	const MAX = 16;
 
-	/** Fits the whole image, centred. */
+	/** Fits the image to the window's width: its top in view when taller than the window, centred when shorter. */
 	function fit() {
 		if (!box || !natural.w) return;
 		const r = box.getBoundingClientRect();
-		scale = Math.min(1, (r.width - 32) / natural.w, (r.height - 32) / natural.h);
+		scale = Math.min(4, (r.width - 32) / natural.w);
 		x = (r.width - natural.w * scale) / 2;
-		y = (r.height - natural.h * scale) / 2;
+		y = Math.max(16, (r.height - natural.h * scale) / 2);
 		fitted = true;
 	}
 
@@ -111,7 +111,7 @@
 <div class="viewer vw-scope">
 	<div class="vw-bar">
 		<div class="vw-group" role="group" aria-label="Size">
-			<button type="button" class="vw-btn" title="Fit to the window (0)" aria-pressed={fitted} onclick={fit}><Scan size={14} /><span class="vw-lbl">Fit</span></button>
+			<button type="button" class="vw-btn" title="Fit to the window's width (0)" aria-pressed={fitted} onclick={fit}><Scan size={14} /><span class="vw-lbl">Fit width</span></button>
 			<button type="button" class="vw-btn" title="Actual size (1)" onclick={actual}><Maximize2 size={14} /><span class="vw-lbl">Actual size</span></button>
 		</div>
 		<div class="vw-group" role="group" aria-label="Zoom">
@@ -156,7 +156,7 @@
 			<p class="msg">Loading</p>
 		{/if}
 	</div>
-	<p class="hint">Drag to move | Ctrl or ⌘ + scroll to zoom | double-click to switch between fit and actual size</p>
+	<p class="hint">Drag to move | Ctrl or ⌘ + scroll to zoom | double-click to switch between fit width and actual size</p>
 </div>
 
 <style>

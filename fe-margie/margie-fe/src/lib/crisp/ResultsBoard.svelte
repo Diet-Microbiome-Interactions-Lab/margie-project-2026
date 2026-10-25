@@ -1,5 +1,6 @@
 <script lang="ts">
 	import Explain from '$lib/workspace/Explain.svelte';
+	import { untrack } from 'svelte';
 	import { goto } from '$app/navigation';
 	import { page } from '$app/state';
 	import { Bot, Check, Copy, Download, FileSpreadsheet, FolderOpen, Maximize2, Minimize2 } from 'lucide-svelte';
@@ -224,11 +225,20 @@
 	const listShut = $derived(ui.isFolded('app:results-list'));
 	const tabIn = (node: Element) => fly(node, { y: ui.motion === 'full' ? 8 : 4, duration: ui.ms(260), easing: cubicOut });
 
+	/**
+	 * The picked genome's finished result, by its report table: the summary loads again when the genome
+	 * or its result changes, not on each refresh of the results list while a run goes, which would
+	 * remount the map and figure viewers (ending full screen and resetting a zoom).
+	 */
+	const pickedResult = $derived(ws.finished.find((r) => r.organism === selected)?.final?.table ?? '');
 	$effect(() => {
 		const g = selected;
-		const finished = ws.finished.some((r) => r.organism === g);
-		summary = null;
-		if (!g || !finished) return;
+		if (!g || !pickedResult) {
+			summary = null;
+			return;
+		}
+		// A new genome clears the page; a newer result for the same one replaces it once loaded.
+		if (untrack(() => summary?.genome) !== g) summary = null;
 		loading = true;
 		ws.loadSummary(g).then((s) => {
 			if (selected !== g) return;
