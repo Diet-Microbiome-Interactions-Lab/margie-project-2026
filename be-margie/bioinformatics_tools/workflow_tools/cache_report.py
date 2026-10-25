@@ -47,14 +47,26 @@ def stage_of(step: str) -> str:
     return 'after gene calling'
 
 
-def proteins(cached: int, to_run: int) -> dict:
-    """Returns set()'s source, level and detail for a protein-level tool: how many proteins came from the cache."""
+def matched(sources: dict[str, int] | None, shown: int = 3) -> str:
+    """The genomes the cached proteins came from, most first: "A (600), B (212) and 2 more"."""
+    if not sources:
+        return ''
+    names = [f'{g} ({n:,})' for g, n in sorted(sources.items(), key=lambda kv: -kv[1])]
+    more = len(names) - shown
+    head = ', '.join(names[:shown])
+    return f'{head} and {more} more' if more > 0 else head
+
+
+def proteins(cached: int, to_run: int, sources: dict[str, int] | None = None) -> dict:
+    """Returns set()'s source, level and detail for a protein-level tool: how many proteins came from the
+    cache, and the genomes they matched."""
     total = cached + to_run
+    whose = f', matched from {matched(sources)}' if matched(sources) else ''
     if total and not to_run:
-        return {'source': RESTORED, 'level': PROTEIN_LEVEL, 'detail': f'all {total:,} proteins from the protein cache'}
+        return {'source': RESTORED, 'level': PROTEIN_LEVEL, 'detail': f'all {total:,} proteins from the protein cache{whose}'}
     if cached:
         return {'source': PARTLY, 'level': PROTEIN_LEVEL,
-                'detail': f'{cached:,} of {total:,} proteins from the protein cache; {to_run:,} annotated now'}
+                'detail': f'{cached:,} of {total:,} proteins from the protein cache{whose}; {to_run:,} annotated now'}
     return {'source': FRESH, 'detail': f'none of its {total:,} proteins in the protein cache; all annotated now'}
 
 

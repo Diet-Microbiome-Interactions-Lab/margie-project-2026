@@ -3,7 +3,8 @@ Per-protein annotation cache in the job's SQLite database, keyed by the protein'
 sequence hash and a tool_key (container, database and settings).
 
 split() writes novel.faa plus the cached rows before a tool runs, MERGE_SH joins
-both into the tool's results file, and store() adds the genome's new proteins.
+both into the tool's results file, and store() adds the genome's new proteins with the
+genome they came from, so a later genome's report names the genomes it matched.
 Only tools whose rows depend on the protein alone are listed in TOOLS.
 """
 from __future__ import annotations
@@ -39,6 +40,7 @@ CREATE TABLE IF NOT EXISTS protein_cache (
     filename TEXT NOT NULL,
     lines TEXT NOT NULL,
     cached_at TEXT NOT NULL,
+    genome TEXT NOT NULL DEFAULT '',
     PRIMARY KEY (tool, tool_key, filename, aa_hash)
 ) WITHOUT ROWID;
 CREATE TABLE IF NOT EXISTS protein_cache_header (
@@ -140,6 +142,13 @@ def _connect(db: str) -> sqlite3.Connection:
     conn = sqlite3.connect(db, timeout=120)
     conn.execute('PRAGMA busy_timeout=120000')
     conn.executescript(CREATE_SQL)
+    # Caches made before the genome column: it is added, empty for the rows already there.
+    if 'genome' not in {r[1] for r in conn.execute('PRAGMA table_info(protein_cache)')}:
+        try:
+            conn.execute("ALTER TABLE protein_cache ADD COLUMN genome TEXT NOT NULL DEFAULT ''")
+        except sqlite3.OperationalError as exc:
+            if 'duplicate column' not in str(exc):
+                raise
     return conn
 
 
@@ -227,8 +236,19 @@ def _proteins(faa: str) -> list[tuple[str, str, str, str]]:
     return [(fid, protein_hash(seq), header, seq) for fid, header, seq in read_fasta(faa) if fid and seq]
 
 
-def split(db: str, faa: str, prefix: str, genome: str, tools: list[str], cfg: dict) -> dict[str, tuple[int, int]]:
-    """Writes novel.faa and the cached proteins' rows per tool; returns {tool: (cached, to run)}."""
+def _source(genome: str, lines: str, org_col: int | None) -> str:
+    """The genome a cached protein came from: recorded with it, else the organism its rows name."""
+    if genome:
+        return genome
+    first = (lines or '').split('\n', 1)[0]
+    parts = first.split('\t') if first else []
+    return parts[org_col] if org_col is not None and org_col < len(parts) else ''
+
+
+def split(db: str, faa: str, prefix: str, genome: str, tools: list[str], cfg: dict,
+          sources: dict[str, dict[str, int]] | None = None) -> dict[str, tuple[int, int]]:
+    """Writes novel.faa and the cached proteins' rows per tool; returns {tool: (cached, to run)}.
+    `sources`, when given, receives {tool: {genome the cached proteins came from: proteins}}."""
     proteins = _proteins(faa)
     hashes = sorted({h for _, h, _, _ in proteins})
     now = {}
@@ -249,18 +269,29 @@ def split(db: str, faa: str, prefix: str, genome: str, tools: list[str], cfg: di
                         for i in range(0, len(seq), 60):
                             fh.write(seq[i:i + 60] + '\n')
             want = sorted(cached)
-            for filename, kind in files:
+            for n, (filename, kind) in enumerate(files):
                 row = conn.execute('SELECT header FROM protein_cache_header WHERE tool = ? AND tool_key = ? AND filename = ?',
                                    (tool, key, filename)).fetchone()
                 header = row[0] if row else None
                 stored: dict[str, str] = {}
+                came: dict[str, str] = {}
                 for chunk in _chunks(want):
-                    stored.update(conn.execute(
-                        'SELECT aa_hash, lines FROM protein_cache WHERE tool = ? AND tool_key = ? AND filename = ? '
-                        f'AND aa_hash IN ({",".join("?" * len(chunk))})', (tool, key, filename, *chunk)))
+                    for h, lines, src in conn.execute(
+                            'SELECT aa_hash, lines, genome FROM protein_cache WHERE tool = ? AND tool_key = ? AND filename = ? '
+                            f'AND aa_hash IN ({",".join("?" * len(chunk))})', (tool, key, filename, *chunk)):
+                        stored[h] = lines
+                        came[h] = src
+                cols = _columns(header) if header and kind != 'domtbl' else (None, None)
+                if n == 0 and sources is not None:
+                    tally: dict[str, int] = {}
+                    for _, h, _, _ in proteins:
+                        if h in cached:
+                            src = _source(came.get(h, ''), stored.get(h, ''), cols[1])
+                            if src:
+                                tally[src] = tally.get(src, 0) + 1
+                    sources[tool] = dict(sorted(tally.items(), key=lambda kv: -kv[1]))
                 if header is None and not any(stored.values()):
                     continue
-                cols = _columns(header) if header and kind != 'domtbl' else (None, None)
                 with open(out / 'cached' / filename, 'w') as fh:
                     if header:
                         fh.write(header + '\n')
@@ -269,7 +300,8 @@ def split(db: str, faa: str, prefix: str, genome: str, tools: list[str], cfg: di
                             fh.write(_remap(line, kind, cols, fid, genome) + '\n')
             (out / 'plan.json').write_text(json.dumps({
                 'tool': tool, 'tool_key': key, 'cached': sum(1 for p in proteins if p[1] in cached),
-                'novel': sum(1 for p in proteins if p[1] not in cached)}) + '\n')
+                'novel': sum(1 for p in proteins if p[1] not in cached),
+                **({'sources': sources[tool]} if sources is not None and tool in sources else {})}) + '\n')
             now[tool] = (sum(1 for p in proteins if p[1] in cached), sum(1 for p in proteins if p[1] not in cached))
     finally:
         conn.close()
@@ -278,8 +310,9 @@ def split(db: str, faa: str, prefix: str, genome: str, tools: list[str], cfg: di
 
 # ---- after a tool's results are in ----
 
-def store(db: str, faa: str, prefix: str, tool: str, cfg: dict) -> int:
-    """Adds the genome's uncached proteins from the tool's final results; returns the count."""
+def store(db: str, faa: str, prefix: str, tool: str, cfg: dict, genome: str = '') -> int:
+    """Adds the genome's uncached proteins from the tool's final results, each with the genome it
+    came from; returns the count."""
     key = tool_key(tool, cfg)
     files = tool_files(tool, cfg)
     folder = Path(f'{prefix}{tool}')
@@ -316,8 +349,9 @@ def store(db: str, faa: str, prefix: str, tool: str, cfg: dict) -> int:
                     conn.execute('INSERT OR IGNORE INTO protein_cache_header VALUES (?, ?, ?, ?)',
                                  (tool, key, filename, header))
             for filename, (_, rows) in tables.items():
-                conn.executemany('INSERT OR IGNORE INTO protein_cache VALUES (?, ?, ?, ?, ?, ?)',
-                                 [(h, tool, key, filename, '\n'.join(rows.get(first[h], [])), stamp) for h in new])
+                conn.executemany('INSERT OR IGNORE INTO protein_cache (aa_hash, tool, tool_key, filename, lines, cached_at, genome) '
+                                 'VALUES (?, ?, ?, ?, ?, ?, ?)',
+                                 [(h, tool, key, filename, '\n'.join(rows.get(first[h], [])), stamp, genome) for h in new])
         return len(new)
     finally:
         conn.close()

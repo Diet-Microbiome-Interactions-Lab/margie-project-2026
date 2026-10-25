@@ -419,6 +419,8 @@
 	}
 	.qz-opt:disabled {
 		cursor: default;
+		color: var(--mg-text);
+		opacity: 1;
 	}
 	.qz-opt.right,
 	.qz-slot.right .qz-drop {
