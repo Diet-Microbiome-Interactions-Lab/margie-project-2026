@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { ArrowRight, Download, FileCode, MonitorDown } from 'lucide-svelte';
+	import { ArrowRight, Download, MonitorDown } from 'lucide-svelte';
 	import { DESKTOP_URL } from '$lib/crisp/about';
 	import ReadingPage from '$lib/crisp/ReadingPage.svelte';
 	import README from '$lib/crisp/readme.md?raw';
@@ -47,12 +47,11 @@
 			{#each s.parts as part, k (k)}
 				{#if k > 0}
 					<a class="rp-link" href="/code">
-						<span class="rp-link-icon"><FileCode size={24} /></span>
 						<span class="rp-link-text">
 							<b>The code behind each step</b>
 							<span>Consolidation | Labeling | Operon database | Scoring | Fingerprinting | Fingerprint databases | Genome map | Reports</span>
 						</span>
-						<ArrowRight size={18} />
+						<ArrowRight size={20} />
 					</a>
 				{/if}
 				{#if part.trim()}<Markdown source={part} />{/if}
