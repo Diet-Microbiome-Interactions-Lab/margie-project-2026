@@ -15,7 +15,7 @@
 	import { uiBase } from '$lib/workspace/base.svelte';
 	import { ws, type GenomeSummary } from '$lib/workspace/data.svelte';
 	import { GLYPH_TIERS } from '$lib/workspace/final-summary';
-	import { count, figureTitle } from '$lib/workspace/format';
+	import { count, figureNote, figureTitle } from '$lib/workspace/format';
 	import Resizer from '$lib/workspace/motion/Resizer.svelte';
 	import { thumb } from '$lib/workspace/motion/thumb';
 	import { callerName, methodsFor, methodsText } from '$lib/workspace/report';
@@ -221,6 +221,45 @@
 		if (show === 'nonoperonic') return [{ column: 'IS_IN_OPERON?', value: 'no' }];
 		return [{ column: 'CONFIDENCE_TIER', value: show }];
 	});
+	/** The Show choice applies to the table and to the interactive map; other tabs leave it out. */
+	const showApplies = $derived(!!summary && ((tab === 'table' && !!summary.final.table) || (tab === 'map' && !!summary.final.viewer)));
+	/** Saving the table's rows for the Show choice: '' or what is under way. */
+	let rowsSaving = $state('');
+	/** Saves the FINAL table's rows for the Show choice as a TSV, with the table's own columns. */
+	async function saveShownRows() {
+		const path = summary?.final.table;
+		if (!path || rowsSaving) return;
+		rowsSaving = 'Saving…';
+		try {
+			type Rows = { columns: { name: string }[]; rows: { cells: string[] }[]; pages: number };
+			const params = new URLSearchParams({ path, sheet: '0', page: '1', size: '10', q: '' });
+			const cols = (await api<Rows>(`/files/table?${params}`)).columns.map((c) => c.name);
+			for (const p of preset) {
+				const i = cols.findIndex((c) => c.replace(/^Column-[A-Z]+:\s*/, '') === p.column);
+				if (i >= 0) params.set(`f${i}`, `=${p.value}`);
+			}
+			params.set('size', '1000');
+			const lines = [cols.join('\t')];
+			for (let pg = 1, pages = 1; pg <= pages; pg++) {
+				params.set('page', String(pg));
+				const d = await api<Rows>(`/files/table?${params}`);
+				pages = d.pages;
+				for (const r of d.rows) lines.push(r.cells.join('\t'));
+				rowsSaving = `${lines.length - 1} rows…`;
+			}
+			const url = URL.createObjectURL(new Blob([lines.join('\n') + '\n'], { type: 'text/tab-separated-values' }));
+			const a = Object.assign(document.createElement('a'), { href: url, download: `${selected}_${show}_genes.tsv` });
+			document.body.append(a);
+			a.click();
+			a.remove();
+			setTimeout(() => URL.revokeObjectURL(url), 10_000);
+			ui.notify(`${count(lines.length - 1)} ${SHOWS.find((x) => x.id === show)?.label.toLowerCase()} genes saved.`, 'ok');
+		} catch (e) {
+			ui.notify(e instanceof Error ? e.message : 'The rows could not be saved.', 'error');
+		} finally {
+			rowsSaving = '';
+		}
+	}
 	let copied = $state(false);
 	let figure = $state('');
 	/** Saving figures: what is under way (for the button), or ''. */
@@ -335,7 +374,7 @@
 		if (s === 'noncoding') return nonCoding;
 		if (s === 'operonic') return summary.inOperons;
 		if (s === 'nonoperonic') return Math.max(0, summary.genes - summary.inOperons - nonCoding);
-		if (s === 'flagged') return null;
+		if (s === 'flagged') return summary.flagged ?? null;
 		return tierRows.find((r) => r.key === s)?.n ?? 0;
 	}
 	/** 4.6 Mb, 812 kb. */
@@ -499,19 +538,26 @@
 				</button>
 			</div>
 
-			<!-- which genes the map and the table show -->
-			<div class="rb-show" role="group" aria-label="Show genes">
-				<span class="rb-show-l">Show</span>
-				{#each SHOWS as s (s.id)}
-					{@const n = showCount(s.id)}
-					{#if s.id === 'all' || n !== 0}
-						<button type="button" class="rb-chip" aria-pressed={show === s.id} onclick={() => setShow(s.id)}>
-							{#if s.tier !== undefined}<span class="rb-dot" style="background: var(--mg-tier-{s.tier})"></span>{/if}
-							{s.label}{#if n !== null}<i>{count(n)}</i>{/if}
-						</button>
+			<!-- which genes the map and the table show (the tabs it applies to) -->
+			{#if showApplies}
+				<div class="rb-show" role="group" aria-label="Show genes">
+					<span class="rb-show-l">Show</span>
+					{#each SHOWS as s (s.id)}
+						{@const n = showCount(s.id)}
+						{#if s.id === 'all' || n !== 0}
+							<button type="button" class="rb-chip" aria-pressed={show === s.id} onclick={() => setShow(s.id)}>
+								{#if s.tier !== undefined}<span class="rb-dot" style="background: var(--mg-tier-{s.tier})"></span>{/if}
+								{s.label}{#if n !== null}<i>{count(n)}</i>{/if}
+							</button>
+						{/if}
+					{/each}
+					{#if tab === 'table' && show !== 'all'}
+						<button type="button" class="mg-btn small rb-show-save" disabled={!!rowsSaving} onclick={saveShownRows} title="The table's rows for this choice, as a TSV"
+							><Download size={14} /> {rowsSaving || `Download these genes (TSV)`}</button
+						>
 					{/if}
-				{/each}
-			</div>
+				</div>
+			{/if}
 
 			{#if !ui.isFolded(DETAILS, true)}
 			<div class="rb-hero">
@@ -598,6 +644,7 @@
 								<HtmlViewer src={fileUrl(summary.final.viewer, true) + (mapVersion ? `&v=${mapVersion}` : '')} download={fileUrl(summary.final.viewer)} onfull={toggleFull} {full} hash={show === 'all' ? '' : `show=${show}`} title="Genome viewer for {summary.genome}" />
 								{/key}
 							{:else if circular}
+								<p class="rb-fig-note">{figureNote(circular)}</p>
 								<ImageViewer src={fileUrl(circular, true)} alt="Circular map of {summary.genome}" />
 							{:else if backend.cluster && summary.final.table}
 								<p class="rb-state">
@@ -639,6 +686,7 @@
 												><Download size={14} /> {figSaving && !figSaving.startsWith('Saving') ? `Saving ${figSaving}` : `Download the ${summary.figures.length} figures (zip)`}</button
 											>
 										</div>
+										{#if figureNote(shown)}<p class="rb-fig-note">{figureNote(shown)}</p>{/if}
 										{#key shown}<ImageViewer src={fileUrl(shown, true)} alt="Figure {summary.figures.indexOf(shown) + 1}: {figureTitle(shown)}" />{/key}
 									</div>
 								</div>
@@ -842,11 +890,18 @@
 	.rb-row[aria-current='page'] .rb-row-name {
 		font-weight: 600;
 	}
+	/* The second column: one width for each row, set off by a faint rule. */
 	.rb-row-sub {
-		flex: none;
-		white-space: nowrap;
-		font-size: var(--mg-fs-xs);
+		flex: 0 0 7.6em;
+		overflow: hidden;
+		padding-left: 8px;
+		border-left: 1px solid color-mix(in srgb, var(--mg-text) 12%, transparent);
 		color: var(--mg-text-3);
+		font-size: var(--mg-fs-xs);
+		font-variant-numeric: tabular-nums;
+		text-align: right;
+		text-overflow: ellipsis;
+		white-space: nowrap;
 	}
 	.rb-row.running .rb-row-sub {
 		color: var(--mg-accent-ink, var(--mg-accent));
@@ -980,6 +1035,12 @@
 		gap: 8px;
 		margin: 0 0 6px;
 	}
+	.rb-fig-note {
+		margin: 0 0 8px;
+		color: var(--mg-text-2);
+		font-size: var(--mg-fs-sm);
+		line-height: 1.5;
+	}
 	.rb-fig-cap {
 		margin: 0;
 		font-size: var(--mg-fs-sm);
@@ -1035,6 +1096,9 @@
 		gap: 6px;
 		padding: 7px var(--mg-pad);
 		border-bottom: 1px solid var(--mg-border);
+	}
+	.rb-show-save {
+		margin-left: auto;
 	}
 	.rb-show-l {
 		margin-right: 4px;

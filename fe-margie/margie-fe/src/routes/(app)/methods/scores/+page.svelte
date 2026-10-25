@@ -2,7 +2,7 @@
 	import '$lib/crisp/about.css';
 	import { ArrowLeft, LockKeyhole } from 'lucide-svelte';
 	import { LAB } from '$lib/crisp/about';
-	import { LockedError, alreadyOpen, openLocked, type LockedPage } from '$lib/crisp/locked';
+	import { LockedError, alreadyOpen, openLocked, relock, type LockedPage } from '$lib/crisp/locked';
 
 	/**
 	 * Reading the scores: what a gene's confidence is made of, C3's two channels, the genome pool and
@@ -51,6 +51,9 @@
 	</div>
 
 	{#if page}
+		<div class="sc-relock">
+			<button type="button" class="mg-btn small" onclick={() => (relock('scores'), (page = null))}><LockKeyhole size={14} /> Lock again</button>
+		</div>
 		<div class="ab sc-body sc-read" bind:this={body}>{@html page.html}</div>
 	{:else}
 		<div class="ab">
@@ -73,6 +76,10 @@
 </div>
 
 <style>
+	.sc-relock {
+		display: flex;
+		justify-content: flex-end;
+	}
 	.sc-body {
 		-webkit-user-select: none;
 		user-select: none;

@@ -110,6 +110,8 @@ export interface GenomeSummary {
 	operons: number;
 	inOperons: number;
 	withSupport: number;
+	/** Genes flagged for review; absent from servers older than the count. */
+	flagged?: number;
 	envelope: string;
 	tiers: Record<string, number>;
 	tools: string[];

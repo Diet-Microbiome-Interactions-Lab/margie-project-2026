@@ -1,6 +1,6 @@
 /**
  * Saving a genome's figures from Results: one figure, or each of them in a zip with an index
- * (index.tsv: number, title, file, source). Files are named by the figure's number, as the list
+ * (index.tsv: number, title, file, source, and what the figure shows where it needs a key). Files are named by the figure's number, as the list
  * shows it, so a figure keeps its place once saved: <genome>_figure-03_<title>.png.
  */
 
@@ -8,7 +8,7 @@ import { zipSync } from 'fflate';
 import { fileUrl } from '$lib/api';
 import { fileBlob } from '$lib/cluster/backend';
 import { backend } from '$lib/workspace/backend.svelte';
-import { figureTitle } from '$lib/workspace/format';
+import { figureNote, figureTitle } from '$lib/workspace/format';
 
 const slug = (s: string) => s.replace(/[^A-Za-z0-9]+/g, '-').replace(/^-|-$/g, '');
 
@@ -41,11 +41,11 @@ export async function downloadFigure(genome: string, files: string[], file: stri
 export async function downloadFigures(genome: string, files: string[], onEach?: (done: number, total: number) => void) {
 	const dir = `${slug(genome)}_figures`;
 	const entries: Record<string, Uint8Array> = {};
-	const rows = ['figure\ttitle\tfile\tsource'];
+	const rows = ['figure\ttitle\tfile\tsource\tabout'];
 	for (const [i, f] of files.entries()) {
 		const name = figureName(genome, files, f);
 		entries[`${dir}/${name}`] = new Uint8Array(await (await blobOf(f)).arrayBuffer());
-		rows.push([i + 1, figureTitle(f), name, f].join('\t'));
+		rows.push([i + 1, figureTitle(f), name, f, figureNote(f)].join('\t'));
 		onEach?.(i + 1, files.length);
 	}
 	entries[`${dir}/index.tsv`] = new TextEncoder().encode(rows.join('\n') + '\n');

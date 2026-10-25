@@ -186,8 +186,8 @@
 	<div class="cr-head">
 		<h1 class="cr-title">Quizzes</h1>
 		<p class="cr-lede">
-			Bacterial and archaeal physiology, metabolism, applied bioinformatics and the gut microbiome, at three levels. Each answer shows
-			why.
+			Bacterial and archaeal physiology, metabolism, applied bioinformatics, the gut microbiome and how MARGIE works, at three levels.
+			Each answer shows why.
 		</p>
 		{#if ui.prefs.quizOpen}<span class="cr-meta">{right} right of {done.length} answered | {pool.length} chosen</span>{/if}
 	</div>

@@ -1,0 +1,415 @@
+[
+	{
+		"id": "gut2-001",
+		"topic": "gut",
+		"level": "easy",
+		"kind": "case",
+		"scenario": "A small supplement trial gives healthy volunteers 8 grams a day of fructo-oligosaccharides for two weeks. Faecal samples are sequenced before and after, and one genus of Actinomycetota rises in most participants.",
+		"parts": [
+			{
+				"question": "Which genus most often rises in faecal profiles during fructo-oligosaccharide supplementation?",
+				"options": ["Desulfovibrio", "Bifidobacterium", "Methanobrevibacter", "Akkermansia"],
+				"answer": 1,
+				"explain": "Bifidobacteria carry transporters and a β-fructofuranosidase for short fructans, so they gain ground when fructo-oligosaccharides reach the colon."
+			},
+			{
+				"question": "Fructo-oligosaccharides are fermented in the colon and favour selected members of the community. Which term fits such a substrate?",
+				"options": ["Probiotic", "Postbiotic", "Prebiotic", "Synbiotic"],
+				"answer": 2,
+				"explain": "A prebiotic is a substrate that gut microbes use selectively to the host's benefit | a probiotic is a live organism | a synbiotic combines the two."
+			},
+			{
+				"question": "Which pair of acids does this genus form from the sugars it takes up?",
+				"options": [
+					"Butyrate with methane",
+					"Propionate with sulfide",
+					"Ethanol with succinate",
+					"Acetate with lactate"
+				],
+				"answer": 3,
+				"explain": "The bifid shunt yields acetate and lactate, and other colonic bacteria take that lactate and acetate further, into butyrate and propionate."
+			}
+		],
+		"explain": "Short fructans reach the colon intact and suit bifidobacterial uptake | the acetate and lactate they yield then feed cross-feeding partners."
+	},
+	{
+		"id": "gut2-002",
+		"topic": "gut",
+		"level": "easy",
+		"kind": "case",
+		"scenario": "Two donors' faecal slurries are fermented on the same fibre in sealed bottles. Headspace gas from donor A holds hydrogen and carbon dioxide with a trace of methane, while gas from donor B holds a clear methane peak.",
+		"parts": [
+			{
+				"question": "Which organisms form the methane in donor B's bottle?",
+				"options": [
+					"Methanogenic archaea",
+					"Sulfate-reducing bacteria",
+					"Lactate-utilising Firmicutes",
+					"Pectin-degrading Bacteroides"
+				],
+				"answer": 0,
+				"explain": "Methane in the human colon comes from methanogenic archaea such as Methanobrevibacter smithii, which reach high abundance in some people and stay sparse in others."
+			},
+			{
+				"question": "Which substrate pair do these gut methanogens use?",
+				"options": [
+					"Sulfate with acetate",
+					"Hydrogen with carbon dioxide",
+					"Nitrate with glucose",
+					"Butyrate with oxygen"
+				],
+				"answer": 1,
+				"explain": "Hydrogenotrophic methanogens reduce carbon dioxide with hydrogen to methane, which holds the hydrogen concentration of the community low."
+			},
+			{
+				"question": "What does this hydrogen removal do for the fermenting bacteria?",
+				"options": [
+					"It raises the pH of the bottle by consuming acid",
+					"It supplies them with a nitrogen source",
+					"It stands in for their carbon source",
+					"It keeps their reoxidation of NADH favourable"
+				],
+				"answer": 3,
+				"explain": "Fermenters reoxidise NADH by forming hydrogen, and that step stays thermodynamically favourable while a partner draws the hydrogen off."
+			}
+		],
+		"explain": "Hydrogen builds up during fermentation | sinks such as methanogenesis remove it and let the primary fermenters keep working."
+	},
+	{
+		"id": "gut2-003",
+		"topic": "gut",
+		"level": "easy",
+		"kind": "case",
+		"scenario": "A medium is prepared with purified mucin as its one carbohydrate source and inoculated with a faecal community. After two days a single species makes up much of the culture, and the sugars released into the medium are measured.",
+		"parts": [
+			{
+				"question": "Which species is a specialist on mucin glycans?",
+				"options": [
+					"Ruminococcus bromii",
+					"Faecalibacterium prausnitzii",
+					"Akkermansia muciniphila",
+					"Methanobrevibacter smithii"
+				],
+				"answer": 2,
+				"explain": "Akkermansia muciniphila grows on mucin as its carbon and nitrogen source, using a broad set of glycoside hydrolases together with sulfatases."
+			},
+			{
+				"question": "Which sugars are released as mucin O-glycans are taken apart?",
+				"options": [
+					"Fucose, galactose, N-acetylglucosamine and sialic acid",
+					"Arabinose and xylose with ferulic acid from cereal walls",
+					"Galacturonic acid and rhamnose from plant pectin chains",
+					"Fructose chains that carry one terminal glucose unit"
+				],
+				"answer": 0,
+				"explain": "Mucin O-glycans sit on N-acetylgalactosamine cores extended with galactose and N-acetylglucosamine, and fucose with sialic acid caps the chains."
+			}
+		],
+		"explain": "Mucin is a host-derived glycan niche | foragers such as A. muciniphila release its fucose, galactose, N-acetylglucosamine and sialic acid residues."
+	},
+	{
+		"id": "gut2-004",
+		"topic": "gut",
+		"level": "easy",
+		"kind": "match",
+		"question": "Match each phylum found in the human gut with a genus that belongs to it.",
+		"pairs": [
+			{ "left": "Bacteroidota", "right": "Bacteroides" },
+			{ "left": "Bacillota (Firmicutes)", "right": "Faecalibacterium" },
+			{ "left": "Actinomycetota", "right": "Bifidobacterium" },
+			{ "left": "Verrucomicrobiota", "right": "Akkermansia" },
+			{ "left": "Methanobacteriota", "right": "Methanobrevibacter" }
+		],
+		"explain": "Most colonic bacteria sit in Bacteroidota and Bacillota, with Actinomycetota and Verrucomicrobiota as smaller groups | the methanogens belong to the archaea."
+	},
+	{
+		"id": "gut2-005",
+		"topic": "gut",
+		"level": "easy",
+		"kind": "match",
+		"question": "Match each enzyme with the substrate it acts on.",
+		"pairs": [
+			{ "left": "α-amylase", "right": "Starch" },
+			{ "left": "Inulinase", "right": "Inulin" },
+			{ "left": "Polygalacturonase", "right": "The galacturonic acid backbone of pectin" },
+			{ "left": "1,3-1,4-β-glucanase", "right": "Oat and barley β-glucan" },
+			{ "left": "Sialidase", "right": "Sialic acid caps on mucin glycans" }
+		],
+		"explain": "Enzyme names carry their substrate: amylases work on α-glucans | polygalacturonases on pectin | sialidases on the caps of host glycans."
+	},
+	{
+		"id": "gut2-006",
+		"topic": "gut",
+		"level": "intermediate",
+		"kind": "case",
+		"scenario": "A faecal community is incubated with a quickly fermented fibre in a batch bottle. Lactate peaks near six hours and then falls, while butyrate keeps rising for a further twelve hours and gas output continues to climb.",
+		"parts": [
+			{
+				"question": "What accounts for the fall in lactate while butyrate rises?",
+				"options": [
+					"Lactate utilisers take it up and form butyrate from it",
+					"Lactate breaks down chemically once the pH drops below 6",
+					"Lactate leaves the bottle with the gas in the headspace",
+					"Lactate is taken up by epithelial cells in the slurry"
+				],
+				"answer": 0,
+				"explain": "Species such as Anaerostipes ferment lactate together with acetate to butyrate, so lactate behaves as an intermediate that the community passes on."
+			},
+			{
+				"question": "Which pair of organisms is known for that conversion?",
+				"options": [
+					"Bacteroides and Prevotella",
+					"Anaerostipes and Eubacterium hallii",
+					"Desulfovibrio and Bilophila",
+					"Methanobrevibacter and Methanosphaera"
+				],
+				"answer": 1,
+				"explain": "Anaerostipes species and Eubacterium hallii, now Anaerobutyricum hallii, grow on lactate plus acetate and release butyrate."
+			},
+			{
+				"question": "A donor community poor in lactate utilisers receives the same fibre. Which outcome fits?",
+				"options": [
+					"Butyrate rises faster than in the first bottle",
+					"Gas output rises while the acids hold steady",
+					"Lactate builds up and the pH falls further",
+					"Acetate is consumed before lactate appears"
+				],
+				"answer": 2,
+				"explain": "With few consumers lactate accumulates, and since it is a stronger acid than the short-chain fatty acids the pH drops further than it otherwise would."
+			}
+		],
+		"explain": "Lactate is a cross-feeding intermediate | its consumers turn it into butyrate and propionate, which holds lactate low and steadies the pH."
+	},
+	{
+		"id": "gut2-007",
+		"topic": "gut",
+		"level": "intermediate",
+		"kind": "case",
+		"scenario": "In a crossover trial volunteers take inulin for three weeks. Faecal butyrate rises markedly in part of the group and shifts little in the rest. Baseline profiles show that the responders started with higher counts of butyrate-producing Firmicutes.",
+		"parts": [
+			{
+				"question": "Which explanation fits this split?",
+				"options": [
+					"Inulin was absorbed in the small intestine of the low responders",
+					"The responders already held the butyrate-forming cross-feeders",
+					"The low responders fermented the inulin to methane instead of acid",
+					"Inulin raised the pH in the responders and lowered it in the rest"
+				],
+				"answer": 1,
+				"explain": "Inulin degradation releases fructose and short oligosaccharides, and butyrate follows when species carrying the butyryl-CoA route are present to use them."
+			},
+			{
+				"question": "Which experiment would support that reading?",
+				"options": [
+					"Measure the chain length of the inulin left in each stool sample",
+					"Sequence the 16S rRNA gene in the inulin preparation itself",
+					"Repeat the trial at a higher inulin dose in the responders only",
+					"Add a butyrate producer to a low-responder community in vitro"
+				],
+				"answer": 3,
+				"explain": "Supplying the missing member tests the cross-feeding reading directly, since butyrate would then appear from the same substrate and the same donor community."
+			}
+		],
+		"explain": "Inulin feeds primary degraders | whether the acid profile tips towards butyrate depends on which cross-feeders the donor's community holds."
+	},
+	{
+		"id": "gut2-008",
+		"topic": "gut",
+		"level": "intermediate",
+		"kind": "case",
+		"scenario": "A food lab boils potatoes, cools one batch overnight at 4 °C and holds another at serving temperature. Resistant starch is measured in both batches, which then pass through a simulated gastric and pancreatic digestion before the surviving residue is fermented with the same faecal community.",
+		"parts": [
+			{
+				"question": "Why does the cooled batch hold more resistant starch?",
+				"options": [
+					"Cooling drives water out, so the starch granules shrink and harden",
+					"Amylose chains realign on cooling into crystallites amylase handles slowly",
+					"Cooling turns part of the amylose into cellulose-like β-1,4 chains",
+					"Cooling adds branch points, so amylase loses its binding site"
+				],
+				"answer": 1,
+				"explain": "Retrogradation realigns gelatinised amylose into double helices and crystallites, and pancreatic α-amylase works on that ordered structure slowly, so more starch reaches the colon."
+			},
+			{
+				"question": "How are raw green banana starch and cooled potato starch classified?",
+				"options": ["RS1 and RS2", "RS3 and RS4", "RS1 and RS4", "RS2 and RS3"],
+				"answer": 3,
+				"explain": "RS2 is native granular starch, as in raw banana | RS3 is retrograded starch formed on cooling | RS1 is physically enclosed and RS4 is chemically modified."
+			},
+			{
+				"question": "Which fermentation result fits the two batches?",
+				"options": [
+					"The warm batch yields more acid, since gelatinised starch ferments fast",
+					"Both batches yield the same acid, since the community adapts in a day",
+					"The cooled batch yields more short-chain fatty acid, as more starch arrives",
+					"The warm batch yields more methane, as its starch feeds the archaea first"
+				],
+				"answer": 2,
+				"explain": "The simulated digestion releases the digestible starch as glucose, while the resistant fraction survives into the bottle, so the cooled residue delivers the larger substrate load and more acid."
+			}
+		],
+		"explain": "Cooking and cooling set how much starch escapes amylase | the resistant fraction is what the colonic community ferments to short-chain fatty acids."
+	},
+	{
+		"id": "gut2-009",
+		"topic": "gut",
+		"level": "intermediate",
+		"kind": "match",
+		"question": "Match each reading from a batch fermentation with what it tells you about the community.",
+		"pairs": [
+			{ "left": "A falling pH", "right": "Acids accumulating faster than the buffer takes them up" },
+			{ "left": "Methane in the headspace", "right": "Hydrogenotrophic archaea at work in the bottle" },
+			{
+				"left": "Carbohydrate left in the medium",
+				"right": "How much of the fibre the community has still to touch"
+			},
+			{ "left": "Isobutyrate and isovalerate", "right": "Fermentation of protein and amino acids" },
+			{ "left": "Total gas volume", "right": "The extent of fermentation reached so far" }
+		],
+		"explain": "Each reading reports a different side of one incubation | acid output, hydrogen disposal, substrate remaining, the switch to protein, and the extent reached."
+	},
+	{
+		"id": "gut2-010",
+		"topic": "gut",
+		"level": "intermediate",
+		"kind": "truefalse",
+		"statement": "Faecal profiles dominated by Prevotella are reported more often in people eating plant-rich, high-fibre diets, while Bacteroides-dominated profiles associate with diets higher in fat and animal protein.",
+		"answer": true,
+		"explain": "Comparisons of rural and urban diets, and dietary surveys with faecal sequencing, link long-term fibre intake to Prevotella and long-term fat and protein intake to Bacteroides."
+	},
+	{
+		"id": "gut2-011",
+		"topic": "gut",
+		"level": "hard",
+		"kind": "case",
+		"scenario": "A chemostat fed wheat arabinoxylan holds a defined four-member community: a Bacteroides strain that degrades arabinoxylan, a Roseburia strain that makes butyrate, a Bifidobacterium strain that makes acetate and lactate, and a hydrogenotrophic Methanobrevibacter strain. The run is then repeated leaving one member out at a time.",
+		"parts": [
+			{
+				"question": "Without the Bacteroides strain the arabinoxylan stays largely untouched, while without the Roseburia strain it is consumed as before. What does this show?",
+				"options": [
+					"Each member reaches the backbone with surface enzymes of its own",
+					"The methanogen supplies the enzymes that open the xylan backbone",
+					"The Bacteroides strain opens the backbone and the rest use its fragments",
+					"The Roseburia strain opens the backbone once the pH has fallen"
+				],
+				"answer": 2,
+				"explain": "The Bacteroides strain is the primary degrader here: its utilisation loci open arabinoxylan, and the fragments released support the other members."
+			},
+			{
+				"question": "In the run without the methanogen, hydrogen rises in the headspace and the acid profile shifts. Which shift fits the thermodynamics?",
+				"options": [
+					"Reduced products such as lactate and succinate build up",
+					"Acetate becomes the main product, since hydrogen favours acetyl-CoA cleavage",
+					"Fermentation halts, since hydrogen blocks uptake of xylo-oligosaccharides",
+					"Carbon dioxide is consumed faster, so headspace pressure falls"
+				],
+				"answer": 0,
+				"explain": "With hydrogen high, reoxidising NADH by forming hydrogen turns unfavourable, so the fermenters route electrons into more reduced products such as lactate and succinate."
+			},
+			{
+				"question": "Without the Bifidobacterium strain, arabinoxylan is still consumed while butyrate output falls. What explains this?",
+				"options": [
+					"Hydrogen takes over from acetate as the donor for butyryl-CoA",
+					"The Bacteroides strain took up butyrate formation at a lower rate",
+					"Arabinoxylan fragments inhibited the Roseburia strain directly",
+					"Butyrate synthesis slowed as the acetate from that partner fell away"
+				],
+				"answer": 3,
+				"explain": "Roseburia releases butyrate through butyryl-CoA:acetate CoA-transferase, which draws in external acetate, so losing an acetate producer lowers butyrate while degradation carries on."
+			}
+		],
+		"explain": "Dropout runs separate the roles in a community: one member opens the fibre, one disposes of hydrogen, and the butyrate producer leans on a partner's acetate."
+	},
+	{
+		"id": "gut2-012",
+		"topic": "gut",
+		"level": "hard",
+		"kind": "match",
+		"question": "Match each glycan with the structural feature that defines it.",
+		"pairs": [
+			{
+				"left": "Rhamnogalacturonan I",
+				"right": "Alternating rhamnose and galacturonic acid with arabinan and galactan side chains"
+			},
+			{
+				"left": "Xyloglucan",
+				"right": "A β-1,4-glucan backbone carrying xylose branches, some extended with galactose"
+			},
+			{
+				"left": "Konjac glucomannan",
+				"right": "A β-1,4 chain of mannose and glucose bearing sparse acetyl groups"
+			},
+			{
+				"left": "Guar galactomannan",
+				"right": "A mannan backbone with single galactose units on some residues"
+			},
+			{
+				"left": "Cereal mixed-linkage β-glucan",
+				"right": "Glucose joined by β-1,4 bonds broken up by single β-1,3 bonds"
+			}
+		],
+		"explain": "Fine structure decides which enzymes can act | branching, mixed linkages and acetyl decorations each call for their own activity, which is why one fibre suits a different set of degraders than another."
+	},
+	{
+		"id": "gut2-013",
+		"topic": "gut",
+		"level": "hard",
+		"kind": "match",
+		"question": "Match each enzyme activity of an arabinoxylan-degrading system with its job.",
+		"pairs": [
+			{ "left": "Endo-xylanase", "right": "Cuts the xylose backbone internally into shorter chains" },
+			{
+				"left": "α-L-arabinofuranosidase",
+				"right": "Removes the arabinose side chains from the backbone"
+			},
+			{ "left": "Feruloyl esterase", "right": "Frees the ferulic acid that cross-links the polymer" },
+			{ "left": "β-xylosidase", "right": "Releases xylose from short xylo-oligosaccharides" },
+			{
+				"left": "Acetyl xylan esterase",
+				"right": "Takes acetyl groups off the backbone, opening it to the xylanase"
+			}
+		],
+		"explain": "Debranching and ester-cleaving activities clear the backbone so the xylanase can cut it, and the β-xylosidase finishes the work on the short products it leaves."
+	},
+	{
+		"id": "gut2-014",
+		"topic": "gut",
+		"level": "hard",
+		"kind": "match",
+		"question": "Match each route of hydrogen disposal in the colon with its outcome.",
+		"pairs": [
+			{
+				"left": "Hydrogenotrophic methanogenesis",
+				"right": "Methane formed as carbon dioxide accepts the electrons"
+			},
+			{
+				"left": "Dissimilatory sulfate reduction",
+				"right": "Hydrogen sulfide formed as sulfate accepts the electrons"
+			},
+			{ "left": "Reductive acetogenesis", "right": "Acetate formed from carbon dioxide and hydrogen" },
+			{
+				"left": "Interspecies hydrogen transfer",
+				"right": "A partner holds hydrogen low, so fermentation stays favourable"
+			}
+		],
+		"explain": "Methanogens | sulfate reducers | acetogens draw on the same hydrogen, and whichever consumes it keeps NADH reoxidation favourable for the primary fermenters."
+	},
+	{
+		"id": "gut2-015",
+		"topic": "gut",
+		"level": "hard",
+		"kind": "truefalse",
+		"statement": "The SusC-like outer-membrane transporters of Bacteroides belong to the TonB-dependent transporter family, and their import of glycan fragments draws on the proton-motive force.",
+		"answer": true,
+		"explain": "SusC-like proteins are TonB-dependent β-barrels. Energy from the inner-membrane proton-motive force reaches them through the TonB-ExbB-ExbD complex, which lets them pull oligosaccharides across the outer membrane."
+	},
+	{
+		"id": "gut2-016",
+		"topic": "gut",
+		"level": "hard",
+		"kind": "truefalse",
+		"statement": "Each glycoside hydrolase family in the CAZy classification holds enzymes of one substrate specificity, since the families are grouped by the polysaccharide attacked.",
+		"answer": false,
+		"explain": "CAZy families rest on sequence and structural similarity, so a single family can hold several activities and the same activity turns up in separate families. Substrate is inferred from family membership together with context such as the surrounding utilisation locus."
+	}
+]

@@ -106,7 +106,8 @@ def fig02(genes: pd.DataFrame, outdir: Path, org_label: str) -> None:
              fontsize=12.5, fontweight="bold", color=L.INK)
     axA.set_xlabel("preliminary confidence (C1–C4)")
     axA.set_ylabel("final confidence score")
-    axA.set_xlim(0, 1); axA.set_ylim(0, 1)
+    # A little room past 0 and 1, so genes scored 0 or 1 show whole.
+    axA.set_xlim(-0.03, 1.03); axA.set_ylim(-0.03, 1.03)
     axA.legend(loc="lower right", fontsize=8, frameon=True, facecolor="white",
                edgecolor="#bbbbbb", framealpha=0.95)
     L.set_title(axA, "Preliminary vs final")
@@ -142,7 +143,7 @@ def fig02(genes: pd.DataFrame, outdir: Path, org_label: str) -> None:
     L.set_title(axC, "Mean confidence before vs after")
     L.panel_letter(axC, "c")
 
-    L.finish(fig, "How operon context changes confidence", organism=org_label, top=0.9)
+    L.finish(fig, "How operon context changes confidence", organism=org_label, top=0.9, band=1.8)
     L.draw_sources_footer(fig, _RUN_ROOT, L.organism_source_lines(_RUN_ROOT, org_label))
     L.savefig(fig, outdir / "fig02_confidence_stages.png")
     out = pd.DataFrame({
