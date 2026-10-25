@@ -299,13 +299,11 @@ For machine-readable repository metadata, see [CITATION.cff](CITATION.cff).
 
 ## AI usage in the project
 
-Phase 9-12 scripts were designed and implemented by **Sajal Bhattarai**.
-During script development, **Claude Sonnet 4.6** was used in interactive mode to improve robustness and debug issues.
-The core ideas, architecture, and intended behavior were defined by Sajal Bhattarai.
-These scripts were manually validated for intended behavior.
+MARGIE's platform orchestration, the engine, API and interface MARGIE runs on, was developed by Dane Deemer (Deemer, 2020; Deemer, 2025). The methods and the host scripts of the pipeline were developed by Sajal Bhattarai, who designed and implemented the phase 9 to 12 scripts (consolidation, labeling, scoring and fingerprinting) and defined their core ideas, architecture and intended behaviour.
 
-Visualization and LLM work, including the operon circular diagram page, HTML creation, and interactive chat mode, were refined with interactive-mode assistance from **Claude Opus 4.8**.
-These components were also manually checked and validated for intended purpose.
+Claude models (Anthropic, Inc.) were used interactively during development to debug the code and scripts, to improve their robustness, and to help refine the visualizations: the circular operon diagrams and the interactive genome map pages. Sajal Bhattarai checked the code, scripts and visualizations repeatedly and validated that they run as intended.
+
+*Reference:* Anthropic. (2026). *Claude* [Large language model]. https://www.anthropic.com/claude
 
 ## Disclaimer
 

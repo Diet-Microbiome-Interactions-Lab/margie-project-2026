@@ -21,7 +21,7 @@
 		"kind": "truefalse",
 		"statement": "MARGIE calls a genome's genes with RASTtk when its domain and genetic code are known, from the genome table or from GTDB-Tk, and otherwise calls them with Prodigal.",
 		"answer": true,
-		"explain": "RASTtk needs both the domain and the genetic code, so the gene caller is chosen genome by genome: GTDB-Tk supplies both when it runs, and without it the genome table has to give them. Prodigal writes its gene calls in RASTtk's layout, so the later steps are shared."
+		"explain": "RASTtk needs both the domain and the genetic code, so the gene caller is chosen genome by genome: GTDB-Tk supplies both when it runs, and with GTDB-Tk off the genome table gives them. Prodigal writes its gene calls in RASTtk's layout, so the later steps are shared."
 	},
 	{
 		"id": "margie-003",
@@ -71,7 +71,7 @@
 		"kind": "truefalse",
 		"statement": "When no higher-tier tool has an informative hit, a MEROPS, TCDB or dbCAN hit can set a gene's product label.",
 		"answer": false,
-		"explain": "MEROPS, TCDB and dbCAN confirm a label but do not set it; their hits are reported beside the label for cross-checking. When no tool in tiers 1 to 8 has a hit that qualifies, the label falls back to the first of those tools with any description, or to 'No DB hits'."
+		"explain": "The label comes from the trust hierarchy, and MEROPS, TCDB and dbCAN hits are reported beside it as a cross-check. Otherwise, after tiers 1 to 8, the label falls back to the first of those tools with any description, or to 'No DB hits'."
 	},
 	{
 		"id": "margie-006",
@@ -86,7 +86,7 @@
 			"Fair"
 		],
 		"answer": 1,
-		"explain": "The tiers are highest above 0.9, high above 0.7, medium above 0.5, fair above 0.3 and low otherwise. A score of 0.75 is above 0.7 but not above 0.9, so the gene is in the high tier."
+		"explain": "The tiers are highest above 0.9, high above 0.7, medium above 0.5, fair above 0.3 and low otherwise. A score of 0.75 lies between 0.7 and 0.9, so the gene is in the high tier."
 	},
 	{
 		"id": "margie-007",
@@ -110,7 +110,7 @@
 		"kind": "truefalse",
 		"statement": "A copy of a genome FASTA with different line breaks and a different file name gets the same genome hash, so MARGIE recognises it as a genome she has seen before.",
 		"answer": true,
-		"explain": "The genome hash is a SHA-256 over each record's ID and its upper-case bases, so line breaks and the file name do not enter it. Renaming a record's ID does change the hash, since RASTtk's gene numbering depends on the IDs."
+		"explain": "The genome hash is a SHA-256 over each record's ID and its upper-case bases, so a copy with other line breaks or another file name gets the same hash. Renaming a record's ID does change the hash, since RASTtk's gene numbering depends on the IDs."
 	},
 	{
 		"id": "margie-009",
@@ -119,7 +119,7 @@
 		"kind": "truefalse",
 		"statement": "In MARGIE's confidence score, a gene's operon context can raise its score but does not lower it.",
 		"answer": true,
-		"explain": "The context term is C2 × C3 for a gene in an operon and 0 otherwise; both factors lie between 0 and 1, so the term is zero or positive and is added. A weak or novel operon gives no boost, and the score stays at the gene's own evidence, C1 × C4."
+		"explain": "The context term is C2 × C3 for a gene in an operon and 0 otherwise; both factors lie between 0 and 1, so the term is zero or positive and is added. A weak or novel operon adds 0, and the score stays at the gene's own evidence, C1 × C4."
 	},
 	{
 		"id": "margie-010",
@@ -134,7 +134,7 @@
 			"A label that a language model writes from the descriptions that the tools return"
 		],
 		"answer": 0,
-		"explain": "Labelling walks a fixed hierarchy, from curated prokaryotic family rules (PGAP, NCBIfam, TIGRFAM) down to COG, and takes the first tool with an informative hit that passes its threshold. Tools are ranked by how curated their models are, not by how many of them agree."
+		"explain": "Labelling walks a fixed hierarchy, from curated prokaryotic family rules (PGAP, NCBIfam, TIGRFAM) down to COG, and takes the first tool with an informative hit that passes its threshold. Tools are ranked by how curated their models are, and the label comes from one tool's hit."
 	},
 	{
 		"id": "margie-011",
@@ -233,7 +233,7 @@
 		"kind": "truefalse",
 		"statement": "A gene for which only one tool gives an EC number has C4 = 1, so its preliminary score is C1 alone.",
 		"answer": true,
-		"explain": "C4 measures conflict between tools, and a single source has nothing to conflict with, so R is 0 and C4 = 1. The same holds when no tool gives an EC number: C4 discounts C1 only when EC numbers disagree."
+		"explain": "C4 measures conflict between tools; a single source forms zero tool pairs, so R is 0 and C4 = 1. The same holds for a gene with zero EC numbers: C4 discounts C1 only when EC numbers disagree."
 	},
 	{
 		"id": "margie-016",
@@ -272,7 +272,7 @@
 			"0.21, low: 0.43 scaled down by the neutral C2 of 0.5"
 		],
 		"answer": 0,
-		"explain": "Preliminary = C1 × C4 = 3/7 × 1 ≈ 0.43, and the context term C2 × C3 applies only to genes in an operon, so it is 0 here. A score of 0.43 is above 0.3 but not above 0.5, the fair tier, and being below 0.5 it is also flagged for review."
+		"explain": "Preliminary = C1 × C4 = 3/7 × 1 ≈ 0.43, and the context term C2 × C3 applies only to genes in an operon, so it is 0 here. A score of 0.43 lies between 0.3 and 0.5, the fair tier, and being below 0.5 it is also flagged for review."
 	},
 	{
 		"id": "margie-019",
@@ -281,7 +281,7 @@
 		"kind": "truefalse",
 		"statement": "The operon reference that C3 is scored against is built once from MARGIE's starter genomes and then stays fixed, so a genome's C3 does not change between runs.",
 		"answer": false,
-		"explain": "MARGIE ships a starter reference built from 29 genomes and copies it into place the first time a run needs one. Each genome a run annotates is then added to that copy after labelling and before scoring, so the reference grows, and scoring runs fresh in each run instead of coming back from the cache."
+		"explain": "MARGIE ships a starter reference built from 29 genomes and copies it into place the first time a run needs one. Each genome a run annotates is then added to that copy after labelling and before scoring, so the reference grows, and scoring runs fresh in each run."
 	},
 	{
 		"id": "margie-020",
@@ -314,7 +314,7 @@
 					"It waits inside the batch job until someone types an answer to its prompt"
 				],
 				"answer": 1,
-				"explain": "With no recorded acceptance and no terminal to ask in, MARGIE stops with a message to accept the terms once in an interactive terminal, or through the web app, which records the acceptance."
+				"explain": "With the terms yet to be accepted and the batch job detached from a terminal, MARGIE stops with a message to accept the terms once in an interactive terminal, or through the web app, which records the acceptance."
 			},
 			{
 				"question": "In an interactive terminal they accept the terms, choose academic use and answer that they do not hold a SignalP licence. What happens on their runs?",
@@ -325,7 +325,7 @@
 					"SignalP is turned off, and the tools they may use run as usual"
 				],
 				"answer": 3,
-				"explain": "Tools whose licence the user has to obtain are asked about one by one, and each one the user has not licensed is disabled. For commercial use, MARGIE also asks about the tools whose licences restrict commercial use."
+				"explain": "Tools whose licence the user has to obtain are asked about one by one, and MARGIE runs only those the user holds a licence for, disabling the rest. For commercial use, MARGIE also asks about the tools whose licences restrict commercial use."
 			},
 			{
 				"question": "A later MARGIE release changes the version of the licensing terms. What happens at their next command-line run?",
@@ -339,7 +339,7 @@
 				"explain": "The saved acceptance records the terms version it was given for, and MARGIE uses it only while that version is current. New terms are shown and accepted again."
 			}
 		],
-		"explain": "MARGIE's licensing gate keeps each tool's own terms in force: it records who accepted which terms for which use, and turns off the tools a user is not licensed to run."
+		"explain": "MARGIE's licensing gate keeps each tool's own terms in force: it records who accepted which terms for which use, and runs only the tools a user is licensed to run."
 	},
 	{
 		"id": "margie-022",
@@ -368,7 +368,7 @@
 					"It comes back first, and TCDB's columns are appended to it later"
 				],
 				"answer": 0,
-				"explain": "Consolidation and labelling are cached under the genome hash together with a hash of the tool tables they merge. Adding TCDB changes those tables, so both merge again rather than bring back a merge of other tables."
+				"explain": "Consolidation and labelling are cached under the genome hash together with a hash of the tool tables they merge. Adding TCDB changes those tables, so both merge again over the new set of tables."
 			},
 			{
 				"question": "What happens to COG for the new genome Y?",
@@ -379,10 +379,10 @@
 					"It searches only Y's unseen proteins and merges cached rows for the rest"
 				],
 				"answer": 3,
-				"explain": "COG's answer depends on the protein alone, so it uses the protein-level cache: each protein is matched by the SHA-256 of its sequence with a key for COG's container, database and settings. Only unseen proteins are searched, which is what speeds up a genome that shares many proteins with genomes already run."
+				"explain": "COG's answer depends on the protein alone, so it uses the protein-level cache: each protein is matched by the SHA-256 of its sequence with a key for COG's container, database and settings. Only the proteins new to the cache are searched, which is what speeds up a genome that shares many proteins with genomes already run."
 			}
 		],
-		"explain": "The genome level is tried first and the protein level covers what it does not. Scoring runs fresh for both genomes, since the operon reference grows with each genome added."
+		"explain": "The genome level is tried first and the protein level covers the rest. Scoring runs fresh for both genomes, since the operon reference grows with each genome added."
 	},
 	{
 		"id": "margie-023",
@@ -421,7 +421,7 @@
 			"It subtracts the genome's own counts, matched by content fingerprint or else name"
 		],
 		"answer": 3,
-		"explain": "The reference holds additive counts, so one genome's contribution can be recomputed and subtracted exactly (leave-one-out). The genome is matched by a fingerprint of its protein hashes, or by name when that finds nothing, which makes C3 an out-of-sample estimate."
+		"explain": "The reference holds additive counts, so one genome's contribution can be recomputed and subtracted exactly (leave-one-out). The genome is matched by a fingerprint of its protein hashes, with its name as the fallback, which makes C3 an out-of-sample estimate."
 	},
 	{
 		"id": "margie-026",
@@ -439,7 +439,7 @@
 					"0.5: an operon holding a hypothetical protein is scored as neutral"
 				],
 				"answer": 0,
-				"explain": "The adjacency channel takes the geometric mean of rho_adj over the operon's linked adjacent pairs, leaving out pairs with a hypothetical member and pairs with no support in the pool. Only A–B remains, so each gene of the operon gets 0.6."
+				"explain": "The adjacency channel takes the geometric mean of rho_adj over the operon's linked adjacent pairs, leaving out pairs with a hypothetical member and pairs with zero support in the pool. Only A–B remains, so each gene of the operon gets 0.6."
 			},
 			{
 				"question": "What is gene D's hybrid C3, which adds the membership channel?",
@@ -450,7 +450,7 @@
 					"0.25: the mean of its membership support from A and from B"
 				],
 				"answer": 2,
-				"explain": "The hybrid score is per gene: the stronger of its best rho_adj with an adjacent gene and its best rho_op with any co-member, at any distance. D's neighbour C cannot be judged, but its membership link to B gives 0.5, so a hypothetical gene in the chain does not cut D off."
+				"explain": "The hybrid score is per gene: the stronger of its best rho_adj with an adjacent gene and its best rho_op with any co-member, at any distance. D's neighbour C is hypothetical and is left out, and D's membership link to B gives 0.5, so D keeps a partner past the break in the chain."
 			},
 			{
 				"question": "Suppose instead that A–B also has no support in the pool. What adjacency C3 does the operon get?",
@@ -461,7 +461,7 @@
 					"None, and its genes are dropped from the final annotation"
 				],
 				"answer": 1,
-				"explain": "With no supported pair left, the operon scores 0: its context is novel and adds nothing to the confidence. The neutral 0.5 is for single genes and for operons made only of hypothetical proteins, where there is nothing to judge."
+				"explain": "With zero supported pairs left, the operon scores 0: its context is novel and adds 0 to the confidence. The neutral 0.5 is for single genes and for operons made only of hypothetical proteins, where C3 has zero pairs to judge."
 			}
 		],
 		"explain": "C3 asks whether a gene's operon neighbourhood recurs in other genomes. The adjacency channel judges the operon as a unit and is the default; the membership (hybrid) channel judges each gene by its strongest partner and is written beside it."
@@ -519,7 +519,7 @@
 					"Yes, since its C2 is above the 0.5 threshold"
 				],
 				"answer": 2,
-				"explain": "An EC conflict sets the review flag whatever the score; the other triggers are a confidence below 0.5, C2 below 0.5 in an operon, and an ambiguous operon that gave no boost. Strong operon context can lift the score, but the conflict stays visible to a curator."
+				"explain": "An EC conflict sets the review flag whatever the score; the other triggers are a confidence below 0.5, C2 below 0.5 in an operon, and an ambiguous operon whose context added 0. Strong operon context can lift the score, but the conflict stays visible to a curator."
 			}
 		],
 		"explain": "The confidence is built in two stages: the gene's own evidence (C1 discounted by C4), then an operon boost (C2 × C3). The boost can make up for weak or conflicting evidence, which is why the review flag records the conflict on its own."
@@ -606,7 +606,7 @@
 		"kind": "truefalse",
 		"statement": "MARGIE writes a gene's label by combining words from the descriptions that the different tools report for it.",
 		"answer": false,
-		"explain": "MARGIE does not compose new names. The label is one tool's hit description, from the first tool in the trust hierarchy with an informative hit, and the other tools' evidence stays beside it in the same row so the label can be checked."
+		"explain": "The label is one tool's hit description, taken as the tool wrote it, from the first tool in the trust hierarchy with an informative hit, and the other tools' evidence stays beside it in the same row so the label can be checked."
 	},
 	{
 		"id": "margie-034",
@@ -675,7 +675,7 @@
 			"1/7, as RASTtk's call itself counts as one source"
 		],
 		"answer": 1,
-		"explain": "C1 counts a source only when its best-hit description names a function. A hit described as hypothetical protein counts for nothing, so a gene known only as hypothetical scores 0/7."
+		"explain": "C1 counts a source only when its best-hit description names a function. A hit described as hypothetical protein counts for 0, so a gene known only as hypothetical scores 0/7."
 	},
 	{
 		"id": "margie-038",
@@ -690,7 +690,7 @@
 			"RASTtk, as it runs inside the cluster job and needs no outside service"
 		],
 		"answer": 1,
-		"explain": "RASTtk calls protein-coding and RNA genes with the genome's genetic code and names each product from the SEED subsystems, so RASTtk is a labelling source and the seventh C1 source. Prodigal is fast but calls protein-coding genes only and names nothing, so its genomes reach at most 6/7."
+		"explain": "RASTtk calls protein-coding and RNA genes with the genome's genetic code and names each product from the SEED subsystems, so RASTtk is a labelling source and the seventh C1 source. Prodigal is fast but calls protein-coding genes only and leaves the naming to the other tools, so its genomes reach at most 6/7."
 	},
 	{
 		"id": "margie-039",
@@ -705,7 +705,7 @@
 			"The KOfam profiles that KofamScan searches with"
 		],
 		"answer": 2,
-		"explain": "The tools' reference databases are downloaded at a fixed release and do not grow. MARGIE builds her own: the operon reference and the fingerprint databases grow one genome at a time, and the MARGIE database keeps each genome's results and caches."
+		"explain": "The tools' reference databases are downloaded at a fixed release and stay at it. MARGIE builds her own: the operon reference and the fingerprint databases grow one genome at a time, and the MARGIE database keeps each genome's results and caches."
 	},
 	{
 		"id": "margie-040",
@@ -744,7 +744,7 @@
 		"kind": "truefalse",
 		"statement": "MARGIE gives RNA genes, such as tRNAs, a confidence score as she does for protein-coding genes.",
 		"answer": false,
-		"explain": "Scoring covers protein-coding genes. Non-coding features are not scored, and UniOP, which does not see RNA genes, marks them NOT_APPLICABLE_NON_CODING in the operon table."
+		"explain": "Scoring covers the protein-coding genes. UniOP reads protein-coding genes only, and RNA genes are marked NOT_APPLICABLE_NON_CODING in the operon table."
 	},
 	{
 		"id": "margie-042",
@@ -783,7 +783,7 @@
 			"Its membrane lipids, which set the operon pool its genes are scored against"
 		],
 		"answer": 0,
-		"explain": "Phase 7 reads marker genes in the TIGRFAM, PGAP, Pfam and UniProt results and calls the genome monoderm, diderm or archaeal. PSORTb, DeepSig and SignalP 4.1 then run with that model; Phobius, TMbed and SignalP 6 do not depend on it."
+		"explain": "Phase 7 reads marker genes in the TIGRFAM, PGAP, Pfam and UniProt results and calls the genome monoderm, diderm or archaeal. PSORTb, DeepSig and SignalP 4.1 then run with that model; Phobius, TMbed and SignalP 6 run with the same model for each genome."
 	},
 	{
 		"id": "margie-045",
@@ -792,7 +792,7 @@
 		"kind": "truefalse",
 		"statement": "A genome with no envelope marker hits, such as a wall-less one, gets the diderm model, and default_no_evidence is recorded as the basis.",
 		"answer": true,
-		"explain": "A tie, or no marker, gives the conservative default, diderm. The basis is written to envelope_summary.tsv, so the localisation calls of such a genome can be read with that in mind."
+		"explain": "A tie, or zero markers, gives the conservative default, diderm. The basis is written to envelope_summary.tsv, so the localisation calls of such a genome can be read with that in mind."
 	},
 	{
 		"id": "margie-046",
@@ -867,7 +867,7 @@
 			"Final score 0.95, in a two-gene operon with C2 = 0.7"
 		],
 		"answer": 1,
-		"explain": "A gene is flagged when its EC numbers conflict, its final score is below 0.5, it sits in an operon with C2 below 0.5, or half or more of its operon's adjacent pairs involve an uncharacterised protein and context gave no boost. A high score does not clear an EC conflict."
+		"explain": "A gene is flagged when its EC numbers conflict, its final score is below 0.5, it sits in an operon with C2 below 0.5, or half or more of its operon's adjacent pairs involve an uncharacterised protein and context added 0. An EC conflict flags the gene at any score."
 	},
 	{
 		"id": "margie-050",
@@ -935,7 +935,7 @@
 					"In envelope_summary.tsv, which lists the tools each gene passed"
 				],
 				"answer": 2,
-				"explain": "labeled-genes.tsv tags each decision tool as winner, no_hit, uninformative, gate_failed or available_but_lower_priority, so PGAP's tag says why it did not set the label."
+				"explain": "labeled-genes.tsv tags each decision tool as winner, no_hit, uninformative, gate_failed or available_but_lower_priority, so PGAP's tag says why PGAP was passed over."
 			},
 			{
 				"question": "Where else does MARGIE keep a copy of the genome's final table?",
@@ -958,7 +958,7 @@
 		"kind": "truefalse",
 		"statement": "In C3, a label pair that the pool's genomes carry but that shares an operon in none of them (k = 0) is scored low and pulls the operon's geometric mean down.",
 		"answer": false,
-		"explain": "A pair with k = 0 counts as no evidence and is left out, not scored low; the adjacency C3 is the geometric mean over the operon's supported pairs. An operon with no supported pair gets 0, which leaves the gene's own evidence as its score."
+		"explain": "A pair with k = 0 counts as zero evidence and is left out; the adjacency C3 is the geometric mean over the operon's supported pairs. An operon with zero supported pairs gets 0, which leaves the gene's own evidence as its score."
 	},
 	{
 		"id": "margie-055",

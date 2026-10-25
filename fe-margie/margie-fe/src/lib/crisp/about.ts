@@ -10,7 +10,7 @@ export const LAB = {
 };
 
 export const PEOPLE = [
-	{ name: 'Sajal Bhattarai', role: '' },
+	{ name: 'Sajal Bhattarai', role: "Developed MARGIE's methods and the pipeline's host scripts" },
 	{ name: 'Dane Deemer', role: 'Developed the Bioinformatics Supercomputing Platform (BSP), which houses MARGIE' },
 	{ name: 'Stephen R Lindemann', role: 'Principal investigator' }
 ];
@@ -178,6 +178,15 @@ export const FUNDING: { funder: string; award: string; title: string; url: strin
 	}
 ];
 
+/** How AI was used in building MARGIE: the same text as the READMEs' "AI usage in the project". */
+export const AI_USAGE = {
+	paragraphs: [
+		"MARGIE's platform orchestration, the engine, API and interface MARGIE runs on, was developed by Dane Deemer (Deemer, 2020; Deemer, 2025). The methods and the host scripts of the pipeline were developed by Sajal Bhattarai, who designed and implemented the phase 9 to 12 scripts (consolidation, labeling, scoring and fingerprinting) and defined their core ideas, architecture and intended behaviour.",
+		'Claude models (Anthropic, Inc.) were used interactively during development to debug the code and scripts, to improve their robustness, and to help refine the visualizations: the circular operon diagrams and the interactive genome map pages. Sajal Bhattarai checked the code, scripts and visualizations repeatedly and validated that they run as intended.'
+	],
+	reference: { apa: 'Anthropic. (2026). Claude [Large language model].', url: 'https://www.anthropic.com/claude' }
+};
+
 /** Where the desktop app is downloaded from (its releases, for now). */
 export const DESKTOP_URL = `${CITE_URL}/releases`;
 
@@ -190,7 +199,7 @@ export const SOFTWARE: {
 		group: 'Workflow and computing',
 		items: [
 			{ name: 'Snakemake', what: 'the workflow engine, with its SLURM executor plugin', href: 'https://snakemake.github.io' },
-			{ name: 'Apptainer', what: 'runs every tool in its own container', href: 'https://apptainer.org' },
+			{ name: 'Apptainer', what: 'runs each tool in its own container', href: 'https://apptainer.org' },
 			{ name: 'Slurm', what: 'schedules the jobs on the cluster', href: 'https://slurm.schedmd.com' },
 			{ name: 'Python', what: 'the pipeline, the scoring and the server', href: 'https://www.python.org' },
 			{ name: 'uv', what: 'installs the Python environment', href: 'https://docs.astral.sh/uv/' }
