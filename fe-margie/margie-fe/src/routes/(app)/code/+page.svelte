@@ -1,6 +1,6 @@
 <script lang="ts">
 	import '$lib/crisp/about.css';
-	import { Copy, Download, ExternalLink, FileCode } from 'lucide-svelte';
+	import { Copy, Download, ExternalLink } from 'lucide-svelte';
 	import { goto } from '$app/navigation';
 	import { page } from '$app/state';
 	import { api, formatBytes } from '$lib/api';
@@ -10,7 +10,8 @@
 	/**
 	 * Code: the Python scripts behind MARGIE's own steps (consolidation to the fingerprint
 	 * databases), read from the server's installed pipeline when opened (routers/code.py) and
-	 * shown highlighted, with line numbers (CodeBlock). Reached from the README's How does MARGIE work.
+	 * shown highlighted, with line numbers (CodeBlock), in the reading pages' document look. Reached from
+	 * Methods and the README.
 	 */
 
 	interface CodeFile {
@@ -72,8 +73,11 @@
 		);
 	});
 
+	let view = $state<HTMLElement>();
 	function pick(path: string) {
 		goto(`?file=${encodeURIComponent(path)}`, { noScroll: true, keepFocus: true });
+		// On a narrow screen the list sits above the code, so the code comes into view.
+		if (matchMedia('(max-width: 900px)').matches) view?.scrollIntoView({ block: 'start', behavior: ui.motion === 'off' ? 'auto' : 'smooth' });
 	}
 
 	function copy() {
@@ -97,137 +101,148 @@
 
 <svelte:head><title>{source ? `${source.name} | ` : ''}Code | MARGIE</title></svelte:head>
 
-<div class="cr-page" data-shade="page-code">
-	<div class="cr-head">
-		<h1 class="cr-title">Code</h1>
-		<p class="cr-lede">
-			The Python scripts behind MARGIE's own steps, read from the pipeline this server runs each time you open one. The
-			<a class="mg-link" href="/methods">Methods</a> describe what each step does.
-		</p>
+<div class="cr-page rp" data-shade="page-code">
+	<div class="rp-paper">
+		<nav class="rp-crumbs" aria-label="Breadcrumb">
+			<ol>
+				<li><a href="/">Home</a></li>
+				<li><a href="/methods">Methods</a></li>
+				<li aria-current="page">Code</li>
+			</ol>
+		</nav>
+		<h1 class="rp-title">Code</h1>
+		<p class="rp-lede">The Python scripts behind MARGIE's own steps, read from the pipeline this server runs each time you open one.</p>
+
+		{#if listError}
+			<div class="cd-msg">
+				<p>{listError}</p>
+				<p class="rp-note">The same scripts are in the repository: <a href={`${REPO}/tree/main/be-margie/bioinformatics_tools/workflow_tools`} target="_blank" rel="noreferrer">workflow_tools on GitHub</a>.</p>
+			</div>
+		{:else}
+			<div class="cd">
+				<nav class="cd-nav" aria-label="Steps and their scripts">
+					{#each steps as s (s.key)}
+						<div class="cd-step">
+							<h2>{s.title}</h2>
+							<p class="cd-what">{s.what}</p>
+							<ul>
+								{#each s.files as f (f.path)}
+									<li>
+										<button
+											type="button"
+											class="cd-file"
+											class:on={f.path === picked}
+											aria-current={f.path === picked ? 'page' : undefined}
+											title={f.summary || f.path}
+											onclick={() => pick(f.path)}
+										>
+											<span class="mg-mono">{f.name}</span><span class="cd-n">{f.lines}</span>
+										</button>
+									</li>
+								{/each}
+							</ul>
+						</div>
+					{/each}
+				</nav>
+
+				<article class="cd-view" bind:this={view}>
+					{#if pickedFile}
+						<header class="cd-top">
+							<p class="cd-path">workflow_tools » {pickedFile.path.split('/').join(' » ')}</p>
+							<div class="cd-head">
+								<h2 class="mg-mono">{pickedFile.name}</h2>
+								<div class="cd-acts">
+									<button type="button" class="mg-btn small" onclick={copy} disabled={!source}><Copy size={14} /> Copy</button>
+									<button type="button" class="mg-btn small" onclick={download} disabled={!source}><Download size={14} /> Download</button>
+									<a class="mg-btn small" href={BLOB + pickedFile.path} target="_blank" rel="noreferrer"><ExternalLink size={14} /> On GitHub</a>
+								</div>
+							</div>
+							{#if pickedFile.summary}<p class="cd-sum">{pickedFile.summary}</p>{/if}
+							{#if source && source.path === picked}
+								<p class="cd-meta">
+									{pickedStep?.title} | {source.lines} lines | {formatBytes(source.bytes)} | SHA-256 <span class="mg-mono" title={source.sha256}>{source.sha256.slice(0, 12)}</span>
+								</p>
+							{/if}
+						</header>
+						{#if fileError}
+							<p class="cd-msg">{fileError}</p>
+						{:else if source && source.path === picked}
+							<CodeBlock text={source.text} label="{source.name}, {source.lines} lines" />
+						{:else if loading}
+							<p class="rp-note">Reading {pickedFile.name}…</p>
+						{/if}
+					{:else if steps.length}
+						<p class="rp-note">Pick a script from the list.</p>
+					{:else}
+						<p class="rp-note">Reading the list of scripts…</p>
+					{/if}
+				</article>
+			</div>
+		{/if}
 	</div>
-
-	{#if listError}
-		<section class="ab-box">
-			<p>{listError}</p>
-			<p class="ab-lab">The same scripts are in the repository: <a class="mg-link" href={`${REPO}/tree/main/be-margie/bioinformatics_tools/workflow_tools`} target="_blank" rel="noreferrer">workflow_tools on GitHub</a>.</p>
-		</section>
-	{:else}
-		<div class="cd">
-			<nav class="ab-box cd-steps" aria-label="Steps and their scripts">
-				{#each steps as s (s.key)}
-					<div class="cd-step">
-						<h2>{s.title}</h2>
-						<p class="ab-lab cd-what">{s.what}</p>
-						<ul>
-							{#each s.files as f (f.path)}
-								<li>
-									<button
-										type="button"
-										class="cd-file"
-										class:on={f.path === picked}
-										aria-current={f.path === picked ? 'page' : undefined}
-										title={f.summary || f.path}
-										onclick={() => pick(f.path)}
-									>
-										<FileCode size={14} /><span class="mg-mono">{f.name}</span><span class="cd-n">{f.lines}</span>
-									</button>
-								</li>
-							{/each}
-						</ul>
-					</div>
-				{/each}
-			</nav>
-
-			<section class="ab-box cd-view">
-				{#if pickedFile}
-					<div class="cd-top">
-						<div class="cd-id">
-							<span class="ab-lab cd-crumb">{pickedStep?.title} | workflow_tools/{pickedFile.path}</span>
-							<b class="mg-mono cd-name">{pickedFile.name}</b>
-							{#if pickedFile.summary}<span class="cd-sum">{pickedFile.summary}</span>{/if}
-						</div>
-						<div class="cd-acts">
-							<button type="button" class="mg-btn small" onclick={copy} disabled={!source}><Copy size={14} /> Copy</button>
-							<button type="button" class="mg-btn small" onclick={download} disabled={!source}><Download size={14} /> Download</button>
-							<a class="mg-btn small" href={BLOB + pickedFile.path} target="_blank" rel="noreferrer"><ExternalLink size={14} /> On GitHub</a>
-						</div>
-					</div>
-					{#if source && source.path === picked}
-						<p class="ab-lab cd-meta">
-							{source.lines} lines | {formatBytes(source.bytes)} | SHA-256 <span class="mg-mono" title={source.sha256}>{source.sha256.slice(0, 12)}</span>
-						</p>
-					{/if}
-					{#if fileError}
-						<p>{fileError}</p>
-					{:else if source && source.path === picked}
-						<CodeBlock text={source.text} label="{source.name}, {source.lines} lines" />
-					{:else if loading}
-						<p class="ab-lab">Reading {pickedFile.name}…</p>
-					{/if}
-				{:else if steps.length}
-					<p class="ab-lab">That script is not on the list; pick one from the list.</p>
-				{:else}
-					<p class="ab-lab">Reading the list of scripts…</p>
-				{/if}
-			</section>
-		</div>
-	{/if}
 </div>
 
 <style>
 	.cd {
 		display: grid;
-		grid-template-columns: minmax(220px, 280px) minmax(0, 1fr);
-		gap: var(--cr-gutter, 16px);
+		grid-template-columns: minmax(220px, 270px) minmax(0, 1fr);
+		gap: 36px;
 		align-items: start;
-		max-width: 1400px;
+		margin-top: 24px;
 	}
-	.cd-steps {
+	/* The scripts, by step, as a contents list. */
+	.cd-nav {
 		position: sticky;
-		top: 12px;
-		gap: 14px;
-		max-height: calc(100vh - 140px);
+		top: 14px;
+		display: flex;
+		flex-direction: column;
+		gap: 18px;
+		max-height: calc(100vh - 120px);
 		overflow: auto;
+		padding-right: 6px;
 	}
 	.cd-step h2 {
 		margin: 0;
-		font-size: var(--mg-fs-xs);
-		font-weight: 650;
-		letter-spacing: 0.06em;
-		text-transform: uppercase;
-		color: var(--mg-text-2);
+		color: var(--rp-head);
+		font-family: var(--rp-head-font);
+		font-size: calc(var(--mg-fs) * 1.1);
+		font-weight: 700;
 	}
 	.cd-what {
-		margin: 2px 0 6px;
-		font-size: var(--mg-fs-xs);
+		margin: 3px 0 8px;
+		color: var(--mg-text-3);
+		font-size: var(--mg-fs-sm);
 		line-height: 1.45;
 	}
 	.cd-step ul {
 		margin: 0;
 		padding: 0;
+		border-left: 1px solid var(--rp-line);
 		list-style: none;
 	}
 	.cd-file {
 		display: flex;
 		align-items: center;
-		gap: 7px;
+		gap: 8px;
 		width: 100%;
-		padding: 4px 8px;
+		margin-left: -1px;
+		padding: 6px 10px 6px 12px;
 		border: 0;
-		border-radius: var(--mg-r-sm);
+		border-left: 2px solid transparent;
 		background: none;
-		color: var(--mg-text);
-		font-size: var(--mg-fs-xs);
+		color: var(--rp-link);
+		font-size: calc(var(--mg-fs) * 0.98);
 		text-align: left;
 		cursor: pointer;
 	}
 	.cd-file:hover {
-		background: var(--mg-surface-2);
+		background: var(--rp-stripe);
 	}
 	.cd-file.on {
-		background: color-mix(in srgb, var(--mg-accent) 14%, transparent);
-		color: var(--mg-accent);
-		font-weight: 600;
+		border-left-color: var(--rp-link);
+		background: var(--rp-stripe);
+		color: var(--rp-head);
+		font-weight: 700;
 	}
 	.cd-file .mg-mono {
 		flex: 1;
@@ -238,47 +253,67 @@
 	}
 	.cd-n {
 		color: var(--mg-text-3);
+		font-size: var(--mg-fs-xs);
 		font-variant-numeric: tabular-nums;
 	}
+	/* The open script: its path, name, what it does, and the code. */
 	.cd-view {
+		display: flex;
+		flex-direction: column;
+		gap: 14px;
 		min-width: 0;
 	}
 	.cd-top {
 		display: flex;
-		flex-wrap: wrap;
-		align-items: flex-start;
-		justify-content: space-between;
-		gap: 10px;
-	}
-	.cd-id {
-		display: flex;
 		flex-direction: column;
-		gap: 2px;
-		min-width: 0;
+		gap: 6px;
+		padding-bottom: 14px;
+		border-bottom: 1px solid var(--rp-line);
 	}
-	.cd-crumb {
-		font-size: var(--mg-fs-xs);
+	.cd-path {
+		margin: 0;
+		color: var(--mg-text-3);
+		font-size: var(--mg-fs-sm);
 		overflow-wrap: anywhere;
 	}
-	.cd-name {
-		font-size: var(--mg-fs);
+	.cd-head {
+		display: flex;
+		flex-wrap: wrap;
+		align-items: center;
+		justify-content: space-between;
+		gap: 10px 16px;
 	}
-	.cd-sum {
-		color: var(--mg-text-2);
+	.cd-head h2 {
+		margin: 0;
+		color: var(--rp-head);
+		font-size: calc(var(--mg-fs) * 1.6);
+		font-weight: 600;
+		overflow-wrap: anywhere;
 	}
 	.cd-acts {
 		display: flex;
 		flex-wrap: wrap;
 		gap: 8px;
 	}
+	.cd-sum {
+		margin: 0;
+		font-size: var(--rp-body);
+		line-height: 1.55;
+	}
 	.cd-meta {
-		font-size: var(--mg-fs-xs);
+		margin: 0;
+		color: var(--mg-text-3);
+		font-size: var(--mg-fs-sm);
+	}
+	.cd-msg {
+		margin-top: 20px;
 	}
 	@media (max-width: 900px) {
 		.cd {
 			grid-template-columns: minmax(0, 1fr);
+			gap: 22px;
 		}
-		.cd-steps {
+		.cd-nav {
 			position: static;
 			max-height: none;
 		}

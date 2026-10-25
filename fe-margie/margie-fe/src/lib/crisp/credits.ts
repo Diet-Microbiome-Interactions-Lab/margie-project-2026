@@ -1505,6 +1505,45 @@ export const SOFTWARE_CREDITS: SoftwareCredit[] = [
 		"cite": []
 	},
 	{
+		"name": "highlight.js",
+		"group": "Website",
+		"listedAs": "highlight.js",
+		"version": "11.11.1",
+		"licence": "BSD-3-Clause",
+		"licenceUrl": "https://github.com/highlightjs/highlight.js/blob/main/LICENSE",
+		"source": "https://github.com/highlightjs/highlight.js",
+		"citeRequired": false,
+		"citeRule": "",
+		"citeRuleUrl": "",
+		"cite": []
+	},
+	{
+		"name": "fflate",
+		"group": "Website",
+		"listedAs": "fflate",
+		"version": "0.8.2",
+		"licence": "MIT",
+		"licenceUrl": "https://github.com/101arrowz/fflate/blob/master/LICENSE",
+		"source": "https://github.com/101arrowz/fflate",
+		"citeRequired": false,
+		"citeRule": "",
+		"citeRuleUrl": "",
+		"cite": []
+	},
+	{
+		"name": "@xterm/addon-fit",
+		"group": "Website",
+		"listedAs": "xterm.js",
+		"version": "0.10.0",
+		"licence": "MIT",
+		"licenceUrl": "https://github.com/xtermjs/xterm.js/blob/master/LICENSE",
+		"source": "https://github.com/xtermjs/xterm.js",
+		"citeRequired": false,
+		"citeRule": "",
+		"citeRuleUrl": "",
+		"cite": []
+	},
+	{
 		"name": "Bricolage Grotesque (@fontsource-variable/bricolage-grotesque)",
 		"group": "Website",
 		"listedAs": "Fontsource",
