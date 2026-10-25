@@ -25,6 +25,7 @@
 	import { backend } from '$lib/workspace/backend.svelte';
 	import { stemOf } from '$lib/crisp/genomes';
 	import ImageViewer from '$lib/workspace/viewers/ImageViewer.svelte';
+	import { downloadFigure, downloadFigures } from '$lib/crisp/figure-download';
 
 	/**
 	 * Modern's Results page: a head row (name, facts, tabs, downloads), a line of
@@ -222,6 +223,20 @@
 	});
 	let copied = $state(false);
 	let figure = $state('');
+	/** Saving figures: what is under way (for the button), or ''. */
+	let figSaving = $state('');
+	async function saveFigures(files: string[], one?: string) {
+		if (figSaving) return;
+		figSaving = one ? 'Saving…' : `0 of ${files.length}`;
+		try {
+			if (one) await downloadFigure(selected, files, one);
+			else await downloadFigures(selected, files, (done, total) => (figSaving = `${done} of ${total}`));
+		} catch (e) {
+			ui.notify(e instanceof Error ? e.message : 'The figures could not be saved.', 'error');
+		} finally {
+			figSaving = '';
+		}
+	}
 	const listShut = $derived(ui.isFolded('app:results-list'));
 	const tabIn = (node: Element) => fly(node, { y: ui.motion === 'full' ? 8 : 4, duration: ui.ms(260), easing: cubicOut });
 
@@ -599,6 +614,7 @@
 						{:else if tab === 'figures'}
 							{#if summary.figures.length}
 								{@const shown = summary.figures.includes(figure) ? figure : summary.figures[0]}
+								{@const figs = summary.figures}
 								<div class="rb-gallery">
 									<div class="rb-fig-side" style="--w: {ui.size('app:figs', 210)}px">
 										<ul class="rb-fig-list" role="listbox" aria-label="Figures">
@@ -613,7 +629,16 @@
 										<Resizer id="app:figs" fallback={210} min={150} max={420} label="Resize the figure list" />
 									</div>
 									<div class="rb-fig">
-										<p class="rb-fig-cap">Figure {summary.figures.indexOf(shown) + 1} of {summary.figures.length}: {figureTitle(shown)}</p>
+										<div class="rb-fig-top">
+											<p class="rb-fig-cap">Figure {summary.figures.indexOf(shown) + 1} of {summary.figures.length}: {figureTitle(shown)}</p>
+											<span class="mg-grow"></span>
+											<button type="button" class="mg-btn small" disabled={!!figSaving} onclick={() => saveFigures(figs, shown)} title="Saved as figure {summary.figures.indexOf(shown) + 1}, by its number and title"
+												><Download size={14} /> Download</button
+											>
+											<button type="button" class="mg-btn small" disabled={!!figSaving} onclick={() => saveFigures(figs)} title="A zip of the {summary.figures.length} figures, numbered, with index.tsv"
+												><Download size={14} /> {figSaving && !figSaving.startsWith('Saving') ? `Saving ${figSaving}` : `Download the ${summary.figures.length} figures (zip)`}</button
+											>
+										</div>
 										{#key shown}<ImageViewer src={fileUrl(shown, true)} alt="Figure {summary.figures.indexOf(shown) + 1}: {figureTitle(shown)}" />{/key}
 									</div>
 								</div>
@@ -948,8 +973,15 @@
 		font-size: var(--mg-fs-xs);
 		font-variant-numeric: tabular-nums;
 	}
-	.rb-fig-cap {
+	.rb-fig-top {
+		display: flex;
+		flex-wrap: wrap;
+		align-items: center;
+		gap: 8px;
 		margin: 0 0 6px;
+	}
+	.rb-fig-cap {
+		margin: 0;
 		font-size: var(--mg-fs-sm);
 		color: var(--mg-text-2);
 	}

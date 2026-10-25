@@ -2,7 +2,7 @@
 	import '$lib/crisp/about.css';
 	import { Copy } from 'lucide-svelte';
 	import { Download } from 'lucide-svelte';
-	import { BASE_BIBTEX, BASE_CITATIONS, CITATION, CITE_URL, COMPUTING, LAB, PEOPLE, THESIS_BIBTEX, THESIS_CITATION, THESIS_DOI } from '$lib/crisp/about';
+	import { BASE_BIBTEX, BASE_CITATIONS, CITATION, CITE_URL, COMPUTING, LAB, PEOPLE, THESIS_BIBTEX, THESIS_CITATION, THESIS_DOI, THESIS_RECORDS, THESIS_RECORDS_BIBTEX } from '$lib/crisp/about';
 	import { CITED_SOFTWARE, RUN_TOOLS, citedPapers, downloadBibtex } from '$lib/crisp/bibtex';
 	import { ui } from '$lib/workspace/ui.svelte';
 
@@ -60,6 +60,15 @@
 				<button type="button" class="mg-btn small" onclick={() => copy(THESIS_CITATION)}><Copy size={14} /> Copy the citation</button>
 				<button type="button" class="mg-btn small" onclick={() => copy(THESIS_BIBTEX, 'The BibTeX')}><Copy size={14} /> Copy BibTeX</button>
 				<a class="mg-link" href={THESIS_DOI} target="_blank" rel="noreferrer">The thesis</a>
+			</div>
+			<p class="ab-lab">The code and data as the thesis used and cites them:</p>
+			<ol class="cite-list">
+				{#each THESIS_RECORDS as r (r.href)}
+					<li>{r.text} <span class="ab-lab">({r.what})</span></li>
+				{/each}
+			</ol>
+			<div class="acts">
+				<button type="button" class="mg-btn small" onclick={() => copy(THESIS_RECORDS_BIBTEX, 'The BibTeX')}><Copy size={14} /> Copy BibTeX for these</button>
 			</div>
 			<p class="ab-lab">Base architecture on which MARGIE was built, by Dane Deemer:</p>
 			{#each BASE_CITATIONS as b (b.href)}
