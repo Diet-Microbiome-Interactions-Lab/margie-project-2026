@@ -1,20 +1,16 @@
 <script lang="ts">
-	import '@fontsource/ibm-plex-sans/400.css';
-	import '@fontsource/ibm-plex-sans/400-italic.css';
-	import '@fontsource/ibm-plex-sans/500.css';
-	import '@fontsource/ibm-plex-sans/600.css';
-	import '@fontsource/ibm-plex-sans/700.css';
 	import './about.css';
 	import { onMount, type Snippet } from 'svelte';
 	import { page } from '$app/state';
+	import { LAB } from './about';
 	import { ui } from '$lib/workspace/ui.svelte';
 
 	/**
-	 * The frame of the reading pages (Methods, FAQ, README, Contributors, Acknowledgements): a centred
-	 * title block with a switch between the five pages, then one centred column of sections. Each
-	 * `[data-toc]` element in the column is listed in the left margin (as chips on narrow screens),
-	 * and the list marks the section being read. Text is set in IBM Plex Sans while Customize keeps
-	 * its default face, and in the chosen face otherwise.
+	 * The frame of the reading pages (Methods, README, FAQ, Contributors, Acknowledgements): one white
+	 * document with a breadcrumb, the title and the sections, and Previous and Next at its foot. Each
+	 * `[data-toc]` element is listed beside the text (above it on narrow screens), the list marks the
+	 * section being read, and each section heading gets a ¶ link. Text is set in Lato with Roboto Slab
+	 * headings while Customize keeps its default face, and in the chosen face otherwise.
 	 */
 	let {
 		title,
@@ -24,22 +20,33 @@
 		children
 	}: { title: string; lede?: string; shade: string; actions?: Snippet; children: Snippet } = $props();
 
+	/** In the sidebar's order. */
 	const PAGES = [
 		{ href: '/methods', label: 'Methods' },
-		{ href: '/faq', label: 'FAQ' },
 		{ href: '/readme', label: 'README' },
+		{ href: '/faq', label: 'FAQ' },
 		{ href: '/contributors', label: 'Contributors' },
 		{ href: '/acknowledgements', label: 'Acknowledgements' }
 	];
-	const font = $derived(ui.prefs.typeface === 'arial' ? '"IBM Plex Sans", system-ui, -apple-system, sans-serif' : 'var(--mg-font)');
+	const at = $derived(PAGES.findIndex((p) => p.href === page.url.pathname));
+	const prev = $derived(at > 0 ? PAGES[at - 1] : null);
+	const next = $derived(at >= 0 && at < PAGES.length - 1 ? PAGES[at + 1] : null);
+	const font = $derived(ui.prefs.typeface === 'arial' ? undefined : 'var(--mg-font)');
 
-	let main = $state<HTMLElement>();
+	let doc = $state<HTMLElement>();
 	let sections = $state<{ id: string; label: string }[]>([]);
 	let current = $state('');
 
 	onMount(() => {
-		const els = [...(main?.querySelectorAll<HTMLElement>('[data-toc][id]') ?? [])];
+		const els = [...(doc?.querySelectorAll<HTMLElement>('[data-toc][id]') ?? [])];
 		sections = els.map((el) => ({ id: el.id, label: el.dataset.toc ?? el.id }));
+		for (const el of els) {
+			const h = el.querySelector(':scope > h2, :scope > header h2');
+			if (h && !h.querySelector('.rp-anchor')) {
+				const a = Object.assign(document.createElement('a'), { className: 'rp-anchor', href: `#${el.id}`, textContent: '¶', title: 'Link to this section' });
+				h.append(a);
+			}
+		}
 		const seen = new Map<string, boolean>();
 		const io = new IntersectionObserver(
 			(entries) => {
@@ -53,35 +60,45 @@
 	});
 </script>
 
-<div class="cr-page rp" data-shade={shade} style="--rp-font: {font}">
-	<header class="rp-hero">
-		<nav class="rp-tabs" aria-label="About MARGIE">
-			{#each PAGES as p (p.href)}
-				<a href={p.href} aria-current={page.url.pathname === p.href ? 'page' : undefined}>{p.label}</a>
-			{/each}
-		</nav>
-		<h1 class="rp-title">{title}</h1>
-		{#if lede}<p class="rp-lede">{lede}</p>{/if}
-		{#if actions}<div class="rp-acts">{@render actions()}</div>{/if}
-		<span class="rp-rule" aria-hidden="true"></span>
-		{#if sections.length > 2}
-			<nav class="rp-chips" aria-label="On this page">
-				{#each sections as s (s.id)}<a href="#{s.id}">{s.label}</a>{/each}
-			</nav>
-		{/if}
-	</header>
+<div class="cr-page rp" data-shade={shade} style={font ? `--rp-font: ${font}` : undefined}>
+	<div class="rp-paper">
+		<div class="rp-grid">
+			<article class="rp-doc" bind:this={doc}>
+				<nav class="rp-crumbs" aria-label="Breadcrumb">
+					<ol>
+						<li><a href="/">Home</a></li>
+						<li aria-current="page">{title}</li>
+					</ol>
+					{#if actions}<div class="rp-acts">{@render actions()}</div>{/if}
+				</nav>
+				<h1 class="rp-title">{title}</h1>
+				{#if lede}<p class="rp-lede">{lede}</p>{/if}
+				{#if sections.length > 2}
+					<nav class="rp-chips" aria-label="On this page">
+						<b>On this page:</b>
+						{#each sections as s (s.id)}<a href="#{s.id}">{s.label}</a>{/each}
+					</nav>
+				{/if}
 
-	<div class="rp-grid">
-		<div class="rp-main" bind:this={main}>{@render children()}</div>
-		{#if sections.length > 2}
-			<nav class="rp-toc" aria-label="On this page">
-				<p>On this page</p>
-				<ol>
-					{#each sections as s (s.id)}
-						<li><a href="#{s.id}" class:on={current === s.id}>{s.label}</a></li>
-					{/each}
-				</ol>
-			</nav>
-		{/if}
+				<div class="rp-main">{@render children()}</div>
+
+				<nav class="rp-pager" aria-label="Previous and next pages">
+					{#if prev}<a class="prev" href={prev.href}><span>Previous</span><b>« {prev.label}</b></a>{/if}
+					{#if next}<a class="next" href={next.href}><span>Next</span><b>{next.label} »</b></a>{/if}
+				</nav>
+				<p class="rp-foot">MARGIE | {LAB.name}, Purdue University</p>
+			</article>
+
+			{#if sections.length > 2}
+				<nav class="rp-toc" aria-label="On this page">
+					<p>On this page</p>
+					<ol>
+						{#each sections as s (s.id)}
+							<li><a href="#{s.id}" class:on={current === s.id}>{s.label}</a></li>
+						{/each}
+					</ol>
+				</nav>
+			{/if}
+		</div>
 	</div>
 </div>

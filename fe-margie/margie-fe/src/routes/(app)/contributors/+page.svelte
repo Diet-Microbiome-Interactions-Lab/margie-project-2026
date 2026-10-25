@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { ChevronRight, Copy, Download, FlaskConical, Mail, UserRound } from 'lucide-svelte';
+	import { ChevronRight, Copy, Download, Mail } from 'lucide-svelte';
 	import { BASE_BIBTEX, BASE_CITATIONS, CITATION, CITE_URL, COMPUTING, LAB, PEOPLE, THESIS_BIBTEX, THESIS_CITATION, THESIS_DOI, THESIS_RECORDS, THESIS_RECORDS_BIBTEX } from '$lib/crisp/about';
 	import { CITED_SOFTWARE, RUN_TOOLS, citedPapers, downloadBibtex } from '$lib/crisp/bibtex';
 	import ReadingPage from '$lib/crisp/ReadingPage.svelte';
@@ -21,11 +21,10 @@
 		<h2>People and lab</h2>
 		<div class="rp-trio">
 			{#each PEOPLE as p (p.name)}
-				<div class="rp-tile"><UserRound size={22} /><b>{p.name}</b>{#if p.role}<span>{p.role}</span>{/if}</div>
+				<div class="rp-tile"><b>{p.name}</b>{#if p.role}<span>{p.role}</span>{/if}</div>
 			{/each}
 		</div>
 		<div class="ct-lab">
-			<span class="rp-link-icon"><FlaskConical size={24} /></span>
 			<div>
 				<b>{LAB.name}</b>, Purdue University
 				<p class="rp-note">PI: {LAB.pi}. Questions, accounts for reviewers and collaborators, and requests go to the lab.</p>

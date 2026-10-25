@@ -95,7 +95,7 @@ Research computing (MARGIE's runs use RCAC's Negishi community cluster and Gedde
 - Smith, P. M., Gough, E., Younts, A., Werts, B., Hacker, T. J., Neumeister, N., & Wisecaver, J. (2020). The “Geddes” composable platform: An evolution of community clusters for a composable world. *2020 IEEE/ACM International Workshop on Interoperability of Supercomputing and Cloud Technologies (SuperCompCloud)*, 33–38. https://doi.org/10.1109/SuperCompCloud51944.2020.00011
 - Rosen Center for Advanced Computing. (n.d.). *Negishi* [Community cluster]. Purdue University. Retrieved October 25, 2026, from https://www.rcac.purdue.edu/compute/negishi
 
-Cite the version you ran, and each tool and database MARGIE ran for you; their references are under **Acknowledgements**.
+Cite the version you ran, and each tool and database MARGIE ran for you; their references, with one BibTeX file of each, are under **Contributors**.
 
 ## Licences
 

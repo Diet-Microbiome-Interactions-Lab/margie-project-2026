@@ -242,7 +242,7 @@ export const SOFTWARE: {
 			{ name: 'xterm.js', what: 'the Terminal', href: 'https://xtermjs.org' },
 			{ name: 'marked and DOMPurify', what: 'Markdown, safely', href: 'https://marked.js.org' },
 			{ name: 'ExcelJS', what: 'workbooks in the browser', href: 'https://github.com/exceljs/exceljs' },
-			{ name: 'Fontsource', what: 'Bricolage Grotesque and IBM Plex', href: 'https://fontsource.org' }
+			{ name: 'Fontsource', what: 'Bricolage Grotesque, IBM Plex, Lato and Roboto Slab', href: 'https://fontsource.org' }
 		]
 	},
 	{

@@ -1,6 +1,6 @@
 <script lang="ts">
 	import { onMount, tick } from 'svelte';
-	import { ChevronRight, ChevronsDownUp, ChevronsUpDown, CodeXml, Database, Gauge, Library, LockKeyhole, Search, Server, Workflow } from 'lucide-svelte';
+	import { ChevronRight, ChevronsDownUp, ChevronsUpDown, Search } from 'lucide-svelte';
 	import { LAB } from './about';
 	import { FAQS, GROUPS, REFS, type Faq } from './faq';
 	import FaqCode from './FaqCode.svelte';
@@ -26,12 +26,12 @@
 	/** The references the answers cite, in alphabetical order, numbered for the list at the foot. */
 	const cited = $derived([...new Set(FAQS.flatMap((f) => f.refs))].filter((id) => REFS[id]).sort((a, b) => REFS[a].apa.localeCompare(REFS[b].apa)));
 
-	/** Each group's icon and what its questions cover. */
-	const META: Record<string, { icon: typeof Server; blurb: string }> = {
-		'Running MARGIE': { icon: Server, blurb: 'How MARGIE reaches your cluster, calls genes and writes results, and the versions and licences behind each step.' },
-		'Inside the pipeline': { icon: Workflow, blurb: 'Hashing, consolidation, labels, envelopes, operons and fingerprints: what each step does and why.' },
-		'Databases and provenance': { icon: Database, blurb: 'What MARGIE keeps, how it grows with each genome, and how each result can be traced.' },
-		Scoring: { icon: Gauge, blurb: 'How confident MARGIE is in each label: the four measures, C3 in depth, and how it was checked.' }
+	/** What each group's questions cover. */
+	const META: Record<string, { blurb: string }> = {
+		'Running MARGIE': { blurb: 'How MARGIE reaches your cluster, calls genes and writes results, and the versions and licences behind each step.' },
+		'Inside the pipeline': { blurb: 'Hashing, consolidation, labels, envelopes, operons and fingerprints: what each step does and why.' },
+		'Databases and provenance': { blurb: 'What MARGIE keeps, how it grows with each genome, and how each result can be traced.' },
+		Scoring: { blurb: 'How confident MARGIE is in each label: the four measures, C3 in depth, and how it was checked.' }
 	};
 	const slug = (g: string) => 'g-' + g.toLowerCase().replace(/[^a-z]+/g, '-');
 
@@ -76,10 +76,8 @@
 	{#if words.length}<p class="ab-lab">{count} question{count === 1 ? '' : 's'} match.</p>{/if}
 
 	{#each shown as { g, faqs } (g)}
-		{@const Icon = META[g]?.icon ?? Server}
 		<section class="fq-group" id={slug(g)} data-toc="{g} ({FAQS.filter((f) => f.group === g).length})">
 			<header class="fq-ghead">
-				<span class="fq-gicon" aria-hidden="true"><Icon size={24} /></span>
 				<div>
 					<h2>{g}</h2>
 					{#if META[g]}<p>{META[g].blurb}</p>{/if}
@@ -94,14 +92,14 @@
 
 						{#if f.code.length}
 							<div class="fq-part">
-								<h3><CodeXml size={15} /> The code</h3>
+								<h3>The code</h3>
 								{#each f.code as c (c.path + c.symbol)}<FaqCode code={c} />{/each}
 							</div>
 						{/if}
 
 						{#if f.thesis}
 							<div class="fq-part fq-thesis">
-								<h3><LockKeyhole size={15} /> From the thesis</h3>
+								<h3>From the thesis</h3>
 								{#if thesis?.sections[f.id]}
 									<div class="fq-text fq-thesis-body">{@html thesis.sections[f.id]}</div>
 								{:else}
@@ -120,7 +118,7 @@
 
 						{#if f.refs.length}
 							<details class="fq-part fq-refs">
-								<summary><h3><Library size={15} /> References ({f.refs.filter((r) => REFS[r]).length})</h3><ChevronRight size={15} class="fq-fold" /></summary>
+								<summary><h3>References ({f.refs.filter((r) => REFS[r]).length})</h3><ChevronRight size={15} class="fq-fold" /></summary>
 								<ul>
 									{#each f.refs.filter((r) => REFS[r]) as r (r)}
 										<li>{REFS[r].apa} {#if REFS[r].url}<a class="mg-link" href={REFS[r].url} target="_blank" rel="noreferrer">{REFS[r].url}</a>{/if}</li>
@@ -139,7 +137,6 @@
 
 	<section class="fq-group fq-allrefs" id="faq-references" data-toc="References">
 		<header class="fq-ghead">
-			<span class="fq-gicon" aria-hidden="true"><Library size={24} /></span>
 			<div>
 				<h2>References</h2>
 				<p>{cited.length} works the answers rest on.</p>
@@ -154,8 +151,8 @@
 			</ol>
 		</details>
 		<p class="ab-lab">
-			To cite MARGIE, see <a class="mg-link" href="/contributors">Contributors</a>; the tools and databases MARGIE runs, with their versions and
-			licences, are on <a class="mg-link" href="/acknowledgements">Acknowledgements</a>.
+			The citations, with one BibTeX file of each, are on <a class="mg-link" href="/contributors#cite">Contributors</a>; the tools and databases
+			MARGIE runs, with their versions and licences, are on <a class="mg-link" href="/acknowledgements">Acknowledgements</a>.
 		</p>
 	</section>
 </div>
@@ -163,7 +160,7 @@
 <style>
 	.fq-list {
 		--fq-body: var(--rp-body, calc(var(--mg-fs) + 3px));
-		--fq-tint: color-mix(in srgb, var(--mg-accent) 9%, var(--mg-surface));
+		--fq-tint: var(--rp-stripe, color-mix(in srgb, var(--mg-text) 5%, var(--mg-surface)));
 		display: flex;
 		flex-direction: column;
 		gap: 18px;
@@ -190,11 +187,6 @@
 	.fq-group {
 		display: flex;
 		flex-direction: column;
-		padding: 26px 30px 10px;
-		border: 1px solid var(--cr-card-edge, var(--mg-border));
-		border-radius: calc(var(--mg-r) + 4px);
-		background: var(--cr-card, var(--mg-surface));
-		box-shadow: var(--cr-card-shadow);
 		scroll-margin-top: 18px;
 	}
 	.fq-ghead {
@@ -203,22 +195,13 @@
 		gap: 14px;
 		padding-bottom: 12px;
 	}
-	.fq-gicon {
-		display: grid;
-		flex: 0 0 auto;
-		place-items: center;
-		width: 46px;
-		height: 46px;
-		border-radius: 12px;
-		background: var(--fq-tint);
-		color: var(--mg-accent);
-	}
 	.fq-ghead h2 {
 		margin: 0;
+		color: var(--rp-head, var(--mg-text));
+		font-family: var(--rp-head-font, inherit);
 		font-size: var(--rp-h2, var(--mg-fs-xl));
-		font-weight: 650;
-		letter-spacing: -0.016em;
-		color: var(--mg-text);
+		font-weight: 700;
+		line-height: 1.25;
 	}
 	.fq-ghead p {
 		margin: 2px 0 0;
@@ -228,7 +211,7 @@
 	}
 	/* A question. */
 	.fq {
-		border-top: 1px solid var(--mg-border);
+		border-top: 1px solid var(--rp-line, var(--mg-border));
 		scroll-margin-top: 12px;
 	}
 	.fq summary {
@@ -252,25 +235,28 @@
 		place-items: center;
 		width: 34px;
 		height: 34px;
+		border: 1px solid var(--rp-line, var(--mg-border));
 		border-radius: 50%;
-		background: var(--fq-tint);
-		color: var(--mg-accent);
+		background: var(--rp-paper, var(--mg-surface));
+		color: var(--rp-link, var(--mg-accent));
 		font-size: var(--mg-fs);
 		font-weight: 700;
 		font-variant-numeric: tabular-nums;
 	}
 	.fq[open] .fq-n {
-		background: var(--mg-accent);
-		color: var(--mg-on-accent, #fff);
+		border-color: var(--rp-link, var(--mg-accent));
+		background: var(--rp-link, var(--mg-accent));
+		color: #fff;
 	}
 	.fq-q {
 		flex: 1;
+		color: var(--rp-head, var(--mg-text));
 		font-size: var(--rp-h3, calc(var(--mg-fs) + 4px));
-		font-weight: 600;
+		font-weight: 700;
 		line-height: 1.38;
 	}
 	.fq[open] .fq-q {
-		color: var(--mg-accent);
+		color: var(--rp-link, var(--mg-accent));
 	}
 	.fq summary :global(.fq-chev) {
 		flex: 0 0 auto;
@@ -279,7 +265,7 @@
 	}
 	.fq[open] summary :global(.fq-chev) {
 		transform: rotate(90deg);
-		color: var(--mg-accent);
+		color: var(--rp-link, var(--mg-accent));
 	}
 	/* The answer: large, airy text in a readable column. */
 	.fq-a {
@@ -318,55 +304,54 @@
 		list-style: decimal;
 	}
 	.fq-text :global(li::marker) {
-		color: var(--mg-accent);
-		font-weight: 700;
+		color: var(--mg-text-3);
 	}
 	.fq-text :global(li + li) {
 		margin-top: 6px;
 	}
 	.fq-text :global(code) {
 		padding: 1px 5px;
-		border-radius: 4px;
-		background: var(--mg-surface-2);
+		border: 1px solid var(--rp-line, var(--mg-border));
+		border-radius: 2px;
+		background: var(--rp-paper, var(--mg-surface));
+		color: var(--rp-lit, var(--mg-text));
 		font-family: var(--mg-mono);
-		font-size: 0.88em;
+		font-size: 0.82em;
 	}
-	/* Formulas, as cards. */
+	/* Formulas, as literal blocks. */
 	.fq-text :global(pre) {
 		margin: 0;
 		padding: 12px 16px;
-		border-left: 4px solid var(--mg-accent);
-		border-radius: var(--mg-r-sm);
-		background: var(--fq-tint);
+		border: 1px solid var(--rp-line, var(--mg-border));
+		background: var(--rp-pre, var(--mg-surface-2));
 		font-family: var(--mg-mono);
 		font-size: var(--mg-fs);
 		line-height: 1.6;
 		white-space: pre-wrap;
 	}
-	/* Tables: a tinted head, striped rows. */
+	/* Tables: ruled cells, striped rows. */
 	.fq-text :global(table) {
 		width: 100%;
+		border: 1px solid var(--rp-line, var(--mg-border));
 		border-collapse: collapse;
-		overflow: hidden;
-		border-radius: var(--mg-r-sm);
 		font-size: var(--mg-fs);
 		line-height: 1.5;
 	}
 	.fq-text :global(th) {
-		padding: 9px 10px;
-		background: var(--fq-tint);
-		color: var(--mg-text);
-		font-weight: 650;
+		padding: 8px 10px;
+		border: 1px solid var(--rp-line, var(--mg-border));
+		color: var(--rp-head, var(--mg-text));
+		font-weight: 700;
 		text-align: left;
 	}
 	.fq-text :global(td) {
 		padding: 8px 10px;
-		border-top: 1px solid var(--mg-border);
+		border: 1px solid var(--rp-line, var(--mg-border));
 		vertical-align: top;
 		overflow-wrap: anywhere;
 	}
-	.fq-text :global(tbody tr:nth-child(even) td) {
-		background: color-mix(in srgb, var(--mg-surface-2) 70%, transparent);
+	.fq-text :global(tbody tr:nth-child(odd) td) {
+		background: var(--fq-tint);
 	}
 	/* The parts under an answer. */
 	.fq-part {
@@ -379,20 +364,16 @@
 		align-items: center;
 		gap: 7px;
 		margin: 0;
-		color: var(--mg-text-2);
+		color: var(--rp-ink, var(--mg-accent));
 		font-size: var(--mg-fs-sm);
 		font-weight: 700;
 		letter-spacing: 0.05em;
 		text-transform: uppercase;
 	}
-	.fq-part h3 :global(svg) {
-		color: var(--mg-accent);
-	}
 	.fq-thesis {
 		padding: 14px 16px;
-		border-left: 4px solid var(--mg-accent);
-		border-radius: var(--mg-r-sm);
-		background: var(--fq-tint);
+		border: 1px solid var(--rp-line, var(--mg-border));
+		background: var(--rp-pre, var(--mg-surface-2));
 	}
 	.fq-thesis-body :global(figure) {
 		margin: 4px 0;
@@ -441,7 +422,7 @@
 	}
 	.fq-refs-all > summary {
 		margin-bottom: 8px;
-		color: var(--mg-accent);
+		color: var(--rp-link, var(--mg-accent));
 		font-size: var(--mg-fs);
 		font-weight: 600;
 	}
@@ -488,9 +469,6 @@
 		margin-top: 5px;
 	}
 	@media (max-width: 640px) {
-		.fq-group {
-			padding: 14px 12px 6px;
-		}
 		.fq-a {
 			padding-left: 4px;
 		}
