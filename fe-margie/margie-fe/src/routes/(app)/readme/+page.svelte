@@ -35,13 +35,13 @@
 		<section class="ab-box readme">
 			<Markdown source={BEFORE} />
 			{#if AFTER !== undefined}
-				<a class="code-card" href="/code">
+				<a class="ab-go" href="/code">
 					<FileCode size={26} />
-					<span class="code-card-text">
+					<span class="ab-go-text">
 						<b>Read the code behind each step</b>
 						<span>Consolidation | Labeling | Operon database | Scoring | Fingerprinting | Fingerprint databases: the Python scripts as MARGIE runs them, highlighted, with line numbers.</span>
 					</span>
-					<span class="code-card-go">Open the code <ArrowRight size={15} /></span>
+					<span class="ab-go-to">Open the code <ArrowRight size={15} /></span>
 				</a>
 				<Markdown source={AFTER} />
 			{/if}
@@ -58,57 +58,9 @@
 		padding: 22px 30px 28px;
 		font-size: var(--mg-fs);
 	}
-	.code-card {
-		display: flex;
-		align-items: center;
-		gap: 14px;
-		max-width: 920px;
-		margin: 4px 0 14px;
-		padding: 14px 18px;
-		border: 1px solid color-mix(in srgb, var(--mg-accent) 45%, var(--mg-border));
-		border-left: 4px solid var(--mg-accent);
-		border-radius: var(--mg-r);
-		background: color-mix(in srgb, var(--mg-accent) 7%, var(--mg-surface));
-		color: var(--mg-text);
-		text-decoration: none;
-	}
-	.code-card:hover {
-		background: color-mix(in srgb, var(--mg-accent) 12%, var(--mg-surface));
-	}
-	.code-card > :global(svg) {
-		flex: 0 0 auto;
-		color: var(--mg-accent);
-	}
-	.code-card-text {
-		display: flex;
-		flex: 1;
-		flex-direction: column;
-		gap: 3px;
-		min-width: 0;
-		font-size: var(--mg-fs-sm);
-		line-height: 1.5;
-	}
-	.code-card-text b {
-		font-size: var(--mg-fs);
-	}
-	.code-card-text span {
-		color: var(--mg-text-2);
-	}
-	.code-card-go {
-		display: inline-flex;
-		flex: 0 0 auto;
-		align-items: center;
-		gap: 6px;
-		color: var(--mg-accent);
-		font-weight: 600;
-		white-space: nowrap;
-	}
 	@media (max-width: 640px) {
 		.readme {
 			padding: 16px;
-		}
-		.code-card {
-			flex-wrap: wrap;
 		}
 	}
 </style>
