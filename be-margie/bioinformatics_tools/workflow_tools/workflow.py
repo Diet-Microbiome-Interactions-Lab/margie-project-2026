@@ -1030,6 +1030,8 @@ class WorkflowBase(ProgramBase):
             pc_stored: set[str] = set()
             # {tool: (proteins from the protein cache, proteins to annotate)} for this genome's report.
             pc_counts: dict[str, tuple[int, int]] = {}
+            # {tool: {genome its cached proteins came from: proteins}}.
+            pc_sources: dict[str, dict[str, int]] = {}
             if pc_on and Path(pc_faa_path).exists():
                 pc_tools = [t for t in protein_cache.TOOLS
                             if smk_config.get(f'run_{t}', True) not in (False, 'false', '0', 'no')]
@@ -1038,11 +1040,14 @@ class WorkflowBase(ProgramBase):
                     if t not in to_split:
                         protein_cache.clear(pc_prefix, t)
                 try:
-                    counts = protein_cache.split(db_path, pc_faa_path, pc_prefix, genome, to_split, pc_cfg)
+                    counts = protein_cache.split(db_path, pc_faa_path, pc_prefix, genome, to_split, pc_cfg, sources=pc_sources)
                     pc_counts = counts
                     served = {t: c for t, c in counts.items() if c[0]}
                     LOGGER.info('Protein cache for %s: %s', genome,
                                 ', '.join(f'{t} {c}/{c + n} cached' for t, (c, n) in counts.items()) or 'no tool to split')
+                    for t, src in pc_sources.items():
+                        if src:
+                            LOGGER.info('Protein cache sources for %s, %s: matched from %s', genome, t, cache_report.matched(src))
                     if served:
                         LOGGER.info('Protein cache: %d tool(s) run on fewer proteins for %s', len(served), genome)
                 except Exception as exc:
@@ -1069,7 +1074,7 @@ class WorkflowBase(ProgramBase):
                 elif all(Path(p).exists() for p in paths):
                     provenance.set(genome, step, cache_report.KEPT, "already in this run's folder (an earlier attempt)")
                 elif step in pc_counts:
-                    provenance.set(genome, step, **cache_report.proteins(*pc_counts[step]))
+                    provenance.set(genome, step, **cache_report.proteins(*pc_counts[step], sources=pc_sources.get(step)))
                 else:
                     provenance.set(genome, step, cache_report.FRESH, '' if db_path else 'no MARGIE database set')
             if smk_config.get('run_scoring', True) not in (False, 'false', '0', 'no'):
@@ -1123,7 +1128,7 @@ class WorkflowBase(ProgramBase):
                         continue
                     pc_stored.add(t)
                     try:
-                        added = protein_cache.store(db_path, pc_faa_path, pc_prefix, t, pc_cfg)
+                        added = protein_cache.store(db_path, pc_faa_path, pc_prefix, t, pc_cfg, genome=genome)
                         if added:
                             LOGGER.info('Protein cache: %d new protein(s) of %s kept for %s', added, genome, t)
                     except Exception as exc:
