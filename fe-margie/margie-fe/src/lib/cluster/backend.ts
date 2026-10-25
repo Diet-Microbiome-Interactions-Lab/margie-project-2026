@@ -13,6 +13,7 @@ import { FinalTally, type FinalCounts } from '$lib/workspace/final-summary';
 import { TABLE_EXT, extOf, parseDelimited, queryFromParams, queryLoaded, type CellStyle, type Table } from '$lib/workspace/viewers/table-query';
 import { sheetsOf } from '$lib/workspace/viewers/excel-sheets';
 import { call, fetchRaw, get } from './http';
+import { readWithProgress } from './transfers.svelte';
 import { getApiUrl } from '$lib/config';
 import { getToken } from '$lib/auth';
 import type { ChatRemote } from '$lib/workspace/cluster-parts';
@@ -1046,8 +1047,8 @@ async function jobFor(path: string): Promise<{ id: string; rel: string } | null>
 export async function fileBlob(path: string, whole = false): Promise<Blob> {
 	const abs = await expand(path);
 	const job = await jobFor(abs);
-	if (job) return (await fetchRaw(`/v1/ssh/download_file/${q(job.id)}?path=${q(job.rel)}`)).blob();
-	if (whole) return (await fetchRaw(`/v1/ssh/download_path?path=${q(abs)}`)).blob();
+	if (job) return readWithProgress(await fetchRaw(`/v1/ssh/download_file/${q(job.id)}?path=${q(job.rel)}`), abs);
+	if (whole) return readWithProgress(await fetchRaw(`/v1/ssh/download_path?path=${q(abs)}`), abs);
 	const d = await get<{ content: string; binary: boolean; truncated: boolean }>(`/v1/ssh/browse_view?path=${q(abs)}`);
 	if (d.binary) throw new ApiError('Outside a job’s folder only text files can be opened from the cluster.', 415);
 	return new Blob([d.content], { type: 'text/plain' });
