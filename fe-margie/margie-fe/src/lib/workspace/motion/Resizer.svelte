@@ -129,6 +129,12 @@
 			opacity var(--mo-1) ease,
 			transform var(--mo-2) var(--mo-ease);
 	}
+	/* A bottom edge shows a faint grip, so a pane that grows downward looks it. */
+	.bottom::after {
+		height: 4px;
+		opacity: 0.35;
+		transform: none;
+	}
 	.mo-resizer:hover::after,
 	.mo-resizer:focus-visible::after,
 	.dragging::after {

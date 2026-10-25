@@ -4,6 +4,10 @@
 	import { formatBytes } from '$lib/api';
 	import { leftText, span, type Progress, type RowProgress } from '$lib/crisp/progress-model';
 	import { uiBase } from '$lib/workspace/base.svelte';
+	import Resizer from '$lib/workspace/motion/Resizer.svelte';
+	import { ui } from '$lib/workspace/ui.svelte';
+	import Fold from '$lib/workspace/motion/Fold.svelte';
+	import FoldToggle from '$lib/workspace/motion/FoldToggle.svelte';
 
 	/**
 	 * A run's progress, genome by step: a pie per step (done, running, failed, not started, not
@@ -69,6 +73,12 @@
 			kept: on.filter((c) => c.src!.source === 'kept').length
 		};
 	}
+	/** The grid's height: room for 50 genomes (26 px rows under about 152 px of headings and totals), then as dragged. */
+	const GRID = 'jobs:grid';
+	/** The section folds away with Hide (remembered). */
+	const FOLD = 'jobs:progress';
+	const GRID_FALLBACK = 152 + 50 * 26;
+	const gridMax = $derived(ui.size(GRID, GRID_FALLBACK));
 	const folderOf = (g: string) => (runDir ? uiBase.to(`/files?path=${encodeURIComponent(`${runDir.replace(/\/$/, '')}/${g}`)}`) : '');
 </script>
 
@@ -85,9 +95,12 @@
 			<li><span class="pie na"></span>not chosen</li>
 			<li title="Its results came from the MARGIE database: the whole output (genome level) or every protein (protein level); a paler dot, only some proteins"><span class="pie done fromdb" style="--p: 100"><Check size={9} strokeWidth={3.5} /></span>restored</li>
 		</ul>
+		<FoldToggle id={FOLD} />
 	</header>
+	<Fold id={FOLD}>
 	{#if prog.rows.length && prog.cols.length}
-		<div class="scroller">
+		<div class="gwrap">
+		<div class="scroller" style="max-height: {gridMax}px">
 			<table class="pgrid" aria-label="Progress, by genome and step">
 				<thead>
 					<tr class="phases">
@@ -162,9 +175,12 @@
 				</tbody>
 			</table>
 		</div>
+			<Resizer id={GRID} fallback={GRID_FALLBACK} min={200} max={8000} edge="bottom" label="Drag to show more or fewer genomes" />
+		</div>
 	{:else}
 		<p class="mg-note empty">No genomes in view yet: they appear as the run's jobs start.</p>
 	{/if}
+	</Fold>
 </section>
 
 <svelte:window onkeydown={(e) => e.key === 'Escape' && (pick = null)} />
@@ -185,6 +201,12 @@
 				<dl class="pop-rows">
 					<dt>This step</dt>
 					<dd>{STATE_WORD[c.state] ?? c.state}{c.state === 'run' && c.pct !== null ? `, ${Math.round(c.pct)}%` : ''}</dd>
+					{#if c.jobs?.length}
+						<dt>SLURM job{c.jobs.length === 1 ? '' : 's'}</dt>
+						<dd class="pop-jobs">
+							{#each c.jobs as j (j.id)}<span><span class="mg-mono">{j.id}</span> {j.rule} | {j.status}</span>{/each}
+						</dd>
+					{/if}
 					{#if c.store}
 						<dt>Results file</dt>
 						<dd class="pop-file">{#if c.store.file}<span class="mg-mono">{c.store.file.name}</span>, {formatBytes(c.store.file.size)}{:else}being written{/if}</dd>
@@ -333,12 +355,18 @@
 		align-items: center;
 		gap: 5px;
 	}
-	/* Scrolls both ways; pull its corner to make it taller. */
+	.pop-jobs {
+		display: flex;
+		flex-direction: column;
+		gap: 2px;
+	}
+	/* Scrolls both ways; as tall as dragged at its bottom edge (room for 50 genomes to start with). */
+	.gwrap {
+		position: relative;
+	}
 	.scroller {
-		max-height: 60vh;
 		min-height: 160px;
 		overflow: auto;
-		resize: vertical;
 	}
 	/* The full width of the card: few tools give wider columns, many give narrow ones. */
 	.pgrid {
