@@ -83,8 +83,8 @@
 	const ABOUT: { href: string; label: string; icon: typeof Users; external?: boolean }[] = [
 		{ href: '/methods', label: 'Methods', icon: FlaskConical },
 		{ href: '/readme', label: 'README', icon: BookOpen },
-		// The FAQ, on Methods, once it has questions.
-		...(FAQS.length ? [{ href: '/methods#faq', label: 'FAQ', icon: CircleQuestionMark }] : []),
+		// The FAQ, on its own page, once it has questions.
+		...(FAQS.length ? [{ href: '/faq', label: 'FAQ', icon: CircleQuestionMark }] : []),
 		{ href: '/contributors', label: 'Contributors', icon: Users },
 		{ href: '/acknowledgements', label: 'Acknowledgements', icon: HeartHandshake },
 		{ href: DESKTOP_URL, label: 'Desktop app', icon: MonitorDown, external: true }
