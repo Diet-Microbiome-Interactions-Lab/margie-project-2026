@@ -186,7 +186,7 @@
 				<p class="full">Mostly Automated Rapid Genome Inference Environment</p>
 				<p class="motto">Annotate with confidence: a genome-centric, context-dependent approach</p>
 				<button type="button" class="bored" aria-expanded={game} onclick={() => (game = !game)}>
-					{game ? 'Hide the puzzle' : 'Bored? Enjoy the puzzle game'}
+					{game ? 'Hide the puzzle' : 'Solve Puzzle'}
 				</button>
 				{#if game}
 					<div class="game" transition:slide={{ duration: ui.ms(240) }}><GenomePuzzle /></div>
