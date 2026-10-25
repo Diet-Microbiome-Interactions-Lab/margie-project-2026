@@ -60,7 +60,7 @@ DRIVER_PARTITION = 'cpu'
 DRIVER_ACCOUNT = None          # None -> let SLURM pick the default account
 # Wide margin over the 1-3 h runs take; SLURM charges actual use, not the cap.
 DRIVER_TIME = '7-00:00:00'
-DRIVER_CPUS = 2                # Snakemake plus the shell that waits on it
+DRIVER_CPUS = 4                # Stage 1, up to three Stage 2 genomes and QUAST (one Snakemake each), and the shell
 DRIVER_MEM_MB = 8000
 
 # Six sbatch --time formats; a bad user-edited value falls back to the default.

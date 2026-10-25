@@ -45,7 +45,8 @@ RESTORED_FROM_CACHE_RE = re.compile(r'Restored from cache:\s+(.+)$')
 # Fallback genome source: Snakemake's --verbose "wildcards: genome=..." line.
 WILDCARDS_GENOME_RE = re.compile(r'wildcards:.*\bgenome=([^\s,]+)')
 # Sequential orchestrator's per-genome progress; step counts reset per genome.
-SEQUENTIAL_GENOME_RE = re.compile(r'SEQUENTIAL: genome (\d+)/(\d+)')
+# "STAGE 2: genome i/N" as genomes start (older logs say "SEQUENTIAL: genome i/N").
+SEQUENTIAL_GENOME_RE = re.compile(r'(?:SEQUENTIAL|STAGE 2): genome (\d+)/(\d+)')
 
 
 def _slurm_status_checker(job_id: str, connection: SSHConnection):
@@ -252,7 +253,7 @@ def run_ssh_task(job_id: str, command: str, connection: SSHConnection,
             if "SyntaxError in file" in line or "Unexpected keyword" in line and "rule definition" in line:
                 saw_snakemake_syntax_error = True
 
-            # Parses the sequential orchestrator's genome-transition marker.
+            # Parses the orchestrator's marker as each genome starts Stage 2.
             genome_match = SEQUENTIAL_GENOME_RE.search(line)
             if genome_match:
                 genome_index, genome_total = genome_match.groups()
