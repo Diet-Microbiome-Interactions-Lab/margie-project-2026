@@ -42,7 +42,7 @@
 	</section>
 
 	{#each SECTIONS as s (s.id)}
-		<section class="rp-sec" id={s.id} data-toc={s.title}>
+		<section class="rp-sec" id={s.id} data-toc={s.title} data-copy={s.id === 'how-to-cite' ? '' : undefined}>
 			<h2>{s.title}</h2>
 			{#each s.parts as part, k (k)}
 				{#if k > 0}

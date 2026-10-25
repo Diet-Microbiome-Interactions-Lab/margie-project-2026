@@ -5,7 +5,7 @@
 	import { uiBase } from '../base.svelte';
 	import { ui } from '../ui.svelte';
 	import TabPicture from './home/TabPicture.svelte';
-	import MargieLogo from '../MargieLogo.svelte';
+	import LogoPuzzle from '../LogoPuzzle.svelte';
 	import { CITE_URL, LAB, THESIS_DOI } from '$lib/crisp/about';
 
 	/**
@@ -70,10 +70,8 @@
 
 <div class="home">
 	<section class="hero">
-		<!-- The logo turns in, a full slow turn; a pointer over it turns it once more. -->
-		<h1>
-			<MargieLogo size="clamp(220px, 24vw, 300px)" />
-		</h1>
+		<!-- The logo turns in and turns again under the pointer; a click breaks it into a jigsaw (LogoPuzzle). -->
+		<LogoPuzzle size="clamp(220px, 24vw, 300px)" />
 		<p class="full">Mostly Automated Rapid Genome Inference Environment</p>
 		<p class="motto">Annotate with confidence: a genome-centric, context-dependent approach</p>
 		<div class="cta">
@@ -247,10 +245,6 @@
 	}
 	.hero > :nth-child(4) {
 		animation-delay: 200ms;
-	}
-	h1 {
-		margin: 0;
-		line-height: 0;
 	}
 	.full {
 		font-size: 1.15rem;

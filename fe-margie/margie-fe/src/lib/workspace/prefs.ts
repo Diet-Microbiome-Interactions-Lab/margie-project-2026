@@ -91,6 +91,8 @@ export interface UiPrefs {
 	step: 0 | 1 | 2 | 3;
 	/** The quiz was opened by answering one of its unlock questions (routes/(app)/quiz); kept with the account. */
 	quizOpen: boolean;
+	/** The look's version: 2 since Modern took Graphite as its accent (see sanitizePrefs). */
+	looks: number;
 }
 
 export const SPEEDS = [0.5, 0.75, 1, 1.5, 2] as const;
@@ -145,7 +147,7 @@ export const DEFAULT_PREFS: UiPrefs = {
 	mode: 'clean',
 	welcomed: false,
 	theme: 'system',
-	accent: 'blue',
+	accent: 'graphite',
 	radius: 6,
 	density: 'comfortable',
 	textSize: 'm',
@@ -165,7 +167,7 @@ export const DEFAULT_PREFS: UiPrefs = {
 	stripes: true,
 	shades: 'soft',
 	contrast: 'normal',
-	palette: '',
+	palette: 'crisp',
 	colours: { light: {}, dark: {} },
 	vision: 'typical',
 	visionStrength: 0.6,
@@ -179,7 +181,8 @@ export const DEFAULT_PREFS: UiPrefs = {
 	panels: LAYOUTS.default(),
 	board: BOARD,
 	step: 0,
-	quizOpen: false
+	quizOpen: false,
+	looks: 2
 };
 
 /** Keys "Set as default" keeps: the look, not folded sections, pane widths or panels. */
@@ -257,8 +260,12 @@ function scaleOf(v: unknown, min: number, max: number, fallback: number): number
 /** Keeps only valid values; anything missing or wrong falls back to `base`. */
 export function sanitizePrefs(raw: unknown, base: UiPrefs = DEFAULT_PREFS): UiPrefs {
 	const r = (raw && typeof raw === 'object' ? raw : {}) as Record<string, unknown>;
-	const accent =
+	let accent =
 		typeof r.accent === 'string' && (HEX.test(r.accent) || ACCENTS.some((a) => a.id === r.accent)) ? r.accent : base.accent;
+	// A look saved before version 2 with Modern's former blue, and no colours of its own, takes Graphite.
+	const own = (side: unknown) => side && typeof side === 'object' && Object.keys(side).length > 0;
+	const colours = r.colours as { light?: unknown; dark?: unknown } | undefined;
+	if (r.looks !== 2 && 'accent' in r && accent === 'blue' && (!r.palette || r.palette === 'crisp') && !own(colours?.light) && !own(colours?.dark)) accent = 'graphite';
 	let panels = base.panels;
 	if (Array.isArray(r.panels) && r.board === BOARD) {
 		const seen = new Set<PanelId>();
@@ -325,7 +332,8 @@ export function sanitizePrefs(raw: unknown, base: UiPrefs = DEFAULT_PREFS): UiPr
 		panels,
 		board: BOARD,
 		step: oneOf(r.step, [0, 1, 2, 3] as const, base.step),
-		quizOpen: typeof r.quizOpen === 'boolean' ? r.quizOpen : base.quizOpen
+		quizOpen: typeof r.quizOpen === 'boolean' ? r.quizOpen : base.quizOpen,
+		looks: 2
 	};
 }
 

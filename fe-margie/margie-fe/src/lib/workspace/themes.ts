@@ -95,7 +95,7 @@ const GENERATED: [string, string, string, number, number][] = [
 const HAND_MADE: Preset[] = [
 	{
 		id: 'crisp',
-		accent: 'blue',
+		accent: 'graphite',
 		name: 'Modern',
 		note: 'White boxes on cool grey',
 		// Lines (hairlines between rows) a faint blue-white, so rows part without ruling the page.

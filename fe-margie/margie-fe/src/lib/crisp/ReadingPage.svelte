@@ -10,7 +10,9 @@
 	 * document with a breadcrumb, the title and the sections, and Previous and Next at its foot. Each
 	 * `[data-toc]` element is listed beside the text (above it on narrow screens), the list marks the
 	 * section being read, and each section heading gets a ¶ link. Text is set in Lato with Roboto Slab
-	 * headings while Customize keeps its default face, and in the chosen face otherwise.
+	 * headings while Customize keeps its default face, and in the chosen face otherwise. The text is
+	 * for reading here: citations, reference lists and `[data-copy]` parts select and copy, the rest
+	 * does not.
 	 */
 	let {
 		title,
@@ -34,6 +36,21 @@
 	const font = $derived(ui.prefs.typeface === 'arial' ? undefined : 'var(--mg-font)');
 
 	let doc = $state<HTMLElement>();
+
+	/** The parts of a page that copy: citations, reference lists and BibTeX. */
+	const COPYABLE = '.rp-cite, .rp-refs, .fq-refs, .fq-all, [data-copy], input, textarea';
+	const host = (n: Node | null) => (n instanceof Element ? n : (n?.parentElement ?? null))?.closest(COPYABLE);
+	function guard(e: ClipboardEvent) {
+		const sel = getSelection();
+		if (!doc || !sel || sel.isCollapsed || !sel.rangeCount) return;
+		if (document.activeElement?.matches('input, textarea')) return;
+		const range = sel.getRangeAt(0);
+		if (!range.intersectsNode(doc)) return;
+		const a = host(range.startContainer);
+		if (a && a === host(range.endContainer) && doc.contains(a)) return;
+		e.preventDefault();
+		ui.notify('Citations and BibTeX copy from their boxes and Copy buttons.', 'info');
+	}
 	let sections = $state<{ id: string; label: string }[]>([]);
 	let current = $state('');
 
@@ -59,6 +76,8 @@
 		return () => io.disconnect();
 	});
 </script>
+
+<svelte:document oncopy={guard} oncut={guard} />
 
 <div class="cr-page rp" data-shade={shade} style={font ? `--rp-font: ${font}` : undefined}>
 	<div class="rp-paper">

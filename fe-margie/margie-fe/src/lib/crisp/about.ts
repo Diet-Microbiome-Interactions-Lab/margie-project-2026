@@ -6,7 +6,8 @@
 export const LAB = {
 	name: 'Diet-Microbiome Interactions Lab',
 	pi: 'Stephen R Lindemann',
-	email: 'lindems@purdue.edu'
+	email: 'lindems@purdue.edu',
+	github: 'https://github.com/Diet-Microbiome-Interactions-Lab'
 };
 
 export const PEOPLE = [
@@ -248,8 +249,9 @@ export const SOFTWARE: {
 	{
 		group: 'Documentation',
 		items: [
-			{ name: 'MkDocs and Material for MkDocs', what: 'the documentation', href: 'https://squidfunk.github.io/mkdocs-material/' },
-			{ name: 'Read the Docs', what: 'hosts it', href: 'https://readthedocs.org' }
+			{ name: 'BSP documentation', what: "Dane Deemer's documentation of the Bioinformatics Supercomputing Platform", href: 'https://bioinformatics-tools.readthedocs.io/en/latest/' },
+			{ name: 'MkDocs and Material for MkDocs', what: 'build the BSP documentation', href: 'https://squidfunk.github.io/mkdocs-material/' },
+			{ name: 'Read the Docs', what: 'hosts the BSP documentation', href: 'https://readthedocs.org' }
 		]
 	}
 ];

@@ -236,7 +236,7 @@
 
 	/* The document: one white sheet, the text column and the contents beside it. */
 	.rp-paper {
-		padding: 26px 48px 40px;
+		padding: 26px 40px 40px;
 		border: 1px solid var(--rp-line);
 		border-radius: var(--mg-r);
 		background: var(--rp-paper);
@@ -244,14 +244,21 @@
 	}
 	.rp-grid {
 		display: grid;
-		grid-template-columns: minmax(0, 820px) 200px;
-		column-gap: 44px;
+		grid-template-columns: minmax(0, 1fr) 200px;
+		column-gap: 48px;
 		align-items: start;
 	}
 	.rp-doc {
 		min-width: 0;
 		font-size: var(--rp-body);
 		line-height: 1.6;
+		-webkit-user-select: none;
+		user-select: none;
+	}
+	/* Citations, reference lists and BibTeX select and copy; the rest of the text is for reading. */
+	.rp-doc :is(.rp-cite, .rp-refs, .fq-refs, .fq-all, [data-copy], input, textarea) {
+		-webkit-user-select: text;
+		user-select: text;
 	}
 	.rp-crumbs {
 		display: flex;
@@ -333,6 +340,8 @@
 	.rp-toc {
 		position: sticky;
 		top: 18px;
+		justify-self: end;
+		width: 200px;
 		padding-top: 4px;
 	}
 	.rp-toc p {
@@ -368,9 +377,9 @@
 		color: var(--rp-link);
 		font-weight: 700;
 	}
-	@container (max-width: 1140px) {
+	@container (max-width: 980px) {
 		.rp-grid {
-			grid-template-columns: minmax(0, 820px);
+			grid-template-columns: minmax(0, 1fr);
 		}
 		.rp-toc {
 			display: none;
