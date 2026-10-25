@@ -162,6 +162,22 @@ note = {Accessed 2026-10-25}
 }`
 };
 
+/** The grants that fund the work (PI Stephen R. Lindemann), as the agencies' records name them. */
+export const FUNDING: { funder: string; award: string; title: string; url: string }[] = [
+	{
+		funder: 'U.S. National Science Foundation',
+		award: 'Grant No. 2125155',
+		title: 'MIM: Microbial Division of Labor in Polysaccharide-Degrading Communities',
+		url: 'https://www.nsf.gov/awardsearch/showAward?AWD_ID=2125155'
+	},
+	{
+		funder: 'National Institute of General Medical Sciences (NIGMS), U.S. National Institutes of Health',
+		award: 'Award No. R35 GM133634',
+		title: 'Carbohydrate Structure Controls on Human Gut Microbial Ecology',
+		url: 'https://reporter.nih.gov/project-details/10645210'
+	}
+];
+
 /** Where the desktop app is downloaded from (its releases, for now). */
 export const DESKTOP_URL = `${CITE_URL}/releases`;
 

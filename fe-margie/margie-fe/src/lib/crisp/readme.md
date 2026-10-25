@@ -101,6 +101,10 @@ Cite the version you ran, and each tool and database MARGIE ran for you; their r
 
 MARGIE is released under the MIT licence. The tools and databases it runs keep their own licences; several are for academic use only. Install lists every one, with links, and MARGIE turns off any tool whose terms you have not accepted.
 
+## Funding
+
+MARGIE was developed in the Diet-Microbiome Interactions Lab with support from the U.S. National Science Foundation, [Grant No. 2125155](https://www.nsf.gov/awardsearch/showAward?AWD_ID=2125155) (*MIM: Microbial Division of Labor in Polysaccharide-Degrading Communities*), and the National Institute of General Medical Sciences of the National Institutes of Health, [Award No. R35 GM133634](https://reporter.nih.gov/project-details/10645210) (*Carbohydrate Structure Controls on Human Gut Microbial Ecology*).
+
 ## Contact
 
 Diet-Microbiome Interactions Lab, Purdue University: lindems@purdue.edu
