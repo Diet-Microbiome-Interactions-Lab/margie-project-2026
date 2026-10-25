@@ -1377,6 +1377,11 @@ export async function clusterApi<T = any>(path: string, init: RequestInit = {}):
 		const report = route.match(/^\/results\/([^/]+)$/);
 		if (report && method === 'GET') return summary(decodeURIComponent(report[1]));
 		switch (`${method} ${route}`) {
+			// The Code page: the scripts behind MARGIE's own steps, as the server has them (routers/code.py).
+			case 'GET /code':
+				return get('/v1/code');
+			case 'GET /code/file':
+				return get(`/v1/code/file?path=${q(params.get('path') ?? '')}`);
 			case 'GET /runs':
 				return listRuns();
 			case 'POST /runs':
