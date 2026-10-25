@@ -244,7 +244,7 @@ class WorkflowBase(ProgramBase):
                 file targets, placed before --config. Adds --nolock, since Stage 1
                 and Stage 2 run concurrently on disjoint rules in one directory.
             max_jobs_override: --jobs value that wins over compute_config's
-                max_jobs; Stage 1 uses 1 so BV-BRC sees one submission at a time.
+                max_jobs (QUAST's own run uses it).
         '''
         smk_path = WORKFLOW_DIR / key.snakemake_file
 
@@ -883,11 +883,12 @@ class WorkflowBase(ProgramBase):
         batch_targets = ([f"{output_dir_for_batch}/original_container_outputs/gtdbtk/gtdbtk_batch.done"]
                          if gtdbtk_pending and output_dir_for_batch else [])
 
+        # Stage 1 runs at the account's job limit; RASTtk alone goes one at a time (the
+        # margie_sb_bvbrc slot, and the rule's own lock across runs), so BV-BRC sees one submission.
         def _launch_wave(targets: list[str], label: str):
             command = self.build_executable(selected_wf, config_overrides=smk_config, mode=mode,
                                             compute_config=compute_config, extra_resources=extra_resources,
-                                            rerun_triggers=rerun_triggers, target=targets,
-                                            max_jobs_override=1)
+                                            rerun_triggers=rerun_triggers, target=targets)
             LOGGER.info('Starting Stage 1 wave [%s] over %d target(s): %s',
                         label, len(targets), ' '.join(command))
             proc = self._start_background_subprocess(command)
@@ -1700,6 +1701,8 @@ class WorkflowBase(ProgramBase):
             'margie_sb_phase4_slot': max_parallel_tools,
             # One database load at a time (margie_sb.smk, LOAD_RUNTIME).
             'margie_sb_db_writer': 1,
+            # One RASTtk (BV-BRC) job at a time (margie_sb.smk, run_rasttk).
+            'margie_sb_bvbrc': 1,
         }
 
         # Set by resume_job's relaunch; mtime-only triggers treat copied outputs as done.
