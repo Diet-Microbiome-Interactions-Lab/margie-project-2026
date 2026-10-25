@@ -166,8 +166,8 @@
 					Purdue University. <a class="mg-link" href={THESIS_DOI} target="_blank" rel="noreferrer">doi:10.25394/PGS.33103682.v1</a>
 				</p>
 				<p class="cite-note">
-					Please also cite each tool and database MARGIE runs; they are listed, with their references, under
-					<a class="mg-link" href={uiBase.to('/acknowledgements')}>Acknowledgements</a>.
+					Please also cite each tool and database MARGIE runs; their references, with one BibTeX file of each, are on
+					<a class="mg-link" href={uiBase.to('/contributors#cite-with')}>Contributors</a>.
 				</p>
 			</div>
 		</footer>

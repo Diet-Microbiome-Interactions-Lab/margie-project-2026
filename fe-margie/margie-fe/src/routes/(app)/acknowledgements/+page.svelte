@@ -1,14 +1,14 @@
 <script lang="ts">
-	import { Download, Landmark } from 'lucide-svelte';
+	import { ArrowRight } from 'lucide-svelte';
 	import { AI_USAGE, COMPUTING, FUNDING, LAB, SOFTWARE } from '$lib/crisp/about';
 	import { SOFTWARE_CREDITS } from '$lib/crisp/credits';
-	import { CITED_SOFTWARE, RUN_TOOLS, downloadBibtex } from '$lib/crisp/bibtex';
+	import { RUN_TOOLS } from '$lib/crisp/bibtex';
 	import ReadingPage from '$lib/crisp/ReadingPage.svelte';
 
 	/**
 	 * Acknowledgements: thanks, funding and AI usage; the tools and databases MARGIE runs (credits.ts,
 	 * checked against their own pages), each with its version, licence, source code and data sources;
-	 * the software MARGIE is built with; the research computing MARGIE runs on; and the papers to cite.
+	 * and the software MARGIE is built with. The citations, with the BibTeX file, are on Contributors.
 	 */
 
 	/** A download entry: its URL as a link, and any note after it ("register; tarball ..."). */
@@ -40,7 +40,7 @@
 
 <svelte:head><title>Acknowledgements | MARGIE</title></svelte:head>
 
-<ReadingPage title="Acknowledgements" lede="The people, funding, tools and computing that MARGIE is built on." shade="page-acknowledgements">
+<ReadingPage title="Acknowledgements" lede="With thanks to the people, funding, tools and computing that MARGIE is built on." shade="page-acknowledgements">
 	<section class="rp-sec" id="thanks" data-toc="With thanks">
 		<h2>With thanks</h2>
 		<p class="rp-lead">
@@ -55,13 +55,15 @@
 			feedback and ideas.
 		</p>
 		<p>
-			{AWARD_BEFORE}<a href={COMPUTING.award} target="_blank" rel="noreferrer">OAC-2018926</a>{AWARD_AFTER} RCAC's citations are under
-			<a href="#computing">Computing</a>.
+			{AWARD_BEFORE}<a href={COMPUTING.award} target="_blank" rel="noreferrer">OAC-2018926</a>{AWARD_AFTER}
 		</p>
-		<p class="rp-note">
-			If you publish results from MARGIE, please cite MARGIE and the tools and databases she ran for you, listed under
-			<a href="#references">References</a> (<a href="/contributors#cite">how to cite</a>).
-		</p>
+		<a class="rp-link" href="/contributors#cite">
+			<span class="rp-link-text">
+				<b>Citations</b>
+				<span>MARGIE, the thesis, the research computing and the papers of each tool and database, with one BibTeX file of each, are on Contributors.</span>
+			</span>
+			<ArrowRight size={20} />
+		</a>
 	</section>
 
 	<section class="rp-sec" id="funding" data-toc="Funding">
@@ -70,7 +72,6 @@
 		<div class="rp-pair">
 			{#each FUNDING as f (f.award)}
 				<div class="rp-tile ak-grant">
-					<Landmark size={22} />
 					<b>{f.funder}</b>
 					<a href={f.url} target="_blank" rel="noreferrer">{f.award}</a>
 					<i>{f.title}</i>
@@ -89,9 +90,11 @@
 
 	<section class="rp-sec" id="tools" data-toc="Tools and databases">
 		<h2>Tools and databases MARGIE runs</h2>
+		<p>With thanks to the authors of each tool and database that MARGIE runs.</p>
 		<p class="rp-note">
 			The version each step uses, its licence as its provider states it, its source code and where its data comes from. Each user fetches the
-			tools for academic use from their providers, under the provider's licence.
+			tools for academic use from their providers, under the provider's licence. Their papers are cited on
+			<a href="/contributors#cite-with">Contributors</a>.
 		</p>
 		{#each BY_PHASE as g (g.n)}
 			<div class="ak-phase">
@@ -161,35 +164,7 @@
 		</div>
 	</section>
 
-	<section class="rp-sec" id="computing" data-toc="Computing">
-		<h2>Computing</h2>
-		<p class="rp-note">The research computing MARGIE runs on, cited with MARGIE.</p>
-		<ol class="rp-refs">
-			{#each COMPUTING.refs as r (r.id)}
-				<li>{r.apa} <a href={r.url} target="_blank" rel="noreferrer">{r.url}</a></li>
-			{/each}
-		</ol>
-	</section>
 
-	<section class="rp-sec" id="references" data-toc="References">
-		<h2>References</h2>
-		<div class="rp-row">
-			<button type="button" class="mg-btn primary small" onclick={downloadBibtex}><Download size={14} /> Download the citations (BibTeX)</button>
-			<span class="rp-note">With MARGIE's own, the thesis and the research computing (<a href="/contributors#cite">how to cite</a>).</span>
-		</div>
-		<ul class="rp-plain ak-refs">
-			{#each [...RUN_TOOLS.filter((t) => t.cite.length), ...CITED_SOFTWARE] as t ('id' in t ? t.id : t.name)}
-				<li>
-					<b>{t.name}</b>
-					<ol class="rp-refs">
-						{#each t.cite as c (c.key)}
-							<li>{c.apa}{#if c.doi} <a href="https://doi.org/{c.doi}" target="_blank" rel="noreferrer">doi:{c.doi}</a>{/if}</li>
-						{/each}
-					</ol>
-				</li>
-			{/each}
-		</ul>
-	</section>
 </ReadingPage>
 
 <style>
@@ -278,18 +253,6 @@
 		display: block;
 		color: var(--mg-text-3);
 		font-size: var(--mg-fs-sm);
-	}
-	.ak-refs {
-		display: flex;
-		flex-direction: column;
-		gap: 14px;
-		font-size: var(--rp-small);
-	}
-	.ak-refs > li + li {
-		margin-top: 0;
-	}
-	.ak-refs .rp-refs {
-		margin-top: 4px;
 	}
 	@container (max-width: 720px) {
 		.ak-sw {

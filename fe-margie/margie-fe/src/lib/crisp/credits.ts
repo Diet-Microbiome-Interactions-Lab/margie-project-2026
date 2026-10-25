@@ -1544,6 +1544,32 @@ export const SOFTWARE_CREDITS: SoftwareCredit[] = [
 		"cite": []
 	},
 	{
+		"name": "Lato (@fontsource/lato, files in static/fonts)",
+		"group": "Website",
+		"listedAs": "Fontsource",
+		"version": "5.3.0",
+		"licence": "OFL-1.1",
+		"licenceUrl": "https://github.com/fontsource/font-files/blob/main/fonts/google/lato/LICENSE",
+		"source": "https://github.com/fontsource/font-files",
+		"citeRequired": false,
+		"citeRule": "",
+		"citeRuleUrl": "",
+		"cite": []
+	},
+	{
+		"name": "Roboto Slab (@fontsource-variable/roboto-slab, files in static/fonts)",
+		"group": "Website",
+		"listedAs": "Fontsource",
+		"version": "5.3.0",
+		"licence": "Apache-2.0",
+		"licenceUrl": "https://github.com/fontsource/font-files/blob/main/fonts/variable/roboto-slab/LICENSE",
+		"source": "https://github.com/fontsource/font-files",
+		"citeRequired": false,
+		"citeRule": "",
+		"citeRuleUrl": "",
+		"cite": []
+	},
+	{
 		"name": "MkDocs",
 		"group": "Documentation",
 		"listedAs": "MkDocs and Material for MkDocs",

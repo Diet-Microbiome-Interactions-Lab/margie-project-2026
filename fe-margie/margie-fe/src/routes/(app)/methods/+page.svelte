@@ -1,5 +1,6 @@
 <script lang="ts">
-	import { ArrowRight, Boxes, CircleQuestionMark, Dna, FileCode, Gauge, MapPin, Tag, Workflow } from 'lucide-svelte';
+	import { ArrowRight } from 'lucide-svelte';
+	import { api } from '$lib/api';
 	import ReadingPage from '$lib/crisp/ReadingPage.svelte';
 	import { FAQS } from '$lib/crisp/faq';
 
@@ -105,13 +106,28 @@
 		}
 	];
 	const DOES = [
-		{ icon: Dna, title: 'Calls genes', text: 'RASTtk or Prodigal, genome by genome' },
-		{ icon: Boxes, title: 'Annotates proteins', text: 'with many tools at once, each on its own' },
-		{ icon: Workflow, title: 'Finds operons', text: 'from the spacing between neighbouring genes' },
-		{ icon: MapPin, title: 'Places proteins', text: 'in the cell, with the inferred envelope' },
-		{ icon: Tag, title: 'Labels each gene', text: 'with one product name, by a trust hierarchy' },
-		{ icon: Gauge, title: 'Scores the label', text: 'from 0 to 1, by how well the evidence agrees' }
+		{ title: 'Calls genes', text: 'RASTtk or Prodigal, genome by genome' },
+		{ title: 'Annotates proteins', text: 'with many tools at once, each on its own' },
+		{ title: 'Finds operons', text: 'from the spacing between neighbouring genes' },
+		{ title: 'Places proteins', text: 'in the cell, with the inferred envelope' },
+		{ title: 'Labels each gene', text: 'with one product name, by a trust hierarchy' },
+		{ title: 'Scores the label', text: 'from 0 to 1, by how well the evidence agrees' }
 	];
+
+	/** MARGIE's own steps and their scripts, as the Code page lists them (routers/code.py). */
+	interface CodeStep {
+		key: string;
+		title: string;
+		what: string;
+		files: { path: string; name: string; lines: number }[];
+	}
+	let code = $state<CodeStep[]>([]);
+	$effect(() => {
+		api<{ steps: CodeStep[] }>('/code').then(
+			(r) => (code = r.steps),
+			() => (code = [])
+		);
+	});
 </script>
 
 <svelte:head><title>Methods | MARGIE</title></svelte:head>
@@ -125,154 +141,182 @@
 		</p>
 		<div class="rp-trio">
 			{#each DOES as d (d.title)}
-				<div class="rp-tile"><d.icon size={22} /><b>{d.title}</b><span>{d.text}</span></div>
+				<div class="rp-tile"><b>{d.title}</b><span>{d.text}</span></div>
 			{/each}
 		</div>
 		<p>She keeps each step's output, so each label traces back to the hits behind it.</p>
 	</section>
 
-	<div class="rp-pair">
-		<a class="rp-link" href="/faq">
-			<span class="rp-link-icon"><CircleQuestionMark size={24} /></span>
-			<span class="rp-link-text"><b>Frequently asked questions</b><span>{FAQS.length} answers, with the papers and the code behind each step.</span></span>
-			<ArrowRight size={18} />
-		</a>
-		<a class="rp-link" href="/code">
-			<span class="rp-link-icon"><FileCode size={24} /></span>
-			<span class="rp-link-text"><b>The code behind each step</b><span>The Python scripts as the server runs them, highlighted.</span></span>
-			<ArrowRight size={18} />
-		</a>
-	</div>
+	<a class="rp-link" href="/faq">
+		<span class="rp-link-text"><b>Frequently asked questions</b><span>{FAQS.length} answers on how each step works, with the papers it rests on and the code that does it.</span></span>
+		<ArrowRight size={20} />
+	</a>
 
 	<section class="rp-sec" id="phases" data-toc="The phases of a run">
 		<h2>The phases of a run</h2>
 		<p class="rp-note">A run moves through four stages. Each phase starts once the files it reads exist.</p>
 		{#each STAGES as s, k (s.title)}
-			<div class="mt-stage">
-				<header class="mt-stage-head">
-					<span class="mt-stage-k">Stage {k + 1}</span>
-					<h3>{s.title}</h3>
-					<p class="rp-note">{s.blurb}</p>
-				</header>
-				<ol class="mt-steps">
-					{#each s.phases as p (p.n)}
-						<li class="mt-step">
-							<span class="mt-n">{p.n}</span>
-							<div class="mt-body">
-								<b class="mt-name">{p.step}</b>
-								<div class="mt-tools">{#each p.tools as t (t)}<span>{t}</span>{/each}</div>
-								<p>{p.does}</p>
-								{#if p.more}<a class="mt-more" href={p.more.href}>{p.more.label} <ArrowRight size={14} /></a>{/if}
-							</div>
-						</li>
-					{/each}
-				</ol>
+			<h3>Stage {k + 1}: {s.title}</h3>
+			<p class="rp-note">{s.blurb}</p>
+			<div class="rp-scroll">
+				<table class="rp-table mt-phases">
+					<thead><tr><th>Phase</th><th>Step</th><th>Tools</th><th>What it does</th></tr></thead>
+					<tbody>
+						{#each s.phases as p (p.n)}
+							<tr>
+								<td class="mt-n">{p.n}</td>
+								<td><b>{p.step}</b></td>
+								<td>{p.tools.join(' | ')}</td>
+								<td>{p.does}{#if p.more}{' '}<a href={p.more.href}>{p.more.label} »</a>{/if}</td>
+							</tr>
+						{/each}
+					</tbody>
+				</table>
 			</div>
 		{/each}
+	</section>
+
+	<section class="rp-sec" id="code" data-toc="The code behind each step">
+		<h2>The code behind each step</h2>
+		<p>MARGIE's own steps are Python scripts. Each one opens on the Code page as the server runs it, highlighted, with line numbers.</p>
+		{#if code.length}
+			<div class="mt-code">
+				{#each code as c (c.key)}
+					<div class="mt-code-step">
+						<b>{c.title}</b>
+						<p class="rp-note">{c.what}</p>
+						<ul class="rp-plain">
+							{#each c.files as f (f.path)}
+								<li>
+									<a class="mt-file" href="/code?file={encodeURIComponent(f.path)}">
+										<span class="mg-mono">{f.name}</span><span class="mt-lines">{f.lines} lines</span><ArrowRight size={16} />
+									</a>
+								</li>
+							{/each}
+						</ul>
+					</div>
+				{/each}
+			</div>
+		{/if}
+		<a class="rp-link" href="/code">
+			<span class="rp-link-text"><b>Open the Code page</b><span>Each script, with copy and download, and its place on GitHub.</span></span>
+			<ArrowRight size={20} />
+		</a>
 	</section>
 </ReadingPage>
 
 <style>
-	.mt-stage {
-		display: flex;
-		flex-direction: column;
-		gap: 12px;
-		padding-top: 18px;
-		border-top: 1px solid var(--mg-border);
+	.mt-phases td {
+		min-width: 0;
 	}
-	.mt-stage:first-of-type {
-		padding-top: 6px;
-		border-top: none;
-	}
-	.mt-stage-head {
-		display: flex;
-		flex-direction: column;
-		gap: 2px;
-	}
-	.mt-stage-k {
-		color: var(--rp-ink);
-		font-size: var(--mg-fs-xs);
-		font-weight: 700;
-		letter-spacing: 0.12em;
-		text-transform: uppercase;
-	}
-	.mt-stage-head h3 {
-		margin: 0;
-	}
-	/* The phases as a timeline: a numbered dot per phase on one line. */
-	.mt-steps {
-		position: relative;
-		display: flex;
-		flex-direction: column;
-		gap: 16px;
-		margin: 4px 0 6px;
-		padding: 0;
-		list-style: none;
-	}
-	.mt-steps::before {
-		position: absolute;
-		top: 18px;
-		bottom: 18px;
-		left: 17px;
-		width: 2px;
-		background: color-mix(in srgb, var(--mg-accent) 22%, transparent);
-		content: '';
-	}
-	.mt-step {
-		position: relative;
-		display: grid;
-		grid-template-columns: 36px minmax(0, 1fr);
-		gap: 16px;
-		margin: 0;
-	}
-	.mt-steps > li + li {
-		margin-top: 0;
-	}
-	.mt-n {
-		display: grid;
-		place-items: center;
-		width: 36px;
-		height: 36px;
-		border: 2px solid var(--mg-accent);
-		border-radius: 50%;
-		background: var(--mg-surface);
-		color: var(--rp-ink);
-		font-size: var(--mg-fs-sm);
-		font-weight: 700;
+	.mt-phases .mt-n {
+		color: var(--mg-text-3);
 		font-variant-numeric: tabular-nums;
+		text-align: center;
 	}
-	.mt-body {
+	.mt-phases td:nth-child(2) {
+		white-space: nowrap;
+	}
+	.mt-phases td:nth-child(3) {
+		width: 24%;
+	}
+	/* The scripts of each of MARGIE's own steps: a ruled box per step, a row per script. */
+	.mt-code {
+		display: grid;
+		grid-template-columns: repeat(2, minmax(0, 1fr));
+		gap: 14px;
+	}
+	.mt-code-step {
 		display: flex;
 		flex-direction: column;
 		gap: 6px;
 		min-width: 0;
-		padding-top: 4px;
+		padding: 16px 18px;
+		border: 1px solid var(--rp-line);
+		border-radius: 3px;
+		background: var(--rp-paper);
 	}
-	.mt-name {
+	.mt-code-step > b {
+		color: var(--rp-head);
+		font-family: var(--rp-head-font);
 		font-size: var(--rp-h3);
-		font-weight: 650;
+		font-weight: 700;
 		line-height: 1.3;
 	}
-	.mt-tools {
+	.mt-code-step ul {
 		display: flex;
-		flex-wrap: wrap;
-		gap: 6px;
+		flex-direction: column;
+		margin-top: 4px;
+		border-top: 1px solid var(--rp-line);
 	}
-	.mt-tools span {
-		padding: 2px 10px;
-		border: 1px solid color-mix(in srgb, var(--mg-accent) 25%, var(--mg-border));
-		border-radius: 999px;
-		background: var(--rp-tint);
-		color: var(--mg-text);
-		font-size: var(--mg-fs-sm);
-		line-height: 1.6;
+	.mt-code-step li + li {
+		margin-top: 0;
 	}
-	.mt-more {
-		display: inline-flex;
-		align-self: flex-start;
+	.mt-file {
+		display: flex;
 		align-items: center;
-		gap: 4px;
-		font-size: var(--rp-small);
+		gap: 10px;
+		padding: 10px 4px;
+		border-bottom: 1px solid var(--rp-line);
+		color: var(--rp-link);
+		text-decoration: none;
+	}
+	.mt-file:hover {
+		background: var(--rp-stripe);
+	}
+	.mt-file .mg-mono {
+		flex: 1;
+		min-width: 0;
+		font-size: calc(var(--mg-fs) * 1.08);
 		font-weight: 600;
+		overflow-wrap: anywhere;
+	}
+	.mt-lines {
+		color: var(--mg-text-3);
+		font-size: var(--mg-fs-sm);
+		white-space: nowrap;
+	}
+	@container (max-width: 760px) {
+		.mt-code {
+			grid-template-columns: minmax(0, 1fr);
+		}
+		/* Each phase as a stacked block on narrow screens. */
+		.mt-phases,
+		.mt-phases tbody,
+		.mt-phases tr,
+		.mt-phases td {
+			display: block;
+			width: auto;
+		}
+		.mt-phases thead {
+			display: none;
+		}
+		.mt-phases tr {
+			border-bottom: 1px solid var(--rp-line);
+		}
+		.mt-phases tr:last-child {
+			border-bottom: 0;
+		}
+		.mt-phases td {
+			padding: 3px 14px;
+			border: 0;
+		}
+		.mt-phases td:nth-child(2) {
+			white-space: normal;
+		}
+		.mt-phases .mt-n {
+			padding-top: 12px;
+			text-align: left;
+		}
+		.mt-phases .mt-n::before {
+			content: 'Phase ';
+		}
+		.mt-phases td:nth-child(3) {
+			width: auto;
+			color: var(--mg-text-2);
+		}
+		.mt-phases td:last-child {
+			padding-bottom: 12px;
+		}
 	}
 </style>
