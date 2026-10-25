@@ -23,14 +23,14 @@
 	import GenomePuzzle from '$lib/workspace/GenomePuzzle.svelte';
 	import MargieLogo from '$lib/workspace/MargieLogo.svelte';
 	import SizeSliders from '$lib/workspace/SizeSliders.svelte';
-	import { LAB } from '$lib/crisp/about';
+	import { LAB, DATABASES } from '$lib/crisp/about';
 	import { crispVars } from '$lib/crisp/theme';
 	import { isLoggedIn, setToken } from '$lib/auth';
 	import { getApiUrl } from '$lib/config';
 	import { DEFAULT_PREFS, sanitizePrefs, styleString } from '$lib/workspace/prefs';
 	import { ui } from '$lib/workspace/ui.svelte';
 
-	let mode = $state<'signin' | 'create' | 'request'>('signin');
+	let mode = $state<'signin' | 'create' | 'request' | 'databases'>('signin');
 	let username = $state('');
 	let password = $state('');
 	let clusterHost = $state('');
@@ -195,9 +195,13 @@
 
 			<div class="side">
 				<header class="st-head">
-					<h1 class="cr-title">{mode === 'signin' ? 'Sign in' : mode === 'create' ? 'New account' : 'Access from outside Purdue'}</h1>
+					<h1 class="cr-title">{mode === 'signin' ? 'Sign in' : mode === 'create' ? 'New account' : mode === 'databases' ? 'MARGIE databases' : 'Access from outside Purdue'}</h1>
 					<p class="cr-lede">
-						{mode === 'request' ? 'Reviewers and collaborators get a username and password to sign in with.' : 'Sign in to run MARGIE on your cluster.'}
+						{mode === 'request'
+							? 'Reviewers and collaborators get a username and password to sign in with.'
+							: mode === 'databases'
+								? 'The databases MARGIE builds from the genomes she annotates.'
+								: 'Sign in to run MARGIE on your cluster.'}
 					</p>
 				</header>
 
@@ -208,6 +212,7 @@
 							<button type="button" role="tab" aria-selected={mode === 'signin'} onclick={() => (mode = 'signin')}>Sign in</button>
 							<button type="button" role="tab" aria-selected={mode === 'create'} onclick={() => (mode = 'create')}>Create account</button>
 							<button type="button" role="tab" aria-selected={mode === 'request'} onclick={() => (mode = 'request')}>Outside Purdue</button>
+							<button type="button" role="tab" aria-selected={mode === 'databases'} onclick={() => (mode = 'databases')}>MARGIE databases</button>
 						</div>
 
 						{#if problem}
@@ -260,6 +265,17 @@
 								<div class="acts">
 									<span class="hint">Opens your mail app, addressed to {CONTACT}.</span>
 									<a class="mg-btn primary" class:off={!canRequest} href={canRequest ? mailto : undefined} aria-disabled={!canRequest}><Mail size={15} /> Send request</a>
+								</div>
+							</div>
+						{:else if mode === 'databases'}
+							<!-- The MARGIE-generated databases, released here as one download once enough genomes are annotated. -->
+							<div class="form">
+								<div class="hint request">
+									<p class="db-soon"><b>{DATABASES.soon}</b></p>
+									<p>{DATABASES.about}</p>
+									<ul class="db-list">
+										{#each DATABASES.holds as h (h)}<li>{h}</li>{/each}
+									</ul>
 								</div>
 							</div>
 						{:else}
@@ -461,7 +477,7 @@
 	}
 	.tabs {
 		display: grid;
-		grid-template-columns: repeat(3, minmax(0, 1fr));
+		grid-template-columns: repeat(4, minmax(0, 1fr));
 		gap: 2px;
 		padding: 3px;
 		border: 1px solid var(--mg-border);
@@ -487,6 +503,17 @@
 			0 0 0 1px var(--mg-border);
 		color: var(--mg-accent-ink, var(--mg-text));
 		font-weight: 600;
+	}
+	.db-soon {
+		font-size: var(--cr-fs-section);
+	}
+	.db-list {
+		display: flex;
+		flex-direction: column;
+		gap: 4px;
+		margin: 0;
+		padding-left: 1.3em;
+		list-style: disc;
 	}
 	.form {
 		display: flex;

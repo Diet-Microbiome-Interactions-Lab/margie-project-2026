@@ -10,7 +10,7 @@
 	import { cubicOut } from 'svelte/easing';
 	import { fade, fly } from 'svelte/transition';
 	import { page } from '$app/state';
-	import { BookOpen, ChartPie, Check, CircleQuestionMark, Eye, FlaskConical, FolderOpen, Gauge, HeartHandshake, House, Lightbulb, ListChecks, LogOut, Menu, Monitor, MonitorDown, Moon, Package, Palette, Play, RotateCcw, SlidersHorizontal, SquareTerminal, Sun, UserRound, Users, X } from 'lucide-svelte';
+	import { BookOpen, ChartPie, Check, CircleQuestionMark, Database, Eye, FlaskConical, FolderOpen, Gauge, HeartHandshake, House, Lightbulb, ListChecks, LogOut, Menu, Monitor, MonitorDown, Moon, Package, Palette, Play, RotateCcw, SlidersHorizontal, SquareTerminal, Sun, UserRound, Users, X } from 'lucide-svelte';
 	import { DESKTOP_URL } from './about';
 	import { AppBar } from '@skeletonlabs/skeleton-svelte';
 	import avatar from '$lib/assets/neuromancer.jpg';
@@ -87,7 +87,8 @@
 		...(FAQS.length ? [{ href: '/faq', label: 'FAQ', icon: CircleQuestionMark }] : []),
 		{ href: '/contributors', label: 'Contributors', icon: Users },
 		{ href: '/acknowledgements', label: 'Acknowledgements', icon: HeartHandshake },
-		{ href: DESKTOP_URL, label: 'Desktop app', icon: MonitorDown, external: true }
+		{ href: DESKTOP_URL, label: 'Desktop app', icon: MonitorDown, external: true },
+		{ href: '/databases', label: 'MARGIE databases', icon: Database }
 	];
 
 	/*
