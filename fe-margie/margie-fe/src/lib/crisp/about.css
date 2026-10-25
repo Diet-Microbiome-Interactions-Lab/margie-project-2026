@@ -150,3 +150,455 @@
 		}
 	}
 }
+
+/* ---------------------------------------------------------------- reading pages
+
+   Methods, FAQ, README, Contributors and Acknowledgements (ReadingPage.svelte): a centred column
+   under a centred title block, white section cards with one type scale, and the sections listed
+   in the left margin on wide screens (as chips above the column on narrow ones). Sizes follow
+   Customize → text size through --mg-fs. */
+@layer components {
+	.rp {
+		--rp-col: 760px;
+		--rp-body: calc(var(--mg-fs) * 1.2);
+		--rp-small: calc(var(--mg-fs) * 1.04);
+		--rp-h2: calc(var(--mg-fs) * 1.6);
+		--rp-h3: calc(var(--mg-fs) * 1.2);
+		--rp-tint: color-mix(in srgb, var(--mg-accent) 7%, var(--mg-surface));
+		--rp-tint-2: color-mix(in srgb, var(--mg-accent) 13%, var(--mg-surface));
+		--rp-edge: color-mix(in srgb, var(--mg-text) 10%, transparent);
+		--rp-ink: var(--mg-accent-ink, var(--mg-accent));
+		container-type: inline-size;
+		font-family: var(--rp-font, var(--mg-font));
+		color: var(--mg-text);
+		font-feature-settings: 'kern', 'liga';
+	}
+	.rp :is(h1, h2, h3, h4) {
+		text-wrap: balance;
+	}
+	.rp p {
+		text-wrap: pretty;
+	}
+
+	/* The title block. */
+	.rp-hero {
+		display: flex;
+		flex-direction: column;
+		align-items: center;
+		gap: 14px;
+		padding: 18px 0 10px;
+		text-align: center;
+	}
+	.rp-tabs {
+		display: flex;
+		gap: 2px;
+		max-width: 100%;
+		padding: 4px;
+		overflow-x: auto;
+		border: 1px solid var(--rp-edge);
+		border-radius: 999px;
+		background: var(--mg-surface);
+		box-shadow: var(--cr-card-shadow);
+		scrollbar-width: none;
+	}
+	.rp-tabs a {
+		flex: 0 0 auto;
+		padding: 6px 15px;
+		border-radius: 999px;
+		color: var(--mg-text-2);
+		font-size: var(--mg-fs-sm);
+		font-weight: 500;
+		text-decoration: none;
+		transition: background 120ms ease, color 120ms ease;
+	}
+	.rp-tabs a:hover {
+		background: var(--rp-tint);
+		color: var(--rp-ink);
+	}
+	.rp-tabs a[aria-current='page'] {
+		background: var(--mg-accent);
+		color: var(--mg-on-accent, #fff);
+	}
+	.rp-title {
+		margin: 10px 0 0;
+		font-size: calc(var(--mg-fs) * 2.6);
+		font-weight: 700;
+		line-height: 1.08;
+		letter-spacing: -0.028em;
+		color: var(--mg-text);
+	}
+	.rp-lede {
+		max-width: 56ch;
+		margin: 0;
+		font-size: calc(var(--mg-fs) * 1.28);
+		line-height: 1.55;
+		color: var(--mg-text-2);
+	}
+	.rp-acts {
+		display: flex;
+		flex-wrap: wrap;
+		justify-content: center;
+		gap: 8px;
+		margin-top: 4px;
+	}
+	.rp-rule {
+		width: 56px;
+		height: 3px;
+		margin-top: 6px;
+		border-radius: 3px;
+		background: var(--mg-accent);
+	}
+
+	/* The column, with the section list in the left margin. */
+	.rp-grid {
+		display: grid;
+		grid-template-columns: minmax(0, 1fr) minmax(0, var(--rp-col)) minmax(0, 1fr);
+		column-gap: 28px;
+		align-items: start;
+		margin-top: 14px;
+	}
+	.rp-main {
+		grid-column: 2;
+		display: flex;
+		flex-direction: column;
+		gap: 20px;
+		min-width: 0;
+		counter-reset: rp-sec;
+	}
+	.rp-toc {
+		position: sticky;
+		top: 18px;
+		grid-column: 1;
+		grid-row: 1;
+		justify-self: end;
+		width: min(200px, 100%);
+		padding-top: 6px;
+	}
+	.rp-toc p {
+		margin: 0 0 10px;
+		color: var(--mg-text-3);
+		font-size: var(--mg-fs-xs);
+		font-weight: 650;
+		letter-spacing: 0.1em;
+		text-transform: uppercase;
+	}
+	.rp-toc ol {
+		display: flex;
+		flex-direction: column;
+		margin: 0;
+		padding: 0;
+		border-left: 2px solid var(--rp-edge);
+		list-style: none;
+	}
+	.rp-toc a {
+		display: block;
+		margin-left: -2px;
+		padding: 5px 0 5px 14px;
+		border-left: 2px solid transparent;
+		color: var(--mg-text-2);
+		font-size: var(--mg-fs-sm);
+		line-height: 1.35;
+		text-decoration: none;
+	}
+	.rp-toc a:hover {
+		color: var(--rp-ink);
+	}
+	.rp-toc a.on {
+		border-left-color: var(--mg-accent);
+		color: var(--rp-ink);
+		font-weight: 600;
+	}
+	.rp-chips {
+		display: none;
+		flex-wrap: wrap;
+		justify-content: center;
+		gap: 6px;
+		margin-top: 6px;
+	}
+	.rp-chips a {
+		padding: 4px 12px;
+		border: 1px solid var(--rp-edge);
+		border-radius: 999px;
+		background: var(--mg-surface);
+		color: var(--mg-text-2);
+		font-size: var(--mg-fs-sm);
+		text-decoration: none;
+	}
+	.rp-chips a:hover {
+		border-color: var(--mg-accent);
+		color: var(--rp-ink);
+	}
+	@container (max-width: 1200px) {
+		.rp-grid {
+			grid-template-columns: minmax(0, 1fr) minmax(0, var(--rp-col)) minmax(0, 1fr);
+			column-gap: 0;
+		}
+		.rp-toc {
+			display: none;
+		}
+		.rp-chips {
+			display: flex;
+		}
+	}
+
+	/* A section: a white card with a numbered heading. */
+	.rp-sec {
+		display: flex;
+		flex-direction: column;
+		gap: 14px;
+		min-width: 0;
+		padding: 30px 38px 32px;
+		border: 1px solid var(--cr-card-edge, var(--mg-border));
+		border-radius: calc(var(--mg-r) + 4px);
+		background: var(--cr-card, var(--mg-surface));
+		box-shadow: var(--cr-card-shadow);
+		font-size: var(--rp-body);
+		line-height: 1.72;
+		scroll-margin-top: 18px;
+	}
+	.rp-sec > h2,
+	.rp-sec > header > h2 {
+		margin: 0 0 2px;
+		font-size: var(--rp-h2);
+		font-weight: 650;
+		line-height: 1.2;
+		letter-spacing: -0.016em;
+		color: var(--mg-text);
+	}
+	.rp-sec > h2::before,
+	.rp-sec > header > h2::before {
+		display: block;
+		margin-bottom: 8px;
+		color: var(--rp-ink);
+		font-size: var(--mg-fs-xs);
+		font-weight: 700;
+		letter-spacing: 0.14em;
+		counter-increment: rp-sec;
+		content: counter(rp-sec, decimal-leading-zero);
+	}
+	.rp-sec h3 {
+		margin: 8px 0 0;
+		font-size: var(--rp-h3);
+		font-weight: 650;
+		line-height: 1.3;
+		color: var(--mg-text);
+	}
+	.rp-sec p,
+	.rp-sec ul,
+	.rp-sec ol {
+		margin: 0;
+	}
+	.rp-sec ul,
+	.rp-sec ol {
+		padding-left: 1.3em;
+	}
+	.rp-sec li + li {
+		margin-top: 6px;
+	}
+	.rp-sec li::marker {
+		color: var(--mg-accent);
+	}
+	.rp-sec a:not(.mg-btn, .rp-link) {
+		color: var(--rp-ink);
+		text-decoration: underline;
+		text-decoration-color: color-mix(in srgb, var(--mg-accent) 35%, transparent);
+		text-underline-offset: 3px;
+		overflow-wrap: anywhere;
+	}
+	.rp-sec a:not(.mg-btn, .rp-link):hover {
+		text-decoration-color: currentColor;
+	}
+	.rp-note {
+		color: var(--mg-text-2);
+		font-size: var(--rp-small);
+		line-height: 1.6;
+	}
+	.rp-lead {
+		font-size: calc(var(--rp-body) * 1.06);
+		line-height: 1.68;
+	}
+	.rp .rp-plain {
+		padding: 0;
+		list-style: none;
+	}
+
+	/* Two or three equal cards side by side. */
+	.rp-pair,
+	.rp-trio {
+		display: grid;
+		gap: 12px;
+	}
+	.rp-pair {
+		grid-template-columns: repeat(2, minmax(0, 1fr));
+	}
+	.rp-trio {
+		grid-template-columns: repeat(3, minmax(0, 1fr));
+	}
+	.rp-tile {
+		display: flex;
+		flex-direction: column;
+		gap: 6px;
+		min-width: 0;
+		padding: 16px 18px;
+		border: 1px solid var(--rp-edge);
+		border-radius: var(--mg-r);
+		background: var(--rp-tint);
+		font-size: var(--rp-small);
+		line-height: 1.55;
+	}
+	.rp-tile > svg {
+		color: var(--mg-accent);
+	}
+	.rp-tile b {
+		color: var(--mg-text);
+		font-size: var(--rp-body);
+		font-weight: 650;
+		line-height: 1.3;
+	}
+	.rp-tile span {
+		color: var(--mg-text-2);
+	}
+
+	/* A card that links on. */
+	.rp-link {
+		display: flex;
+		align-items: center;
+		gap: 14px;
+		min-width: 0;
+		padding: 18px 20px;
+		border: 1px solid color-mix(in srgb, var(--mg-accent) 30%, var(--mg-border));
+		border-radius: calc(var(--mg-r) + 4px);
+		background: var(--mg-surface);
+		box-shadow: var(--cr-card-shadow);
+		color: var(--mg-text);
+		text-decoration: none;
+		transition: transform 120ms ease, box-shadow 120ms ease, border-color 120ms ease;
+	}
+	.rp-link:hover {
+		border-color: var(--mg-accent);
+		box-shadow: 0 6px 18px color-mix(in srgb, var(--mg-accent) 16%, transparent);
+		transform: translateY(-1px);
+	}
+	.rp-link-icon {
+		display: grid;
+		flex: 0 0 auto;
+		place-items: center;
+		width: 46px;
+		height: 46px;
+		border-radius: 12px;
+		background: var(--rp-tint-2);
+		color: var(--mg-accent);
+	}
+	.rp-link-text {
+		display: flex;
+		flex: 1;
+		flex-direction: column;
+		gap: 3px;
+		min-width: 0;
+		font-size: var(--mg-fs-sm);
+		line-height: 1.5;
+	}
+	.rp-link-text b {
+		font-size: calc(var(--mg-fs) * 1.1);
+		font-weight: 650;
+	}
+	.rp-link-text span {
+		color: var(--mg-text-2);
+	}
+	.rp-link > :last-child {
+		flex: 0 0 auto;
+		color: var(--mg-accent);
+	}
+
+	/* A citation, set off with the accent. */
+	.rp-cite {
+		padding: 14px 18px;
+		border-left: 3px solid var(--mg-accent);
+		border-radius: var(--mg-r-sm);
+		background: var(--rp-tint);
+		font-size: var(--rp-small);
+		line-height: 1.6;
+		overflow-wrap: anywhere;
+	}
+	.rp-row {
+		display: flex;
+		flex-wrap: wrap;
+		align-items: center;
+		gap: 8px 14px;
+	}
+
+	/* A numbered reference list with hanging numbers. */
+	.rp-refs {
+		display: flex;
+		flex-direction: column;
+		gap: 8px;
+		margin: 0;
+		padding-left: 1.9em;
+		font-size: var(--rp-small);
+		line-height: 1.6;
+	}
+	.rp-refs li + li {
+		margin-top: 0;
+	}
+
+	/* Plain tables inside a section. */
+	.rp-table {
+		width: 100%;
+		border-collapse: collapse;
+		font-size: var(--rp-small);
+		line-height: 1.5;
+	}
+	.rp-table th {
+		padding: 9px 10px;
+		background: var(--rp-tint);
+		color: var(--mg-text);
+		font-weight: 650;
+		text-align: left;
+	}
+	.rp-table td {
+		padding: 9px 10px;
+		border-top: 1px solid var(--mg-border);
+		vertical-align: top;
+	}
+
+	@container (max-width: 720px) {
+		.rp-tabs {
+			flex-wrap: wrap;
+			justify-content: center;
+			border-radius: 20px;
+		}
+		.rp-sec {
+			padding: 22px 18px 24px;
+		}
+		.rp-pair,
+		.rp-trio {
+			grid-template-columns: minmax(0, 1fr);
+		}
+		.rp-title {
+			font-size: calc(var(--mg-fs) * 2.1);
+		}
+		.rp-lede {
+			font-size: calc(var(--mg-fs) * 1.12);
+		}
+	}
+	@container (min-width: 721px) and (max-width: 900px) {
+		.rp-trio {
+			grid-template-columns: repeat(2, minmax(0, 1fr));
+		}
+	}
+}
+
+/* Markdown inside a reading section takes the section's type (the viewer's own scoped rules are
+   unlayered, so these sit outside the layer with doubled classes). */
+.rp-sec .md-body.md-body {
+	max-width: none;
+	font-size: inherit;
+	line-height: inherit;
+}
+.rp-sec .md-body.md-body :is(h3, h4) {
+	margin: 1.1em 0 0.4em;
+	font-size: var(--rp-h3);
+}
+.rp-sec .md-body.md-body > :last-child {
+	margin-bottom: 0;
+}

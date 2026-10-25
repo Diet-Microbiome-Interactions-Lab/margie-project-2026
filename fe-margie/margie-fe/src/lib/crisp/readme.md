@@ -4,7 +4,7 @@
 
 A product of the Diet-Microbiome Interactions Lab, Purdue University. PI: Stephen R Lindemann (lindems@purdue.edu).
 
-MARGIE annotates prokaryotic genomes with many tools at once and scores how much their evidence agrees, gene by gene. MARGIE is a Snakemake pipeline housed, among other tools, within the Bioinformatics Supercomputing Platform (BSP) developed by Dane Deemer. This website runs MARGIE on Purdue's clusters: you sign in, choose your genomes, and follow the run; nothing is installed on your computer.
+MARGIE annotates prokaryotic genomes with many tools at once and scores how much their evidence agrees, gene by gene. MARGIE is a Snakemake pipeline housed, among other tools, within the Bioinformatics Supercomputing Platform (BSP) developed by Dane Deemer. This website runs MARGIE on Purdue's clusters: you sign in, choose your genomes, and follow the run from your browser.
 
 ## Getting an account
 
@@ -17,17 +17,17 @@ MARGIE annotates prokaryotic genomes with many tools at once and scores how much
 2. **Settings**: the one place for what a run reads: folders, databases, SLURM resources per phase and per tool. Changes apply to the next run.
 3. **Analyze**:
    1. *Genomes*: the folder they are in, or drop FASTA files; give each its domain and genetic code if you know them.
-   2. *Gene calling*: QUAST, GTDB-Tk (if domain and genetic code are not known), then RASTtk or Prodigal for each genome.
-   3. *Annotation tools*: the phase 4 tools are recommended; tools with licence terms stay off until you accept them.
+   2. *Gene calling*: QUAST, GTDB-Tk (to find each genome's domain and genetic code), then RASTtk or Prodigal for each genome.
+   3. *Annotation tools*: the phase 4 tools are recommended; tools with licence terms turn on once you accept them.
    4. Start. Before a first run, accept the licence terms here, once; on a first run your databases are copied to your scratch folder once.
 4. **Jobs**: progress by genome and tool, the log, and the exact command that ran, to run again from a shell.
-5. **Results**: the annotation with its confidence, per genome, an interactive genome map, and every file in **Files**.
+5. **Results**: the annotation with its confidence, per genome, an interactive genome map, and each file in **Files**.
 
 How a run annotates and scores is set out under **Methods**.
 
 ## What comes out
 
-- `FINAL_ANNOTATION_WITH_CONFIDENCE.tsv`: every gene's label, its source, location and topology, the four scoring measures with their reasoning, its 0 to 1 confidence and tier.
+- `FINAL_ANNOTATION_WITH_CONFIDENCE.tsv`: each gene's label, its source, location and topology, the four scoring measures with their reasoning, its 0 to 1 confidence and tier.
 - A GFF of the annotation, each tool's own results, gene and operon fingerprints, and a genome map.
 
 ## How does MARGIE work
@@ -99,11 +99,19 @@ Cite the version you ran, and each tool and database MARGIE ran for you; their r
 
 ## Licences
 
-MARGIE is released under the MIT licence. The tools and databases it runs keep their own licences; several are for academic use only. Install lists every one, with links, and MARGIE turns off any tool whose terms you have not accepted.
+MARGIE is released under the MIT licence. The tools and databases she runs keep their own licences, several of them for academic use only. Install lists each one with links, and MARGIE runs the tools whose terms you have accepted.
 
 ## Funding
 
 MARGIE was developed in the Diet-Microbiome Interactions Lab with support from the U.S. National Science Foundation, [Grant No. 2125155](https://www.nsf.gov/awardsearch/showAward?AWD_ID=2125155) (*MIM: Microbial Division of Labor in Polysaccharide-Degrading Communities*), and the National Institute of General Medical Sciences of the National Institutes of Health, [Award No. R35 GM133634](https://reporter.nih.gov/project-details/10645210) (*Carbohydrate Structure Controls on Human Gut Microbial Ecology*).
+
+## AI usage in the project
+
+MARGIE's platform orchestration, the engine, API and interface MARGIE runs on, was developed by Dane Deemer (Deemer, 2020; Deemer, 2025). The methods and the host scripts of the pipeline were developed by Sajal Bhattarai, who designed and implemented the phase 9 to 12 scripts (consolidation, labeling, scoring and fingerprinting) and defined their core ideas, architecture and intended behaviour.
+
+Claude models (Anthropic, Inc.) were used interactively during development to debug the code and scripts, to improve their robustness, and to help refine the visualizations: the circular operon diagrams and the interactive genome map pages. Sajal Bhattarai checked the code, scripts and visualizations repeatedly and validated that they run as intended.
+
+*Reference:* Anthropic. (2026). *Claude* [Large language model]. https://www.anthropic.com/claude
 
 ## Contact
 

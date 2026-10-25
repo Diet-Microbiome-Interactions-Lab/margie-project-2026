@@ -54,17 +54,22 @@
 	}
 
 	// ------------------------------------------------ which questions
-	const saved = load<{ topics: Topic[]; levels: Level[]; kinds: Question['kind'][] }>(FILTERS, {
+	const saved = load<{ topics: Topic[]; levels: Level[]; kinds: Question['kind'][]; known?: Topic[] }>(FILTERS, {
 		topics: TOPICS.map((t) => t.id),
 		levels: [...LEVELS],
 		kinds: KINDS.map((k) => k.id)
 	});
+	// A topic added since the filters were saved starts chosen (saves without `known` had the first four).
+	const known: Topic[] = saved.known ?? ['physiology', 'metabolism', 'bioinformatics', 'gut'];
+	const added = TOPICS.map((t) => t.id).filter((id) => !known.includes(id) && !saved.topics.includes(id));
 	// ?topic=<id> (the FAQ links to ?topic=margie) starts on that topic alone.
 	const asked = TOPICS.find((t) => t.id === page.url.searchParams.get('topic'))?.id;
-	let topics = $state<Topic[]>(asked ? [asked] : saved.topics);
+	let topics = $state<Topic[]>(asked ? [asked] : [...saved.topics, ...added]);
 	let levels = $state<Level[]>(saved.levels);
 	let kinds = $state<Question['kind'][]>(saved.kinds);
-	$effect(() => save(FILTERS, { topics: $state.snapshot(topics), levels: $state.snapshot(levels), kinds: $state.snapshot(kinds) }));
+	$effect(() =>
+		save(FILTERS, { topics: $state.snapshot(topics), levels: $state.snapshot(levels), kinds: $state.snapshot(kinds), known: TOPICS.map((t) => t.id) })
+	);
 
 	function flip<T>(list: T[], v: T): T[] {
 		const next = list.includes(v) ? list.filter((x) => x !== v) : [...list, v];
