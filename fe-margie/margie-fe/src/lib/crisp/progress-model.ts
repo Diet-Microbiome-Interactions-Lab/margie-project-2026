@@ -284,17 +284,20 @@ export function buildProgress(i: ProgressInput): Progress {
 
 	function hrefOf(col: string, genome: string, c: Cell): string | undefined {
 		if (c.state === 'na' || c.state === 'none') return undefined;
-		if (c.state === 'failed') return i.run ? uiBase.to(`/jobs/${i.run.id}`) : undefined;
-		const r = results.get(genome);
 		const out = i.outputRoot;
-		const toolPath = (t: string) => r?.tools.find((x) => x.tool === t)?.path;
+		// This job's own folder first: Results may list the genome from another run, or not yet at all.
+		const runDir = (i.run?.outputDir ?? '').replace(/\/$/, '');
+		const listed = results.get(genome);
+		const r = listed && (!runDir || listed.folder?.startsWith(`${runDir}/`)) ? listed : undefined;
+		const gdir = r?.folder ?? (runDir ? `${runDir}/${genome}` : undefined);
+		const toolPath = (t: string) => r?.tools.find((x) => x.tool === t)?.path ?? (gdir ? `${gdir}/${t}` : undefined);
 		let dir: string | undefined;
 		if (col === 'genes') dir = toolPath('rasttk') ?? toolPath('prodigal');
-		else if (col === 'report') dir = r?.final?.dir;
-		else if (col === 'figures') dir = r?.final?.diagrams ?? r?.folder;
-		else if (['consolidation', 'labeling', 'scoring'].includes(col)) dir = r?.folder ? `${r.folder}/${col}` : undefined;
-		else if ((RESULT_STAGES as readonly string[]).includes(col)) dir = r?.folder;
-		else if ((COMPARE_TOOLS as readonly string[]).includes(col)) dir = out ? `${out}/${col}` : undefined;
+		else if (col === 'report') dir = r?.final?.dir ?? gdir;
+		else if (col === 'figures') dir = r?.final?.diagrams ?? (gdir ? `${gdir}/scoring/figures` : undefined);
+		else if (['consolidation', 'labeling', 'scoring'].includes(col)) dir = gdir ? `${gdir}/${col}` : undefined;
+		else if ((RESULT_STAGES as readonly string[]).includes(col)) dir = gdir;
+		else if ((COMPARE_TOOLS as readonly string[]).includes(col)) dir = runDir ? `${runDir}/${col}` : out ? `${out}/${col}` : undefined;
 		else dir = toolPath(col) ?? (out ? `${out}/${col}/${genome}` : undefined);
 		return dir ? uiBase.to(`/files?path=${encodeURIComponent(dir)}`) : undefined;
 	}
