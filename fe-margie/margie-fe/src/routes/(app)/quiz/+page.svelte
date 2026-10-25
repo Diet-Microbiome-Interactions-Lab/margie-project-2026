@@ -92,6 +92,7 @@
 		const had = untrack(() => answers);
 		order = [...shuffled(ids.filter((id) => !(id in had))), ...shuffled(ids.filter((id) => id in had))];
 		at = 0;
+		untrack(() => fresh(QUESTIONS.find((x) => x.id === order[0])));
 	});
 	const q = $derived(QUESTIONS.find((x) => x.id === order[at]));
 
@@ -107,8 +108,8 @@
 	/** Whether this attempt was right, once answered. */
 	let gotIt = $state<boolean | null>(null);
 
-	$effect(() => {
-		const cur = q;
+	/** Clears the answer state for question `cur`, in the same step that shows it. */
+	function fresh(cur: Question | undefined) {
 		pick = null;
 		checked = false;
 		holding = null;
@@ -116,7 +117,12 @@
 		rights = cur?.kind === 'match' ? shuffled(cur.pairs.map((_, k) => k)) : [];
 		parts = cur?.kind === 'case' ? cur.parts.map(() => null) : [];
 		gotIt = null;
-	});
+	}
+	/** Moves to question `k` of the order. */
+	function goTo(k: number) {
+		at = k;
+		fresh(QUESTIONS.find((x) => x.id === order[k]));
+	}
 
 	/** Keeps the latest attempt at each question, for the score. */
 	function record(ok: boolean) {
@@ -157,17 +163,17 @@
 	);
 
 	function next() {
-		at = (at + 1) % Math.max(1, order.length);
+		goTo((at + 1) % Math.max(1, order.length));
 	}
 	function reshuffle() {
 		order = shuffled(order);
-		at = 0;
+		goTo(0);
 	}
 	function startOver() {
 		if (!confirm('Clear your answers and score on this browser?')) return;
 		answers = {};
 		order = shuffled(order);
-		at = 0;
+		goTo(0);
 	}
 	const levelWord: Record<Level, string> = { easy: 'Easy', intermediate: 'Intermediate', hard: 'Hard' };
 	const topicWord = (t: Topic) => TOPICS.find((x) => x.id === t)?.label ?? t;
@@ -291,7 +297,7 @@
 										}}
 										onclick={() => (holding !== null ? place(k, holding) : item !== null ? unplace(k) : null)}
 									>
-										{#if item !== null}{q.pairs[item].right}{:else}<span class="mg-note">{holding !== null ? 'Place here' : 'Drop here'}</span>{/if}
+										{#if item !== null && q.pairs[item]}{q.pairs[item].right}{:else}<span class="mg-note">{holding !== null ? 'Place here' : 'Drop here'}</span>{/if}
 									</button>
 									{#if checked && item !== k}<span class="qz-fix">{q.pairs[k].right}</span>{/if}
 								</li>
@@ -299,7 +305,7 @@
 						</ul>
 						<ul class="qz-tray" aria-label="Items to place">
 							{#each rights as r (r)}
-								{#if !placed.includes(r)}
+								{#if !placed.includes(r) && q.pairs[r]}
 									<li>
 										<button
 											type="button"

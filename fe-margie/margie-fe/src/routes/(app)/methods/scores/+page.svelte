@@ -30,9 +30,18 @@
 			busy = false;
 		}
 	}
+	/** The opened page: its text is for reading here, so copying from it is held back. */
+	let body = $state<HTMLElement>();
 </script>
 
 <svelte:head><title>Reading the scores | MARGIE</title></svelte:head>
+
+<svelte:document
+	oncopy={(e) => {
+		const sel = getSelection();
+		if (body && sel && !sel.isCollapsed && sel.rangeCount && sel.getRangeAt(0).intersectsNode(body)) e.preventDefault();
+	}}
+/>
 
 <div class="cr-page" data-shade="page-methods">
 	<div class="cr-head">
@@ -42,7 +51,7 @@
 	</div>
 
 	{#if page}
-		<div class="ab sc-body sc-read">{@html page.html}</div>
+		<div class="ab sc-body sc-read" bind:this={body}>{@html page.html}</div>
 	{:else}
 		<div class="ab">
 			<section class="ab-box sc-lock">
@@ -57,13 +66,17 @@
 					<button type="submit" class="mg-btn primary small" disabled={!password || busy || missing}>{busy ? 'Opening…' : 'Open'}</button>
 				</form>
 				{#if error}<p class="sc-error" role="alert">{error}</p>{/if}
-				<p class="ab-lab">The four measures and the confidence formula are on <a class="mg-link" href="/methods">Methods</a>, open to everyone.</p>
+				<p class="ab-lab">The four measures and the confidence formula are in the <a class="mg-link" href="/faq#scoring">FAQ</a>, open to everyone.</p>
 			</section>
 		</div>
 	{/if}
 </div>
 
 <style>
+	.sc-body {
+		-webkit-user-select: none;
+		user-select: none;
+	}
 	.sc-back {
 		display: inline-flex;
 		align-items: center;

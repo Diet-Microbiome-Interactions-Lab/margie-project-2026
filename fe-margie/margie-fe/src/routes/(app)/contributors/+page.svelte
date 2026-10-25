@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { ChevronRight, Copy, Download, Mail } from 'lucide-svelte';
+	import { ChevronRight, Copy, Download, ExternalLink, Mail } from 'lucide-svelte';
 	import { BASE_BIBTEX, BASE_CITATIONS, CITATION, CITE_URL, COMPUTING, LAB, PEOPLE, THESIS_BIBTEX, THESIS_CITATION, THESIS_DOI, THESIS_RECORDS, THESIS_RECORDS_BIBTEX } from '$lib/crisp/about';
 	import { CITED_SOFTWARE, RUN_TOOLS, citedPapers, downloadBibtex } from '$lib/crisp/bibtex';
 	import ReadingPage from '$lib/crisp/ReadingPage.svelte';
@@ -29,7 +29,10 @@
 				<b>{LAB.name}</b>, Purdue University
 				<p class="rp-note">PI: {LAB.pi}. Questions, accounts for reviewers and collaborators, and requests go to the lab.</p>
 			</div>
-			<a class="mg-btn small" href="mailto:{LAB.email}"><Mail size={14} /> {LAB.email}</a>
+			<div class="ct-lab-acts">
+				<a class="mg-btn small" href="mailto:{LAB.email}"><Mail size={14} /> {LAB.email}</a>
+				<a class="mg-btn small" href={LAB.github} target="_blank" rel="noreferrer"><ExternalLink size={14} /> The lab on GitHub</a>
+			</div>
 		</div>
 	</section>
 
@@ -132,6 +135,11 @@
 	.ct-lab > div {
 		flex: 1;
 		min-width: 220px;
+	}
+	.ct-lab-acts {
+		display: flex;
+		flex-wrap: wrap;
+		gap: 8px;
 	}
 	.ct-base {
 		display: flex;

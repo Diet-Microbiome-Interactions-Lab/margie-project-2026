@@ -115,4 +115,4 @@ Claude models (Anthropic, Inc.) were used interactively during development to de
 
 ## Contact
 
-Diet-Microbiome Interactions Lab, Purdue University: lindems@purdue.edu
+Diet-Microbiome Interactions Lab, Purdue University: lindems@purdue.edu | [github.com/Diet-Microbiome-Interactions-Lab](https://github.com/Diet-Microbiome-Interactions-Lab)
