@@ -12,10 +12,19 @@ import { annotateProgress } from './progress';
 import { selectByPattern } from './genome-select';
 
 /** When a run started each tool on each genome, and each tool's usual seconds (the server's lib/server/toolClock). */
+/** A SLURM job of a run: its id, the rule it ran and its state. */
+export interface ToolJob {
+	id: string;
+	rule: string;
+	status: string;
+}
+
 export interface ToolClock {
 	typical: Record<string, number>;
 	started: { tool: string; genome: string; start: number; last: number; ok: boolean; failed: boolean }[];
 	now: number;
+	/** The SLURM jobs behind each step, by "tool<TAB>genome" ("tool<TAB>" for a batch over the run). */
+	jobs?: Record<string, ToolJob[]>;
 }
 
 export interface Genome {

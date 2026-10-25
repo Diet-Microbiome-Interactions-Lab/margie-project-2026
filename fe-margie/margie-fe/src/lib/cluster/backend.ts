@@ -8,7 +8,7 @@ import { ApiError, type Run } from '$lib/api';
 import { NOT_YET } from '$lib/license';
 import { isWorkflowPathParam } from '$lib/configParams';
 import { backend } from '$lib/workspace/backend.svelte';
-import type { CheckRow, Genome, GenomeSummary, OrganismResult, Overview, Setting, SetupRow, Tool, ToolClock } from '$lib/workspace/data.svelte';
+import type { CheckRow, Genome, GenomeSummary, OrganismResult, Overview, Setting, SetupRow, Tool, ToolClock, ToolJob } from '$lib/workspace/data.svelte';
 import { FinalTally, type FinalCounts } from '$lib/workspace/final-summary';
 import { TABLE_EXT, extOf, parseDelimited, queryFromParams, queryLoaded, type CellStyle, type Table } from '$lib/workspace/viewers/table-query';
 import { sheetsOf } from '$lib/workspace/viewers/excel-sheets';
@@ -380,9 +380,16 @@ function clockOf(j: JobRow): ToolClock | null {
 		if (prev && prev.ok) continue;
 		started.set(key, { tool, genome: sj.genome ?? '', start: now - elapsedMs(sj.time), last: now, ok, failed });
 	}
+	// Each step's SLURM jobs, its database load (load_<tool>_to_db) with them, for the step's popup.
+	const jobsBy: Record<string, ToolJob[]> = {};
+	for (const sj of jobs) {
+		const rule = sj.rule ?? '';
+		const col = colOf(rule) ?? /^load_([a-z0-9]+?)(?:_perdb)?_to_db$/.exec(rule)?.[1];
+		if (col && sj.job_id) (jobsBy[`${col}\t${sj.genome ?? ''}`] ??= []).push({ id: String(sj.job_id), rule, status: String(sj.status || '').toLowerCase() });
+	}
 	// This run's own finished genomes first (same cluster, same load), then the user's history.
 	const here = Object.fromEntries([...toolSeconds(jobs)].map(([t, xs]) => [t, median(xs)]));
-	return { typical: { ...usualTimes, ...here }, started: [...started.values()], now };
+	return { typical: { ...usualTimes, ...here }, started: [...started.values()], now, jobs: jobsBy };
 }
 
 async function runDetail(id: string, params: URLSearchParams) {
