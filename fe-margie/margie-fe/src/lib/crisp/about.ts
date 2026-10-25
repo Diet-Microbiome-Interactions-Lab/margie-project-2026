@@ -188,6 +188,19 @@ export const AI_USAGE = {
 	reference: { apa: 'Anthropic. (2026). Claude [Large language model].', url: 'https://www.anthropic.com/claude' }
 };
 
+/** The MARGIE-generated databases: released as one download once thousands of genomes are annotated. */
+export const DATABASES = {
+	soon: 'MARGIE-specific databases will be released soon. Stay tuned!',
+	about:
+		'Once MARGIE has annotated thousands of genomes, the first release will be here as one zip file: a folder named margie-databases holding the databases MARGIE generates.',
+	holds: [
+		'the operon reference (the operon .pkl file) that C3 scores against',
+		'the gene and operon fingerprint databases',
+		'the MARGIE SQLite database',
+		'a version file and a manifest of what the folder holds'
+	]
+};
+
 /** Where the desktop app is downloaded from (its releases, for now). */
 export const DESKTOP_URL = `${CITE_URL}/releases`;
 
