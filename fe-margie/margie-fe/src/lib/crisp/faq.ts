@@ -43,7 +43,7 @@ export const FAQS: Faq[] = [
 			"<p>The pipeline is a Snakemake workflow. Snakemake works out which steps each genome needs from the files each step reads and writes, and its SLURM executor plugin submits each step as its own SLURM job, with the threads, memory and run time set for that tool on Settings. A step starts once its input files exist; when one fails, only the steps that depend on it stop, and the rest of the run goes on. GTDB-Tk asks for a large-memory node, and RASTtk sends one genome at a time to the BV-BRC annotation service.</p>",
 			"<p>Each annotation tool runs inside its own Apptainer container, which holds the tool at a recorded version and reads its reference database from your database folder. MARGIE's own steps, from consolidation to the fingerprint databases, are Python scripts that run as jobs beside them.</p>",
 			"<p>Results, the MARGIE database and the shared operon and fingerprint databases stay in your own storage on the cluster; the site reads them from there for Jobs, Results and Files. Jobs also shows the command that ran, so the same run can be started again from a cluster shell.</p>",
-			"<p>At Purdue, MARGIE's runs use the research computing of the Rosen Center for Advanced Computing (RCAC): the Negishi community cluster and the Geddes Community Composable Platform (McCartney et al., 2014; Smith et al., 2020). Results from them are cited as RCAC asks; see <a href=\"/acknowledgements\">Acknowledgements</a>.</p>"
+			"<p>At Purdue, MARGIE's runs use the research computing of the Rosen Center for Advanced Computing (RCAC): the Negishi community cluster and the Geddes Community Composable Platform (McCartney et al., 2014; Smith et al., 2020). They are cited on <a href=\"/acknowledgements\">Acknowledgements</a>.</p>"
 		],
 		"refs": [
 			"koster2012",
@@ -65,7 +65,7 @@ export const FAQS: Faq[] = [
 	{
 		"id": "gene-calling",
 		"group": "Running MARGIE",
-		"q": "How does she call genes? What options are there, which is recommended, and why?",
+		"q": "How does MARGIE call genes? What options are there, which is recommended, and why?",
 		"a": [
 			"<p>Phase 3 calls each genome's genes with one of two callers, chosen genome by genome. RASTtk needs the genome's domain and genetic code. MARGIE takes them from the genome table on Analyze or, when GTDB-Tk runs (phase 2), from its classification. A genome with both known goes to RASTtk; a genome missing either, with GTDB-Tk off, goes to Prodigal. Analyze shows how many genomes go to each caller, and filling in the table or turning on GTDB-Tk moves genomes to RASTtk.</p>",
 			"<p><b>RASTtk is recommended.</b> It runs through the BV-BRC service, calls protein-coding and RNA genes with the genome's own genetic code, and names each product from the SEED subsystems. That description is one of the labeling sources (tier 5) and one of the seven C1 sources, and RASTtk's gene calls are what the genome-level cache stores, so a genome run before comes back from the MARGIE database. MARGIE sends one RASTtk job to BV-BRC at a time and stops the step when no genetic code can be read, rather than guessing one.</p>",
@@ -222,7 +222,7 @@ export const FAQS: Faq[] = [
 	{
 		"id": "hashing",
 		"group": "Inside the pipeline",
-		"q": "How does she hash the genomes and proteins, and at what stage?",
+		"q": "How does MARGIE hash the genomes and proteins, and at what stage?",
 		"a": [
 			"<p>MARGIE identifies genomes and proteins by SHA-256 hashes, so she recognises data she has seen before under any file name. Hashing happens at three points of a run.</p>",
 			"<p><b>Genomes, before the steps start.</b> <code>genome_hash</code> reads the FASTA and hashes each record's name and its upper-case bases in file order; line breaks, lower case and the file name do not change it. The result, marked <code>fa1:</code>, keys the genome's stored step outputs in the MARGIE database (the genome-level cache), its run log rows, and the check for a genome already finished at this pipeline version. An older hash of the file's bytes is still looked up, so earlier entries are found.</p>",
@@ -255,7 +255,7 @@ export const FAQS: Faq[] = [
 	{
 		"id": "consolidation",
 		"group": "Inside the pipeline",
-		"q": "How does she consolidate the results from the various phases, and which phases?",
+		"q": "How does MARGIE consolidate the results from the various phases, and which phases?",
 		"a": [
 			"<p>Consolidation is phase 9. It joins the per-gene result tables of phases 3 to 8 into one table per genome, one row per gene, keyed by feature id. The tables come from the gene caller (RASTtk, or Prodigal in the same layout), the phase 4 annotation tools, with InterPro split into its member databases (HAMAP | NCBIfam | CDD | PIRSF), UniOP's operons, the topology tools (Phobius | TMbed | SignalP 6) and the localisation tools (PSORTb | DeepSig | SignalP 4), which carry phase 7's envelope call as extra columns. QUAST and GTDB-Tk describe the whole genome, so they stay out; the domain comes from <code>genome_info.tsv</code>.</p>",
 			"<p>Each tool's columns get the tool's prefix (<code>COG_</code>, <code>PFAM_</code> and so on), and the gene's coordinates, lengths and sequences come from the gene caller's row. When a tool reports several rows for one gene, they join into one cell as <code>key: value</code> pairs, keyed by accession for database hits or by start–end range for segment tools such as TMbed. A tool with no hit leaves its columns empty, so each genome's table has the same shape. KEGG keeps only rows above KofamScan's threshold, and the merge stops when a tool's gene ids come from a different RASTtk submission.</p>",

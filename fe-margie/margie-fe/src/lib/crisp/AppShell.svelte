@@ -70,7 +70,7 @@
 			items: [
 				{ href: '/settings', label: 'Settings', icon: SlidersHorizontal, note: 'Folders, cores and the steps a run takes' },
 				{ href: '/profile', label: 'User profile', icon: UserRound, note: 'Your details, cluster account and SSH key' },
-				{ href: '/quiz', label: 'Try Quizzes!', lead: 'Bored while waiting?', icon: Lightbulb, note: 'Bored while waiting? Microbes, metabolism, bioinformatics, the gut and MARGIE herself' }
+				{ href: '/quiz', label: 'Try Quizzes!', lead: 'Bored while waiting?', icon: Lightbulb, note: 'Bored while waiting? Microbes, metabolism, bioinformatics, the gut and MARGIE' }
 			]
 		}
 	];

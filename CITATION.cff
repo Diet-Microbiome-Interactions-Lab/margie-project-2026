@@ -1,5 +1,5 @@
 cff-version: 1.2.0
-message: "If you use MARGIE, please cite her, the thesis in which she was first built, the base architecture she was built on (bioinformatics-tools and biolab-fe), and the research computing she runs on (RCAC); these are under references."
+message: "If you use MARGIE, please cite MARGIE, the thesis in which MARGIE was first built, the base architecture (bioinformatics-tools and biolab-fe) and the research computing (RCAC); these are under references."
 authors:
   - family-names: "Bhattarai"
     given-names: "Sajal"
@@ -51,7 +51,7 @@ references:
     repository-code: "https://github.com/wintermutant/biolab-fe"
   - type: magazine-article
     title: "Empowering Faculty: A Campus Cyberinfrastructure Strategy for Research Communities"
-    notes: "Research computing: RCAC, Purdue University, as RCAC asks to be cited."
+    notes: "Research computing: RCAC, Purdue University."
     authors:
       - family-names: "McCartney"
         given-names: "Gerry"
