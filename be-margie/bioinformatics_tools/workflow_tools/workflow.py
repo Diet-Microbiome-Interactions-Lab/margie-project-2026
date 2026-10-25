@@ -34,6 +34,7 @@ from bioinformatics_tools.workflow_tools.workflow_registry import (
     MARGIE_SB_PHASED_TOOLS,
     MARGIE_SB_REQUIRED_TOOLS,
     QUAST_AT_ONCE,
+    STAGE2_AT_ONCE,
     WORKFLOWS,
     margie_sb_sif_files,
 )
@@ -677,6 +678,20 @@ class WorkflowBase(ProgramBase):
         except (TypeError, ValueError):
             return QUAST_AT_ONCE
 
+    def _stage2_at_once(self, smk_config: dict) -> int:
+        '''How many genomes go through Stage 2 at a time: margie_sb.stage2.at_once from the run or the
+        account's config (Settings), else STAGE2_AT_ONCE; at least 1.'''
+        value = smk_config.get('margie_sb.stage2.at_once')
+        if value in (None, ''):
+            try:
+                value = ((self.conf.get('margie_sb', {}) if self.conf else {}) or {}).get('stage2', {}).get('at_once')
+            except Exception:
+                value = None
+        try:
+            return max(1, int(value))
+        except (TypeError, ValueError):
+            return STAGE2_AT_ONCE
+
     def _restore_gene_calls(self, db_path: str, genome_files: dict[str, str], smk_config: dict,
                             prodigal_genomes: set[str]) -> tuple[dict[str, bool], dict[str, bool]]:
         '''Takes each genome's GTDB-Tk and RASTtk outputs from the MARGIE database, genome by genome.
@@ -944,55 +959,19 @@ class WorkflowBase(ProgramBase):
         last_proc = None
         progress_memo: dict[str, tuple[int, int]] = {}  # genome -> completeness, for most-complete-first ordering
 
-        while pending or queue:
-            # Caches GTDB-Tk outputs once the split has written them (its compute token comes
-            # last), so a run that stops before a genome's Stage 1 wave keeps them, and again
-            # once they are loaded, with the database token.
-            if db_path and run_gtdbtk_enabled:
-                for genome in genome_files:
-                    if genome in gtdbtk_loaded:
-                        continue
-                    paths = self._gtdbtk_split_paths(genome, smk_config)
-                    split = [*paths[:2], f"{get_workflow_prefix_for(genome, smk_config)}gtdbtk/gtdbtk_compute.tkn"]
-                    if Path(paths[2]).exists() or (genome not in gtdbtk_stored and all(Path(p).exists() for p in split)):
-                        store(db_path, genome_files[genome], 'gtdbtk', paths)
-                        gtdbtk_stored.add(genome)
-                        if Path(paths[2]).exists():
-                            gtdbtk_loaded.add(genome)
+        # Stage 2 takes up to `at_once` genomes at a time (margie_sb.stage2.at_once): a genome starts
+        # once its gene calls are in and a place is free, and its own steps run as before. Their
+        # database loads take turns through SQLite's lock (the load rules wait and retry), and the
+        # shared operon and fingerprint references are written under their own file locks.
+        at_once = self._stage2_at_once(smk_config)
+        active: list[dict] = []
+        last = {'proc': None}
 
-            for genome in list(pending):
-                if Path(_rasttk_token_path(genome)).exists():
-                    pending.discard(genome)
-                    queue.append(genome)
-                    if db_path:
-                        if run_gtdbtk_enabled and genome not in gtdbtk_stored:
-                            store(db_path, genome_files[genome], 'gtdbtk', self._gtdbtk_split_paths(genome, smk_config))
-                            gtdbtk_stored.add(genome)
-                        if genome not in prodigal_genomes and not rasttk_restored.get(genome, False):
-                            store(db_path, genome_files[genome], 'rasttk', self._rasttk_paths(genome, smk_config))
-
-            if not queue:
-                if stage1.poll() is not None and pending:
-                    # No token after Stage 1 exit: phase1-3 failure, skipped.
-                    LOGGER.warning('Stage 1 exited without producing a RASTtk token for: %s -- skipping',
-                                   sorted(pending))
-                    skipped.extend(pending)
-                    pending.clear()
-                else:
-                    time.sleep(15)
-                continue
-
-            # Most complete first; memoised since pending genomes do not change.
-            if len(queue) > 1:
-                queue.sort(
-                    key=lambda g: progress_memo.setdefault(
-                        g, self._genome_stage2_progress(g, genome_files[g], smk_config)),
-                    reverse=True,
-                )
-            genome = queue.pop(0)
-            processed += 1
-            LOGGER.info('=== SEQUENTIAL: genome %d/%d (%s) phase4-12 starting ===', processed, total, genome)
-
+        def _start(genome: str) -> dict | None:
+            """Prepares one genome (cache restore, protein cache, report rows) and starts its Stage 2;
+            None when its selected steps all came back from the cache."""
+            genome_restored: dict = {}
+            merged_fp = ''
             # Restored after rast.faa so mtimes are newer; must precede the skip below.
             if db_path:
                 genome_cache_map_now = cache_map_fn(genome)
@@ -1100,7 +1079,7 @@ class WorkflowBase(ProgramBase):
                     LOGGER.info(provenance.summary(genome))
                     log_workflow_run(db_path, run_id, genome_files[genome], key_name, 0,
                                      status='success')
-                    continue
+                    return None
                 if missing_selected:
                     LOGGER.info('Genome %s at version %s but selected steps not in cache: %s — running Stage 2 to compute them',
                                 genome, PIPELINE_VERSION, missing_selected)
@@ -1115,51 +1094,49 @@ class WorkflowBase(ProgramBase):
             LOGGER.info('Starting Stage 2 (%s) for %s: %s', stage2_target, genome, ' '.join(stage2_command))
             stage2_proc = self._start_background_subprocess(stage2_command)
 
-            # Stores each tool once its outputs and db token (written last) exist.
-            genome_cache_map = cache_map_fn(genome)
-            genome_restored = restored.get(genome, {})
-            genome_stored: set[str] = set()
+            return {'genome': genome, 'proc': stage2_proc, 'command': stage2_command, 'pc_prefix': pc_prefix,
+                    'pc_faa_path': pc_faa_path, 'pc_tools': pc_tools, 'pc_stored': pc_stored,
+                    'cache_map': cache_map_fn(genome), 'restored': restored.get(genome, {}), 'stored': set()}
 
-            def _store_ready_tools():
-                if not db_path:
-                    return
-                # Each tool's proteins, once its results are loaded (its db token).
-                for t in pc_tools:
-                    if t in pc_stored or not Path(f"{pc_prefix}{t}/{t}_db.tkn").exists():
-                        continue
-                    pc_stored.add(t)
-                    try:
-                        added = protein_cache.store(db_path, pc_faa_path, pc_prefix, t, pc_cfg, genome=genome)
-                        if added:
-                            LOGGER.info('Protein cache: %d new protein(s) of %s kept for %s', added, genome, t)
-                    except Exception as exc:
-                        LOGGER.warning('Protein cache store failed for %s / %s: %s', genome, t, exc)
-                for tool, paths in genome_cache_map.items():
-                    if tool in genome_stored or genome_restored.get(tool, False):
-                        continue
-                    if all(Path(p).exists() for p in paths):
-                        # Consolidation is done, so every table it merged is final.
-                        name = cache_name(tool, merged_inputs_fingerprint(pc_prefix)) if input_keyed(tool) else tool
-                        store(db_path, genome_files[genome], name, paths)
-                        genome_stored.add(tool)
-                        LOGGER.info('Cached %s for %s as soon as its own db token appeared '
-                                    '(Stage 2 still running)', tool, genome)
+        def _store_ready(slot: dict) -> None:
+            """Stores each of a genome's tools once its outputs and db token (written last) exist."""
+            if not db_path:
+                return
+            genome, pc_prefix = slot['genome'], slot['pc_prefix']
+            # Each tool's proteins, once its results are loaded (its db token).
+            for t in slot['pc_tools']:
+                if t in slot['pc_stored'] or not Path(f"{pc_prefix}{t}/{t}_db.tkn").exists():
+                    continue
+                slot['pc_stored'].add(t)
+                try:
+                    added = protein_cache.store(db_path, slot['pc_faa_path'], pc_prefix, t, pc_cfg, genome=genome)
+                    if added:
+                        LOGGER.info('Protein cache: %d new protein(s) of %s kept for %s', added, genome, t)
+                except Exception as exc:
+                    LOGGER.warning('Protein cache store failed for %s / %s: %s', genome, t, exc)
+            for tool, paths in slot['cache_map'].items():
+                if tool in slot['stored'] or slot['restored'].get(tool, False):
+                    continue
+                if all(Path(p).exists() for p in paths):
+                    # Consolidation is done, so every table it merged is final.
+                    name = cache_name(tool, merged_inputs_fingerprint(pc_prefix)) if input_keyed(tool) else tool
+                    store(db_path, genome_files[genome], name, paths)
+                    slot['stored'].add(tool)
+                    LOGGER.info('Cached %s for %s as soon as its own db token appeared '
+                                '(Stage 2 still running)', tool, genome)
 
-            if stage2_proc is None:
-                proc = None
-            else:
-                while stage2_proc.poll() is None:
-                    _store_ready_tools()
-                    time.sleep(10)
-                _store_ready_tools()  # final catch-up for tokens written right before exit
-                proc = subprocess.CompletedProcess(
-                    args=stage2_command, returncode=stage2_proc.proc.returncode,
-                    stdout='\n'.join(stage2_proc.stdout_lines), stderr='\n'.join(stage2_proc.stderr_lines))
-            last_proc = proc
-
+        def _finish(slot: dict) -> None:
+            """Wraps up a genome whose Stage 2 has ended: its last tools stored, its record and report."""
+            genome = slot['genome']
+            _store_ready(slot)  # tokens written right before exit
+            p = slot['proc']
+            proc = None if p is None else subprocess.CompletedProcess(
+                args=slot['command'], returncode=p.proc.returncode,
+                stdout='\n'.join(p.stdout_lines), stderr='\n'.join(p.stderr_lines))
+            last['proc'] = proc
             if proc is None or proc.returncode != 0:
                 rc = proc.returncode if proc else None
-                LOGGER.error('Stage 2 (phase4-10) failed for genome "%s" (rc=%s); going on with the next genome.',
+                LOGGER.error('Stage 2 (phase4-10) failed for genome "%s" (rc=%s); going on with the others.',
                              genome, rc)
                 result = (self._build_result(key_name, proc) if proc else
                           {'workflow': key_name, 'returncode': rc, 'rules_summary': {}, 'stdout_tail': '', 'stderr_tail': ''})
@@ -1170,20 +1147,84 @@ class WorkflowBase(ProgramBase):
                     log_workflow_run(db_path, run_id, genome_files[genome], key_name,
                                      result['rules_summary'].get('completed', 0), status='failed')
                 failed.append(genome)
-                continue
+                return
             finished.append(genome)
-
             if db_path:
-                tools_to_store = {tool: paths for tool, paths in genome_cache_map.items()
-                                  if tool not in genome_stored and not genome_restored.get(tool, False)}
+                tools_to_store = {tool: paths for tool, paths in slot['cache_map'].items()
+                                  if tool not in slot['stored'] and not slot['restored'].get(tool, False)}
                 if tools_to_store:
-                    merged_fp = merged_inputs_fingerprint(pc_prefix)
+                    merged_fp = merged_inputs_fingerprint(slot['pc_prefix'])
                     store_all(db_path, genome_files[genome], {cache_name(t, merged_fp): p for t, p in tools_to_store.items()})
                 else:
                     LOGGER.info('All outputs were already cached incrementally or were cache hits for %s', genome)
                 log_workflow_run(db_path, run_id, genome_files[genome], key_name,
                                  self._build_result(key_name, proc)['rules_summary'].get('completed', 0), status='success')
             LOGGER.info(provenance.summary(genome))
+
+        while pending or queue or active:
+            # Caches GTDB-Tk outputs once the split has written them (its compute token comes
+            # last), so a run that stops before a genome's Stage 1 wave keeps them, and again
+            # once they are loaded, with the database token.
+            if db_path and run_gtdbtk_enabled:
+                for genome in genome_files:
+                    if genome in gtdbtk_loaded:
+                        continue
+                    paths = self._gtdbtk_split_paths(genome, smk_config)
+                    split = [*paths[:2], f"{get_workflow_prefix_for(genome, smk_config)}gtdbtk/gtdbtk_compute.tkn"]
+                    if Path(paths[2]).exists() or (genome not in gtdbtk_stored and all(Path(p).exists() for p in split)):
+                        store(db_path, genome_files[genome], 'gtdbtk', paths)
+                        gtdbtk_stored.add(genome)
+                        if Path(paths[2]).exists():
+                            gtdbtk_loaded.add(genome)
+
+            for genome in list(pending):
+                if Path(_rasttk_token_path(genome)).exists():
+                    pending.discard(genome)
+                    queue.append(genome)
+                    if db_path:
+                        if run_gtdbtk_enabled and genome not in gtdbtk_stored:
+                            store(db_path, genome_files[genome], 'gtdbtk', self._gtdbtk_split_paths(genome, smk_config))
+                            gtdbtk_stored.add(genome)
+                        if genome not in prodigal_genomes and not rasttk_restored.get(genome, False):
+                            store(db_path, genome_files[genome], 'rasttk', self._rasttk_paths(genome, smk_config))
+
+            # The genomes in Stage 2: finished tools stored, ended ones wrapped up.
+            for slot in list(active):
+                _store_ready(slot)
+                if slot['proc'] is None or slot['proc'].poll() is not None:
+                    active.remove(slot)
+                    _finish(slot)
+
+            if not queue:
+                if not active and stage1.poll() is not None and pending:
+                    # No token after Stage 1 exit: phase1-3 failure, skipped.
+                    LOGGER.warning('Stage 1 exited without producing a RASTtk token for: %s -- skipping',
+                                   sorted(pending))
+                    skipped.extend(pending)
+                    pending.clear()
+                elif pending or active:
+                    time.sleep(10)
+                continue
+
+            # Most complete first; memoised since pending genomes do not change.
+            if len(queue) > 1:
+                queue.sort(
+                    key=lambda g: progress_memo.setdefault(
+                        g, self._genome_stage2_progress(g, genome_files[g], smk_config)),
+                    reverse=True,
+                )
+            while queue and len(active) < at_once:
+                genome = queue.pop(0)
+                processed += 1
+                LOGGER.info('=== STAGE 2: genome %d/%d (%s) phase4-12 starting, up to %d at a time ===',
+                            processed, total, genome, at_once)
+                slot = _start(genome)
+                if slot is not None:
+                    active.append(slot)
+            if active:
+                time.sleep(10)
+
+        last_proc = last['proc']
 
         # Stage 3: LLM for all genomes at once; --keep-going lets one failure pass.
         if run_llm_enabled and processed > 0:
