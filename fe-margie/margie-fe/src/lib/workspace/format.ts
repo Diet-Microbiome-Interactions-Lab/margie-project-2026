@@ -33,4 +33,12 @@ export function figureTitle(file: string): string {
 	return words.charAt(0).toUpperCase() + words.slice(1);
 }
 
+/** What a figure shows, where the title needs a key (Results and the figures' index.tsv), or ''. */
+export function figureNote(file: string): string {
+	const base = (file.split('/').pop() ?? file).replace(/\.png$/i, '');
+	if (/_circular$/.test(base))
+		return "Rings, outside in: the replicons (black, positions in Mb) | genes on the + strand | genes on the − strand, both coloured by confidence tier | dark red ticks: genes flagged for review. The centre line is GC content in windows along the genome: outside the grey circle is above the genome's mean GC, inside below.";
+	return '';
+}
+
 export const count = (n: number) => n.toLocaleString('en-US');

@@ -4,7 +4,7 @@
 	import { LAB } from './about';
 	import { FAQS, GROUPS, REFS, type Faq } from './faq';
 	import FaqCode from './FaqCode.svelte';
-	import { LockedError, alreadyOpen, openLocked, type LockedPage } from './locked';
+	import { LockedError, alreadyOpen, openLocked, relock, type LockedPage } from './locked';
 
 	/**
 	 * The FAQ (its own page, /faq): how MARGIE works, question by question. Each answer names the papers it
@@ -102,6 +102,7 @@
 								<h3>From the thesis</h3>
 								{#if thesis?.sections[f.id]}
 									<div class="fq-text fq-thesis-body">{@html thesis.sections[f.id]}</div>
+									<button type="button" class="mg-btn small fq-relock" onclick={() => (relock('faq'), (thesis = null))}>Lock the thesis panels again</button>
 								{:else}
 									<p class="ab-lab">
 										More on this, with figures, from the thesis, which is under embargo. It opens with a password; ask the {LAB.name}
@@ -391,6 +392,9 @@
 		margin-top: 6px;
 		color: var(--mg-text-2);
 		font-size: var(--mg-fs-sm);
+	}
+	.fq-relock {
+		align-self: flex-start;
 	}
 	.fq-form {
 		display: flex;

@@ -308,8 +308,11 @@ def main():
         in_op = col(r, "IS_IN_OPERON?").strip().lower() == "yes" and opid.startswith("operon_")
         rv = col(r, "NEEDS_REVIEW?").strip().lower() == "yes"
         c4v = num(col(r, "C4_score_EC_conflict"))
+        # Regions RASTtk reports beside the genes (prophages, repeats, CRISPR arrays) span many genes.
+        ftype = col(r, "FEATURE_TYPE").strip().lower()
         genes.append({
             "s": s, "e": e,
+            "rg": 1 if ftype and ftype not in ("cds", "peg", "rna") else 0,
             "st": -1 if col(r, "RAST_strand").strip() == "-" else 1,
             "ci": cidx[contig_of(gid)],
             "ti": ti,
@@ -593,6 +596,8 @@ const OPERON_CYCLE=["#1F77FF","#FF8C00","#00B84D","#B65CFF","#00C2D1","#EE2233"]
 // Retained for the legend swatch and the operon card tag.
 const OPERON=OPERON_CYCLE[0];
 const NONCODE="#d5d5d5", NONOP="#6b6b6b", FLAG="#b32b1e";
+// A region (prophage, repeat, CRISPR array): a pale band under the genes it holds.
+const REGION="#eeeeea";
 // Stable per-operon colour: hash the id so a given operon keeps its colour
 // across renders and modes, instead of depending on iteration order.
 function opColor(id){
@@ -662,17 +667,19 @@ order.forEach((ci,k)=>{
   }
 });
 
-// ---- gene layer (event-delegated) ----
+// ---- gene layer (event-delegated); regions sit in their own layer underneath ----
+const regionLayer=el("g",{}); svg.appendChild(regionLayer);
 const geneLayer=el("g",{}); svg.appendChild(geneLayer);
 const flagLayer=el("g",{}); svg.appendChild(flagLayer);
 const nodes=[];
 D.genes.forEach((g,i)=>{
   let aHi=ang(g.ci,g.s), aLo=ang(g.ci,g.e); if(aHi<aLo){const t=aHi;aHi=aLo;aLo=t;}
   if(aHi-aLo<0.05) aHi=aLo+0.05;
-  const ro=g.st>0?R.fO:R.rO, ri=g.st>0?R.fI:R.rI;
+  // A region spans both gene rings, under the genes; a gene fills its strand's ring.
+  const ro=g.rg?R.fO:g.st>0?R.fO:R.rO, ri=g.rg?R.rI:g.st>0?R.fI:R.rI;
   const poly=el("polygon",{points:`${P(ro,aHi)} ${P(ro,aLo)} ${P(ri,aLo)} ${P(ri,aHi)}`,class:"gene"});
   poly.dataset.i=i; if(g.op)poly.dataset.op=g.op;
-  geneLayer.appendChild(poly); nodes.push(poly);
+  (g.rg?regionLayer:geneLayer).appendChild(poly); nodes.push(poly);
   if(g.rv){const mid=(aHi+aLo)/2;const[x0,y0]=pol(R.tick-6,mid),[x1,y1]=pol(R.tick+6,mid);
     const ln=el("line",{x1:x0,y1:y0,x2:x1,y2:y1,stroke:FLAG,"stroke-width":.9}); ln.dataset.flag=i; flagLayer.appendChild(ln);}
 });
@@ -703,6 +710,7 @@ function shown(g){
   }
 }
 function geneFill(g){
+  if(g.rg) return REGION;
   if(!shown(g)) return HIDDEN;
   if(mode==="gene") return g.ti<0?NONCODE:TIER_COL[g.ti];
   if(mode==="review") return g.rv?(g.ti<0?NONCODE:TIER_COL[g.ti]):"#ececea";

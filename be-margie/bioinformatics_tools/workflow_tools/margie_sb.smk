@@ -1902,11 +1902,22 @@ rule run_rasttk:
         HEARTBEAT=$!
         trap 'kill $HEARTBEAT 2>/dev/null; rm -rf "{params.lock}"' EXIT
 
+        # Each attempt starts from an empty folder: the container keeps a gene table it finds there,
+        # and a table from an interrupted attempt carries another BV-BRC submission's gene ids.
+        rm -rf {params.output_dir}
+        mkdir -p {params.output_dir}
         /usr/local/bin/run -i {input.fasta} -o {params.output_dir} -t {threads} -d {params.db} --scientific {wildcards.genome} --domain "$DOMAIN" --genetic-code "$GCODE"
         cp $(find {params.output_dir} -path "*/processed/rast*.tsv") {output.results}
         cp $(find {params.output_dir} -name "genome.faa") {output.faa}
         cp $(find {params.output_dir} -name "genome.gff") {output.gff}
         cp $(find {params.output_dir} -type d -name gene_calls -print -quit)/* $(dirname {output.results})/ || true
+        # The gene table, the proteins and the GFF come from one BV-BRC submission.
+        TSV_ID=$(grep -m1 -o 'fig|6666666[.][0-9]*' {output.results} || true)
+        GFF_ID=$(grep -m1 -o 'fig|6666666[.][0-9]*' {output.gff} || true)
+        if [[ -n "$TSV_ID" && -n "$GFF_ID" && "$TSV_ID" != "$GFF_ID" ]]; then
+            echo "ERROR: RASTtk's gene table ($TSV_ID) and GFF ($GFF_ID) come from different BV-BRC submissions for {wildcards.genome}; run the step again" >&2
+            exit 1
+        fi
         echo "rasttk complete for {wildcards.genome}" > {output.tkn}
         """
 

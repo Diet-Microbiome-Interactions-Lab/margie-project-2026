@@ -1,0 +1,665 @@
+[
+	{
+		"id": "bioi2-001",
+		"topic": "bioinformatics",
+		"level": "easy",
+		"kind": "case",
+		"scenario": "A student assembles a bacterial genome of about 5.1 Mb from 150 bp Illumina paired-end reads. The assembler returns 112 contigs with an N50 of 145 kb, and many contigs end inside copies of the rRNA operon or of insertion sequences.",
+		"parts": [
+			{
+				"question": "What does the N50 of 145 kb tell the student?",
+				"options": [
+					"Half of the 112 contigs are 145 kb long or longer",
+					"The mean length of the 112 contigs works out at 145 kb",
+					"Contigs of 145 kb or longer hold half the assembly",
+					"The longest contig in the assembly is 145 kb long"
+				],
+				"answer": 2,
+				"explain": "N50 is the length at which contigs of that length or longer add up to at least half the assembly. It weights contigs by their length, unlike the mean or the median contig length."
+			},
+			{
+				"question": "Why do so many contigs end inside rRNA operons and insertion sequences?",
+				"options": [
+					"These repeats come in near-identical copies longer than the reads",
+					"These regions have such a high GC content that they fail to sequence",
+					"The assembler deletes rRNA and transposase genes to save memory",
+					"These regions come from the contaminating DNA of another organism"
+				],
+				"answer": 0,
+				"explain": "A repeat longer than the reads gives the assembler several equally good ways to continue, so it ends the contig at the repeat. rRNA operons of about 5 kb and insertion sequences of one to a few kilobases are the usual repeats in bacterial genomes."
+			},
+			{
+				"question": "Which extra data would best help close the genome into one circular contig?",
+				"options": [
+					"Twice as many 150 bp reads from the same DNA library",
+					"A second assembly run with a smaller k-mer size",
+					"RNA-seq reads from cells grown in a rich medium",
+					"Long Nanopore or PacBio reads spanning the repeats"
+				],
+				"answer": 3,
+				"explain": "Reads tens of kilobases long run through each repeat copy into unique sequence on both sides, which settles how the contigs join. More short reads add coverage, yet the repeats stay longer than the reads."
+			}
+		],
+		"explain": "Short-read assemblies of bacteria usually break at repeats, which sets their N50. Long reads, alone or with short reads in a hybrid assembly, often give complete circular chromosomes."
+	},
+	{
+		"id": "bioi2-002",
+		"topic": "bioinformatics",
+		"level": "easy",
+		"kind": "match",
+		"question": "Match each file format to what it holds.",
+		"pairs": [
+			{
+				"left": "FASTA",
+				"right": "Sequences, each under a header line starting with >"
+			},
+			{
+				"left": "FASTQ",
+				"right": "Sequencing reads, each with a line of per-base quality scores"
+			},
+			{
+				"left": "GFF3",
+				"right": "Feature positions on sequences, in nine tab-separated columns"
+			},
+			{
+				"left": "GenBank",
+				"right": "Annotation and sequence in one file, the sequence after an ORIGIN line"
+			},
+			{
+				"left": "SAM",
+				"right": "Reads aligned to a reference, one alignment per line"
+			}
+		],
+		"explain": "FASTA and FASTQ carry sequences, and FASTQ adds a quality score for each base. GFF3 lists where features lie, GenBank packs features and sequence together, and SAM records where each read aligns."
+	},
+	{
+		"id": "bioi2-003",
+		"topic": "bioinformatics",
+		"level": "easy",
+		"kind": "case",
+		"scenario": "A student runs Prodigal on a newly assembled 4.6 Mb Escherichia coli genome and gets about 4,300 predicted genes.",
+		"parts": [
+			{
+				"question": "What has Prodigal predicted?",
+				"options": [
+					"Protein functions, named by similarity to known proteins",
+					"Protein-coding genes, each from start codon to stop codon",
+					"Each gene in the genome, its tRNA and rRNA genes included",
+					"Promoters and terminators around each transcription unit"
+				],
+				"answer": 1,
+				"explain": "Prodigal finds open reading frames and picks each gene's most likely start codon, using a model it trains on the genome itself. It reports coordinates and translations, and naming the proteins is a later annotation step."
+			},
+			{
+				"question": "Is a count of about 4,300 genes plausible for this genome?",
+				"options": [
+					"No, since a genome of this size carries about 400 genes",
+					"No, since most of a bacterial genome lies between genes",
+					"Yes, though only if the genome carries large plasmids",
+					"Yes, since bacterial genomes hold about one gene per kb"
+				],
+				"answer": 3,
+				"explain": "Bacterial genomes are densely packed, with roughly 85 to 90% of the sequence coding for proteins, which works out at close to one gene per kilobase. E. coli K-12, at about 4.6 Mb, has around 4,300 protein-coding genes."
+			},
+			{
+				"question": "The student also needs the genome's tRNA and rRNA genes. Which step adds them?",
+				"options": [
+					"Running tRNAscan-SE and barrnap beside Prodigal",
+					"Rerunning Prodigal in its metagenome mode",
+					"Lowering Prodigal's minimum gene length to 60 bp",
+					"Searching the six-frame translation against Pfam"
+				],
+				"answer": 0,
+				"explain": "Prodigal models protein-coding genes only, so RNA genes come from their own tools: tRNAscan-SE or Aragorn for tRNAs, and barrnap or RNAmmer for rRNAs. Annotation pipelines such as RASTtk call RNA genes as part of their run."
+			}
+		],
+		"explain": "Gene calling is the first annotation step: Prodigal gives the protein-coding genes, and separate tools add the RNA genes before functions are assigned."
+	},
+	{
+		"id": "bioi2-004",
+		"topic": "bioinformatics",
+		"level": "easy",
+		"kind": "truefalse",
+		"statement": "In a pangenome of several strains, the core genome is the set of genes found in each strain, and the accessory genome holds the genes found in only some.",
+		"answer": true,
+		"explain": "The pangenome is the whole gene repertoire of the strains studied: core genes are shared by each strain, and accessory genes, often carried on plasmids, prophages and genomic islands, vary between them. Tools such as Roary also report a soft core, found in at least 95% of the strains, to allow for genes missed in draft assemblies."
+	},
+	{
+		"id": "bioi2-005",
+		"topic": "bioinformatics",
+		"level": "easy",
+		"kind": "case",
+		"scenario": "A student wants to annotate the 4,300 predicted proteins of a new genome by searching them against a protein database of over 100 million sequences.",
+		"parts": [
+			{
+				"question": "Which tool suits this large protein search best?",
+				"options": [
+					"BLASTN, which compares nucleotide sequences",
+					"Clustal Omega, which builds multiple alignments",
+					"DIAMOND, a far faster protein aligner than BLASTP",
+					"Prodigal, which predicts protein-coding genes"
+				],
+				"answer": 2,
+				"explain": "DIAMOND aligns proteins many times faster than BLASTP, and its sensitive modes come close to BLASTP in sensitivity. That speed makes searches of whole proteomes against huge databases practical."
+			},
+			{
+				"question": "Why search with the protein sequences rather than the genes' DNA?",
+				"options": [
+					"Protein files are smaller, and file size sets the search speed",
+					"Proteins change more slowly, so distant homologs stay visible",
+					"DNA databases hold sequences from only a few model species",
+					"DNA searches can only find genes that share one codon usage"
+				],
+				"answer": 1,
+				"explain": "Synonymous codon changes and the four-letter alphabet make DNA similarity fade quickly, while amino acid sequences, scored with matrices such as BLOSUM62, keep a detectable signal over far longer evolutionary distances. Protein searches therefore reach distant homologs that DNA searches miss."
+			},
+			{
+				"question": "One protein has two hits: hit A with a bit score of 310 and an E-value of 1e-85, and hit B with a bit score of 48 and an E-value of 1e-4. Which reading is right?",
+				"options": [
+					"Hit B is stronger, since its E-value is the larger number",
+					"The two hits are equal, since both pass an E-value of 0.01",
+					"Neither can be judged until percent identity is known",
+					"Hit A is stronger evidence of homology than hit B"
+				],
+				"answer": 3,
+				"explain": "A higher bit score and a lower E-value both mark a better alignment, and hit A wins on each. Hit B is weaker evidence, worth checking against other sources such as domain searches."
+			}
+		],
+		"explain": "Choosing a search tool that fits the size of the job, searching at the protein level and reading bit scores with E-values make homology searches both fast and sound."
+	},
+	{
+		"id": "bioi2-006",
+		"topic": "bioinformatics",
+		"level": "easy",
+		"kind": "match",
+		"question": "Match each tool to the job it does in a genome project.",
+		"pairs": [
+			{
+				"left": "SPAdes",
+				"right": "Assembles short sequencing reads into contigs"
+			},
+			{
+				"left": "CheckM",
+				"right": "Estimates completeness and contamination from marker genes"
+			},
+			{
+				"left": "RASTtk",
+				"right": "Calls genes and gives their proteins function names"
+			},
+			{
+				"left": "GTDB-Tk",
+				"right": "Assigns taxonomy against the Genome Taxonomy Database"
+			},
+			{
+				"left": "HMMER",
+				"right": "Searches sequences with profile hidden Markov models"
+			}
+		],
+		"explain": "These tools follow a genome from reads to annotation: SPAdes assembles, CheckM judges quality, RASTtk annotates, GTDB-Tk names the lineage and HMMER finds protein families."
+	},
+	{
+		"id": "bioi2-007",
+		"topic": "bioinformatics",
+		"level": "easy",
+		"kind": "case",
+		"scenario": "A student runs eggNOG-mapper on the proteins of a new Pseudomonas genome. For one protein it reports an orthologous group, a KEGG ortholog (KO) number and the COG functional category E.",
+		"parts": [
+			{
+				"question": "What makes two genes in different species orthologs?",
+				"options": [
+					"They arose by duplication of one gene inside a genome",
+					"They share more than 50% identity along their whole length",
+					"They descend from one ancestral gene split by speciation",
+					"They moved between the species by horizontal transfer"
+				],
+				"answer": 2,
+				"explain": "Orthologs descend from a single gene in the last common ancestor and separated when the species did, while paralogs arise by duplication. Orthology is the usual basis for carrying a function from one species to another."
+			},
+			{
+				"question": "What does the KO number let the student do next?",
+				"options": [
+					"Place the gene on KEGG pathway maps and modules",
+					"Find the gene's position on the chromosome",
+					"Predict whether the protein carries a signal peptide",
+					"Work out the genome's taxonomy at species level"
+				],
+				"answer": 0,
+				"explain": "A KO groups orthologous genes that play one role, and KEGG draws its pathway maps and modules in KO terms. Mapping a genome's KOs onto them shows which pathways look complete."
+			},
+			{
+				"question": "What does COG category E say about the protein?",
+				"options": [
+					"It works in energy production and conversion",
+					"It has a conserved function that is still unknown",
+					"It takes part in building the cell wall",
+					"It works in amino acid transport and metabolism"
+				],
+				"answer": 3,
+				"explain": "COG category E is amino acid transport and metabolism. Energy production and conversion is C, cell wall, membrane and envelope biogenesis is M, and function unknown is S."
+			}
+		],
+		"explain": "Orthology tools such as eggNOG-mapper turn sequence matches into functional labels, KOs for pathways and COG letters for broad categories, which together sketch what a genome can do."
+	},
+	{
+		"id": "bioi2-008",
+		"topic": "bioinformatics",
+		"level": "intermediate",
+		"kind": "case",
+		"scenario": "A student calls genes on a Mycoplasma genome with Prodigal, setting translation table 11 with -g 11. Many predicted genes are unusually short, and pairs of neighbouring genes in the same frame each match one half of a single known Mycoplasma protein.",
+		"parts": [
+			{
+				"question": "What best explains the split genes?",
+				"options": [
+					"Sequencing errors that caused a frameshift at each split point",
+					"Mycoplasma reads TGA as tryptophan, and table 11 reads it as stop",
+					"Self-splicing introns inside the genes, which table 11 skips",
+					"The genome's low GC content, which shifts Prodigal's start codons"
+				],
+				"answer": 1,
+				"explain": "Mycoplasma uses translation table 4, in which TGA codes for tryptophan. Under table 11 each in-frame TGA ends a gene, so one real gene is called as fragments in the same frame, whereas frameshifts would put the halves in different frames."
+			},
+			{
+				"question": "What should the student do?",
+				"options": [
+					"Switch Prodigal to its metagenome mode with -p meta",
+					"Raise the minimum gene length to remove the short genes",
+					"Merge each split pair by hand and keep table 11",
+					"Rerun Prodigal with -g 4, so TGA reads as tryptophan"
+				],
+				"answer": 3,
+				"explain": "Table 4 matches the code the organism uses, so Prodigal reads through TGA and calls each gene at full length. RASTtk takes the genetic code as an input for the same reason."
+			},
+			{
+				"question": "After the rerun, how should the gene count and the mean gene length change?",
+				"options": [
+					"Fewer genes, with a longer mean length",
+					"More genes, with a shorter mean length",
+					"The same number of genes, each slightly longer",
+					"More genes, with the same mean length"
+				],
+				"answer": 0,
+				"explain": "Fragments joined back into whole genes lower the count and raise the mean length, and the share of the genome called as coding rises too. These shifts are a quick check that the right code was used."
+			}
+		],
+		"explain": "The genetic code is a per-genome setting: Mycoplasma and Spiroplasma use table 4, and a wrong table splits genes in ways the gene statistics reveal."
+	},
+	{
+		"id": "bioi2-009",
+		"topic": "bioinformatics",
+		"level": "intermediate",
+		"kind": "match",
+		"question": "Match each search task to the BLAST program that fits it.",
+		"pairs": [
+			{
+				"left": "Check an isolate's 16S rRNA gene against other 16S rRNA genes",
+				"right": "blastn"
+			},
+			{
+				"left": "Compare a predicted protein with a database of proteins",
+				"right": "blastp"
+			},
+			{
+				"left": "Find which known proteins a new, unannotated contig encodes",
+				"right": "blastx"
+			},
+			{
+				"left": "Find where a known protein is encoded in an unannotated assembly",
+				"right": "tblastn"
+			},
+			{
+				"left": "Compare two DNA sequences through their six-frame translations",
+				"right": "tblastx"
+			}
+		],
+		"explain": "The program follows the molecule types: blastn and blastp compare like with like, blastx translates a DNA query, tblastn translates a DNA database, and tblastx translates both. DIAMOND offers the two protein-database modes, blastp and blastx, at far higher speed."
+	},
+	{
+		"id": "bioi2-010",
+		"topic": "bioinformatics",
+		"level": "intermediate",
+		"kind": "truefalse",
+		"statement": "Searching the same query against a database twice the size changes a hit's bit score, while its E-value stays the same.",
+		"answer": false,
+		"explain": "The bit score depends on the alignment and the scoring system, so it stays the same in any database. The E-value scales with the search space, so doubling the database roughly doubles it, which makes bit scores the better number for comparing searches."
+	},
+	{
+		"id": "bioi2-011",
+		"topic": "bioinformatics",
+		"level": "intermediate",
+		"kind": "case",
+		"scenario": "A student's protein has only weak BLASTP hits, the best with an E-value of 0.3. A hmmscan search against Pfam finds a domain hit with an E-value of 1e-25 that passes the family's gathering threshold, and a search against TIGRFAMs finds a hit above the trusted cutoff of an equivalog model.",
+		"parts": [
+			{
+				"question": "Why can the profile search find a family that BLASTP missed?",
+				"options": [
+					"HMMER searches a far larger database than BLASTP",
+					"The HMM scores each position by how conserved it is",
+					"HMMER relaxes its threshold until a hit turns up",
+					"The HMM skips gaps, which raises each alignment score"
+				],
+				"answer": 1,
+				"explain": "A profile HMM is built from an alignment of many family members, so it rewards the residues the family conserves, tolerates change elsewhere and sets gap costs position by position. That makes it more sensitive to distant homologs than a single-sequence search."
+			},
+			{
+				"question": "What does Pfam's gathering threshold mean?",
+				"options": [
+					"A curated bit-score cutoff above which hits join the family",
+					"The E-value below which a hit counts as an exact match",
+					"The share of the query that the domain has to cover",
+					"The lowest percent identity to the seed that the family allows"
+				],
+				"answer": 0,
+				"explain": "Pfam curators set a gathering threshold in bits for each family so that sequences scoring above it are true members. The --cut_ga option of hmmscan applies these thresholds."
+			},
+			{
+				"question": "What does the TIGRFAMs equivalog hit add to the Pfam domain hit?",
+				"options": [
+					"Evidence that the gene is a broken pseudogene copy",
+					"Evidence of where in the cell the protein sits",
+					"Support for a specific function, beyond a shared domain",
+					"A taxonomic label for the genome the protein came from"
+				],
+				"answer": 2,
+				"explain": "TIGRFAMs equivalog models cover proteins that keep one specific function, and a score above the trusted cutoff supports giving the protein that function's name. A Pfam domain hit places the protein in a family whose members may differ in their exact role."
+			}
+		],
+		"explain": "Profile HMMs reach further than pairwise searches, and curated cutoffs turn their scores into decisions: Pfam for domain families and TIGRFAMs equivalogs for specific functions."
+	},
+	{
+		"id": "bioi2-012",
+		"topic": "bioinformatics",
+		"level": "intermediate",
+		"kind": "match",
+		"question": "The proteins of a Gram-negative bacterium are run through SignalP and a transmembrane helix predictor. Match each prediction to what it means for the protein.",
+		"pairs": [
+			{
+				"left": "Sec/SPI signal peptide",
+				"right": "Exported unfolded through SecYEG, its signal cut by signal peptidase I"
+			},
+			{
+				"left": "Tat/SPI signal peptide",
+				"right": "Exported already folded, led by a twin-arginine motif"
+			},
+			{
+				"left": "Sec/SPII signal peptide",
+				"right": "A lipoprotein, anchored to a membrane by lipid on a cysteine"
+			},
+			{
+				"left": "Several hydrophobic helices of about 20 residues",
+				"right": "An integral membrane protein that spans the bilayer several times"
+			},
+			{
+				"left": "No signal peptide and no transmembrane helix",
+				"right": "Most likely a cytoplasmic protein"
+			}
+		],
+		"explain": "SignalP 6 tells apart the Sec route, which moves proteins unfolded, the Tat route, which moves them folded, and lipoprotein signals cut by signal peptidase II before a lipobox cysteine. Runs of about 20 hydrophobic residues mark membrane-spanning helices, and proteins lacking both features mostly stay in the cytoplasm."
+	},
+	{
+		"id": "bioi2-013",
+		"topic": "bioinformatics",
+		"level": "intermediate",
+		"kind": "case",
+		"scenario": "A student classifies a metagenome-assembled genome with GTDB-Tk. The genome is placed in the genus g__Bacteroides, and the species field is left empty (s__).",
+		"parts": [
+			{
+				"question": "What does the empty species field most likely mean?",
+				"options": [
+					"The genome is too fragmented for GTDB-Tk to classify",
+					"Its species is known to GTDB but has no Latin name yet",
+					"No GTDB species representative lies within about 95% ANI",
+					"The genome mixes DNA from two separate Bacteroides species"
+				],
+				"answer": 2,
+				"explain": "GTDB-Tk names a species only when the genome falls within the ANI radius, typically 95%, of a species representative. Species GTDB knows without a Latin name carry placeholder names built from sp and an assembly accession number, so an empty field points to a species missing from GTDB, often a new one."
+			},
+			{
+				"question": "How does GTDB-Tk place a genome in its reference tree?",
+				"options": [
+					"By matching its 16S rRNA gene against the SILVA database",
+					"By placing its aligned marker proteins in the GTDB tree",
+					"By counting k-mers shared with each genome in NCBI",
+					"By comparing its GC content with the genus average"
+				],
+				"answer": 1,
+				"explain": "GTDB-Tk finds about 120 conserved single-copy marker proteins in a bacterial genome, or 53 in an archaeal one, aligns them and places the concatenated alignment in the GTDB reference tree with pplacer. The placement and relative evolutionary divergence assign the ranks above species, and ANI to species representatives settles the species."
+			},
+			{
+				"question": "A 16S amplicon survey of the same sample gave this lineage a named Bacteroides species. Which explanation fits best?",
+				"options": [
+					"Close species share near-identical 16S genes, so short reads blur them",
+					"Amplicon reads span the whole genome, which makes their species calls firmer",
+					"The genome's 16S gene came from an archaeon by horizontal transfer",
+					"GTDB-Tk drops the species of genomes assembled from metagenomes"
+				],
+				"answer": 0,
+				"explain": "The 16S gene changes slowly, and an amplicon covers only a few hundred bases of it, so species of one genus often look alike. Genome-wide ANI compares far more sequence and separates species that 16S lumps together."
+			}
+		],
+		"explain": "GTDB-Tk places a genome by its marker proteins and names the species by ANI, so an empty species field flags a likely new species within a known genus."
+	},
+	{
+		"id": "bioi2-014",
+		"topic": "bioinformatics",
+		"level": "hard",
+		"kind": "case",
+		"scenario": "A student checks a metagenome bin against 120 marker genes that are single-copy across its lineage. Of the 120 markers, 114 are found: 108 once and 6 twice. In a simplified form of CheckM's method, completeness is the share of the markers found, and contamination is the number of extra copies as a share of the 120 markers.",
+		"parts": [
+			{
+				"question": "What is the bin's completeness?",
+				"options": [
+					"90%",
+					"95%",
+					"100%",
+					"5%"
+				],
+				"answer": 1,
+				"explain": "114 of the 120 markers are present, and 114 ÷ 120 = 95%. Counting only the 108 markers found once would give 90%, which leaves out the 6 found twice."
+			},
+			{
+				"question": "What is the bin's contamination?",
+				"options": [
+					"10%",
+					"2.5%",
+					"5%",
+					"6%"
+				],
+				"answer": 2,
+				"explain": "The 6 duplicated markers add 6 extra copies, and 6 ÷ 120 = 5%. Counting both copies of each, 12 ÷ 120, would double the figure to 10%."
+			},
+			{
+				"question": "The two copies of each duplicated marker share 99% amino acid identity. What is the most likely source of the extra copies?",
+				"options": [
+					"A distant organism from another phylum, binned by mistake",
+					"Sequencing errors that copied the marker genes in the reads",
+					"Plasmids that carry spare copies of ribosomal protein genes",
+					"A closely related strain of the same species, binned together"
+				],
+				"answer": 3,
+				"explain": "Copies this similar point to two strains of one species in the sample, which CheckM reports as strain heterogeneity. A contaminant from a distant lineage would carry markers far less similar to the bin's own."
+			}
+		],
+		"explain": "Single-copy marker genes give quick estimates of completeness and contamination, and the similarity of duplicated markers helps tell a strain mixture from a distant contaminant."
+	},
+	{
+		"id": "bioi2-015",
+		"topic": "bioinformatics",
+		"level": "hard",
+		"kind": "match",
+		"question": "An assembly has six contigs of 400, 250, 150, 100, 60 and 40 kb. Match each statistic to its value.",
+		"pairs": [
+			{
+				"left": "Total assembly length",
+				"right": "1,000 kb"
+			},
+			{
+				"left": "N50",
+				"right": "250 kb"
+			},
+			{
+				"left": "L50",
+				"right": "2 contigs"
+			},
+			{
+				"left": "N90",
+				"right": "100 kb"
+			},
+			{
+				"left": "L90",
+				"right": "4 contigs"
+			}
+		],
+		"explain": "Sorted from longest, the contigs add up to 400, 650, 800 and 900 kb of the 1,000 kb total. Half the total, 500 kb, is passed at the second contig, of 250 kb, and 90%, or 900 kb, is reached at the fourth, of 100 kb."
+	},
+	{
+		"id": "bioi2-016",
+		"topic": "bioinformatics",
+		"level": "hard",
+		"kind": "truefalse",
+		"statement": "When a transmembrane helix predictor finds a single helix within the first 30 residues of a protein, the protein is certain to be an integral membrane protein.",
+		"answer": false,
+		"explain": "The hydrophobic core of a signal peptide looks much like a transmembrane helix, so predictors such as TMHMM often report one at the N-terminus of secreted proteins. Running SignalP alongside, or using Phobius, which models both together, separates cleaved signal peptides from true membrane anchors."
+	},
+	{
+		"id": "bioi2-017",
+		"topic": "bioinformatics",
+		"level": "hard",
+		"kind": "match",
+		"question": "Prodigal writes this GFF3 line, shown with its columns separated by bars: contig_7 | Prodigal_v2.6.3 | CDS | 1201 | 2400 | 85.3 | - | 0 | ID=7_12. Its coordinates include the stop codon. Match each quantity to its value.",
+		"pairs": [
+			{
+				"left": "Length of the CDS",
+				"right": "1,200 bp"
+			},
+			{
+				"left": "Codons in the CDS, the stop codon included",
+				"right": "400"
+			},
+			{
+				"left": "Amino acids in the encoded protein",
+				"right": "399"
+			},
+			{
+				"left": "Coordinate of the first base of the start codon",
+				"right": "2,400"
+			},
+			{
+				"left": "Coordinates of the stop codon",
+				"right": "1,201 to 1,203"
+			}
+		],
+		"explain": "GFF3 counts from 1 and includes both ends, so the CDS spans 2,400 − 1,201 + 1 = 1,200 bp, or 400 codons, and the stop codon leaves 399 amino acids. On the minus strand the gene reads from high to low coordinates, so it starts at 2,400 and its stop codon sits at 1,201 to 1,203."
+	},
+	{
+		"id": "bioi2-018",
+		"topic": "bioinformatics",
+		"level": "hard",
+		"kind": "case",
+		"scenario": "A student builds a pangenome of 20 genomes of one bacterial species with Panaroo. Each genome carries genes from about 4,500 gene families. The core genome holds 3,200 gene families and the whole pangenome 11,000, and on the accumulation curve each extra genome still adds about 150 new gene families.",
+		"parts": [
+			{
+				"question": "About how many accessory gene families does a typical genome in the set carry?",
+				"options": [
+					"About 7,800",
+					"About 1,300",
+					"About 6,500",
+					"About 3,200"
+				],
+				"answer": 1,
+				"explain": "A genome carries about 4,500 families, 3,200 of them core, which leaves about 1,300 accessory families. The 7,800 figure is the accessory genome of the whole set, 11,000 − 3,200."
+			},
+			{
+				"question": "What does the steady arrival of new gene families tell the student?",
+				"options": [
+					"The pangenome is open, so further genomes will keep adding genes",
+					"The pangenome is closed, so the gene count has reached its limit",
+					"The core genome grows by about 150 families with each genome",
+					"The species has stopped taking up genes by horizontal transfer"
+				],
+				"answer": 0,
+				"explain": "A pangenome that keeps growing as genomes are added is called open, as in species that often gain genes by horizontal transfer, such as Escherichia coli. In a closed pangenome the curve levels off, and Panaroo's error correction keeps fragmented genes from inflating the count."
+			},
+			{
+				"question": "To build a tree of the 20 strains, which genes should the student align?",
+				"options": [
+					"The accessory genes, since they vary most between strains",
+					"The genes found in only one genome, which mark each strain",
+					"Plasmid genes, since they move often between strains",
+					"Single-copy core genes, which each genome carries once"
+				],
+				"answer": 3,
+				"explain": "Single-copy core genes give each strain one aligned sequence per gene, and their shared vertical history suits tree building. Accessory genes, often moved by horizontal transfer, follow histories of their own."
+			}
+		],
+		"explain": "Pangenome counts follow from simple set arithmetic, and the accumulation curve and the core gene alignment answer separate questions: how open the gene pool is, and how the strains are related."
+	},
+	{
+		"id": "bioi2-019",
+		"topic": "bioinformatics",
+		"level": "hard",
+		"kind": "match",
+		"question": "Match each codon, in its context, to what the ribosome does with it.",
+		"pairs": [
+			{
+				"left": "ATG at the start of an Escherichia coli gene",
+				"right": "Starts the protein with formyl-methionine"
+			},
+			{
+				"left": "ATG inside an Escherichia coli gene",
+				"right": "Adds methionine"
+			},
+			{
+				"left": "TGA at the end of an Escherichia coli gene",
+				"right": "Ends translation and releases the protein"
+			},
+			{
+				"left": "TGA inside E. coli fdhF, followed by a SECIS hairpin",
+				"right": "Adds selenocysteine"
+			},
+			{
+				"left": "TAG inside the mtmB gene of Methanosarcina",
+				"right": "Adds pyrrolysine"
+			}
+		],
+		"explain": "Context decides the reading: the bacterial initiator tRNA brings formyl-methionine to a start codon, and a SECIS hairpin just downstream recodes TGA as selenocysteine. In Methanosarcina a dedicated tRNA reads TAG in mtmB as pyrrolysine, and a plain TGA at the end of a gene calls release factor 2 to free the protein."
+	},
+	{
+		"id": "bioi2-020",
+		"topic": "bioinformatics",
+		"level": "hard",
+		"kind": "truefalse",
+		"statement": "If a gene duplicated in an ancestor and two descendant lineages then lost different copies, the reciprocal best BLAST hits between their genomes can be paralogs.",
+		"answer": true,
+		"explain": "Each lineage keeps one copy, so each copy is the other's best hit, yet the two split at the duplication and are paralogs. Comparing many genomes, as eggNOG and similar resources do, helps expose such hidden paralogy."
+	},
+	{
+		"id": "bioi2-021",
+		"topic": "bioinformatics",
+		"level": "hard",
+		"kind": "match",
+		"question": "Match each arrangement of two neighbouring genes to the reading it best supports.",
+		"pairs": [
+			{
+				"left": "Same strand, the stop codon of the first overlapping the start codon of the second in ATGA",
+				"right": "Translation of the second coupled to the first on one mRNA"
+			},
+			{
+				"left": "Same strand, 300 bp apart, with a predicted terminator between them",
+				"right": "Two transcription units, the first ending at its terminator"
+			},
+			{
+				"left": "Opposite strands, the starts adjacent, the genes pointing apart",
+				"right": "Divergent genes, transcribed outward from a shared intergenic region"
+			},
+			{
+				"left": "Opposite strands, the ends adjacent, the genes pointing together",
+				"right": "Convergent genes, whose transcripts end in the gap between them"
+			},
+			{
+				"left": "Same strand, kept side by side in distantly related genomes",
+				"right": "Conserved neighbourhood, a hint that the proteins work together"
+			}
+		],
+		"explain": "Tight same-strand spacing, overlapping stop and start codons and conserved gene order are classic signs of an operon, and a terminator marks where a transcription unit ends. Genes on opposite strands sit in separate transcription units, read away from or toward each other."
+	}
+]

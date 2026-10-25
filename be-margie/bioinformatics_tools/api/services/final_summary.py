@@ -36,10 +36,10 @@ def _number(text: str) -> float | None:
 
 
 def tally(lines: Iterable[str]) -> dict:
-    """Counts genes, operons, support and tiers from FINAL table lines and builds the ring glyph."""
+    """Counts genes, operons, support, review flags and tiers from FINAL table lines and builds the ring glyph."""
     columns: list[str] = []
     idx: dict[str, int] = {}
-    genes = in_operons = with_support = 0
+    genes = in_operons = with_support = flagged = 0
     envelope = ''
     operons: set[str] = set()
     tiers: dict[str, int] = {}
@@ -62,6 +62,8 @@ def tally(lines: Iterable[str]) -> dict:
         genes += 1
         if _YES.match(get('IS_IN_OPERON?')):
             in_operons += 1
+        if _YES.match(get('NEEDS_REVIEW?')):
+            flagged += 1
         op = get('UniOP_OPERON_id')
         if op.startswith('operon'):
             operons.add(op)
@@ -92,6 +94,7 @@ def tally(lines: Iterable[str]) -> dict:
         'operons': len(operons),
         'inOperons': in_operons,
         'withSupport': with_support,
+        'flagged': flagged,
         'envelope': envelope,
         'tiers': tiers,
         'glyph': _glyph(placed),

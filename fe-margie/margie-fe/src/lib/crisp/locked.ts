@@ -2,7 +2,7 @@
  * Pages that open with a password (the scores page draws on a thesis under embargo). The website
  * build adds each page as /locked/<name>.bin, encrypted (AES-256-GCM, key from PBKDF2-SHA256 of the
  * password); its source and the encrypting script are kept privately. An opened page stays open
- * for this tab's visit.
+ * for this tab's visit, or until relock() locks it again.
  */
 
 import DOMPurify from 'dompurify';
@@ -16,6 +16,8 @@ export interface LockedPage {
 
 const MAGIC = 'MARGIEL1';
 const opened = new Map<string, LockedPage>();
+/** Each opened page's figure URLs, released when the page is locked again. */
+const figureUrls = new Map<string, string[]>();
 
 export class LockedError extends Error {
 	constructor(
@@ -28,6 +30,13 @@ export class LockedError extends Error {
 
 /** The page if it was opened earlier in this visit. */
 export const alreadyOpen = (name: string): LockedPage | null => opened.get(name) ?? null;
+
+/** Locks a page again: it asks for the password at its next opening, and its figures are released. */
+export function relock(name: string) {
+	opened.delete(name);
+	for (const url of figureUrls.get(name) ?? []) URL.revokeObjectURL(url);
+	figureUrls.delete(name);
+}
 
 /** Fetches, decrypts and returns a locked page; throws LockedError for a missing page or a wrong password. */
 export async function openLocked(name: string, password: string): Promise<LockedPage> {
@@ -60,5 +69,6 @@ export async function openLocked(name: string, password: string): Promise<Locked
 		sections: Object.fromEntries(Object.entries(data.sections ?? {}).map(([k, v]) => [k, clean(v)]))
 	};
 	opened.set(name, page);
+	figureUrls.set(name, urls.map(([, url]) => url));
 	return page;
 }

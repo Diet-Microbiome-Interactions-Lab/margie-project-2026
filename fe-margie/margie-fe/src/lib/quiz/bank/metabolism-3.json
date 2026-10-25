@@ -1,0 +1,515 @@
+[
+	{
+		"id": "meta3-001",
+		"topic": "metabolism",
+		"level": "easy",
+		"kind": "case",
+		"scenario": "Lactococcus lactis is added to warm milk to start a cheese. Over a few hours the pH falls from about 6.6 to about 5, and nearly the whole of the sugar the bacterium uses ends up as lactate.",
+		"parts": [
+			{
+				"question": "Which pathway carries glucose to pyruvate in this homolactic fermentation?",
+				"options": [
+					"The Embden–Meyerhof–Parnas pathway",
+					"The Entner–Doudoroff pathway",
+					"The phosphoketolase pathway",
+					"The oxidative pentose phosphate pathway"
+				],
+				"answer": 0,
+				"explain": "Homolactic bacteria such as Lactococcus split fructose 1,6-bisphosphate with aldolase, the hallmark of the EMP pathway, and make two pyruvate per glucose. The phosphoketolase pathway belongs to heterolactic fermenters, which make ethanol and CO2 alongside lactate."
+			},
+			{
+				"question": "How many lactate molecules does the fermentation make from one glucose?",
+				"options": [
+					"One, along with ethanol and CO2",
+					"Two, along with acetate and formate",
+					"Two, as the sole main product",
+					"Four, from two rounds of glycolysis"
+				],
+				"answer": 2,
+				"explain": "Each of the two pyruvate from the EMP pathway is reduced to lactate, so one glucose gives two lactate. A fermentation with lactate as nearly its sole product is called homolactic."
+			},
+			{
+				"question": "What does lactate dehydrogenase achieve in this fermentation?",
+				"options": [
+					"It makes ATP from pyruvate by substrate-level phosphorylation",
+					"It removes CO2 from pyruvate to form acetaldehyde",
+					"It pumps protons out to build a proton motive force",
+					"It regenerates NAD+ by reducing pyruvate to lactate"
+				],
+				"answer": 3,
+				"explain": "Glyceraldehyde 3-phosphate dehydrogenase reduces NAD+ to NADH, and the cell holds only a small pool of NAD+. Lactate dehydrogenase hands these electrons to pyruvate, regenerating NAD+ so that glycolysis keeps running."
+			}
+		],
+		"explain": "Lactococcus lactis runs a homolactic fermentation: the EMP pathway makes pyruvate, and lactate dehydrogenase reduces it to lactate to balance NADH. The lactic acid it releases lowers the pH of the milk, an early step in making many cheeses."
+	},
+	{
+		"id": "meta3-002",
+		"topic": "metabolism",
+		"level": "easy",
+		"kind": "match",
+		"question": "Match each top-level EC class with the kind of reaction its enzymes catalyse.",
+		"pairs": [
+			{ "left": "EC 1", "right": "Oxidation–reduction, moving electrons between molecules" },
+			{ "left": "EC 2", "right": "Moving a group, such as phosphate, from one molecule to another" },
+			{ "left": "EC 3", "right": "Splitting a bond by adding water" },
+			{ "left": "EC 4", "right": "Breaking a bond by elimination, often leaving a double bond" },
+			{ "left": "EC 6", "right": "Joining two molecules with energy from ATP or a similar triphosphate" }
+		],
+		"explain": "The seven EC classes are oxidoreductases (EC 1), transferases (EC 2), hydrolases (EC 3), lyases (EC 4), isomerases (EC 5), ligases (EC 6) and translocases (EC 7). The later digits narrow the reaction down, as in EC 3.2.1 for the glycoside hydrolases."
+	},
+	{
+		"id": "meta3-003",
+		"topic": "metabolism",
+		"level": "easy",
+		"kind": "case",
+		"scenario": "Cellulomonas fimi, a soil bacterium, grows on filter paper, which is nearly pure cellulose, as its sole carbon source. It secretes enzymes that cut the cellulose chains, and the culture fluid soon contains cellobiose, a disaccharide of two glucose units.",
+		"parts": [
+			{
+				"question": "Which linkage joins the glucose units in cellulose?",
+				"options": [
+					"α-1,4-glycosidic bonds",
+					"β-1,4-glycosidic bonds",
+					"α-1,6-glycosidic bonds",
+					"β-1,3-glycosidic bonds"
+				],
+				"answer": 1,
+				"explain": "Cellulose is an unbranched chain of glucose units joined by β-1,4 bonds, which lets neighbouring chains pack into tight, crystalline fibres. Starch and glycogen use α-1,4 bonds, with α-1,6 bonds at their branch points."
+			},
+			{
+				"question": "Which enzyme splits cellobiose into two glucose?",
+				"options": [
+					"α-Amylase",
+					"Endo-1,4-β-xylanase",
+					"Pectate lyase",
+					"β-Glucosidase"
+				],
+				"answer": 3,
+				"explain": "β-Glucosidase hydrolyses the β-1,4 bond of cellobiose to release two glucose. Endoglucanases cut inside the cellulose chains and cellobiohydrolases release cellobiose from their ends, so β-glucosidase completes the breakdown."
+			},
+			{
+				"question": "Why does C. fimi break cellulose down outside the cell?",
+				"options": [
+					"The chains are too large to cross the membrane, so small sugars are taken up",
+					"Cellulases need O2, which is plentiful only in the soil around the cell",
+					"Cellulose is toxic inside the cell, so the cell keeps it at the surface",
+					"The proton motive force drives the cutting of cellulose at the outer surface"
+				],
+				"answer": 0,
+				"explain": "Polysaccharides such as cellulose are far too large for membrane transporters. Cellulolytic bacteria therefore secrete glycoside hydrolases and take up the cellobiose and glucose they release."
+			}
+		],
+		"explain": "Cellulose is a β-1,4-linked glucose polymer that bacteria break down outside the cell with secreted glycoside hydrolases. β-Glucosidase finishes the job by turning cellobiose into glucose."
+	},
+	{
+		"id": "meta3-004",
+		"topic": "metabolism",
+		"level": "easy",
+		"kind": "truefalse",
+		"statement": "The oxidative branch of the pentose phosphate pathway makes NADPH, which cells use as reducing power for biosynthesis.",
+		"answer": true,
+		"explain": "Glucose-6-phosphate dehydrogenase and 6-phosphogluconate dehydrogenase each reduce one NADP+, giving two NADPH and one CO2 as glucose 6-phosphate becomes ribulose 5-phosphate. The pathway also supplies ribose 5-phosphate for nucleotides and erythrose 4-phosphate for aromatic amino acids."
+	},
+	{
+		"id": "meta3-005",
+		"topic": "metabolism",
+		"level": "easy",
+		"kind": "case",
+		"scenario": "In an anaerobic digester treating sewage sludge, fermenting bacteria break organic matter down to acetate, H2 and CO2. Methanogenic archaea turn these products into methane, which is collected as biogas.",
+		"parts": [
+			{
+				"question": "Hydrogenotrophic methanogens use H2 as their electron donor. Which compound accepts the electrons and becomes methane?",
+				"options": [
+					"Acetate",
+					"Sulfate",
+					"CO2",
+					"Nitrate"
+				],
+				"answer": 2,
+				"explain": "Hydrogenotrophic methanogens reduce CO2 to methane with four H2: CO2 + 4 H2 → CH4 + 2 H2O. On the way, the carbon passes through formyl, methylene and methyl stages on carrier coenzymes."
+			},
+			{
+				"question": "Acetoclastic methanogens such as Methanothrix (formerly Methanosaeta) use acetate. What do they make from it?",
+				"options": [
+					"Methane and CO2",
+					"Methane and H2",
+					"CO2 and H2",
+					"Methanol and water"
+				],
+				"answer": 0,
+				"explain": "Acetoclastic methanogens split acetate: the methyl group is reduced to methane and the carboxyl group is oxidised to CO2, so CH3COOH → CH4 + CO2."
+			},
+			{
+				"question": "2-Bromoethanesulfonate, an inhibitor of methanogens, is added to the digester. What builds up?",
+				"options": [
+					"Methane, as the archaea speed up to make up for it",
+					"H2 and acetate, which the methanogens stop using",
+					"O2, which fermenting bacteria release in their place",
+					"Nitrate, as the bacteria switch to nitrification"
+				],
+				"answer": 1,
+				"explain": "2-Bromoethanesulfonate is an analogue of coenzyme M that blocks methyl-coenzyme M reductase, the last step of methanogenesis. H2 and acetate then accumulate, and the rising H2 slows the bacteria that make it."
+			}
+		],
+		"explain": "Biogas comes from a partnership: bacteria ferment organic matter to acetate, H2 and CO2, and methanogenic archaea turn these into methane. By consuming H2, the methanogens keep fermentation running."
+	},
+	{
+		"id": "meta3-006",
+		"topic": "metabolism",
+		"level": "easy",
+		"kind": "match",
+		"question": "Match each step of the nitrogen cycle with the change it makes.",
+		"pairs": [
+			{ "left": "Nitrogen fixation", "right": "N2 to NH3" },
+			{ "left": "Ammonia oxidation", "right": "NH3 to NO2−" },
+			{ "left": "Nitrite oxidation", "right": "NO2− to NO3−" },
+			{ "left": "Denitrification", "right": "NO3− to N2" },
+			{ "left": "Ammonification", "right": "Organic nitrogen to NH4+" }
+		],
+		"explain": "Nitrogenase fixes N2 into ammonia, ammonia oxidisers such as Nitrosomonas make nitrite, and nitrite oxidisers such as Nitrobacter and Nitrospira make nitrate; together these two oxidations are nitrification. Denitrifiers return nitrate to N2, and ammonification releases ammonium as organic matter decays."
+	},
+	{
+		"id": "meta3-007",
+		"topic": "metabolism",
+		"level": "easy",
+		"kind": "case",
+		"scenario": "Escherichia coli is grown on glucose in three flasks: one shaken in air, one sealed and free of O2 but with nitrate added, and one sealed with neither O2 nor nitrate. The flask in air gives the most cells per gram of glucose, and the flask with neither gives the fewest.",
+		"parts": [
+			{
+				"question": "Why does growth in air give the highest yield?",
+				"options": [
+					"O2 lets glycolysis run faster, so substrate-level steps make more ATP",
+					"O2 is a substrate of ATP synthase and is built into each ATP it makes",
+					"O2 adds oxygen atoms to glucose, so more carbon ends up in biomass",
+					"O2 is the most positive acceptor, so respiration releases most energy"
+				],
+				"answer": 3,
+				"explain": "O2/H2O has the most positive reduction potential of the common acceptors (+0.82 V), so electrons passing from NADH to O2 release the most free energy. The cell conserves more of it as proton motive force, which ATP synthase uses to make ATP."
+			},
+			{
+				"question": "In the nitrate flask, what does E. coli mainly reduce nitrate to?",
+				"options": [
+					"Dinitrogen gas",
+					"Nitrite",
+					"Nitrous oxide",
+					"Nitric oxide"
+				],
+				"answer": 1,
+				"explain": "The respiratory nitrate reductase of E. coli reduces nitrate to nitrite, part of which is then reduced to ammonium. Reduction through NO and N2O to N2 is denitrification, carried out by bacteria such as Paracoccus and Pseudomonas."
+			},
+			{
+				"question": "Which products would you expect in the flask with neither O2 nor nitrate?",
+				"options": [
+					"Butyrate, butanol, acetone, acetate and H2",
+					"Propionate, acetate and CO2, in a 2 : 1 : 1 ratio",
+					"Lactate, acetate, ethanol, succinate and formate",
+					"Lactate alone, as in a homolactic fermentation"
+				],
+				"answer": 2,
+				"explain": "With neither acceptor, E. coli runs a mixed-acid fermentation and makes its ATP by substrate-level phosphorylation. Formate from pyruvate formate-lyase is often split further into H2 and CO2 by formate hydrogenlyase."
+			}
+		],
+		"explain": "The more positive the terminal acceptor, the more energy respiration conserves. O2 gives the highest yield, nitrate less, and fermentation, which relies on substrate-level phosphorylation, the least."
+	},
+	{
+		"id": "meta3-008",
+		"topic": "metabolism",
+		"level": "intermediate",
+		"kind": "case",
+		"scenario": "E. coli cells suspended in a buffer at pH 6.6 keep their cytoplasm at pH 7.6 and hold a membrane potential of 120 mV, negative inside. Take the proton motive force as the membrane potential plus about 59 mV for each pH unit by which the outside is more acidic than the inside.",
+		"parts": [
+			{
+				"question": "What is the proton motive force across this membrane?",
+				"options": [
+					"About 60 mV",
+					"About 120 mV",
+					"About 180 mV",
+					"About 240 mV"
+				],
+				"answer": 2,
+				"explain": "The one-unit pH gradient is worth about 59 mV and adds to the 120 mV membrane potential, giving about 180 mV. Both parts drive protons inwards: the charge towards the negative inside, and the concentration towards the less acidic cytoplasm."
+			},
+			{
+				"question": "The buffer is changed to pH 7.6, and the membrane potential stays at 120 mV. What happens to the proton motive force?",
+				"options": [
+					"It rises to about 240 mV",
+					"It falls to about 120 mV",
+					"It falls to about 60 mV",
+					"It stays at about 180 mV"
+				],
+				"answer": 1,
+				"explain": "With the same pH on both sides, the pH gradient contributes zero, so the proton motive force equals the 120 mV membrane potential."
+			},
+			{
+				"question": "Back at pH 6.6, an ionophore collapses the membrane potential but leaves the pH gradient in place. What proton motive force is left?",
+				"options": [
+					"About 180 mV, from both parts",
+					"About 120 mV, from the membrane potential",
+					"Zero, as both parts collapse together",
+					"About 60 mV, from the pH gradient"
+				],
+				"answer": 3,
+				"explain": "The one-unit pH gradient remains, worth about 59 mV, so the proton motive force falls to about 60 mV. Experimenters use ionophores such as valinomycin with K+ in this way to tell the two parts apart."
+			}
+		],
+		"explain": "The proton motive force has an electrical part, the membrane potential, and a chemical part, the pH gradient, worth about 59 mV per pH unit. Changing either part changes the force available to ATP synthase and other proton-driven processes."
+	},
+	{
+		"id": "meta3-009",
+		"topic": "metabolism",
+		"level": "intermediate",
+		"kind": "match",
+		"question": "Match each enzyme with the central carbon pathway it marks when found in a genome.",
+		"pairs": [
+			{ "left": "Phosphofructokinase", "right": "EMP glycolysis" },
+			{ "left": "KDPG aldolase", "right": "Entner–Doudoroff pathway" },
+			{ "left": "6-Phosphogluconate dehydrogenase", "right": "Oxidative pentose phosphate pathway" },
+			{ "left": "Isocitrate lyase", "right": "Glyoxylate shunt" },
+			{ "left": "2-Oxoglutarate dehydrogenase", "right": "TCA cycle" }
+		],
+		"explain": "Phosphofructokinase commits sugar to the EMP route, and KDPG aldolase splits the six-carbon intermediate of the Entner–Doudoroff pathway into pyruvate and glyceraldehyde 3-phosphate. 6-Phosphogluconate dehydrogenase decarboxylates 6-phosphogluconate to ribulose 5-phosphate, isocitrate lyase opens the glyoxylate shunt, and 2-oxoglutarate dehydrogenase is the TCA step that the shunt bypasses."
+	},
+	{
+		"id": "meta3-010",
+		"topic": "metabolism",
+		"level": "intermediate",
+		"kind": "case",
+		"scenario": "A soil isolate, later identified as Azotobacter vinelandii, grows in air on a medium of sucrose and mineral salts with no added nitrogen compound. When the cells are incubated in a sealed vial with acetylene, ethylene appears in the gas above them.",
+		"parts": [
+			{
+				"question": "What does the ethylene show?",
+				"options": [
+					"The cells are fermenting sucrose to ethylene and CO2",
+					"Ammonia monooxygenase is active, as it makes ethylene",
+					"The cells are dying, as ethylene comes from broken membranes",
+					"Nitrogenase is active and reduces acetylene to ethylene"
+				],
+				"answer": 3,
+				"explain": "Nitrogenase reduces the triple bond of acetylene as well as that of N2, giving ethylene that is easy to measure by gas chromatography. This acetylene reduction assay is a standard test for nitrogen fixation."
+			},
+			{
+				"question": "Ammonium is then added to the medium, and ethylene production soon falls. Why would the cells cut back on nitrogen fixation?",
+				"options": [
+					"Fixing N2 costs much ATP, so the cells use ammonium instead",
+					"Ammonium reacts with acetylene and removes it from the vial",
+					"Ammonium is toxic and kills the cells that fix nitrogen",
+					"Ammonium raises O2 inside the cells, destroying nitrogenase"
+				],
+				"answer": 0,
+				"explain": "Reducing one N2 to two NH3 costs at least 16 ATP, so taking up ammonium is far cheaper. In Azotobacter, ammonium switches off the synthesis of nitrogenase through the regulators NifL and NifA."
+			},
+			{
+				"question": "Azotobacter is a strict aerobe, yet O2 quickly destroys nitrogenase. How does Azotobacter protect the enzyme?",
+				"options": [
+					"It forms heterocysts, thick-walled cells lacking photosystem II",
+					"It lives in root nodules, where leghaemoglobin binds the O2",
+					"It respires so fast that little O2 reaches nitrogenase",
+					"It makes a form of nitrogenase that O2 leaves unharmed"
+				],
+				"answer": 2,
+				"explain": "Azotobacter respires at a very high rate, which keeps the O2 level in its cytoplasm low; this is called respiratory protection. When O2 rises further, the FeSII (Shethna) protein binds nitrogenase and holds it in an O2-tolerant, inactive state."
+			}
+		],
+		"explain": "Ethylene from acetylene marks active nitrogenase, an enzyme that is costly to run and damaged by O2. Azotobacter fixes N2 when fixed nitrogen is scarce, and shields the enzyme by consuming O2 rapidly."
+	},
+	{
+		"id": "meta3-011",
+		"topic": "metabolism",
+		"level": "intermediate",
+		"kind": "truefalse",
+		"statement": "NDH-2, the single-subunit NADH dehydrogenase of E. coli, pumps protons across the membrane in the same way as complex I (NDH-1).",
+		"answer": false,
+		"explain": "NDH-2 passes electrons from NADH to quinone while moving zero protons, whereas complex I couples the same transfer to proton pumping. NADH oxidised through NDH-2 therefore adds to the proton motive force only at later steps, such as the quinol oxidases."
+	},
+	{
+		"id": "meta3-012",
+		"topic": "metabolism",
+		"level": "intermediate",
+		"kind": "case",
+		"scenario": "Propionibacterium freudenreichii is grown anaerobically on lactate as its sole carbon and energy source. Some lactate is oxidised to acetate and CO2, and the electrons released are used to reduce the rest to propionate.",
+		"parts": [
+			{
+				"question": "Oxidising one lactate to acetate and CO2 releases four electrons, and reducing one lactate to propionate takes up two. How many lactate become propionate for each one that becomes acetate?",
+				"options": [
+					"One",
+					"Two",
+					"Three",
+					"Four"
+				],
+				"answer": 1,
+				"explain": "The four electrons from one oxidised lactate reduce two lactate, at two electrons each. The fermentation therefore runs as 3 lactate → 2 propionate + 1 acetate + 1 CO2 + 1 H2O."
+			},
+			{
+				"question": "In one run the culture uses 30 mM lactate. Which products should accumulate?",
+				"options": [
+					"20 mM propionate, 10 mM acetate and 10 mM CO2",
+					"15 mM propionate, 15 mM acetate and 15 mM CO2",
+					"10 mM propionate, 20 mM acetate and 20 mM CO2",
+					"20 mM propionate, 10 mM acetate and 20 mM CO2"
+				],
+				"answer": 0,
+				"explain": "The 30 mM lactate is 10 mM of the overall reaction, which uses three lactate each time, so it gives 20 mM propionate, 10 mM acetate and 10 mM CO2. This CO2 forms the eyes of Swiss-type cheeses."
+			},
+			{
+				"question": "The route to propionate runs through succinyl-CoA and methylmalonyl-CoA. Which cofactor does methylmalonyl-CoA mutase need?",
+				"options": [
+					"Biotin",
+					"Thiamine diphosphate",
+					"Lipoic acid",
+					"Coenzyme B12"
+				],
+				"answer": 3,
+				"explain": "Methylmalonyl-CoA mutase uses adenosylcobalamin, a form of B12, to rearrange succinyl-CoA into methylmalonyl-CoA. Biotin serves a different step, the transcarboxylase that passes a carboxyl group from methylmalonyl-CoA to pyruvate, and P. freudenreichii makes enough B12 to be used for producing the vitamin."
+			}
+		],
+		"explain": "In propionic fermentation, electron balance sets the ratio at two propionate for each acetate. The B12-dependent mutase links succinyl-CoA to the methylmalonyl-CoA that yields propionate."
+	},
+	{
+		"id": "meta3-013",
+		"topic": "metabolism",
+		"level": "hard",
+		"kind": "case",
+		"scenario": "A Clostridium strain is grown on glucose, which it breaks down by the EMP pathway. In pure culture it ferments each glucose to butyrate, 2 CO2 and 2 H2. In co-culture with a methanogen that consumes H2, it makes mainly acetate instead: glucose → 2 acetate + 2 CO2 + 4 H2.",
+		"parts": [
+			{
+				"question": "In pure culture, how many ATP per glucose does the strain make by substrate-level phosphorylation, with butyrate kinase releasing the butyrate?",
+				"options": [
+					"2 ATP",
+					"3 ATP",
+					"4 ATP",
+					"5 ATP"
+				],
+				"answer": 1,
+				"explain": "The EMP pathway gives a net 2 ATP. The two acetyl-CoA are joined and reduced to one butyryl-CoA, and butyrate kinase makes one more ATP from butyryl phosphate, a total of 3."
+			},
+			{
+				"question": "In co-culture, how many ATP per glucose does it make by substrate-level phosphorylation?",
+				"options": [
+					"2 ATP",
+					"3 ATP",
+					"4 ATP",
+					"6 ATP"
+				],
+				"answer": 2,
+				"explain": "Each acetyl-CoA becomes acetyl phosphate, from which acetate kinase makes one ATP. Two acetate thus add 2 ATP to the 2 from the EMP pathway, a total of 4."
+			},
+			{
+				"question": "Why does the methanogen make the acetate route possible?",
+				"options": [
+					"Its uptake keeps H2 scarce, so NADH can be reoxidised by making H2",
+					"It feeds acetate to the clostridium, which phosphorylates it for ATP",
+					"It removes CO2, which would otherwise inhibit acetate kinase",
+					"It lowers the pH, which favours acetate kinase over butyrate kinase"
+				],
+				"answer": 0,
+				"explain": "Reducing protons to H2 (E0′ −0.42 V) with NADH (E0′ −0.32 V) is uphill under standard conditions and becomes favourable only at a very low H2 partial pressure. The methanogen holds H2 that low, so the clostridium can release its NADH electrons as H2 and turn its acetyl-CoA into acetate, gaining ATP."
+			}
+		],
+		"explain": "Making butyrate reoxidises NADH inside the cell at the cost of one ATP per glucose, while making acetate gains that ATP but needs the NADH electrons released as H2. Interspecies hydrogen transfer to a methanogen opens the higher-yield route."
+	},
+	{
+		"id": "meta3-014",
+		"topic": "metabolism",
+		"level": "hard",
+		"kind": "match",
+		"question": "Match each enzyme with its EC class, judging by the reaction it catalyses rather than by its name.",
+		"pairs": [
+			{ "left": "Glucokinase", "right": "EC 2, transferases" },
+			{ "left": "β-Glucosidase", "right": "EC 3, hydrolases" },
+			{ "left": "Fructose-bisphosphate aldolase", "right": "EC 4, lyases" },
+			{ "left": "Pyruvate carboxylase", "right": "EC 6, ligases" },
+			{ "left": "H+-transporting ATP synthase", "right": "EC 7, translocases" }
+		],
+		"explain": "A kinase transfers a phosphoryl group from ATP, so glucokinase is a transferase (EC 2.7.1.2), and β-glucosidase splits a glycosidic bond with water (EC 3.2.1.21). Aldolase cleaves a C–C bond by elimination (EC 4.1.2.13), pyruvate carboxylase joins CO2 to pyruvate at the expense of ATP (EC 6.4.1.1), and ATP synthase, which couples ATP formation to moving protons across the membrane, is a translocase (EC 7.1.2.2)."
+	},
+	{
+		"id": "meta3-015",
+		"topic": "metabolism",
+		"level": "hard",
+		"kind": "truefalse",
+		"statement": "In methanogens that reduce CO2 with H2, the transfer of the methyl group from methyl-tetrahydromethanopterin to coenzyme M is coupled to pumping Na+ out of the cell.",
+		"answer": true,
+		"explain": "The membrane-bound methyltransferase Mtr couples this exergonic methyl transfer to Na+ export, one of the steps that build the ion gradient for the A1Ao ATP synthase. Methanogens make their ATP chemiosmotically in this way, from gradients built during methanogenesis."
+	},
+	{
+		"id": "meta3-016",
+		"topic": "metabolism",
+		"level": "hard",
+		"kind": "match",
+		"question": "Match each coenzyme of methanogens with its role as CO2 is reduced to methane.",
+		"pairs": [
+			{ "left": "Methanofuran", "right": "Takes up CO2 as a formyl group in the first step" },
+			{ "left": "Tetrahydromethanopterin", "right": "Carries the C1 unit as it is reduced from formyl to methyl" },
+			{ "left": "Coenzyme M", "right": "Carries the methyl group that is reduced to methane" },
+			{ "left": "Coenzyme B", "right": "Gives electrons to the last step, forming a heterodisulfide" },
+			{ "left": "Coenzyme F430", "right": "Nickel tetrapyrrole at the active site of the last enzyme" }
+		],
+		"explain": "CO2 is first bound to methanofuran as formyl-methanofuran, then passed to tetrahydromethanopterin and reduced in steps to methyl-tetrahydromethanopterin. The methyl group moves to coenzyme M, and methyl-coenzyme M reductase, with its nickel cofactor F430, reduces it to methane using coenzyme B, leaving the CoM-S-S-CoB heterodisulfide for heterodisulfide reductase to recycle."
+	},
+	{
+		"id": "meta3-017",
+		"topic": "metabolism",
+		"level": "hard",
+		"kind": "case",
+		"scenario": "Acetobacterium woodii grows on H2 and CO2 alone, making acetate by the Wood–Ljungdahl pathway: 4 H2 + 2 CO2 → acetate + H+ + 2 H2O. One CO2 is reduced to a methyl group on tetrahydrofolate and the other to a nickel-bound carbonyl group. Growth on H2 and CO2 needs Na+ in the medium.",
+		"parts": [
+			{
+				"question": "Which enzyme joins the methyl group, the carbonyl group and coenzyme A into acetyl-CoA?",
+				"options": [
+					"CO dehydrogenase/acetyl-CoA synthase",
+					"Pyruvate:ferredoxin oxidoreductase",
+					"Ribulose-1,5-bisphosphate carboxylase",
+					"ATP citrate lyase"
+				],
+				"answer": 0,
+				"explain": "The bifunctional CO dehydrogenase/acetyl-CoA synthase reduces CO2 to CO and joins it with coenzyme A and the methyl group, which a corrinoid iron–sulfur protein brings from methyl-tetrahydrofolate. Its active sites contain nickel, iron and sulfur."
+			},
+			{
+				"question": "Formyl-tetrahydrofolate synthetase spends ATP to attach formate to tetrahydrofolate. How much ATP per acetate does the pathway gain by substrate-level phosphorylation?",
+				"options": [
+					"One, made by acetate kinase from acetyl phosphate",
+					"Two, one from each of the methyl and carbonyl branches",
+					"Four, one for each H2 that the cells oxidise",
+					"Zero, as acetate kinase only repays the ATP spent"
+				],
+				"answer": 3,
+				"explain": "Acetate kinase makes one ATP from acetyl phosphate, and formyl-tetrahydrofolate synthetase spends one, so the net gain by substrate-level phosphorylation is zero. The ATP for growth comes from an ion gradient instead."
+			},
+			{
+				"question": "How, then, does A. woodii make ATP for growth on H2 and CO2?",
+				"options": [
+					"A light-driven proton pump builds a gradient for an H+ ATP synthase",
+					"Rnf pumps Na+ as ferredoxin reduces NAD+, driving a Na+ ATP synthase",
+					"Its hydrogenase pumps protons and passes the electrons on to O2 at the end",
+					"Pyruvate kinase makes extra ATP from PEP formed from acetyl-CoA"
+				],
+				"answer": 1,
+				"explain": "An electron-bifurcating hydrogenase makes reduced ferredoxin from H2, and the Rnf complex passes electrons from ferredoxin to NAD+ while pumping Na+ out of the cell. A Na+-driven ATP synthase then makes ATP, which is why growth on H2 and CO2 depends on Na+."
+			}
+		],
+		"explain": "The Wood–Ljungdahl pathway fixes two CO2 into acetyl-CoA with zero net ATP from substrate-level phosphorylation. Acetogens such as A. woodii conserve energy chemiosmotically instead, through a Na+ gradient built by the Rnf complex."
+	},
+	{
+		"id": "meta3-018",
+		"topic": "metabolism",
+		"level": "hard",
+		"kind": "match",
+		"question": "A bacterium oxidises each compound completely to CO2. Match each compound with the number of electrons one molecule releases.",
+		"pairs": [
+			{ "left": "Glucose, C6H12O6", "right": "24 electrons" },
+			{ "left": "Lactic acid, C3H6O3", "right": "12 electrons" },
+			{ "left": "Acetic acid, C2H4O2", "right": "8 electrons" },
+			{ "left": "Methanol, CH3OH", "right": "6 electrons" },
+			{ "left": "Formic acid, HCOOH", "right": "2 electrons" }
+		],
+		"explain": "Each carbon ends as CO2, at oxidation state +4, and gives up as many electrons as its oxidation state rises. The carbons of glucose, lactic acid and acetic acid average 0, so each gives 4 (24, 12 and 8 in total); the carbon of methanol starts at −2 and gives 6, and that of formic acid starts at +2 and gives 2."
+	},
+	{
+		"id": "meta3-019",
+		"topic": "metabolism",
+		"level": "hard",
+		"kind": "truefalse",
+		"statement": "An ATP synthase whose rotor ring has 15 c subunits needs fewer protons per ATP made than one whose ring has 10.",
+		"answer": false,
+		"explain": "Each c subunit carries one proton across the membrane per turn of the ring, and each turn makes three ATP in F1. A ring of 10 therefore uses about 3.3 protons per ATP and a ring of 15 uses 5, so the larger ring needs more protons per ATP but can work at a lower proton motive force."
+	}
+]
