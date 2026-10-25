@@ -1,0 +1,161 @@
+[
+  {
+    "id": "phys1-001",
+    "topic": "physiology",
+    "level": "easy",
+    "kind": "choice",
+    "question": "What directly powers rotation of the bacterial flagellar motor?",
+    "options": [
+      "ATP hydrolysis by the filament",
+      "Ion flow, usually of protons, across the cytoplasmic membrane",
+      "GTP hydrolysis in the hook",
+      "Phosphoenolpyruvate from glycolysis"
+    ],
+    "answer": 1,
+    "explain": "Protons, or Na⁺ in some bacteria, flow through the motor's stator proteins down their electrochemical gradient, and this flow drives rotation. ATP is not the direct energy source for turning the motor."
+  },
+  {
+    "id": "phys1-002",
+    "topic": "physiology",
+    "level": "easy",
+    "kind": "truefalse",
+    "statement": "Gram-positive bacteria have an outer membrane that contains lipopolysaccharide.",
+    "answer": false,
+    "explain": "The Gram-positive envelope is a cytoplasmic membrane covered by a thick peptidoglycan wall with teichoic acids. An outer membrane with lipopolysaccharide in its outer leaflet is a hallmark of Gram-negative bacteria."
+  },
+  {
+    "id": "phys1-003",
+    "topic": "physiology",
+    "level": "easy",
+    "kind": "match",
+    "question": "Match each phase of a batch culture growth curve to what happens in it.",
+    "pairs": [
+      { "left": "Lag phase", "right": "Cells adjust to the new medium and make new enzymes, with little increase in number" },
+      { "left": "Exponential phase", "right": "Cell number doubles at a constant rate" },
+      { "left": "Stationary phase", "right": "No net increase in cell number as nutrients run out or wastes build up" },
+      { "left": "Death phase", "right": "The number of viable cells declines" }
+    ],
+    "explain": "In a closed batch culture, growth slows when an essential nutrient is used up or waste products accumulate. Stationary-phase cells are still metabolically active, while in the death phase viable counts fall."
+  },
+  {
+    "id": "phys1-004",
+    "topic": "physiology",
+    "level": "intermediate",
+    "kind": "choice",
+    "question": "A periplasmic enzyme of a Gram-negative bacterium carries a metal cofactor that is inserted in the cytoplasm before export. Which export pathway is it most likely to use?",
+    "options": [
+      "The Sec pathway",
+      "A type III secretion system",
+      "The Tat pathway",
+      "A type VI secretion system"
+    ],
+    "answer": 2,
+    "explain": "The Tat pathway moves proteins that have already folded, including many redox enzymes whose cofactors are loaded in the cytoplasm. Sec moves only unfolded chains, and type III and type VI systems deliver proteins beyond the periplasm, into other cells."
+  },
+  {
+    "id": "phys1-005",
+    "topic": "physiology",
+    "level": "intermediate",
+    "kind": "truefalse",
+    "statement": "In Escherichia coli chemotaxis, an attractant binding to its chemoreceptor lowers CheA autophosphorylation, so less CheY-P forms and runs last longer.",
+    "answer": true,
+    "explain": "CheY-P binds the motor switch and promotes clockwise rotation, which causes tumbles. Attractant binding reduces CheA kinase activity and so lowers CheY-P, making tumbles rarer while the cell heads up the gradient."
+  },
+  {
+    "id": "phys1-006",
+    "topic": "physiology",
+    "level": "intermediate",
+    "kind": "match",
+    "question": "Match each organism to the cell wall it has.",
+    "pairs": [
+      { "left": "Escherichia coli", "right": "Thin peptidoglycan layer beneath an outer membrane" },
+      { "left": "Staphylococcus aureus", "right": "Thick peptidoglycan with teichoic acids and no outer membrane" },
+      { "left": "Methanothermobacter", "right": "Pseudomurein containing N-acetyltalosaminuronic acid" },
+      { "left": "Methanocaldococcus jannaschii", "right": "An S-layer of protein as the only wall layer" },
+      { "left": "Mycobacterium tuberculosis", "right": "Peptidoglycan linked to arabinogalactan and waxy mycolic acids" }
+    ],
+    "explain": "Bacteria build their walls from peptidoglycan in Gram-negative, Gram-positive or mycolic acid-rich forms, while archaea lack peptidoglycan. Some methanogens make pseudomurein instead, and many archaea rely on an S-layer alone."
+  },
+  {
+    "id": "phys1-007",
+    "topic": "physiology",
+    "level": "hard",
+    "kind": "choice",
+    "question": "A chemostat with a 1-liter culture vessel receives fresh medium at 0.5 liter per hour, and the culture is at steady state. What is the doubling time of the cells?",
+    "options": [
+      "0.35 hour",
+      "0.5 hour",
+      "0.69 hour",
+      "1.4 hours"
+    ],
+    "answer": 3,
+    "explain": "At steady state the specific growth rate equals the dilution rate, D = flow ÷ volume = 0.5 per hour. The doubling time is ln 2 ÷ μ = 0.693 ÷ 0.5 ≈ 1.4 hours."
+  },
+  {
+    "id": "phys1-008",
+    "topic": "physiology",
+    "level": "hard",
+    "kind": "choice",
+    "question": "Halobacterium salinarum grows in brines near NaCl saturation. Which solute does it mainly accumulate in its cytoplasm to stay in osmotic balance?",
+    "options": [
+      "K⁺",
+      "Glycine betaine",
+      "Glucose",
+      "Na⁺, at a higher level than outside"
+    ],
+    "answer": 0,
+    "explain": "Extreme halophilic archaea such as Halobacterium take up K⁺ to very high levels, a 'salt-in' strategy, in place of making organic compatible solutes. Their proteins are rich in acidic amino acids and need high K⁺ to stay folded and active."
+  },
+  {
+    "id": "phys1-009",
+    "topic": "physiology",
+    "level": "hard",
+    "kind": "truefalse",
+    "statement": "In rapidly growing Escherichia coli, the generation time can be shorter than the time needed to replicate the chromosome, because new rounds of replication start before earlier rounds finish.",
+    "answer": true,
+    "explain": "In rich medium E. coli can divide about once per 20 minutes, although copying its chromosome takes about 40 minutes. Overlapping rounds, called multifork replication, give each daughter cell a complete chromosome in time."
+  },
+  {
+    "id": "phys1-010",
+    "topic": "physiology",
+    "level": "hard",
+    "kind": "case",
+    "scenario": "A researcher measures uptake of two radiolabeled nutrients, A and B, by Escherichia coli. A protonophore that collapses the proton motive force stops uptake of A at once, but uptake of B continues while the cells can still make ATP by glycolysis. When ATP is depleted, B uptake stops. Osmotic shock, which releases periplasmic proteins, abolishes B uptake but not A uptake.",
+    "parts": [
+      {
+        "question": "Which kind of transporter most likely takes up nutrient A?",
+        "options": [
+          "An ABC transporter with a periplasmic binding protein",
+          "A secondary transporter driven by the proton motive force",
+          "A phosphotransferase system",
+          "A porin in the outer membrane"
+        ],
+        "answer": 1,
+        "explain": "Uptake that stops as soon as the proton motive force collapses, and that survives osmotic shock, fits a proton-coupled secondary transporter such as a symporter."
+      },
+      {
+        "question": "Which kind of transporter most likely takes up nutrient B?",
+        "options": [
+          "A proton symporter",
+          "A uniporter driven by membrane potential",
+          "A Na⁺/H⁺ antiporter",
+          "An ABC transporter"
+        ],
+        "answer": 3,
+        "explain": "Uptake that needs ATP but not the proton motive force fits an ABC transporter, which hydrolyzes ATP at its cytoplasmic nucleotide-binding domains."
+      },
+      {
+        "question": "What does the osmotic shock result add?",
+        "options": [
+          "B uptake depends on a periplasmic substrate-binding protein",
+          "B uptake depends on the outer membrane alone",
+          "A uptake depends on a periplasmic substrate-binding protein",
+          "Osmotic shock collapses the proton motive force"
+        ],
+        "answer": 0,
+        "explain": "Osmotic shock releases periplasmic binding proteins, so loss of B uptake shows its transporter needs one, as Gram-negative ABC importers do. A uptake is unaffected, which also rules out a collapse of the proton motive force."
+      }
+    ],
+    "explain": "Inhibitor and fractionation experiments sort transporters by energy source: proton-coupled carriers stop when the proton motive force collapses, whereas ABC importers need ATP and, in Gram-negative bacteria, a periplasmic binding protein."
+  }
+]

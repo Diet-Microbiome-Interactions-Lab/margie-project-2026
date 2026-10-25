@@ -1,0 +1,192 @@
+[
+ {
+  "id": "meta1-001",
+  "topic": "metabolism",
+  "level": "easy",
+  "kind": "choice",
+  "question": "What is the net yield of the EMP pathway when one glucose is converted to two pyruvate?",
+  "options": [
+   "4 ATP and 2 NADH",
+   "2 ATP and 2 NADH",
+   "2 ATP and 4 NADH",
+   "1 ATP, 1 NADH and 1 NADPH"
+  ],
+  "answer": 1,
+  "explain": "Four ATP are made by substrate-level phosphorylation, but two are spent priming the sugar, leaving a net 2 ATP. Each of the two glyceraldehyde 3-phosphate molecules is oxidised once, giving 2 NADH; the 1 ATP, 1 NADH and 1 NADPH yield belongs to the Entner–Doudoroff pathway."
+ },
+ {
+  "id": "meta1-002",
+  "topic": "metabolism",
+  "level": "easy",
+  "kind": "truefalse",
+  "statement": "In a fermentation, ATP is made mainly by substrate-level phosphorylation.",
+  "answer": true,
+  "explain": "Without an electron transport chain to drive ATP synthase, fermenting cells make ATP when an enzyme transfers a phosphoryl group from an energy-rich intermediate, such as 1,3-bisphosphoglycerate or phosphoenolpyruvate, directly to ADP."
+ },
+ {
+  "id": "meta1-003",
+  "topic": "metabolism",
+  "level": "intermediate",
+  "kind": "choice",
+  "question": "Electrons pass from NADH (E0′ = −0.32 V) to O2 (E0′ = +0.82 V). Using ΔG0′ = −nFΔE0′, with n = 2 and F = 96.5 kJ per volt per mole, what is ΔG0′ for oxidising one NADH with oxygen?",
+  "options": [
+   "About −110 kJ/mol",
+   "About −97 kJ/mol",
+   "About −220 kJ/mol",
+   "About +220 kJ/mol"
+  ],
+  "answer": 2,
+  "explain": "ΔE0′ is the acceptor minus the donor: +0.82 − (−0.32) = 1.14 V. Then ΔG0′ = −2 × 96.5 × 1.14 ≈ −220 kJ/mol; the negative sign shows that energy is released, which the respiratory chain conserves as a proton motive force."
+ },
+ {
+  "id": "meta1-004",
+  "topic": "metabolism",
+  "level": "easy",
+  "kind": "match",
+  "question": "Match each type of fermentation with a bacterium well known for it.",
+  "pairs": [
+   {
+    "left": "Homolactic fermentation",
+    "right": "Lactococcus lactis"
+   },
+   {
+    "left": "Heterolactic fermentation",
+    "right": "Leuconostoc mesenteroides"
+   },
+   {
+    "left": "Mixed-acid fermentation",
+    "right": "Escherichia coli"
+   },
+   {
+    "left": "Butanediol fermentation",
+    "right": "Klebsiella aerogenes (formerly Enterobacter aerogenes)"
+   },
+   {
+    "left": "Propionic acid fermentation",
+    "right": "Propionibacterium freudenreichii"
+   }
+  ],
+  "explain": "Lactococcus makes almost only lactate, Leuconostoc uses the phosphoketolase pathway, E. coli is the model mixed-acid fermenter, Klebsiella aerogenes makes 2,3-butanediol, and Propionibacterium turns lactate into propionate during the ripening of Swiss-type cheese."
+ },
+ {
+  "id": "meta1-005",
+  "topic": "metabolism",
+  "level": "intermediate",
+  "kind": "truefalse",
+  "statement": "A bacterium that has the TCA cycle but lacks the glyoxylate shunt can grow on acetate as its sole carbon source, because the cycle regenerates oxaloacetate.",
+  "answer": false,
+  "explain": "In each turn the two carbons that enter as acetyl-CoA are matched by two lost as CO2, so the cycle makes no net four-carbon compounds to replace intermediates drawn off for biosynthesis. The glyoxylate shunt skips the two decarboxylations and gives a net gain of C4 compounds from acetate."
+ },
+ {
+  "id": "meta1-006",
+  "topic": "metabolism",
+  "level": "hard",
+  "kind": "case",
+  "scenario": "A Gram-negative soil isolate is sequenced and annotated. Its genome carries zwf (glucose-6-phosphate dehydrogenase), edd (6-phosphogluconate dehydratase) and eda (KDPG aldolase), but no phosphofructokinase gene is found. The cells grow well on glucose in air.",
+  "parts": [
+   {
+    "question": "Which route most likely carries glucose to pyruvate in this isolate?",
+    "options": [
+     "The EMP pathway",
+     "The phosphoketolase pathway",
+     "The glyoxylate shunt",
+     "The Entner–Doudoroff pathway"
+    ],
+    "answer": 3,
+    "explain": "Without phosphofructokinase, fructose 1,6-bisphosphate cannot be made from glucose, so the EMP route is blocked. The edd and eda genes encode the two enzymes unique to the Entner–Doudoroff pathway."
+   },
+   {
+    "question": "Compared with the EMP pathway, what is the net ATP yield per glucose from substrate-level phosphorylation by this route?",
+    "options": [
+     "One ATP, half the EMP yield",
+     "Two ATP, the same as the EMP yield",
+     "Four ATP, twice the EMP yield",
+     "No ATP, as the route makes only NADPH"
+    ],
+    "answer": 0,
+    "explain": "Only one of the two three-carbon products, glyceraldehyde 3-phosphate, passes through the ATP-making steps, so the net yield is one ATP. In air the cells respire the pyruvate and NADH, so the low ATP yield of the pathway itself matters little."
+   },
+   {
+    "question": "Glucose labelled with 13C at carbon 1 is fed to the cells. Where does the label appear in pyruvate if the Entner–Doudoroff pathway is used?",
+    "options": [
+     "In the methyl carbon (C3)",
+     "In the carboxyl carbon (C1)",
+     "In the carbonyl carbon (C2)",
+     "Spread evenly over the three carbons"
+    ],
+    "answer": 1,
+    "explain": "Carbon 1 of glucose becomes the carboxyl group of 6-phosphogluconate and stays there in KDPG, whose aldolase releases carbons 1–3 as pyruvate. In the EMP pathway the same carbon ends up in the methyl group of pyruvate, so the label position tells the two routes apart."
+   }
+  ],
+  "explain": "The genome lacks the key EMP enzyme but has the two enzymes unique to the Entner–Doudoroff pathway. That route gives one ATP per glucose and leaves a distinctive labelling pattern in pyruvate."
+ },
+ {
+  "id": "meta1-007",
+  "topic": "metabolism",
+  "level": "intermediate",
+  "kind": "match",
+  "question": "Match each redox couple with its approximate standard reduction potential (E0′, pH 7).",
+  "pairs": [
+   {
+    "left": "O2/H2O",
+    "right": "+0.82 V"
+   },
+   {
+    "left": "NO3−/NO2−",
+    "right": "+0.42 V"
+   },
+   {
+    "left": "Fumarate/succinate",
+    "right": "+0.03 V"
+   },
+   {
+    "left": "SO4²−/H2S",
+    "right": "−0.22 V"
+   },
+   {
+    "left": "2H+/H2",
+    "right": "−0.42 V"
+   }
+  ],
+  "explain": "These values form the redox tower. The farther apart a donor and acceptor sit, the more energy their reaction releases, which is why H2 oxidation with O2 yields far more energy than H2 oxidation with sulfate."
+ },
+ {
+  "id": "meta1-008",
+  "topic": "metabolism",
+  "level": "hard",
+  "kind": "choice",
+  "question": "An aerobically growing culture of E. coli is treated with the protonophore CCCP at a level that collapses the proton motive force. What happens straight away to oxygen uptake and to ATP synthesis by oxidative phosphorylation?",
+  "options": [
+   "Both stop, because electron transport needs ATP to run",
+   "Both continue, because ATP synthase can switch to using Na+",
+   "Oxygen uptake stops, but ATP synthesis continues from the stored gradient",
+   "Oxygen uptake continues or speeds up, but oxidative phosphorylation stops"
+  ],
+  "answer": 3,
+  "explain": "An uncoupler carries protons back across the membrane, so the respiratory chain is no longer held back by a large proton motive force and electron flow to O2 runs freely. With no gradient, ATP synthase has nothing to drive it, so the energy is released as heat instead of being conserved."
+ },
+ {
+  "id": "meta1-009",
+  "topic": "metabolism",
+  "level": "hard",
+  "kind": "truefalse",
+  "statement": "Cytochrome bd oxidase pumps no protons, so electron flow through it adds nothing to the proton motive force.",
+  "answer": false,
+  "explain": "Cytochrome bd oxidises quinol near the outer face of the membrane, releasing protons outside, while the protons used to make water come from the cytoplasm. This charge separation builds a proton motive force without pumping, though less of it than cytochrome bo3, which also pumps protons."
+ },
+ {
+  "id": "meta1-010",
+  "topic": "metabolism",
+  "level": "hard",
+  "kind": "choice",
+  "question": "Many human gut butyrate producers, such as Faecalibacterium prausnitzii, form butyrate mainly with butyryl-CoA:acetate CoA-transferase rather than with butyrate kinase. What consequence does this have for the gut community?",
+  "options": [
+   "They take up acetate, so acetate made by other bacteria such as bifidobacteria supports their butyrate production",
+   "They release extra acetate, which lowers the colonic pH further",
+   "They make ATP directly in the CoA-transferase step by substrate-level phosphorylation",
+   "They need oxygen to regenerate free coenzyme A"
+  ],
+  "answer": 0,
+  "explain": "The CoA-transferase passes CoA from butyryl-CoA to acetate taken up from the gut, so acetate is consumed as butyrate is released. This links acetate producers to butyrate producers, a key cross-feeding route in the colon, where butyrate is the main fuel for the cells lining the gut."
+ }
+]
