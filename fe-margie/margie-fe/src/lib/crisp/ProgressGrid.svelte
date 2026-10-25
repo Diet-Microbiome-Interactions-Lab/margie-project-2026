@@ -273,7 +273,8 @@
 				<div class="pop-acts">
 					{#if c.state === 'failed' && onLog}
 						<button type="button" class="mg-btn small" onclick={() => { pick = null; onLog?.(); }}>Show the log</button>
-					{:else if c.href}
+					{/if}
+					{#if c.href}
 						<a class="mg-btn small" href={c.href} onclick={() => (pick = null)}>Open its folder</a>
 					{/if}
 				</div>
