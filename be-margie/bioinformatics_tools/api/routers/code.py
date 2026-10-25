@@ -64,6 +64,24 @@ STEPS = [
         "files": ["fingerprint/update-fingerprint-database.py",
                   "fingerprint/update-operon-fingerprint-database.py"],
     },
+    {
+        "key": "genome-map",
+        "title": "Genome map and diagrams",
+        "what": "Draws each genome's interactive map (gene, operon or review mode; circular or linear; one or two strands), "
+                "its circular figure and its operon diagrams.",
+        "files": ["viz/gen_genome_viewer.py", "viz/make_circular_genome.py",
+                  "scoring/analysis/report_figures/make_complete_operon_diagrams.py"],
+    },
+    {
+        "key": "reports",
+        "title": "Reports",
+        "what": "Builds each genome's report figures and tables and the report across genomes, and checks their numbers "
+                "against the scoring outputs.",
+        "files": ["scoring/analysis/report_figures/make_organism_report.py",
+                  "scoring/analysis/report_figures/make_global_report.py",
+                  "scoring/analysis/report_figures/reportfig_lib.py",
+                  "scoring/analysis/report_figures/verify_report.py"],
+    },
 ]
 
 _LISTED = {f for step in STEPS for f in step["files"]}

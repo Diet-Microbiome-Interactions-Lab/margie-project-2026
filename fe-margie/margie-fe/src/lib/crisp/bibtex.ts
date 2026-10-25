@@ -6,7 +6,7 @@
  */
 
 import { NOT_YET } from '$lib/license';
-import { BASE_BIBTEX, CITE_URL, COMPUTING, THESIS_BIBTEX, THESIS_DOI } from './about';
+import { BASE_BIBTEX, CITE_URL, COMPUTING, THESIS_BIBTEX, THESIS_DOI, THESIS_RECORDS_BIBTEX } from './about';
 import { SOFTWARE_CREDITS, TOOLS, type Cite } from './credits';
 
 /** MARGIE herself, as the repository's CITATION.cff gives her. */
@@ -44,6 +44,7 @@ export function allBibtex(): string {
 		'% MARGIE, the thesis in which she was first built, and the base architecture she was built on',
 		MARGIE_BIBTEX,
 		THESIS_BIBTEX,
+		THESIS_RECORDS_BIBTEX,
 		BASE_BIBTEX,
 		'% The research computing she runs on, as RCAC asks it to be cited',
 		COMPUTING.bibtex,

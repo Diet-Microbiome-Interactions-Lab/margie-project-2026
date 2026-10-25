@@ -197,6 +197,12 @@ APA 7th (thesis, in which MARGIE was first built):
 
 Bhattarai, S. (2026). *Mostly Automated Rapid Genome Inference Environment* [Thesis, Purdue University]. Purdue University Graduate School. https://doi.org/10.25394/PGS.33103682.v1
 
+APA 7th (the code and data as the thesis used and cites them):
+
+- Bhattarai, S., Deemer, D., & Lindemann, S. (2026a). *bioinformatics-tools* (Version 1.0.0) [Computer software]. https://github.com/sajalbhattarai/bioinformatics-tools/releases/tag/v.1.0.0
+- Bhattarai, S., Deemer, D., & Lindemann, S. (2026b). *biolab-fe* (Version 1.0.0) [Computer software]. https://github.com/sajalbhattarai/biolab-fe/releases/tag/v1.0.0
+- Bhattarai, S., Deemer, D., & Lindemann, S. (2026c). *Mostly Automated Rapid Genome Inference Environment* [Dataset]. Zenodo. https://doi.org/10.5281/zenodo.21632205 (embargoed until 30 August 2028)
+
 APA 7th (base architecture on which MARGIE was built, by Dane Deemer):
 
 - Deemer, D. (2020). *bioinformatics-tools* [Computer software]. GitHub. https://github.com/wintermutant/bioinformatics-tools (the backend that be-margie grew from: API, command line and workflow engine)
@@ -218,6 +224,29 @@ year = "2026",
 month = "7",
 url = "https://hammer.purdue.edu/articles/thesis/_b_MOSTLY_AUTOMATED_RAPID_GENOME_INFERENCE_ENVIRONMENT_b_/33103682",
 doi = "10.25394/PGS.33103682.v1"
+}
+@software{Bhattarai2026aBioinformaticsTools,
+author = "Sajal Bhattarai and Dane Deemer and Stephen Lindemann",
+title = "{bioinformatics-tools}",
+version = "1.0.0",
+year = "2026",
+url = "https://github.com/sajalbhattarai/bioinformatics-tools/releases/tag/v.1.0.0"
+}
+@software{Bhattarai2026bBiolabFe,
+author = "Sajal Bhattarai and Dane Deemer and Stephen Lindemann",
+title = "{biolab-fe}",
+version = "1.0.0",
+year = "2026",
+url = "https://github.com/sajalbhattarai/biolab-fe/releases/tag/v1.0.0"
+}
+@misc{Bhattarai2026cData,
+doi = {10.5281/ZENODO.21632205},
+url = {https://zenodo.org/doi/10.5281/zenodo.21632205},
+author = {Bhattarai, Sajal and Deemer, Dane and Lindemann, Stephen},
+title = {Mostly Automated Rapid Genome Inference Environment},
+publisher = {Zenodo},
+year = {2026},
+note = {Embargoed until 2028-08-30}
 }
 @software{Deemer2020,
 author = "Dane Deemer",

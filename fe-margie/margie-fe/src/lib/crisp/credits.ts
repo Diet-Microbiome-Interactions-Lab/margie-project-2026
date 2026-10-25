@@ -1084,7 +1084,14 @@ export const SOFTWARE_CREDITS: SoftwareCredit[] = [
 		"citeRequired": false,
 		"citeRule": "",
 		"citeRuleUrl": "",
-		"cite": []
+		"cite": [
+			{
+				"key": "python311",
+				"apa": "Python Software Foundation. (2022). Python (Version 3.11) [Computer software]. https://www.python.org/",
+				"doi": "",
+				"bibtex": "@software{python311, author={{Python Software Foundation}}, title={Python}, version={3.11}, year={2022}, url={https://www.python.org/}}"
+			}
+		]
 	},
 	{
 		"name": "uv",
@@ -1120,10 +1127,17 @@ export const SOFTWARE_CREDITS: SoftwareCredit[] = [
 		"licence": "BSD-3-Clause",
 		"licenceUrl": "https://github.com/numpy/numpy/blob/main/LICENSE.txt",
 		"source": "https://github.com/numpy/numpy",
-		"citeRequired": false,
-		"citeRule": "",
-		"citeRuleUrl": "",
-		"cite": []
+		"citeRequired": true,
+		"citeRule": "If NumPy has been significant in your research, and you would like to acknowledge the project in your academic publication, we suggest citing the following paper:",
+		"citeRuleUrl": "https://numpy.org/citing-numpy/",
+		"cite": [
+			{
+				"key": "harris2020numpy",
+				"apa": "Harris, C. R., Millman, K. J., van der Walt, S. J., Gommers, R., Virtanen, P., Cournapeau, D., Wieser, E., Taylor, J., Berg, S., Smith, N. J., Kern, R., Picus, M., Hoyer, S., van Kerkwijk, M. H., Brett, M., Haldane, A., del Río, J. F., Wiebe, M., Peterson, P., et al. (2020). Array programming with NumPy. Nature, 585(7825), 357–362. https://doi.org/10.1038/s41586-020-2649-2",
+				"doi": "10.1038/s41586-020-2649-2",
+				"bibtex": "@article{harris2020numpy, title={Array programming with NumPy}, volume={585}, ISSN={1476-4687}, url={http://dx.doi.org/10.1038/s41586-020-2649-2}, DOI={10.1038/s41586-020-2649-2}, number={7825}, journal={Nature}, publisher={Springer Science and Business Media LLC}, author={Harris, Charles R. and Millman, K. Jarrod and van der Walt, Stéfan J. and Gommers, Ralf and Virtanen, Pauli and Cournapeau, David and Wieser, Eric and Taylor, Julian and Berg, Sebastian and Smith, Nathaniel J. and Kern, Robert and Picus, Matti and Hoyer, Stephan and van Kerkwijk, Marten H. and Brett, Matthew and Haldane, Allan and del Río, Jaime Fernández and Wiebe, Mark and Peterson, Pearu and Gérard-Marchant, Pierre and Sheppard, Kevin and Reddy, Tyler and Weckesser, Warren and Abbasi, Hameer and Gohlke, Christoph and Oliphant, Travis E.}, year={2020}, month=sep, pages={357--362}}"
+			}
+		]
 	},
 	{
 		"name": "pandas",
@@ -1133,10 +1147,23 @@ export const SOFTWARE_CREDITS: SoftwareCredit[] = [
 		"licence": "BSD-3-Clause",
 		"licenceUrl": "https://github.com/pandas-dev/pandas/blob/main/LICENSE",
 		"source": "https://github.com/pandas-dev/pandas",
-		"citeRequired": false,
-		"citeRule": "",
-		"citeRuleUrl": "",
-		"cite": []
+		"citeRequired": true,
+		"citeRule": "If you use pandas for a scientific publication, we would appreciate citations to the published software and the following paper:",
+		"citeRuleUrl": "https://pandas.pydata.org/about/citing.html",
+		"cite": [
+			{
+				"key": "pandas233",
+				"apa": "The pandas development team. (2025). pandas-dev/pandas: Pandas (Version v2.3.3) [Computer software]. Zenodo. https://doi.org/10.5281/zenodo.3509134",
+				"doi": "10.5281/zenodo.3509134",
+				"bibtex": "@software{pandas233, author={{The pandas development team}}, title={pandas-dev/pandas: Pandas}, version={v2.3.3}, year={2025}, publisher={Zenodo}, doi={10.5281/zenodo.3509134}, url={https://doi.org/10.5281/zenodo.3509134}}"
+			},
+			{
+				"key": "mckinney2010pandas",
+				"apa": "McKinney, W. (2010). Data structures for statistical computing in Python. Proceedings of the 9th Python in Science Conference, 56–61. https://doi.org/10.25080/Majora-92bf1922-00a",
+				"doi": "10.25080/Majora-92bf1922-00a",
+				"bibtex": "@inproceedings{mckinney2010pandas, series={SciPy}, title={Data Structures for Statistical Computing in Python}, ISSN={2575-9752}, url={http://dx.doi.org/10.25080/Majora-92bf1922-00a}, DOI={10.25080/majora-92bf1922-00a}, booktitle={Proceedings of the 9th Python in Science Conference}, publisher={SciPy}, author={McKinney, Wes}, year={2010}, pages={56--61}, collection={SciPy}}"
+			}
+		]
 	},
 	{
 		"name": "SciPy",
@@ -1146,10 +1173,17 @@ export const SOFTWARE_CREDITS: SoftwareCredit[] = [
 		"licence": "BSD-3-Clause",
 		"licenceUrl": "https://github.com/scipy/scipy/blob/main/LICENSE.txt",
 		"source": "https://github.com/scipy/scipy",
-		"citeRequired": false,
-		"citeRule": "",
-		"citeRuleUrl": "",
-		"cite": []
+		"citeRequired": true,
+		"citeRule": "we suggest citing the following paper",
+		"citeRuleUrl": "https://scipy.org/citing-scipy/",
+		"cite": [
+			{
+				"key": "virtanen2020scipy",
+				"apa": "Virtanen, P., Gommers, R., Oliphant, T. E., Haberland, M., Reddy, T., Cournapeau, D., Burovski, E., Peterson, P., Weckesser, W., Bright, J., van der Walt, S. J., Brett, M., Wilson, J., Millman, K. J., Mayorov, N., Nelson, A. R. J., Jones, E., Kern, R., Larson, E., et al. (2020). SciPy 1.0: Fundamental algorithms for scientific computing in Python. Nature Methods, 17(3), 261–272. https://doi.org/10.1038/s41592-019-0686-2",
+				"doi": "10.1038/s41592-019-0686-2",
+				"bibtex": "@article{virtanen2020scipy, title={SciPy 1.0: fundamental algorithms for scientific computing in Python}, volume={17}, ISSN={1548-7105}, url={http://dx.doi.org/10.1038/s41592-019-0686-2}, DOI={10.1038/s41592-019-0686-2}, number={3}, journal={Nature Methods}, publisher={Springer Science and Business Media LLC}, author={Virtanen, Pauli and Gommers, Ralf and Oliphant, Travis E. and Haberland, Matt and Reddy, Tyler and Cournapeau, David and Burovski, Evgeni and Peterson, Pearu and Weckesser, Warren and Bright, Jonathan and van der Walt, Stéfan J. and Brett, Matthew and Wilson, Joshua and Millman, K. Jarrod and Mayorov, Nikolay and Nelson, Andrew R. J. and Jones, Eric and Kern, Robert and Larson, Eric and Carey, C J and Polat, İlhan and Feng, Yu and Moore, Eric W. and VanderPlas, Jake and Laxalde, Denis and Perktold, Josef and Cimrman, Robert and Henriksen, Ian and Quintero, E. A. and Harris, Charles R. and Archibald, Anne M. and Ribeiro, Antônio H. and Pedregosa, Fabian and van Mulbregt, Paul and Vijaykumar, Aditya and Bardelli, Alessandro Pietro and Rothberg, Alex and Hilboll, Andreas and Kloeckner, Andreas and Scopatz, Anthony and Lee, Antony and Rokem, Ariel and Woods, C. Nathan and Fulton, Chad and Masson, Charles and Häggström, Christian and Fitzgerald, Clark and Nicholson, David A. and Hagen, David R. and Pasechnik, Dmitrii V. and Olivetti, Emanuele and Martin, Eric and Wieser, Eric and Silva, Fabrice and Lenders, Felix and Wilhelm, Florian and Young, G. and Price, Gavin A. and Ingold, Gert-Ludwig and Allen, Gregory E. and Lee, Gregory R. and Audren, Hervé and Probst, Irvin and Dietrich, Jörg P. and Silterra, Jacob and Webber, James T and Slavič, Janko and Nothman, Joel and Buchner, Johannes and Kulick, Johannes and Schönberger, Johannes L. and de Miranda Cardoso, José Vinícius and Reimer, Joscha and Harrington, Joseph and Rodríguez, Juan Luis Cano and Nunez-Iglesias, Juan and Kuczynski, Justin and Tritz, Kevin and Thoma, Martin and Newville, Matthew and Kümmerer, Matthias and Bolingbroke, Maximilian and Tartre, Michael and Pak, Mikhail and Smith, Nathaniel J. and Nowaczyk, Nikolai and Shebanov, Nikolay and Pavlyk, Oleksandr and Brodtkorb, Per A. and Lee, Perry and McGibbon, Robert T. and Feldbauer, Roman and Lewis, Sam and Tygier, Sam and Sievert, Scott and Vigna, Sebastiano and Peterson, Stefan and More, Surhud and Pudlik, Tadeusz and Oshima, Takuya and Pingel, Thomas J. and Robitaille, Thomas P. and Spura, Thomas and Jones, Thouis R. and Cera, Tim and Leslie, Tim and Zito, Tiziano and Krauss, Tom and Upadhyay, Utkarsh and Halchenko, Yaroslav O. and Vázquez-Baeza, Yoshiki}, year={2020}, month=Feb, pages={261--272} }"
+			}
+		]
 	},
 	{
 		"name": "Matplotlib",
@@ -1159,10 +1193,17 @@ export const SOFTWARE_CREDITS: SoftwareCredit[] = [
 		"licence": "Matplotlib License (PSF-based)",
 		"licenceUrl": "https://github.com/matplotlib/matplotlib/blob/main/LICENSE/LICENSE",
 		"source": "https://github.com/matplotlib/matplotlib",
-		"citeRequired": false,
-		"citeRule": "",
-		"citeRuleUrl": "",
-		"cite": []
+		"citeRequired": true,
+		"citeRule": "If Matplotlib contributes to a project that leads to a scientific publication, please acknowledge this fact by citing",
+		"citeRuleUrl": "https://matplotlib.org/stable/project/citing.html",
+		"cite": [
+			{
+				"key": "hunter2007matplotlib",
+				"apa": "Hunter, J. D. (2007). Matplotlib: A 2D graphics environment. Computing in Science & Engineering, 9(3), 90–95. https://doi.org/10.1109/MCSE.2007.55",
+				"doi": "10.1109/MCSE.2007.55",
+				"bibtex": "@article{hunter2007matplotlib, title={Matplotlib: A 2D Graphics Environment}, volume={9}, ISSN={1521-9615}, url={http://dx.doi.org/10.1109/MCSE.2007.55}, DOI={10.1109/mcse.2007.55}, number={3}, journal={Computing in Science \\& Engineering}, publisher={Institute of Electrical and Electronics Engineers (IEEE)}, author={Hunter, John D.}, year={2007}, pages={90--95}}"
+			}
+		]
 	},
 	{
 		"name": "openpyxl",
@@ -1458,19 +1499,6 @@ export const SOFTWARE_CREDITS: SoftwareCredit[] = [
 		"licence": "MIT",
 		"licenceUrl": "https://github.com/exceljs/exceljs/blob/master/LICENSE",
 		"source": "https://github.com/exceljs/exceljs",
-		"citeRequired": false,
-		"citeRule": "",
-		"citeRuleUrl": "",
-		"cite": []
-	},
-	{
-		"name": "Anthropic TypeScript SDK (@anthropic-ai/sdk)",
-		"group": "Website",
-		"listedAs": "Anthropic SDK",
-		"version": "0.128.0",
-		"licence": "MIT",
-		"licenceUrl": "https://github.com/anthropics/anthropic-sdk-typescript/blob/sdk-v0.128.0/LICENSE",
-		"source": "https://github.com/anthropics/anthropic-sdk-typescript",
 		"citeRequired": false,
 		"citeRule": "",
 		"citeRuleUrl": "",

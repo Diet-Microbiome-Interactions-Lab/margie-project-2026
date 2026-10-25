@@ -3,7 +3,7 @@
 	import { Download } from 'lucide-svelte';
 	import { COMPUTING, LAB, SOFTWARE } from '$lib/crisp/about';
 	import { SOFTWARE_CREDITS } from '$lib/crisp/credits';
-	import { RUN_TOOLS, downloadBibtex } from '$lib/crisp/bibtex';
+	import { CITED_SOFTWARE, RUN_TOOLS, downloadBibtex } from '$lib/crisp/bibtex';
 
 	/**
 	 * Acknowledgements: the tools and databases MARGIE runs (credits.ts, checked against their own
@@ -140,7 +140,7 @@
 				<span class="ab-lab">With MARGIE's own, the thesis and the research computing (<a class="mg-link" href="/contributors">how to cite</a>).</span>
 			</div>
 			<ul class="refs">
-				{#each RUN_TOOLS.filter((t) => t.cite.length) as t (t.id)}
+				{#each [...RUN_TOOLS.filter((t) => t.cite.length), ...CITED_SOFTWARE] as t ('id' in t ? t.id : t.name)}
 					<li>
 						<b>{t.name}</b>
 						{#if t.citeRequired}<span class="cite-req">asks to be cited</span>{/if}
