@@ -3,6 +3,10 @@
 	import ResultsBoard from '$lib/crisp/ResultsBoard.svelte';
 	import { ws } from '$lib/workspace/data.svelte';
 	import RefreshButton from '$lib/workspace/blocks/RefreshButton.svelte';
+	import { uiBase } from '$lib/workspace/base.svelte';
+
+	/** The genomes' results folder, opened in Files from the beta note. */
+	const folder = $derived(ws.resultRoots.genomesDir || ws.resultRoots.outputRoot);
 
 	/** The whole page on the whole screen, still scrolling both ways. */
 	let pageEl = $state<HTMLElement | null>(null);
@@ -29,11 +33,36 @@
 			</div>
 		</div>
 
+		<p class="res-beta">
+			<b>Results is in beta</b>, and its loading speed is being improved. When a genome takes long to load, its files are in your results
+			folder ({#if folder}<a class="mg-link" href={uiBase.to(`/files?path=${encodeURIComponent(folder)}`)}>open it here</a>, or find it in
+			{:else}find it in{/if} <a class="mg-link" href={uiBase.to('/files')}>Files</a>): download <span class="mg-mono">FINAL_ANNOTATION_WITH_CONFIDENCE.tsv</span>
+			and its Excel copy, and <span class="mg-mono">FINAL_GENOME_VIEWER.html</span>, the interactive genome map, which opens in your browser.
+		</p>
+
 		<ResultsBoard />
 	</div>
 </div>
 
 <style>
+	.res-beta {
+		margin: 0;
+		padding: 9px 14px;
+		border: 1px solid var(--mg-border);
+		border-left: 3px solid var(--mg-accent);
+		border-radius: var(--mg-r-sm);
+		background: var(--mg-surface);
+		color: var(--mg-text-2);
+		font-size: var(--mg-fs-sm);
+		line-height: 1.55;
+	}
+	.res-beta b {
+		color: var(--mg-text);
+	}
+	.res-beta .mg-mono {
+		font-size: 0.92em;
+		overflow-wrap: anywhere;
+	}
 	/* The page is its own scroll area, both ways, with its scroll bars always shown: the map takes the
 	   wheel while the pointer is on it, and the bars still reach every corner of the page. */
 	.res-scroll {
