@@ -305,6 +305,10 @@ Claude models (Anthropic, Inc.) were used interactively during development to de
 
 *Reference:* Anthropic. (2026). *Claude* [Large language model]. https://www.anthropic.com/claude
 
+## Suggestions
+
+Suggestions and recommendations are welcome. We encourage you to send yours to [lindems@purdue.edu](mailto:lindems@purdue.edu?subject=MARGIE-SUGGESTIONS) with the subject line **MARGIE-SUGGESTIONS**.
+
 ## Disclaimer
 
 This software is provided "as is", without warranty of any kind, express or implied, including but not limited to warranties of merchantability, fitness for a particular purpose, and noninfringement.

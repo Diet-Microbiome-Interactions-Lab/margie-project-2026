@@ -28,6 +28,8 @@ export interface FinalCounts {
 	operons: number;
 	inOperons: number;
 	withSupport: number;
+	/** Genes flagged for review (NEEDS_REVIEW? yes). */
+	flagged: number;
 	envelope: string;
 	tiers: Record<string, number>;
 	glyph: GenomeGlyph | null;
@@ -40,6 +42,7 @@ export class FinalTally {
 	#genes = 0;
 	#inOperons = 0;
 	#withSupport = 0;
+	#flagged = 0;
 	#envelope = '';
 	#operons = new Set<string>();
 	#tiers: Record<string, number> = {};
@@ -56,6 +59,7 @@ export class FinalTally {
 		const get = (name: string) => (this.#idx[name] !== undefined ? (cells[this.#idx[name]] ?? '').trim() : '');
 		this.#genes++;
 		if (/^yes$/i.test(get('IS_IN_OPERON?'))) this.#inOperons++;
+		if (/^yes$/i.test(get('NEEDS_REVIEW?'))) this.#flagged++;
 		const op = get('UniOP_OPERON_id');
 		if (op.startsWith('operon')) this.#operons.add(op);
 		const desc = get('best_consensus_product_descriptor');
@@ -82,6 +86,7 @@ export class FinalTally {
 			operons: this.#operons.size,
 			inOperons: this.#inOperons,
 			withSupport: this.#withSupport,
+			flagged: this.#flagged,
 			envelope: this.#envelope,
 			tiers: this.#tiers,
 			glyph: glyphOf(this.#placed)

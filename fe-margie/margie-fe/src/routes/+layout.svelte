@@ -5,7 +5,6 @@
 	import { updated } from '$app/state';
 	import { ui } from '$lib/workspace/ui.svelte';
 	import { crispVars } from '$lib/crisp/theme';
-	import favicon from '$lib/assets/favicon.svg';
 	import { backend } from '$lib/workspace/backend.svelte';
 	import { isLoggedIn } from '$lib/auth.js';
 	import { useClusterBackend } from '$lib/config';
@@ -58,5 +57,8 @@
 	});
 </script>
 
-<svelte:head><link rel="icon" href={favicon} /></svelte:head>
+<svelte:head>
+	<link rel="icon" type="image/png" sizes="64x64" href="/favicon.png" />
+	<link rel="apple-touch-icon" href="/apple-touch-icon.png" />
+</svelte:head>
 {@render children()}

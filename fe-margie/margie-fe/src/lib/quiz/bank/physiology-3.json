@@ -1,0 +1,586 @@
+[
+	{
+		"id": "phys3-001",
+		"topic": "physiology",
+		"level": "easy",
+		"kind": "case",
+		"scenario": "A student Gram-stains a smear that mixes young cultures of Bacillus subtilis and Escherichia coli: crystal violet, then iodine, a brief alcohol rinse and a safranin counterstain. Under the microscope, the rods of one species are purple and those of the other are pink.",
+		"parts": [
+			{
+				"question": "Which species appears purple?",
+				"options": [
+					"Escherichia coli, as a Gram-negative",
+					"Bacillus subtilis, as a Gram-negative",
+					"Bacillus subtilis, as a Gram-positive",
+					"Escherichia coli, as a Gram-positive"
+				],
+				"answer": 2,
+				"explain": "Bacillus subtilis is a Gram-positive monoderm, so it keeps the crystal violet and stays purple. Escherichia coli is a Gram-negative diderm, so it loses the dye in the alcohol and takes up the pink safranin."
+			},
+			{
+				"question": "Why does the purple species keep the crystal violet through the alcohol rinse?",
+				"options": [
+					"Its outer membrane binds the dye–iodine complex and resists alcohol",
+					"Its thick peptidoglycan dehydrates and traps the dye–iodine complex",
+					"Its teichoic acids react with the safranin and darken it to purple",
+					"Its cytoplasmic membrane pumps the alcohol out before the dye leaves"
+				],
+				"answer": 1,
+				"explain": "Alcohol dehydrates the thick, many-layered peptidoglycan of Gram-positive cells and tightens its mesh, so the crystal violet–iodine complex stays inside. In Gram-negative cells the alcohol disrupts the outer membrane, and the thin peptidoglycan lets the complex wash out."
+			},
+			{
+				"question": "The next day the student forgets the alcohol rinse. How do the two species look?",
+				"options": [
+					"B. subtilis pink and E. coli purple, the reverse of before",
+					"Both pink, as the safranin replaces the crystal violet",
+					"B. subtilis purple and E. coli pink, as on the first day",
+					"Both purple, as each keeps the crystal violet"
+				],
+				"answer": 3,
+				"explain": "The alcohol rinse is the step that tells the two groups apart. Skipping it leaves both species holding the crystal violet–iodine complex, so both look purple and the pink counterstain is masked."
+			}
+		],
+		"explain": "The Gram stain reads envelope structure: a thick peptidoglycan wall holds crystal violet through the alcohol rinse, while a thin wall under an outer membrane releases it. The decolourising step makes that difference visible."
+	},
+	{
+		"id": "phys3-002",
+		"topic": "physiology",
+		"level": "easy",
+		"kind": "case",
+		"scenario": "Escherichia coli growing on glucose is given ¹⁴C-labelled glucose for a few seconds and then broken open at once. Most of the label inside the cells is in glucose 6-phosphate, with very little as free glucose.",
+		"parts": [
+			{
+				"question": "Which uptake system fits this result?",
+				"options": [
+					"A proton symporter, which moves glucose unchanged",
+					"An ABC transporter, which moves glucose unchanged",
+					"A porin, which lets glucose diffuse straight in",
+					"The phosphotransferase system, or PTS"
+				],
+				"answer": 3,
+				"explain": "The PTS carries out group translocation: it phosphorylates the sugar as it crosses the cytoplasmic membrane, so glucose arrives as glucose 6-phosphate. Symporters and ABC transporters deliver the sugar unchanged."
+			},
+			{
+				"question": "Where does the phosphoryl group on the incoming glucose come from?",
+				"options": [
+					"Phosphoenolpyruvate, passed on through enzyme I and HPr",
+					"ATP, hydrolysed by the transporter's ATP-binding domain",
+					"Inorganic phosphate, taken up together with the glucose",
+					"GTP, made by succinyl-CoA synthetase in the TCA cycle"
+				],
+				"answer": 0,
+				"explain": "Phosphoenolpyruvate gives its phosphoryl group to enzyme I, which passes it through HPr and the glucose-specific enzyme II to the sugar. One phosphoenolpyruvate thus pays for both uptake and the first step of glycolysis."
+			}
+		],
+		"explain": "Group translocation by the PTS couples uptake to phosphorylation, with phosphoenolpyruvate as the phosphoryl donor, and the charged sugar phosphate stays inside the cell."
+	},
+	{
+		"id": "phys3-003",
+		"topic": "physiology",
+		"level": "easy",
+		"kind": "case",
+		"scenario": "Bacillus subtilis and Escherichia coli are each grown until their medium is spent, then left for two days. A sample of each is heated to 80 °C for 10 minutes and spread on fresh agar. The heated B. subtilis gives many colonies, while the heated E. coli gives none.",
+		"parts": [
+			{
+				"question": "What in the B. subtilis sample survives the heating?",
+				"options": [
+					"Endospores formed inside the starved cells",
+					"Vegetative cells that have thickened their walls",
+					"Persister cells that have stopped dividing",
+					"Cells carrying a plasmid for heat resistance"
+				],
+				"answer": 0,
+				"explain": "Starved B. subtilis forms endospores, dormant cells that survive heat that kills vegetative cells, and on fresh medium they germinate and grow into colonies. E. coli lacks a spore stage, so its cells die at 80 °C."
+			},
+			{
+				"question": "What sets off sporulation in B. subtilis?",
+				"options": [
+					"A rise in temperature towards 80 °C",
+					"Exposure to air after a spell of anaerobic growth",
+					"Running short of a carbon or nitrogen source",
+					"Reaching a set cell size in rich medium"
+				],
+				"answer": 2,
+				"explain": "Sporulation begins when cells run short of an essential nutrient such as a carbon or nitrogen source. A phosphorelay then activates the master regulator Spo0A, which switches on the early sporulation genes."
+			},
+			{
+				"question": "How many endospores does one B. subtilis cell make?",
+				"options": [
+					"Two, one formed at each pole of the cell",
+					"One, so sporulation serves survival over growth",
+					"Four, after two rounds of division inside the cell",
+					"Many, set free together when the mother cell bursts"
+				],
+				"answer": 1,
+				"explain": "Asymmetric division gives a small forespore and a large mother cell, which engulfs the forespore, builds it into a spore and then lyses to free it. One cell gives one spore, so sporulation is a way to survive starvation rather than to multiply."
+			}
+		],
+		"explain": "Heating to 80 °C selects for endospores. Starvation sets off sporulation in B. subtilis, and each cell makes one heat-resistant spore that germinates once nutrients return."
+	},
+	{
+		"id": "phys3-004",
+		"topic": "physiology",
+		"level": "easy",
+		"kind": "case",
+		"scenario": "A bacterium isolated from a hot spring grows between 45 °C and 75 °C, and fastest at 65 °C.",
+		"parts": [
+			{
+				"question": "How is it classified by its growth temperature?",
+				"options": [
+					"Psychrophile",
+					"Mesophile",
+					"Thermophile",
+					"Hyperthermophile"
+				],
+				"answer": 2,
+				"explain": "Thermophiles grow best between about 45 °C and 80 °C. Hyperthermophiles have optima above 80 °C, and mesophiles grow best at moderate temperatures, as Escherichia coli does near 37 °C."
+			},
+			{
+				"question": "Compared with a mesophile, what would you expect in its membrane lipids?",
+				"options": [
+					"Shorter fatty acids with more double bonds",
+					"Longer, more saturated fatty acids",
+					"Sterols taken up from the spring water",
+					"A lower ratio of lipid to protein"
+				],
+				"answer": 1,
+				"explain": "Heat makes membranes more fluid, so thermophiles build lipids with longer, more saturated fatty acids that pack tightly. This keeps the membrane stable and limits leakage at high temperature."
+			},
+			{
+				"question": "How does its growth rate change as the temperature moves away from 65 °C?",
+				"options": [
+					"It falls gradually below 65 °C and steeply above it",
+					"It falls steeply below 65 °C and gradually above it",
+					"It falls at the same pace on both sides of 65 °C",
+					"It stays level from 45 °C right up to 75 °C"
+				],
+				"answer": 0,
+				"explain": "Below the optimum, enzyme reactions slow gradually as the temperature drops. Above it, proteins and membranes start to fail, so the rate falls sharply to zero at the maximum, only 10 °C higher here."
+			}
+		],
+		"explain": "Each organism has a minimum, optimum and maximum growth temperature. This thermophile keeps its membrane stable with saturated lipids, and its growth rate drops sharply just above the optimum."
+	},
+	{
+		"id": "phys3-005",
+		"topic": "physiology",
+		"level": "easy",
+		"kind": "match",
+		"question": "Match each part of the Vibrio fischeri quorum-sensing system to its role.",
+		"pairs": [
+			{
+				"left": "LuxI",
+				"right": "Synthase that makes the acyl-homoserine lactone signal"
+			},
+			{
+				"left": "LuxR",
+				"right": "Regulator that binds the signal and activates the lux operon"
+			},
+			{
+				"left": "Acyl-homoserine lactone",
+				"right": "Signal that crosses membranes and builds up with cell density"
+			},
+			{
+				"left": "LuxA and LuxB",
+				"right": "The two subunits of luciferase, which gives off light"
+			},
+			{
+				"left": "Light organ of the bobtail squid",
+				"right": "Host site where the bacteria reach a high density"
+			}
+		],
+		"explain": "LuxI makes an acyl-homoserine lactone that diffuses through membranes, so its level rises as the cells multiply. Above a threshold it binds LuxR, which switches on the lux operon, and the cells glow, as they do in the squid's light organ."
+	},
+	{
+		"id": "phys3-006",
+		"topic": "physiology",
+		"level": "easy",
+		"kind": "truefalse",
+		"statement": "Acidophiles grow best at low pH because their cytoplasm is as acidic as their surroundings.",
+		"answer": false,
+		"explain": "An acidophile's optimum pH describes its surroundings. Its cytoplasm stays far closer to neutral, as its membrane limits proton entry and the cell pumps protons out."
+	},
+	{
+		"id": "phys3-007",
+		"topic": "physiology",
+		"level": "intermediate",
+		"kind": "case",
+		"scenario": "Escherichia coli is grown in minimal medium with a little glucose and plenty of lactose. The culture grows exponentially, pauses for about an hour, then grows exponentially again. β-Galactosidase activity stays low through the first phase and rises during the pause.",
+		"parts": [
+			{
+				"question": "Which sugar supports the first phase of growth?",
+				"options": [
+					"Lactose, which the cells take up first",
+					"Glucose, which the cells take up first",
+					"Both sugars, which the cells take up together",
+					"Galactose, split from lactose in the medium"
+				],
+				"answer": 1,
+				"explain": "Glucose is used first, which fits the low β-galactosidase activity of the first phase. When the glucose runs out, the cells pause to switch on the lac operon and then grow on lactose."
+			},
+			{
+				"question": "Which molecule binds the lac repressor, LacI, and releases it from the operator?",
+				"options": [
+					"cAMP, which builds up as glucose runs out",
+					"Glucose 6-phosphate, formed by the PTS",
+					"Lactose itself, as soon as it enters",
+					"Allolactose, formed from lactose"
+				],
+				"answer": 3,
+				"explain": "The small basal amount of β-galactosidase converts some incoming lactose to allolactose, the natural inducer. Allolactose binds LacI, which then leaves the operator so the lac genes can be transcribed."
+			},
+			{
+				"question": "Why does the lac operon stay nearly silent while glucose remains?",
+				"options": [
+					"Glucose binds LacI and holds it firmly on the operator",
+					"Glucose speeds the breakdown of lac mRNA in the cell",
+					"PTS glucose uptake lowers cAMP and blocks lactose entry",
+					"Glucose replaces σ70 with a sigma factor that skips lac"
+				],
+				"answer": 2,
+				"explain": "While the PTS takes up glucose, its EIIA-Glc protein is mostly unphosphorylated. In this form it binds LacY and blocks lactose entry, called inducer exclusion, and it leaves adenylate cyclase less active, so less cAMP-CRP is present to activate the lac promoter."
+			}
+		],
+		"explain": "Diauxic growth shows a hierarchy of sugar use: glucose uptake through the PTS keeps the lac operon down, and once glucose runs out, allolactose and cAMP-CRP switch the operon on, causing a lag before growth on lactose."
+	},
+	{
+		"id": "phys3-008",
+		"topic": "physiology",
+		"level": "intermediate",
+		"kind": "case",
+		"scenario": "A Gram-negative bacterium makes protein X, which ends up in the periplasm. X begins with a short stretch carrying two lysines, then a run of 13 hydrophobic residues, then Ala-Ser-Ala. The periplasmic form of X starts just after this Ala-Ser-Ala.",
+		"parts": [
+			{
+				"question": "Which route most likely takes X across the cytoplasmic membrane?",
+				"options": [
+					"The Tat pathway, which moves folded proteins",
+					"The Sec translocon, as an unfolded chain",
+					"A type III system, which injects proteins",
+					"A type I system, which reads a C-terminal signal"
+				],
+				"answer": 1,
+				"explain": "A positively charged n-region, a hydrophobic h-region and a short c-region ending in small residues make a classic Sec signal peptide. Tat signal peptides carry a twin-arginine motif, which X lacks."
+			},
+			{
+				"question": "Which enzyme removes the signal peptide from X?",
+				"options": [
+					"Signal peptidase I, at the periplasmic face",
+					"Signal peptidase II, once lipid is attached",
+					"A cytoplasmic protease, before export starts",
+					"DegP, a periplasmic protease for misfolded proteins"
+				],
+				"answer": 0,
+				"explain": "Signal peptidase I sits in the cytoplasmic membrane with its active site facing the periplasm. It cuts after the Ala-X-Ala motif and releases the mature protein."
+			},
+			{
+				"question": "A related protein Y ends its signal peptide with Leu-Ala-Gly-Cys, and its mature form starts with that cysteine. What becomes of Y?",
+				"options": [
+					"It forms a disulfide bond with X and stays soluble",
+					"It stays in the cytoplasm, as cysteine stalls Sec",
+					"It moves by Tat instead, as cysteine marks Tat cargo",
+					"It becomes a lipoprotein, anchored by that cysteine"
+				],
+				"answer": 3,
+				"explain": "Leu-Ala-Gly-Cys is a lipobox: the cysteine is linked to diacylglycerol, then signal peptidase II cuts just before it. The modified cysteine becomes the first residue of a lipoprotein held in the inner or outer membrane by its lipid."
+			}
+		],
+		"explain": "The end of a Sec signal peptide sets the protein's fate: an Ala-X-Ala site is cut by signal peptidase I to free a soluble protein, while a lipobox cysteine is lipid-modified and cut by signal peptidase II to make a lipoprotein."
+	},
+	{
+		"id": "phys3-009",
+		"topic": "physiology",
+		"level": "intermediate",
+		"kind": "case",
+		"scenario": "Escherichia coli cells are given a dose of UV light that damages their DNA. Within minutes, expression of recA, uvrA and sulA rises, and over the next hour the cells grow into long filaments before they start dividing again.",
+		"parts": [
+			{
+				"question": "What activates RecA at the start of this response?",
+				"options": [
+					"A fall in the cell's ATP after UV exposure",
+					"Uncharged tRNA in the ribosome's A site",
+					"Misfolded proteins in the outer membrane",
+					"Single-stranded DNA at stalled forks"
+				],
+				"answer": 3,
+				"explain": "Replication forks stall at UV lesions and leave stretches of single-stranded DNA. RecA coats this DNA to form an activated nucleoprotein filament, which is the SOS signal."
+			},
+			{
+				"question": "How does activated RecA raise expression of recA, uvrA and sulA?",
+				"options": [
+					"It triggers LexA self-cleavage, which frees the operators",
+					"It phosphorylates LexA, which then activates the genes",
+					"It binds each promoter itself and recruits RNA polymerase",
+					"It swaps σ70 for a sigma factor specific to DNA damage"
+				],
+				"answer": 0,
+				"explain": "LexA represses the SOS genes by binding their operators. Activated RecA acts as a co-protease that stimulates LexA to cleave itself, so the repressor leaves the operators and the genes are expressed."
+			},
+			{
+				"question": "Why do the cells grow into filaments?",
+				"options": [
+					"LexA cleavage halts each round of chromosome replication",
+					"SulA blocks FtsZ ring assembly until repair is done",
+					"UV light damages the enzymes that make the wall",
+					"RecA binds the septum and keeps it from closing"
+				],
+				"answer": 1,
+				"explain": "SulA, made as part of the SOS response, binds FtsZ and blocks Z-ring formation. The cells keep growing while division waits, which gives time to repair the DNA before it is shared between daughter cells."
+			}
+		],
+		"explain": "The SOS response links DNA damage to gene expression: RecA bound to single-stranded DNA triggers LexA self-cleavage, which derepresses repair genes and sulA, and SulA holds division until repair is done."
+	},
+	{
+		"id": "phys3-010",
+		"topic": "physiology",
+		"level": "intermediate",
+		"kind": "match",
+		"question": "Match each Gram-negative secretion system to its description.",
+		"pairs": [
+			{
+				"left": "Type I",
+				"right": "An ABC transporter with partner proteins that moves its substrate across both membranes in one step"
+			},
+			{
+				"left": "Type II",
+				"right": "Moves proteins that Sec or Tat has already placed in the periplasm across the outer membrane"
+			},
+			{
+				"left": "Type III",
+				"right": "A needle-tipped injectisome, related to the flagellum, that delivers effectors into host cells"
+			},
+			{
+				"left": "Type IV",
+				"right": "Machinery related to conjugation that can transfer DNA as well as proteins"
+			},
+			{
+				"left": "Type VI",
+				"right": "A contractile sheath and tube, related to phage tails, that punctures neighbouring cells"
+			}
+		],
+		"explain": "Type II finishes a two-step route that begins with Sec or Tat, while type I carries its substrate from the cytoplasm to the outside in one step. Types III, IV and VI can deliver proteins straight into target cells."
+	},
+	{
+		"id": "phys3-011",
+		"topic": "physiology",
+		"level": "intermediate",
+		"kind": "match",
+		"question": "Match each archaeal feature to its counterpart in bacteria.",
+		"pairs": [
+			{
+				"left": "Archaellum, a rotary swimming structure driven by ATP",
+				"right": "Flagellum, a rotary swimming structure driven by ion flow"
+			},
+			{
+				"left": "Initiator tRNA carrying methionine",
+				"right": "Initiator tRNA carrying N-formylmethionine"
+			},
+			{
+				"left": "TATA-binding protein and TFB at the promoter",
+				"right": "A sigma factor recognising the −10 and −35 elements"
+			},
+			{
+				"left": "RNA polymerase resembling eukaryotic RNA polymerase II",
+				"right": "RNA polymerase with a core of α₂ββ′ω"
+			}
+		],
+		"explain": "Archaea share much of their gene expression machinery with eukaryotes: a TBP and TFB promoter complex, a Pol II-like RNA polymerase and translation that starts with methionine. Their archaellum is built like a type IV pilus and powered by ATP, while the bacterial flagellum runs on ion flow."
+	},
+	{
+		"id": "phys3-012",
+		"topic": "physiology",
+		"level": "intermediate",
+		"kind": "truefalse",
+		"statement": "When starved for an amino acid, an Escherichia coli relA mutant keeps making rRNA and tRNA, whereas the wild type cuts their synthesis sharply.",
+		"answer": true,
+		"explain": "In the wild type, uncharged tRNA in the ribosome activates RelA to make (p)ppGpp, which cuts stable RNA synthesis. relA mutants make little (p)ppGpp on amino acid starvation and so keep making rRNA and tRNA, the 'relaxed' phenotype."
+	},
+	{
+		"id": "phys3-013",
+		"topic": "physiology",
+		"level": "hard",
+		"kind": "case",
+		"scenario": "A bacterium grows exponentially in broth at 37 °C. Plate counts give 2.0 × 10⁴ viable cells per millilitre at 10:00 and 6.4 × 10⁵ per millilitre at 12:30.",
+		"parts": [
+			{
+				"question": "How many generations took place between 10:00 and 12:30?",
+				"options": [
+					"4",
+					"5",
+					"16",
+					"32"
+				],
+				"answer": 1,
+				"explain": "The count rose 6.4 × 10⁵ ÷ 2.0 × 10⁴ = 32-fold, and 32 = 2⁵, so the population doubled 5 times. In general, n = (log N − log N₀) ÷ log 2."
+			},
+			{
+				"question": "What is the generation time?",
+				"options": [
+					"37.5 minutes",
+					"4.7 minutes",
+					"25 minutes",
+					"30 minutes"
+				],
+				"answer": 3,
+				"explain": "The 150 minutes from 10:00 to 12:30 held 5 generations, so g = 150 ÷ 5 = 30 minutes."
+			},
+			{
+				"question": "If growth stays exponential at this rate, what count is expected at 14:00?",
+				"options": [
+					"5.1 × 10⁶ per millilitre",
+					"1.9 × 10⁶ per millilitre",
+					"2.0 × 10⁷ per millilitre",
+					"1.3 × 10⁶ per millilitre"
+				],
+				"answer": 0,
+				"explain": "From 12:30 to 14:00 is 90 minutes, or 3 more generations, so the count rises 2³ = 8-fold: 6.4 × 10⁵ × 8 ≈ 5.1 × 10⁶ cells per millilitre."
+			}
+		],
+		"explain": "During exponential growth the count doubles once per generation, so N = N₀ × 2ⁿ. Finding n from the fold increase and dividing the elapsed time by n gives the generation time."
+	},
+	{
+		"id": "phys3-014",
+		"topic": "physiology",
+		"level": "hard",
+		"kind": "case",
+		"scenario": "Wild-type Escherichia coli alternates runs, driven by anticlockwise rotation of its flagella, with tumbles, set off by clockwise rotation. Phosphorylated CheY (CheY-P) binds the motor switch and favours clockwise rotation. A cheY deletion mutant swims smoothly with few tumbles, while a cheZ deletion mutant tumbles far more often than the wild type.",
+		"parts": [
+			{
+				"question": "What does CheZ most likely do?",
+				"options": [
+					"It removes the phosphate from CheY-P",
+					"It adds phosphate to CheY, raising CheY-P",
+					"It drives the motor with proton flow",
+					"It builds the hook beneath the filament"
+				],
+				"answer": 0,
+				"explain": "CheZ is the phosphatase that speeds the loss of phosphate from CheY-P. In a cheZ mutant CheY-P builds up, the motors turn clockwise more often and the cells tumble excessively."
+			},
+			{
+				"question": "A cheR mutant cannot methylate its chemoreceptors. How does it most likely swim?",
+				"options": [
+					"It tumbles constantly, like a cheZ mutant",
+					"It runs and tumbles at wild-type rates",
+					"It stops swimming, as its motors stall",
+					"It swims smoothly, with few tumbles"
+				],
+				"answer": 3,
+				"explain": "Methylation by CheR raises the receptors' ability to activate CheA. Unmethylated receptors keep CheA activity low, so little CheY-P forms and the cells swim smoothly with few tumbles."
+			},
+			{
+				"question": "Wild-type cells are suddenly placed in a uniform, steady, high level of attractant. How does their tumbling change over the next few minutes?",
+				"options": [
+					"It rises at once, then falls below its earlier rate",
+					"It stops and stays stopped while attractant remains",
+					"It drops at once, then returns to its earlier rate",
+					"It stays the same, as the level is uniform"
+				],
+				"answer": 2,
+				"explain": "Attractant binding lowers CheA activity, so tumbling drops at first. CheR then methylates the receptors and restores CheA activity, returning tumbling to its baseline while the attractant stays high; this adaptation lets the cell respond to changes in concentration."
+			}
+		],
+		"explain": "The level of CheY-P sets the tumble rate: CheA raises it and CheZ lowers it, while receptor methylation by CheR and demethylation by CheB tune CheA activity, so the cell adapts to steady conditions and responds to changes."
+	},
+	{
+		"id": "phys3-015",
+		"topic": "physiology",
+		"level": "hard",
+		"kind": "match",
+		"question": "Match each partial diploid of Escherichia coli (chromosome / F′) to how it makes β-galactosidase. Genes left unlisted are wild type.",
+		"pairs": [
+			{
+				"left": "lacI⁻ lacZ⁺ / F′ lacI⁺ lacZ⁻",
+				"right": "Inducible, as repressor made from the F′ also binds the chromosome's operator"
+			},
+			{
+				"left": "lacOᶜ lacZ⁺ / F′ lacO⁺ lacZ⁻",
+				"right": "Constitutive, as the operator beside lacZ⁺ has lost repressor binding"
+			},
+			{
+				"left": "lacOᶜ lacZ⁻ / F′ lacO⁺ lacZ⁺",
+				"right": "Inducible, as the operator mutation affects only the lacZ⁻ copy beside it"
+			},
+			{
+				"left": "lacIˢ lacZ⁺ / F′ lacI⁺ lacZ⁺",
+				"right": "Uninducible, as a repressor blind to inducer holds both operators"
+			}
+		],
+		"explain": "LacI is a diffusible repressor, so a wild-type or super-repressor allele acts in trans on both copies of the operon. The operator acts only in cis, on the genes of its own DNA, so a constitutive operator matters only beside a working lacZ."
+	},
+	{
+		"id": "phys3-016",
+		"topic": "physiology",
+		"level": "hard",
+		"kind": "match",
+		"question": "Match each Bacillus subtilis sporulation regulator to where and when it acts.",
+		"pairs": [
+			{
+				"left": "Spo0A",
+				"right": "Master regulator, phosphorylated through a phosphorelay, that starts sporulation"
+			},
+			{
+				"left": "σF",
+				"right": "Forespore sigma factor, active soon after the asymmetric septum forms"
+			},
+			{
+				"left": "σE",
+				"right": "Mother-cell sigma factor, active soon after the asymmetric septum forms"
+			},
+			{
+				"left": "σG",
+				"right": "Forespore sigma factor, active once the forespore is engulfed"
+			},
+			{
+				"left": "σK",
+				"right": "Mother-cell sigma factor, active late, for the late coat genes"
+			}
+		],
+		"explain": "After asymmetric division σF acts in the forespore and σE in the mother cell; after engulfment σG takes over in the forespore and σK in the mother cell, which builds the coat. Each step in one compartment depends on a signal from the other, keeping the two in step."
+	},
+	{
+		"id": "phys3-017",
+		"topic": "physiology",
+		"level": "hard",
+		"kind": "match",
+		"question": "Match each treatment to its outcome.",
+		"pairs": [
+			{
+				"left": "Lysozyme on Bacillus megaterium in isotonic sucrose",
+				"right": "Round protoplasts, with the whole wall removed"
+			},
+			{
+				"left": "Lysozyme with EDTA on Escherichia coli in isotonic sucrose",
+				"right": "Round spheroplasts that keep parts of the outer membrane"
+			},
+			{
+				"left": "Ampicillin on Escherichia coli growing in dilute broth",
+				"right": "Lysis, as growing cells add wall that lacks cross-links"
+			},
+			{
+				"left": "Penicillin on a methanogen with a pseudomurein wall",
+				"right": "Growth goes on, as its wall enzymes differ from penicillin's targets"
+			},
+			{
+				"left": "Vancomycin on Escherichia coli",
+				"right": "Growth goes on, as the outer membrane keeps the large drug out"
+			}
+		],
+		"explain": "Lysozyme cuts the glycan strands of peptidoglycan, and β-lactams such as ampicillin block cross-linking, which kills growing cells by osmotic lysis. The Gram-negative outer membrane keeps out large drugs such as vancomycin and shields the wall from lysozyme until EDTA loosens it, while pseudomurein resists both lysozyme and penicillin."
+	},
+	{
+		"id": "phys3-018",
+		"topic": "physiology",
+		"level": "hard",
+		"kind": "truefalse",
+		"statement": "An Escherichia coli trpR mutant, which lacks the trp repressor, still lowers trp operon expression somewhat when tryptophan is plentiful.",
+		"answer": true,
+		"explain": "Attenuation works independently of TrpR: when charged tRNA-Trp is plentiful, the ribosome translates the leader peptide quickly and the terminator hairpin forms, stopping most transcription before the structural genes. A trpR mutant thus keeps a smaller, attenuation-based response to tryptophan."
+	},
+	{
+		"id": "phys3-019",
+		"topic": "physiology",
+		"level": "hard",
+		"kind": "truefalse",
+		"statement": "Starting from a single cell with a 20-minute generation time, unchecked exponential growth gives more than a million cells within 4 hours.",
+		"answer": false,
+		"explain": "Four hours is 240 ÷ 20 = 12 generations, giving 2¹² = 4,096 cells. Passing a million takes about 20 generations, since 2²⁰ ≈ 1.05 × 10⁶, or roughly 6.7 hours at this rate."
+	}
+]

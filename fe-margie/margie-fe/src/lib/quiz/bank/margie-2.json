@@ -1,0 +1,579 @@
+[
+	{
+		"id": "margie2-001",
+		"topic": "margie",
+		"level": "easy",
+		"kind": "case",
+		"scenario": "A student adds four genomes on Analyze with GTDB-Tk off. The genome table gives the domain and genetic code of two of them and leaves the other two blank, so Analyze shows two genomes going to RASTtk and two going to Prodigal.",
+		"parts": [
+			{
+				"question": "Which genetic code does Prodigal use for the two blank genomes?",
+				"options": [
+					"The code that GTDB-Tk would predict for each genome",
+					"Genetic code 11, its setting when the code is unknown",
+					"The code of the RASTtk genome closest to each of them",
+					"Genetic code 4, its setting for the wall-less bacteria"
+				],
+				"answer": 1,
+				"explain": "Prodigal takes the domain and genetic code when they are known and uses genetic code 11 otherwise. It runs in the cluster job itself and calls protein-coding genes."
+			},
+			{
+				"question": "The student runs the same four genomes again a month later. Which of them can come back from MARGIE's caches?",
+				"options": [
+					"The two RASTtk genomes, as the caches serve RASTtk genomes",
+					"The two Prodigal genomes, as Prodigal runs in the cluster job",
+					"The four genomes, as each one keeps the same genome hash",
+					"Neither pair, as each new run folder starts with empty caches"
+				],
+				"answer": 0,
+				"explain": "The genome-level and protein-level caches serve RASTtk genomes, so a RASTtk genome run before comes back from the MARGIE database. A Prodigal genome's tools run fresh, since its feature ids follow Prodigal's numbering."
+			},
+			{
+				"question": "The student plans to compare the four genomes gene by gene. Which setup suits that comparison?",
+				"options": [
+					"Keep the mix, as Prodigal writes RASTtk's file layout",
+					"Keep the mix, as scoring evens out the two callers' calls",
+					"Fill in the table or turn on GTDB-Tk, so RASTtk calls the four",
+					"Run each genome with both callers and keep the longer gene set"
+				],
+				"answer": 2,
+				"explain": "Gene callers disagree from one organism to another, so genomes you compare are best called by one caller. Filling in the genome table or turning on GTDB-Tk moves genomes to RASTtk, the recommended caller."
+			}
+		],
+		"explain": "MARGIE picks the gene caller genome by genome: RASTtk when the domain and genetic code are both known, and Prodigal for a genome missing either while GTDB-Tk is off. Analyze shows how many genomes go to each caller before the run starts."
+	},
+	{
+		"id": "margie2-002",
+		"topic": "margie",
+		"level": "easy",
+		"kind": "case",
+		"scenario": "A run has finished for two genomes: GTDB-Tk classified genome A and RASTtk called its genes, while genome B went to Prodigal. A student opens each genome's folder and then its per-tool-phased-output/ folder, where the step folders now sit.",
+		"parts": [
+			{
+				"question": "Where does the student find genome A's domain and genetic code from GTDB-Tk?",
+				"options": [
+					"rasttk/rast.tsv",
+					"FINAL_GENOME_VIEWER.html",
+					"genome_info/genome_info.tsv",
+					"cache-report.tsv in the run folder"
+				],
+				"answer": 2,
+				"explain": "The GTDB-Tk step holds the classification, with the domain and genetic code, in genome_info/genome_info.tsv. Consolidation takes the genome's domain from this file."
+			},
+			{
+				"question": "Genome B also has a rasttk/ folder. What does it hold?",
+				"options": [
+					"An empty folder, kept for a later RASTtk run of genome B",
+					"Prodigal's calls, in rast.faa | rast.gff | rast.tsv",
+					"RASTtk's own calls, made as a check on Prodigal's",
+					"A copy of genome A's RASTtk files, kept for reuse"
+				],
+				"answer": 1,
+				"explain": "Prodigal writes RASTtk's file layout, rast.faa | rast.gff | rast.tsv, so phases 4 to 13 run the same way for both genomes."
+			},
+			{
+				"question": "Which file holds each gene's EC consensus across tools, its operon information and its TIGRFAM family-cluster agreement?",
+				"options": [
+					"consolidated-no-stat.tsv",
+					"envelope_summary.tsv",
+					"fingerprint-database.tsv",
+					"labeled-genes.tsv"
+				],
+				"answer": 3,
+				"explain": "Labelling writes labeled-genes.tsv with the label, the EC consensus across tools, the gene's operon context and the agreement within the TIGRFAM family cluster, which scoring reads."
+			}
+		],
+		"explain": "When a run ends, each genome folder keeps FINAL_ANNOTATION_WITH_CONFIDENCE.tsv, its Excel copy, FINAL_GENOME_VIEWER.html and diagrams/ at the top, and the step folders, gene calls included, move into per-tool-phased-output/."
+	},
+	{
+		"id": "margie2-003",
+		"topic": "margie",
+		"level": "easy",
+		"kind": "case",
+		"scenario": "In a genome that Prodigal called, three tools report these best hits for one gene: eggNOG 'conserved protein YbgC' | COG 'Function unknown' | UniProt Swiss-Prot 'Glucokinase' at 85% identity. The other tools report nothing for it.",
+		"parts": [
+			{
+				"question": "Which of the three descriptions does MARGIE count as informative?",
+				"options": [
+					"eggNOG's 'conserved protein YbgC'",
+					"COG's 'Function unknown'",
+					"UniProt's 'Glucokinase'",
+					"The three, as each one is a tool's hit"
+				],
+				"answer": 2,
+				"explain": "MARGIE asks of each description whether it names a function. 'Glucokinase' does, while 'Function unknown' is one of the boilerplate phrases on the uninformative list."
+			},
+			{
+				"question": "Why does MARGIE count 'conserved protein YbgC' as uninformative?",
+				"options": [
+					"It is 'conserved protein' plus a locus tag, lacking a function word",
+					"It comes from eggNOG, whose hits rank below UniProt's hits in labelling",
+					"It is shorter than the length that labelling asks of each label",
+					"It names a gene that RASTtk's SEED subsystems leave without a name"
+				],
+				"answer": 0,
+				"explain": "The last is_uninformative rule covers text that lacks a function word, such as …ase, transport or regulator, and is 'conserved protein' plus a locus tag. The FAQ gives 'conserved protein YbgC' as its example."
+			},
+			{
+				"question": "Suppose UniProt had reported nothing for this gene. Which label would labelling give it?",
+				"options": [
+					"'Function unknown', as COG is the last tool in the hierarchy",
+					"'No DB hits', as the two descriptions left are uninformative",
+					"'hypothetical protein', the label for genes of unknown function",
+					"'conserved protein YbgC', from eggNOG, in pass 2"
+				],
+				"answer": 3,
+				"explain": "When each remaining hit is uninformative, pass 2 takes the first tool in the hierarchy with any description. eggNOG (tier 4) comes before COG (tier 8); 'No DB hits' labels a gene the tools leave undescribed."
+			}
+		],
+		"explain": "One rule set, is_uninformative, decides whether a description names a function, for labelling, C1 and the operon reference alike. Labelling prefers an informative hit and falls back to the first description of any kind."
+	},
+	{
+		"id": "margie2-004",
+		"topic": "margie",
+		"level": "easy",
+		"kind": "case",
+		"scenario": "A scientist at a biotech company sets up MARGIE for commercial work. Before the first run they read the terms and each tool's licence details, accept them, choose commercial use and name TCDB as the one licence-required tool they hold a licence for.",
+		"parts": [
+			{
+				"question": "In MARGIE's licence catalogue, which tier holds Phobius | SignalP 4.x | SignalP 6.0 | the MEROPS database?",
+				"options": [
+					"attribution",
+					"commercial_restricted",
+					"blocked",
+					"permissive"
+				],
+				"answer": 2,
+				"explain": "These four are blocked: their licences let only the provider distribute them, so a user obtains them from the provider. MARGIE runs them for a user who holds that licence and disables them for the run otherwise."
+			},
+			{
+				"question": "For commercial use, which of these also needs the user's own licence?",
+				"options": [
+					"Pfam-A 37.0 | TIGRFAMs 15.0 | the eggNOG database",
+					"TMbed's ProtT5 weights | the full KEGG database",
+					"GTDB r232 | the COG 2024 database",
+					"UniProt Swiss-Prot 2025_05 | the dbCAN database v13"
+				],
+				"answer": 1,
+				"explain": "For commercial use, TMbed's ProtT5 weights (CC-BY-NC-SA 4.0) | TCDB | the full KEGG database also need the user's own licence. MARGIE uses the public KOfam subset of KEGG."
+			},
+			{
+				"question": "When the scientist publishes results, what do MARGIE's terms ask of them?",
+				"options": [
+					"To send the lab a copy of the paper before it is submitted",
+					"To cite MARGIE alone, as that citation covers each tool",
+					"To list each tool's licence tier beside each table shown",
+					"To cite MARGIE and each tool whose output they use"
+				],
+				"answer": 3,
+				"explain": "The terms ask users to cite MARGIE and the authors of each tool whose output they use, and each tool's citation is on Contributors. They also offer eggNOG-mapper's source, as its AGPL-3.0 licence requires."
+			}
+		],
+		"explain": "The licence catalogue puts each tool in a tier: blocked | commercial_restricted | verify | attribution | permissive. The first two gate a run, and the others carry citation or licence duties."
+	},
+	{
+		"id": "margie2-005",
+		"topic": "margie",
+		"level": "easy",
+		"kind": "match",
+		"question": "Match each page of the MARGIE website to what a user finds there.",
+		"pairs": [
+			{
+				"left": "Contributors",
+				"right": "Each tool's citation, with a BibTeX file of each"
+			},
+			{
+				"left": "Acknowledgements",
+				"right": "The full table of tool and database versions"
+			},
+			{
+				"left": "Methods",
+				"right": "How a run annotates and scores, phase by phase"
+			},
+			{
+				"left": "Files",
+				"right": "A view of the run's output folder on the cluster"
+			},
+			{
+				"left": "Code",
+				"right": "The scripts behind MARGIE's steps, such as consolidation"
+			}
+		],
+		"explain": "Contributors holds each tool's citation, and Acknowledgements the full version table, with the localisation tools; both credit RCAC's computing. Methods sets out how a run works, Files browses the output folder and Code holds the scripts."
+	},
+	{
+		"id": "margie2-006",
+		"topic": "margie",
+		"level": "easy",
+		"kind": "match",
+		"question": "Match each step of a MARGIE run to what it adds for a genome.",
+		"pairs": [
+			{
+				"left": "Phase 2",
+				"right": "Its GTDB-Tk classification, with its domain and genetic code"
+			},
+			{
+				"left": "Phase 4",
+				"right": "Annotation hits from tools such as Pfam, TIGRFAM and UniProt"
+			},
+			{
+				"left": "Phase 8",
+				"right": "Protein locations, from the model its envelope type sets"
+			},
+			{
+				"left": "The operon database step",
+				"right": "Its operon contexts, added to the reference that C3 uses"
+			},
+			{
+				"left": "The fingerprint databases step",
+				"right": "Its gene and operon fingerprints, added to the shared pools"
+			}
+		],
+		"explain": "GTDB-Tk classifies each genome in phase 2, the annotation tools run in phase 4 and the localisation tools in phase 8. After labelling, the operon database step adds the genome's operon contexts to C3's reference, and after fingerprinting the fingerprint databases take in its fingerprints."
+	},
+	{
+		"id": "margie2-007",
+		"topic": "margie",
+		"level": "intermediate",
+		"kind": "case",
+		"scenario": "In phase 4, genome P shows several high-confidence markers of wall teichoic acid, lipoteichoic acid and sortase anchoring, and zero diderm markers. Genome Q, which GTDB-Tk places in the Archaea, shows a few β-barrel assembly hits.",
+		"parts": [
+			{
+				"question": "Which envelope type does phase 7 give genome P?",
+				"options": [
+					"Diderm, the conservative default for a genome with mixed evidence",
+					"Monoderm, from several high-confidence markers of one side alone",
+					"Archaeal, as teichoic acid markers also occur in the Archaea",
+					"Unknown, so the localisation tools take the diderm model for P"
+				],
+				"answer": 1,
+				"explain": "Wall teichoic acid, lipoteichoic acid and sortase anchoring are monoderm marker groups. Several high-confidence markers of one side, with zero from the other, decide that side."
+			},
+			{
+				"question": "Which model does DeepSig run with for genome P?",
+				"options": [
+					"-k GRAM-, its model for diderm genomes",
+					"-k ARCH, its model for archaeal genomes",
+					"-k GRAM+, its model for monoderm genomes",
+					"One model for each genome, as TMbed does"
+				],
+				"answer": 2,
+				"explain": "DeepSig runs with -k GRAM- | GRAM+ | ARCH, and PSORTb (-k n | p | a) and SignalP 4.1 (-t gram- | gram+) follow the envelope type in the same way. Phobius | TMbed | SignalP 6 run with the same model for each genome."
+			},
+			{
+				"question": "Which envelope type and SignalP 4.1 model does genome Q get?",
+				"options": [
+					"Archaeal, by the first rule, with SignalP 4.1 run as gram-",
+					"Diderm, from its β-barrel hits, with SignalP 4.1 run as gram-",
+					"Archaeal, with SignalP 4.1 run on its own archaeal model",
+					"Diderm by default, with SignalP 4.1 run as gram+ instead"
+				],
+				"answer": 0,
+				"explain": "The first rule that applies decides the type, and the first rule makes a genome whose domain is Archaea archaeal. SignalP 4.1 has gram- and gram+ models and runs archaea as gram-."
+			}
+		],
+		"explain": "Phase 7 weighs marker genes from TIGRFAM | PGAP | Pfam | UniProt and writes one row to envelope_summary.tsv. Phase 8's localisation tools run with the matching model, and consolidation carries the three ENVELOPE_ columns into each gene's row."
+	},
+	{
+		"id": "margie2-008",
+		"topic": "margie",
+		"level": "intermediate",
+		"kind": "case",
+		"scenario": "In a RASTtk genome, PGAP | NCBIfam | TIGRFAM | HAMAP | PIRSF report nothing for one gene. UniProt Swiss-Prot's best hit is 'Glucokinase' at 35% identity. KEGG's top row is 'uncharacterized protein', and its second row, also above KofamScan's threshold, is 'glucokinase [EC:2.7.1.2]'. eggNOG reports 'Glucokinase'.",
+		"parts": [
+			{
+				"question": "Why does UniProt, in tier 2, leave the label to a lower tier?",
+				"options": [
+					"Its best hit falls below the 40% identity gate",
+					"Swiss-Prot sets labels for Prodigal genomes alone",
+					"Its reviewed names rank below KEGG's orthology names",
+					"Its best hit names a function that eggNOG repeats"
+				],
+				"answer": 0,
+				"explain": "UniProt is the one tool gated at labelling, at identity 40% or more. At 35% its hit fails the gate, and the audit trail tags UniProt gate_failed."
+			},
+			{
+				"question": "Which tool and text set the gene's label?",
+				"options": [
+					"eggNOG's 'Glucokinase', as KEGG's top row is uninformative",
+					"KEGG's 'uncharacterized protein', its top-ranked row by e-value",
+					"UniProt's 'Glucokinase', as the next tool fails as well",
+					"KEGG's 'glucokinase [EC:2.7.1.2]', its informative second row"
+				],
+				"answer": 3,
+				"explain": "Within a tool, an informative lower-ranked hit is preferred to an uninformative top hit, and the gate note records the swap. KEGG (tier 3) comes before eggNOG (tier 4), so KEGG's second row sets the label, as KEGG wrote it."
+			},
+			{
+				"question": "How does the audit trail in labeled-genes.tsv tag UniProt and eggNOG?",
+				"options": [
+					"UniProt gate_failed | eggNOG uninformative",
+					"UniProt gate_failed | eggNOG available_but_lower_priority",
+					"UniProt uninformative | eggNOG available_but_lower_priority",
+					"UniProt available_but_lower_priority | eggNOG gate_failed"
+				],
+				"answer": 1,
+				"explain": "The audit trail tags each decision tool winner | no_hit | uninformative | gate_failed | available_but_lower_priority. UniProt failed its gate, KEGG won, and eggNOG held a usable hit below the winner."
+			}
+		],
+		"explain": "Labelling walks the trust hierarchy and takes the first tool whose best informative hit passes its gate. The label is that tool's text, and the other tools' evidence stays beside it in labeled-genes.tsv."
+	},
+	{
+		"id": "margie2-009",
+		"topic": "margie",
+		"level": "intermediate",
+		"kind": "case",
+		"scenario": "Genome G, called by RASTtk, was annotated in spring. In autumn the lab installs a new Pfam release and runs genome H, also called by RASTtk, which shares many proteins with G. The operon pool has grown since spring.",
+		"parts": [
+			{
+				"question": "One protein that H shares with G ends in a stop '*' in H's calls and lacks it in G's. Do the two copies share a protein hash?",
+				"options": [
+					"Yes: the sequence is upper-cased and cleared of a final '*'",
+					"No: the '*' changes the bytes, so the two copies' hashes differ",
+					"Yes: proteins are matched by feature id rather than by sequence",
+					"No: a protein's hash includes the hash of the genome it came from"
+				],
+				"answer": 0,
+				"explain": "Before hashing, each protein's sequence is upper-cased and cleared of spaces and of a final stop *, so the two copies get the same SHA-256 hash."
+			},
+			{
+				"question": "Which of H's shared proteins go to Pfam?",
+				"options": [
+					"Those in which Pfam found zero domains back in the spring run",
+					"Each of them, as the tool key covers Pfam's database file",
+					"None of them, as their protein hashes are already stored",
+					"Those whose genome hash differs from G's genome hash"
+				],
+				"answer": 1,
+				"explain": "A protein's cached result is keyed to the tool's container, its database location and modification time, and its settings. The new Pfam release gives a new key, so the shared proteins are annotated again."
+			},
+			{
+				"question": "What does scoring record about the operon pool for H?",
+				"options": [
+					"The pool's size back in spring, when its earliest genome was scored",
+					"A copy of the pool, saved beside H's final table for later runs",
+					"How many pool genomes H was scored against, and if H was left out",
+					"The names of the pool genomes that share each one of H's operons"
+				],
+				"answer": 2,
+				"explain": "Scoring runs fresh against the pool as it stands, with H's own counts subtracted, and notes how many pool genomes H was scored against and whether H was left out. The reference's size at scoring is recorded for Results."
+			}
+		],
+		"explain": "MARGIE reuses a protein's cached result while the tool's container, database and settings stay the same. Scoring reads the pools as they stand, so it runs fresh, and each load adds a run_log row with the file's SHA-256 hash, the genome's sequence hash and the pipeline version."
+	},
+	{
+		"id": "margie2-010",
+		"topic": "margie",
+		"level": "intermediate",
+		"kind": "match",
+		"question": "Match each case that consolidation (phase 9) meets to how it handles it.",
+		"pairs": [
+			{
+				"left": "Several database hits for one gene",
+				"right": "Joined in one cell as key: value pairs, keyed by accession"
+			},
+			{
+				"left": "Several TMbed segments for one gene",
+				"right": "Joined in one cell, keyed by each segment's start–end range"
+			},
+			{
+				"left": "A gene outside a tool's hits",
+				"right": "That tool's columns stay empty, so the table keeps its shape"
+			},
+			{
+				"left": "KEGG's rows for the genome",
+				"right": "Kept only for rows above KofamScan's threshold"
+			},
+			{
+				"left": "QUAST and GTDB-Tk results",
+				"right": "Left out, as they describe the whole genome"
+			}
+		],
+		"explain": "Consolidation joins the per-gene tables of phases 3 to 8 into one row per gene, keyed by feature id, and gives each tool's columns its prefix, such as COG_ or PFAM_. The genome's domain comes from genome_info.tsv."
+	},
+	{
+		"id": "margie2-011",
+		"topic": "margie",
+		"level": "intermediate",
+		"kind": "match",
+		"question": "Match each of MARGIE's operon fingerprints to the operons it matches.",
+		"pairs": [
+			{
+				"left": "By evidence, ordered",
+				"right": "Operons with the same tool hits, member by member, in the same order"
+			},
+			{
+				"left": "By evidence, composition",
+				"right": "Operons with the same tool hits, in any gene order"
+			},
+			{
+				"left": "By label, ordered",
+				"right": "Operons whose members carry the same labels, in the same order"
+			},
+			{
+				"left": "By label, composition",
+				"right": "Operons whose members carry the same labels, in any order"
+			}
+		],
+		"explain": "Each operon gets four hashes from its members' gene hashes and labels in genomic order. Evidence hashes match the same tool hits, label hashes match the same labels across species, composition hashes ignore gene order, and only genes in an operon get them."
+	},
+	{
+		"id": "margie2-012",
+		"topic": "margie",
+		"level": "intermediate",
+		"kind": "truefalse",
+		"statement": "MARGIE runs UniOP's upstream code verbatim, at a pinned commit, and rewrites the gene calls into the Prodigal-style protein headers that UniOP reads.",
+		"answer": true,
+		"explain": "The container holds UniOP's code at commit 68c55d2 (30 May 2025), copied verbatim, and MARGIE's changes sit around it. She rewrites the gene calls into contig, start, end and strand headers, runs UniOP with its operon output on, and writes one row per gene with the operon id and an operon-level probability, the geometric mean of the adjacent-pair probabilities."
+	},
+	{
+		"id": "margie2-013",
+		"topic": "margie",
+		"level": "hard",
+		"kind": "case",
+		"scenario": "In a newly scored genome, the three-gene operon A–B–C qualifies for the pool: A, B and C are informative, and UniOP links A–B and B–C. With the genome's own counts left out, the adjacency channel holds M = 10 partnerships. For A–B, n = 10 and k = 9, the pair is observed 3 times, and deg(A) = 4 and deg(B) = 5. For B–C, n = 1 and k = 1, and the pair is observed exactly as often as chance predicts.",
+		"parts": [
+			{
+				"question": "What is ρ_adj for the pair A–B?",
+				"options": [
+					"0.86: the Jeffreys mean (9 + ½)/(10 + 1), unweighted",
+					"0.65: the Jeffreys mean 0.86 times the weight 3/(3 + 1)",
+					"0.90: the raw share 9/10, as n is large enough to trust",
+					"0.43: the Jeffreys mean 0.86 times the chance weight 0.5"
+				],
+				"answer": 1,
+				"explain": "The expected count is E = deg(A) × deg(B) / 2M = 4 × 5 / 20 = 1, so lift = 3/1 = 3 and w = 3/(3 + 1) = 0.75. The Jeffreys mean is 9.5/11 ≈ 0.86, so ρ_adj ≈ 0.86 × 0.75 ≈ 0.65."
+			},
+			{
+				"question": "What is ρ_adj for B–C, and what adjacency C3 does the operon get?",
+				"options": [
+					"0.75 for B–C, and C3 = (0.65 + 0.75)/2 ≈ 0.70",
+					"0.50 for B–C, and C3 = √(0.65 × 0.50) ≈ 0.57",
+					"0.375 for B–C, and C3 = √(0.65 × 0.375) ≈ 0.49",
+					"0.375 for B–C, and C3 = 0.65, its stronger pair"
+				],
+				"answer": 2,
+				"explain": "One of one gives the Jeffreys mean 1.5/2 = 0.75, and a pair seen as often as chance has lift 1 and w = 0.5, so ρ_adj = 0.375. The adjacency C3 is the geometric mean over the operon's supported adjacent pairs, √(0.65 × 0.375) ≈ 0.49, and A, B and C share it."
+			},
+			{
+				"question": "Gene B has C1 = 3/7, C4 = 1 and C2 = 0.8, and its EC numbers agree. What are its final confidence and tier?",
+				"options": [
+					"0.82, high: 3/7 plus the context 0.8 × 0.49 ≈ 0.39",
+					"0.43, fair: context counts for operons of four or more",
+					"0.95, highest: 3/7 plus the stronger pair's 0.8 × 0.65",
+					"0.17, low: 3/7 times the context 0.8 × 0.49 ≈ 0.39"
+				],
+				"answer": 0,
+				"explain": "The preliminary score is C1 × C4 = 3/7 ≈ 0.43 and the context term is C2 × C3 = 0.8 × 0.49 ≈ 0.39, so the final score is about 0.82, in the high tier (above 0.7, up to 0.9). With agreeing EC numbers, a score above 0.5, C2 above 0.5 and informative neighbours, the gene stays clear of the review flags."
+			}
+		],
+		"explain": "Each pair's reliability is the Jeffreys posterior mean times an enrichment weight against a configuration-model null; the adjacency C3 is their geometric mean, and C2 scales it into the context term. The 95% Jeffreys lower bound is written beside each score for reference."
+	},
+	{
+		"id": "margie2-014",
+		"topic": "margie",
+		"level": "hard",
+		"kind": "match",
+		"question": "In C3, n is the number of pool genomes in which both labels of a pair occur in qualifying operons, and k the number in which the pair shares an operon. Match each pair's counts to its Jeffreys posterior mean, (k + ½)/(n + 1).",
+		"pairs": [
+			{
+				"left": "k = 1, n = 1",
+				"right": "0.75"
+			},
+			{
+				"left": "k = 9, n = 10",
+				"right": "0.86"
+			},
+			{
+				"left": "k = 4, n = 4",
+				"right": "0.90"
+			},
+			{
+				"left": "k = 5, n = 9",
+				"right": "0.55"
+			},
+			{
+				"left": "k = 1, n = 4",
+				"right": "0.30"
+			}
+		],
+		"explain": "MARGIE starts from the Jeffreys prior Beta(½, ½) and updates it with the counts: 1.5/2 = 0.75, 9.5/11 ≈ 0.86, 4.5/5 = 0.90, 5.5/10 = 0.55 and 1.5/5 = 0.30. The raw share k/n is coarse when n is small, and the posterior mean softens it, so four of four gives 0.90."
+	},
+	{
+		"id": "margie2-015",
+		"topic": "margie",
+		"level": "hard",
+		"kind": "match",
+		"question": "In a genome that Prodigal called, the genes take their labels from the annotation tools. Match each gene's best hits to the source of its label.",
+		"pairs": [
+			{
+				"left": "A Pfam DUF hit and an informative COG hit",
+				"right": "Pfam, whose DUF hits also qualify"
+			},
+			{
+				"left": "UniProt 'Glucokinase' at 38% identity and an informative eggNOG hit",
+				"right": "eggNOG, as UniProt fails its identity gate"
+			},
+			{
+				"left": "Informative hits from HAMAP and from KEGG",
+				"right": "HAMAP, in tier 2, ahead of KEGG in tier 3"
+			},
+			{
+				"left": "COG 'Function unknown' as the one description",
+				"right": "COG's 'Function unknown', taken in pass 2"
+			},
+			{
+				"left": "Zero descriptions from any tool",
+				"right": "The label 'No DB hits'"
+			}
+		],
+		"explain": "Pass 1 takes the first tool in the hierarchy whose best hit is informative and passes its gate: Pfam's DUF hits qualify, and UniProt needs 40% identity. Pass 2 takes the first description of any kind, and a gene the tools leave undescribed is labelled 'No DB hits'."
+	},
+	{
+		"id": "margie2-016",
+		"topic": "margie",
+		"level": "hard",
+		"kind": "match",
+		"question": "C1 counts the sources, out of seven, whose best hit for a gene is informative. Match each set of sources with an informative best hit to the gene's C1.",
+		"pairs": [
+			{
+				"left": "RASTtk | COG | Pfam",
+				"right": "3/7"
+			},
+			{
+				"left": "TIGRFAM | PGAP | NCBIfam",
+				"right": "1/7"
+			},
+			{
+				"left": "RASTtk | KEGG | eggNOG | UniProt | TIGRFAM | PGAP",
+				"right": "5/7"
+			},
+			{
+				"left": "COG | Pfam | KEGG | eggNOG | UniProt | NCBIfam, in a Prodigal genome",
+				"right": "6/7"
+			},
+			{
+				"left": "HAMAP | PIRSF | CDD | MEROPS",
+				"right": "0/7"
+			}
+		],
+		"explain": "C1 = informative sources / 7, over RASTtk | COG | Pfam | KEGG | eggNOG | UniProt and one TIGRFAM slot that TIGRFAM, PGAP and NCBIfam share. HAMAP, PIRSF, CDD and MEROPS sit outside the seven, and a Prodigal genome reaches at most 6/7."
+	},
+	{
+		"id": "margie2-017",
+		"topic": "margie",
+		"level": "hard",
+		"kind": "truefalse",
+		"statement": "In C3's membership channel, an operon with four informative labels gives three label pairs, one for each pair of consecutive genes.",
+		"answer": false,
+		"explain": "The membership channel pairs informative genes that share a qualifying operon at any distance: s informative labels give s(s − 1)/2 pairs, here 4 × 3 / 2 = 6, each counted once per operon. Consecutive informative pairs make up the adjacency channel, so k(adjacent) ≤ k(membership) ≤ n."
+	},
+	{
+		"id": "margie2-018",
+		"topic": "margie",
+		"level": "hard",
+		"kind": "truefalse",
+		"statement": "In a four-gene operon, informative genes A and B each have a hybrid C3 of 0.6, informative gene D has zero supported partners, and gene C is hypothetical. Gene C's hybrid C3 is 0.4.",
+		"answer": true,
+		"explain": "In the hybrid score an informative gene with zero supported partners gets 0, and a hypothetical member takes the mean of its operon's informative members: (0.6 + 0.6 + 0)/3 = 0.4. The hybrid score belongs to each gene, while the default adjacency score is shared by the operon's members."
+	}
+]
