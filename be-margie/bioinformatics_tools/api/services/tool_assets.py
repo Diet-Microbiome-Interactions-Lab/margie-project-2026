@@ -26,6 +26,9 @@ DB_SUB = 'reference-databases'
 
 # Heavy tools run only when chosen, so their absence never blocks other runs.
 OPTIONAL = {'gtdbtk', 'llm'}
+# Databases a run uses when present: RASTtk's SEED files add subsystem details to its gene table,
+# and their download needs SEED access, so setup leaves them out unless asked.
+OPTIONAL_DATABASES = {'rasttk'}
 
 # Gene caller when GTDB-Tk is off and a genome lacks a domain or genetic code.
 GENE_CALLER = {'key': 'prodigal', 'label': 'Prodigal', 'sif': 'prodigal.sif'}
@@ -96,7 +99,7 @@ def inventory(cfg: dict, home: str) -> list[dict]:
         explicit = _cfg_get(cfg, f'db.{key}')
         rows.append({'id': f'database:{key}', 'kind': 'database', 'tool': key, 'label': t['label'], 'name': key,
                      'path': _expand(explicit, home) if explicit else _join(db_root, key),
-                     'shared': _join(SHARED_DB, key), 'optional': key in OPTIONAL})
+                     'shared': _join(SHARED_DB, key), 'optional': key in OPTIONAL or key in OPTIONAL_DATABASES})
     return rows
 
 
@@ -207,6 +210,8 @@ def needed(rows: list[dict], cfg: dict, tools: set[str], genome_names: list[str]
         callers = {c['gene_caller'] for c in calls.values()}
     out = set()
     for r in rows:
+        if r['kind'] == 'database' and r['tool'] in OPTIONAL_DATABASES:
+            continue
         if r['tool'] in ('rasttk', 'prodigal'):
             if r['tool'] in callers:
                 out.add(r['id'])

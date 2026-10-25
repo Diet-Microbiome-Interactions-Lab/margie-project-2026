@@ -1906,7 +1906,14 @@ rule run_rasttk:
         # and a table from an interrupted attempt carries another BV-BRC submission's gene ids.
         rm -rf {params.output_dir}
         mkdir -p {params.output_dir}
-        /usr/local/bin/run -i {input.fasta} -o {params.output_dir} -t {threads} -d {params.db} --scientific {wildcards.genome} --domain "$DOMAIN" --genetic-code "$GCODE"
+        # The SEED database is optional: without it, the gene table is written without SEED enrichment.
+        SEED_DB="{params.db}"
+        if [[ ! -d "$SEED_DB" ]]; then
+            SEED_DB="{params.output_dir}/seed-database-absent"
+            mkdir -p "$SEED_DB"
+            echo "RASTtk SEED database not at {params.db}: the gene table is written without SEED enrichment" >&2
+        fi
+        /usr/local/bin/run -i {input.fasta} -o {params.output_dir} -t {threads} -d "$SEED_DB" --scientific {wildcards.genome} --domain "$DOMAIN" --genetic-code "$GCODE"
         cp $(find {params.output_dir} -path "*/processed/rast*.tsv") {output.results}
         cp $(find {params.output_dir} -name "genome.faa") {output.faa}
         cp $(find {params.output_dir} -name "genome.gff") {output.gff}
