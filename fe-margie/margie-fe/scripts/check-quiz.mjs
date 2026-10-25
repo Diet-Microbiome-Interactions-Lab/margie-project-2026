@@ -9,6 +9,20 @@ const dir = path.join(path.dirname(fileURLToPath(import.meta.url)), '..', 'src',
 const LEVELS = ['easy', 'intermediate', 'hard'];
 const TOPICS = ['physiology', 'metabolism', 'bioinformatics', 'gut', 'margie'];
 const WORDS = /\b(never|always|every|all)\b/i;
+// The names set in italics (src/lib/quiz/names.ts); a word that looks like a genus or an epithet
+// and is missing there is reported.
+const namesTs = fs.readFileSync(path.join(dir, '..', 'names.ts'), 'utf8');
+const listed = (name) => new Set([...namesTs.match(new RegExp(`${name} = \\[([^\\]]*)\\]`))[1].matchAll(/'([^']+)'/g)].map((m) => m[1]));
+const GENERA = listed('GENERA');
+const EPITHETS = listed('EPITHETS');
+const GENUS_LIKE = /\b[A-Z][a-z]+(?:bacter|bacterium|bacillus|coccus|monas|vibrio|plasma|spira|sarcina|thrix|saeta|sphaera|myces|stipes|ella)\b/g;
+const unnamed = (text) => {
+	const out = [...text.matchAll(GENUS_LIKE)].map((m) => m[0]).filter((g) => !GENERA.has(g));
+	for (const m of text.matchAll(/\b([A-Z][a-z]+|[A-Z]\.)\s?([a-z]+)\b/g))
+		if ((GENERA.has(m[1]) || m[1].endsWith('.')) && /(?:ii|ae|is|us|um|ensis|ophila|ica|ii)$/.test(m[2]) && !EPITHETS.has(m[2]) && !['is', 'thus', 'us', 'plus', 'genus', 'previous', 'various', 'numerous', 'versus', 'focus', 'serum'].includes(m[2]))
+			out.push(m[0]);
+	return out;
+};
 const problems = [];
 const ids = new Set();
 const count = (o, k) => (o[k] = (o[k] ?? 0) + 1);
@@ -33,6 +47,7 @@ for (const file of fs.readdirSync(dir).filter((f) => f.endsWith('.json')).sort()
 		count(by.kind, q.kind);
 		const text = JSON.stringify(q);
 		if (WORDS.test(text)) problems.push(`${w}: uses never/always/every/all (${text.match(WORDS)[0]})`);
+		for (const n of unnamed(text)) problems.push(`${w}: "${n}" looks like a genus or species name; add it to src/lib/quiz/names.ts`);
 		if (q.kind === 'truefalse') {
 			if (!str(q.statement) || typeof q.answer !== 'boolean') problems.push(`${w}: truefalse shape`);
 		} else if (q.kind === 'choice') {

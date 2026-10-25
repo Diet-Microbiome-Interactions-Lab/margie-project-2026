@@ -5,6 +5,7 @@
 	import { ui } from '$lib/workspace/ui.svelte';
 	import { QUESTIONS, shuffled } from '$lib/quiz/bank';
 	import { UNLOCK } from '$lib/quiz/unlock';
+	import Sci from '$lib/quiz/Sci.svelte';
 	import { KINDS, LEVELS, TOPICS, type Level, type Question, type Topic } from '$lib/quiz/types';
 
 	/**
@@ -197,7 +198,7 @@
 		<section class="qz-card qz-gate" aria-labelledby="qz-gate-h">
 			<span class="qz-lock" aria-hidden="true"><Lock size={20} strokeWidth={1.75} /></span>
 			<h2 id="qz-gate-h">Answer one to open the quizzes</h2>
-			<p class="qz-q">{ask.question}</p>
+			<p class="qz-q"><Sci text={ask.question} /></p>
 			<ul class="qz-options">
 				{#each ask.options as o, k (k)}
 					<li>
@@ -207,7 +208,7 @@
 							class:right={gatePick !== null && k === ask.answer}
 							class:wrong={gatePick === k && k !== ask.answer}
 							disabled={gatePick !== null}
-							onclick={() => answerGate(k)}>{o}</button
+							onclick={() => answerGate(k)}><Sci text={o} /></button
 						>
 					</li>
 				{/each}
@@ -215,7 +216,7 @@
 			{#if gatePick !== null}
 				<p class="qz-why" class:ok={gatePick === ask.answer}>
 					<b>{gatePick === ask.answer ? 'Right!' : 'Not quite.'}</b>
-					{ask.explain}
+					<Sci text={ask.explain} />
 				</p>
 				{#if gatePick !== ask.answer}
 					<button type="button" class="mg-btn" onclick={anotherGate}>Try another question</button>
@@ -258,16 +259,16 @@
 				</header>
 
 				{#if q.kind === 'choice'}
-					<p class="qz-q">{q.question}</p>
+					<p class="qz-q"><Sci text={q.question} /></p>
 					<ul class="qz-options">
 						{#each q.options as o, k (k)}
 							<li>
-								<button type="button" class="qz-opt" class:right={pick !== null && k === q.answer} class:wrong={pick === k && k !== q.answer} disabled={pick !== null} onclick={() => choose(k)}>{o}</button>
+								<button type="button" class="qz-opt" class:right={pick !== null && k === q.answer} class:wrong={pick === k && k !== q.answer} disabled={pick !== null} onclick={() => choose(k)}><Sci text={o} /></button>
 							</li>
 						{/each}
 					</ul>
 				{:else if q.kind === 'truefalse'}
-					<p class="qz-q">{q.statement}</p>
+					<p class="qz-q"><Sci text={q.statement} /></p>
 					<ul class="qz-options two">
 						{#each [true, false] as v (v)}
 							<li>
@@ -276,14 +277,14 @@
 						{/each}
 					</ul>
 				{:else if q.kind === 'match'}
-					<p class="qz-q">{q.question}</p>
+					<p class="qz-q"><Sci text={q.question} /></p>
 					<p class="mg-note">Drag each item on the right to its match, or click an item and then its place.</p>
 					<div class="qz-match">
 						<ul class="qz-slots">
 							{#each q.pairs as pair, k (k)}
 								{@const item = placed[k]}
 								<li class="qz-slot" class:right={checked && item === k} class:wrong={checked && item !== k}>
-									<span class="qz-left">{pair.left}</span>
+									<span class="qz-left"><Sci text={pair.left} /></span>
 									<button
 										type="button"
 										class="qz-drop"
@@ -297,9 +298,9 @@
 										}}
 										onclick={() => (holding !== null ? place(k, holding) : item !== null ? unplace(k) : null)}
 									>
-										{#if item !== null && q.pairs[item]}{q.pairs[item].right}{:else}<span class="mg-note">{holding !== null ? 'Place here' : 'Drop here'}</span>{/if}
+										{#if item !== null && q.pairs[item]}<Sci text={q.pairs[item].right} />{:else}<span class="mg-note">{holding !== null ? 'Place here' : 'Drop here'}</span>{/if}
 									</button>
-									{#if checked && item !== k}<span class="qz-fix">{q.pairs[k].right}</span>{/if}
+									{#if checked && item !== k}<span class="qz-fix"><Sci text={q.pairs[k].right} /></span>{/if}
 								</li>
 							{/each}
 						</ul>
@@ -313,7 +314,7 @@
 											class:held={holding === r}
 											draggable="true"
 											ondragstart={(e) => e.dataTransfer?.setData('text/plain', String(r))}
-											onclick={() => (holding = holding === r ? null : r)}>{q.pairs[r].right}</button
+											onclick={() => (holding = holding === r ? null : r)}><Sci text={q.pairs[r].right} /></button
 										>
 									</li>
 								{/if}
@@ -324,19 +325,19 @@
 						<button type="button" class="mg-btn primary" disabled={placed.some((p) => p === null)} onclick={checkMatch}>Check</button>
 					{/if}
 				{:else if q.kind === 'case'}
-					<p class="qz-scenario">{q.scenario}</p>
+					<p class="qz-scenario"><Sci text={q.scenario} /></p>
 					{#each q.parts as part, i (i)}
 						{#if i === 0 || parts[i - 1] !== null}
 							<div class="qz-part">
-								<p class="qz-q">{i + 1}. {part.question}</p>
+								<p class="qz-q">{i + 1}. <Sci text={part.question} /></p>
 								<ul class="qz-options">
 									{#each part.options as o, k (k)}
 										<li>
-											<button type="button" class="qz-opt" class:right={parts[i] !== null && k === part.answer} class:wrong={parts[i] === k && k !== part.answer} disabled={parts[i] !== null} onclick={() => choosePart(i, k)}>{o}</button>
+											<button type="button" class="qz-opt" class:right={parts[i] !== null && k === part.answer} class:wrong={parts[i] === k && k !== part.answer} disabled={parts[i] !== null} onclick={() => choosePart(i, k)}><Sci text={o} /></button>
 										</li>
 									{/each}
 								</ul>
-								{#if parts[i] !== null}<p class="qz-why" class:ok={parts[i] === part.answer}>{part.explain}</p>{/if}
+								{#if parts[i] !== null}<p class="qz-why" class:ok={parts[i] === part.answer}><Sci text={part.explain} /></p>{/if}
 							</div>
 						{/if}
 					{/each}
@@ -345,7 +346,7 @@
 				{#if answered}
 					<p class="qz-why" class:ok={gotIt}>
 						<b>{gotIt ? 'Right!' : 'Not this time.'}</b>
-						{q.explain}
+						<Sci text={q.explain} />
 					</p>
 					<div class="qz-actions">
 						<button type="button" class="mg-btn primary" onclick={next}>Next question</button>
