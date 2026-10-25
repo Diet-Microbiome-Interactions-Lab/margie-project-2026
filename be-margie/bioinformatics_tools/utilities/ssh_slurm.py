@@ -50,6 +50,9 @@ def run_file_stem(job_id: str | None) -> str:
 
 # Snakemake logs status every ~30s, so a live run's log is never quiet this long.
 RUN_STALE_AFTER = 900.0
+# A reattach replays at most the log's last 20 MB: a 1.3 GB log replayed from its start held the
+# API's CPU and its SSH sessions for hours. A new run's log starts empty, so it is read whole.
+REPLAY_BYTES = 20_000_000
 
 # Hang guard on the launching shell echoing the detached run's pid.
 _LAUNCH_ACK_TIMEOUT = 30.0
@@ -300,8 +303,8 @@ def submit_ssh_job(
         # job_runner.run_ssh_task uses this marker to tell a failed start apart.
         yield '__LAUNCHED__'
 
-        # Tails from the start so a reattach replays; -F as the log may not exist.
-        tail_cmd = f'tail -n +1 -F {log} 2>/dev/null'
+        # A reattach replays the log's end (REPLAY_BYTES); -F as the log may not exist yet.
+        tail_cmd = f'tail -c {REPLAY_BYTES} -F {log} 2>/dev/null'
         t_in, t_out, t_err = ssh.exec_command(tail_cmd)
         chan = t_out.channel
         chan.settimeout(poll)

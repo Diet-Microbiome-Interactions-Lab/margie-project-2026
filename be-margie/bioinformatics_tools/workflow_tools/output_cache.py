@@ -54,19 +54,19 @@ CREATE TABLE IF NOT EXISTS output_cache_when (
 """
 
 
-def _get_connection(db_path: str, timeout: float = 30.0) -> sqlite3.Connection:
+def _get_connection(db_path: str, timeout: float = 120.0) -> sqlite3.Connection:
     """Create a SQLite connection configured for network filesystems.
 
     Args:
         db_path: Path to the SQLite database file
-        timeout: Connection timeout in seconds (default 30s for NFS)
+        timeout: Connection timeout in seconds (default 120 s, as the database loads wait)
 
     Returns:
         Configured sqlite3.Connection with increased timeout and busy handler
     """
     conn = sqlite3.connect(db_path, timeout=timeout)
 
-    # Set busy timeout (milliseconds) - wait up to 30s for locks
+    # Busy timeout (milliseconds): waits as long as `timeout` for the lock
     # This is critical for NFS where lock operations are slow
     conn.execute(f"PRAGMA busy_timeout={int(timeout * 1000)}")
 
@@ -130,8 +130,14 @@ def _input_hashes(input_file: str) -> tuple[str, str]:
 
 
 def _ensure_table(conn: sqlite3.Connection) -> None:
-    conn.execute(CREATE_OUTPUT_CACHE_SQL)
-    conn.execute(CREATE_OUTPUT_CACHE_WHEN_SQL)
+    # A read first: CREATE ... IF NOT EXISTS takes the write lock even when the table is there,
+    # and on a busy database that wait is what failed.
+    have = {r[0] for r in conn.execute(
+        "SELECT name FROM sqlite_master WHERE type='table' AND name IN ('output_cache', 'output_cache_when')")}
+    if 'output_cache' not in have:
+        conn.execute(CREATE_OUTPUT_CACHE_SQL)
+    if 'output_cache_when' not in have:
+        conn.execute(CREATE_OUTPUT_CACHE_WHEN_SQL)
 
 
 # ───────────────────────── single-tool helpers ───────────────────────── #
@@ -467,7 +473,7 @@ def log_workflow_run(db_path: str, run_id: str, input_file: str, workflow_name: 
 
         def _log_run():
             """Inner function for retry wrapper."""
-            conn = _get_connection(db_path, timeout=30.0)
+            conn = _get_connection(db_path)
             try:
                 conn.execute(CREATE_RUN_LOG_SQL)
                 conn.execute(

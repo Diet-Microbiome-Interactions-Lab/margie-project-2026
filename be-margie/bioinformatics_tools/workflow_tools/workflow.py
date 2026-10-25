@@ -116,6 +116,33 @@ WORKFLOW_DIR = Path(__file__).parent
 SLURM_MODE_CORES = 256
 
 
+# Snakemake's scheduler repeats these each cycle with --verbose: they name no step, and over a long
+# run they made most of a 1.3 GB job log (and of the driver's memory). Job blocks, "N of M steps",
+# SLURM job ids and errors still go through.
+_SNAKEMAKE_CHATTER = re.compile(
+    r'^\s*(Status query timing|Resources (before|after) job selection|Ready jobs:|Selected jobs:|'
+    r'Select jobs to execute|Solving job selection|Waiting for running jobs to complete|Execute \d+ jobs)')
+
+
+def _chatter(line: str) -> bool:
+    return bool(_SNAKEMAKE_CHATTER.match(line))
+
+
+# A cache read or write that failed (_safely), told apart from a None result.
+_FAILED = object()
+
+
+def _safely(what: str, fn, *args, **kwargs):
+    """Runs one read or write of the MARGIE database for the run's caches: a busy or failing
+    database is logged and the run goes on (the step is not cached this time). Returns fn's result,
+    or _FAILED."""
+    try:
+        return fn(*args, **kwargs)
+    except Exception as exc:
+        LOGGER.warning('%s failed (the run goes on without it): %s', what, exc)
+        return _FAILED
+
+
 def _subprocess_env() -> dict:
     '''Returns the env for every snakemake subprocess, with BASH_ENV set to Lmod's
     init script so the envmodules rules (signalp4/signalp6) find `module`.'''
@@ -397,6 +424,8 @@ class WorkflowBase(ProgramBase):
             def _read_stderr():
                 for line in proc.stderr:
                     line = line.rstrip()
+                    if _chatter(line):
+                        continue
                     LOGGER.info('[snakemake] %s', line)
                     stderr_lines.append(line)
 
@@ -406,6 +435,8 @@ class WorkflowBase(ProgramBase):
             stdout_lines: list[str] = []
             for line in proc.stdout:
                 line = line.rstrip()
+                if _chatter(line):
+                    continue
                 LOGGER.info('[snakemake] %s', line)
                 stdout_lines.append(line)
 
@@ -449,12 +480,16 @@ class WorkflowBase(ProgramBase):
         def _read_stdout():
             for line in proc.stdout:
                 line = line.rstrip()
+                if _chatter(line):
+                    continue
                 LOGGER.info('[snakemake] %s', line)
                 stdout_lines.append(line)
 
         def _read_stderr():
             for line in proc.stderr:
                 line = line.rstrip()
+                if _chatter(line):
+                    continue
                 LOGGER.info('[snakemake] %s', line)
                 stderr_lines.append(line)
 
@@ -976,12 +1011,16 @@ class WorkflowBase(ProgramBase):
             if db_path:
                 genome_cache_map_now = cache_map_fn(genome)
                 tools_map = {k: v for k, v in genome_cache_map_now.items() if not input_keyed(k)}
-                genome_restored = restore_all(db_path, genome_files[genome], tools_map)
+                genome_restored = _safely(f'Restoring {genome} from the cache', restore_all,
+                                          db_path, genome_files[genome], tools_map) or {}
+                if genome_restored is _FAILED:
+                    genome_restored = {}
                 # Consolidation and labeling: only a merge of exactly the tables now in the folder.
                 merged_fp = merged_inputs_fingerprint(get_workflow_prefix_for(genome, smk_config))
-                genome_restored.update(restore_all(
-                    db_path, genome_files[genome],
-                    {cache_name(k, merged_fp): v for k, v in genome_cache_map_now.items() if input_keyed(k)}))
+                merged_back = _safely(f'Restoring {genome} merged tables from the cache', restore_all,
+                                      db_path, genome_files[genome],
+                                      {cache_name(k, merged_fp): v for k, v in genome_cache_map_now.items() if input_keyed(k)})
+                genome_restored.update(merged_back if isinstance(merged_back, dict) else {})
                 # Back under the cache-map keys, for the checks and the report below.
                 genome_restored = {k: genome_restored.get(cache_name(k, merged_fp), False) for k in genome_cache_map_now}
                 restored[genome] = genome_restored
@@ -1070,20 +1109,22 @@ class WorkflowBase(ProgramBase):
                 ]
                 # Scoring is never cached (its OCC reference grows), so no fast path.
                 scoring_always_recomputes = smk_config.get('run_scoring', True) not in (False, 'false', '0', 'no')
+                # Unknown (a busy database) counts as not processed: the genome is computed.
+                already = _safely(f'Checking {genome} in the database', is_already_processed,
+                                  db_path, fasta_hash, PIPELINE_VERSION) is True
                 # A Prodigal genome restores nothing, so it always computes.
-                if (genome not in prodigal_genomes
-                        and is_already_processed(db_path, fasta_hash, PIPELINE_VERSION)
+                if (genome not in prodigal_genomes and already
                         and not missing_selected and not scoring_always_recomputes):
                     LOGGER.info('Genome %s already at pipeline version %s — skipping Stage 2 compute (all selected outputs restored from cache)',
                                 genome, PIPELINE_VERSION)
                     LOGGER.info(provenance.summary(genome))
-                    log_workflow_run(db_path, run_id, genome_files[genome], key_name, 0,
-                                     status='success')
+                    _safely(f'Recording {genome} in the run log table', log_workflow_run, db_path, run_id,
+                            genome_files[genome], key_name, 0, status='success')
                     return None
                 if missing_selected:
                     LOGGER.info('Genome %s at version %s but selected steps not in cache: %s — running Stage 2 to compute them',
                                 genome, PIPELINE_VERSION, missing_selected)
-                elif scoring_always_recomputes and is_already_processed(db_path, fasta_hash, PIPELINE_VERSION):
+                elif scoring_always_recomputes and already:
                     LOGGER.info('Genome %s already at version %s, and scoring runs fresh — running Stage 2 to RE-SCORE (only scoring + fingerprint recompute; all other phases restore from cache)',
                                 genome, PIPELINE_VERSION)
 
@@ -1120,7 +1161,12 @@ class WorkflowBase(ProgramBase):
                 if all(Path(p).exists() for p in paths):
                     # Consolidation is done, so every table it merged is final.
                     name = cache_name(tool, merged_inputs_fingerprint(pc_prefix)) if input_keyed(tool) else tool
-                    store(db_path, genome_files[genome], name, paths)
+                    if _safely(f'Caching {tool} for {genome}', store, db_path, genome_files[genome], name, paths) is _FAILED:
+                        # Asked again at the next look; after five tries the step stays uncached this time.
+                        slot.setdefault('tries', {})[tool] = slot.get('tries', {}).get(tool, 0) + 1
+                        if slot['tries'][tool] >= 5:
+                            slot['stored'].add(tool)
+                        continue
                     slot['stored'].add(tool)
                     LOGGER.info('Cached %s for %s as soon as its own db token appeared '
                                 '(Stage 2 still running)', tool, genome)
@@ -1144,8 +1190,8 @@ class WorkflowBase(ProgramBase):
                 provenance.write()
                 LOGGER.info(provenance.summary(genome))
                 if db_path:
-                    log_workflow_run(db_path, run_id, genome_files[genome], key_name,
-                                     result['rules_summary'].get('completed', 0), status='failed')
+                    _safely(f'Recording {genome} in the run log table', log_workflow_run, db_path, run_id,
+                            genome_files[genome], key_name, result['rules_summary'].get('completed', 0), status='failed')
                 failed.append(genome)
                 return
             finished.append(genome)
@@ -1154,11 +1200,12 @@ class WorkflowBase(ProgramBase):
                                   if tool not in slot['stored'] and not slot['restored'].get(tool, False)}
                 if tools_to_store:
                     merged_fp = merged_inputs_fingerprint(slot['pc_prefix'])
-                    store_all(db_path, genome_files[genome], {cache_name(t, merged_fp): p for t, p in tools_to_store.items()})
+                    _safely(f'Caching the rest of {genome}', store_all, db_path, genome_files[genome],
+                            {cache_name(t, merged_fp): p for t, p in tools_to_store.items()})
                 else:
                     LOGGER.info('All outputs were already cached incrementally or were cache hits for %s', genome)
-                log_workflow_run(db_path, run_id, genome_files[genome], key_name,
-                                 self._build_result(key_name, proc)['rules_summary'].get('completed', 0), status='success')
+                _safely(f'Recording {genome} in the run log table', log_workflow_run, db_path, run_id, genome_files[genome],
+                        key_name, self._build_result(key_name, proc)['rules_summary'].get('completed', 0), status='success')
             LOGGER.info(provenance.summary(genome))
 
         while pending or queue or active:
@@ -1172,7 +1219,7 @@ class WorkflowBase(ProgramBase):
                     paths = self._gtdbtk_split_paths(genome, smk_config)
                     split = [*paths[:2], f"{get_workflow_prefix_for(genome, smk_config)}gtdbtk/gtdbtk_compute.tkn"]
                     if Path(paths[2]).exists() or (genome not in gtdbtk_stored and all(Path(p).exists() for p in split)):
-                        store(db_path, genome_files[genome], 'gtdbtk', paths)
+                        _safely(f'Caching GTDB-Tk for {genome}', store, db_path, genome_files[genome], 'gtdbtk', paths)
                         gtdbtk_stored.add(genome)
                         if Path(paths[2]).exists():
                             gtdbtk_loaded.add(genome)
@@ -1183,10 +1230,12 @@ class WorkflowBase(ProgramBase):
                     queue.append(genome)
                     if db_path:
                         if run_gtdbtk_enabled and genome not in gtdbtk_stored:
-                            store(db_path, genome_files[genome], 'gtdbtk', self._gtdbtk_split_paths(genome, smk_config))
+                            _safely(f'Caching GTDB-Tk for {genome}', store, db_path, genome_files[genome], 'gtdbtk',
+                                    self._gtdbtk_split_paths(genome, smk_config))
                             gtdbtk_stored.add(genome)
                         if genome not in prodigal_genomes and not rasttk_restored.get(genome, False):
-                            store(db_path, genome_files[genome], 'rasttk', self._rasttk_paths(genome, smk_config))
+                            _safely(f'Caching RASTtk for {genome}', store, db_path, genome_files[genome], 'rasttk',
+                                    self._rasttk_paths(genome, smk_config))
 
             # The genomes in Stage 2: finished tools stored, ended ones wrapped up.
             for slot in list(active):
