@@ -21,3 +21,6 @@ Thumbs.db
 # Vite
 vite.config.js.timestamp-*
 vite.config.ts.timestamp-*
+
+# Locked pages: added by the website build from the private hosting repository (lib/crisp/locked.ts).
+static/locked/
