@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { Check, Copy, Database, FolderOpen, PanelLeftClose, PanelLeftOpen, RotateCcw, RotateCw, Square, TextWrap } from 'lucide-svelte';
+	import { ArrowDownToLine, ArrowUpToLine, Check, Copy, Database, FolderOpen, PanelLeftClose, PanelLeftOpen, RotateCcw, RotateCw, Square, TextWrap } from 'lucide-svelte';
 	import Resizer from '$lib/workspace/motion/Resizer.svelte';
 	import JobCommand from '$lib/crisp/JobCommand.svelte';
 	import ProgressGrid from '$lib/crisp/ProgressGrid.svelte';
@@ -231,6 +231,10 @@
 			ui.notify('Could not reach the clipboard', 'error');
 		}
 	}
+	/** Jumps to the log's first or last line. */
+	function jump(to: 'top' | 'bottom') {
+		box?.scrollTo({ top: to === 'top' ? 0 : box.scrollHeight, behavior: ui.motion === 'off' ? 'auto' : 'smooth' });
+	}
 	/** Ctrl or Cmd + C in the log: the selection if there is one, otherwise the whole log. */
 	function logKey(e: KeyboardEvent) {
 		if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'c' && !getSelection()?.toString()) {
@@ -379,6 +383,8 @@
 				<span class="term-n">{logText ? `${all.length.toLocaleString('en-US')} lines${partial ? ' | the end of a longer log' : ''}${all.length > SHOWN ? `, the last ${SHOWN.toLocaleString('en-US')} shown` : ''}` : ''}</span>
 				<span class="mg-grow"></span>
 				{#if going}<span class="live"><i></i>Live</span>{/if}
+				<button type="button" class="term-btn" title="Go to the first line" disabled={!logText} onclick={() => jump('top')}><ArrowUpToLine size={13} />Top</button>
+				<button type="button" class="term-btn" title="Go to the last line" disabled={!logText} onclick={() => jump('bottom')}><ArrowDownToLine size={13} />Bottom</button>
 				<button type="button" class="term-btn" aria-pressed={wrap} title="Wrap long lines" onclick={() => (wrap = !wrap)}><TextWrap size={13} />Wrap</button>
 				<button type="button" class="term-btn" title="Copy the log as read (Ctrl or Cmd + C in the log does the same)" disabled={!logText.trim()} onclick={copyLog}><Copy size={13} />Copy</button>
 			</div>
@@ -885,6 +891,25 @@
 		white-space: pre-wrap;
 		word-break: break-word;
 		color: color-mix(in srgb, var(--tm-ink) 85%, transparent);
+		scrollbar-color: color-mix(in srgb, var(--tm-ink) 40%, transparent) transparent;
+	}
+	/* A scrollbar in view at each moment (not only while scrolling), so a click on its track jumps there. */
+	.out::-webkit-scrollbar {
+		width: 12px;
+		height: 12px;
+	}
+	.out::-webkit-scrollbar-track {
+		background: color-mix(in srgb, var(--tm-ink) 8%, transparent);
+		border-radius: 6px;
+	}
+	.out::-webkit-scrollbar-thumb {
+		background: color-mix(in srgb, var(--tm-ink) 38%, transparent);
+		border: 3px solid transparent;
+		border-radius: 6px;
+		background-clip: padding-box;
+	}
+	.out::-webkit-scrollbar-thumb:hover {
+		background-color: color-mix(in srgb, var(--tm-ink) 60%, transparent);
 	}
 	.ln.ok {
 		color: color-mix(in srgb, var(--mg-ok) 70%, #fff);
