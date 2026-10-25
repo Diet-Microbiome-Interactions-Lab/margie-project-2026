@@ -1,5 +1,8 @@
 <script lang="ts">
-	import { ArrowDownToLine, ArrowUpToLine, Check, Copy, Database, FolderOpen, PanelLeftClose, PanelLeftOpen, RotateCcw, RotateCw, Square, TextWrap } from 'lucide-svelte';
+	import { ArrowDownToLine, ArrowUpToLine, Check, Copy, Database, FileText, FolderOpen, PanelLeftClose, PanelLeftOpen, RotateCcw, RotateCw, Square, TextWrap } from 'lucide-svelte';
+	import { backend } from '$lib/workspace/backend.svelte';
+	import { call } from '$lib/cluster/http';
+	import { downloadBlob } from '$lib/cluster/backend';
 	import Resizer from '$lib/workspace/motion/Resizer.svelte';
 	import JobCommand from '$lib/crisp/JobCommand.svelte';
 	import ProgressGrid from '$lib/crisp/ProgressGrid.svelte';
@@ -47,6 +50,80 @@
 	/** A failed or stopped annotation can be picked up where it stopped, or run again from the start. */
 	const again = (r: Run) => r.kind === 'annotate' && (r.status === 'failed' || r.status === 'cancelled');
 	let busy = $state('');
+
+	/** The job report: what this page shows, made into a PDF with the logs and records on the cluster. */
+	let reporting = $state('');
+	async function jobReport() {
+		const run = shown;
+		if (!run || !prog || reporting) return;
+		reporting = 'Preparing…';
+		try {
+			const clockOf = (tool: string, genome: string) => clock?.started.find((e) => e.tool === tool && e.genome === genome);
+			const model = {
+				run: {
+					id: run.id,
+					label: title(run),
+					kind: run.kind,
+					status: run.status,
+					command: run.command ?? '',
+					args: run.args,
+					started: run.started,
+					finished: run.finished ?? '',
+					outputDir: run.outputDir ?? '',
+					reason: run.reason ?? '',
+					progressText: run.progressText ?? '',
+					tools: run.tools ?? []
+				},
+				summary: { overall: prog.overall, done: prog.counts.done, all: prog.counts.all, left: going ? prog.left : null, untimed: prog.untimed, genomes: prog.rows.length },
+				genomes: prog.rows.map((r) => ({ genome: r.g, state: r.state, pct: r.pct, done: r.done, of: r.of, running: r.running })),
+				columns: prog.columns.map((c) => ({ step: c.t, pct: c.pct, done: c.done, failed: c.failed, of: c.of })),
+				steps: prog.rows.flatMap((r) =>
+					r.cells
+						.filter((c) => c.state !== 'na')
+						.map((c) => {
+							const e = clockOf(c.t, r.g);
+							return {
+								genome: r.g,
+								step: c.t,
+								state: c.state,
+								say: c.say,
+								source: c.src?.source ?? '',
+								level: c.src?.level ?? '',
+								detail: c.src?.detail ?? '',
+								file: c.store?.file?.name ?? '',
+								fileSize: c.store?.file?.size ?? 0,
+								loaded: !!c.store?.loaded,
+								jobs: c.jobs ?? [],
+								seconds: e && e.ok ? (e.last - e.start) / 1000 : (c.so ?? null)
+							};
+						})
+				),
+				clock: clock?.started ?? []
+			};
+			const started = await call<{ zip: string; work: string }>('POST', '/v1/ssh/job-report', { run_id: run.id, model });
+			const t0 = Date.now();
+			for (;;) {
+				await new Promise((r) => setTimeout(r, 3000));
+				const st = await call<{ state: string; error: string }>('GET', `/v1/ssh/job-report-status?work=${encodeURIComponent(started.work)}`);
+				if (st.state === 'done') break;
+				if (st.state === 'failed') throw new Error(`The report could not be made: ${st.error}`);
+				reporting = `Preparing… ${Math.round((Date.now() - t0) / 1000)} s`;
+			}
+			reporting = 'Downloading…';
+			const { blob, name } = await downloadBlob(started.zip);
+			const url = URL.createObjectURL(blob);
+			const a = Object.assign(document.createElement('a'), { href: url, download: name });
+			document.body.append(a);
+			a.click();
+			a.remove();
+			setTimeout(() => URL.revokeObjectURL(url), 10_000);
+			ui.notify(`The job report is saved, and kept in the job's folder as ${name}.`, 'ok');
+		} catch (e) {
+			ui.notify(e instanceof Error ? e.message : 'The job report could not be made.', 'error');
+		} finally {
+			reporting = '';
+		}
+	}
 	async function relaunch(r: Run, how: 'resume' | 'restart') {
 		busy = how;
 		const ok = how === 'resume' ? await ws.resume(r) : await ws.restart(r);
@@ -288,6 +365,11 @@
 						</span>
 					</div>
 					<div class="job-acts">
+						{#if backend.cluster && shown.kind === 'annotate' && shown.outputDir && prog}
+							<button type="button" class="mg-btn small" disabled={!!reporting} onclick={jobReport} title="A PDF of this job's summary and each step, zipped with its logs, the tools' provenance records, the cache report and the licence acceptances"
+								><FileText size={14} />{reporting || 'Prepare the job report'}</button
+							>
+						{/if}
 						{#if shown.outputDir}
 							<a class="mg-btn small" href={folderHref(shown.outputDir)} title={shown.outputDir}><FolderOpen size={14} />Folder</a>
 						{/if}

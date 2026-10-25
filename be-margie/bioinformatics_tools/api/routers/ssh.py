@@ -1698,6 +1698,74 @@ def refresh_genome_viewer(body: dict | None = None, current_user: dict = Depends
     return {"viewer": f"{folder}/{viewer}"}
 
 
+# ---- Job report: a PDF of the job with its logs, provenance and licence record, zipped in its folder ----
+
+@router.post("/job-report")
+def job_report(body: dict | None = None, current_user: dict = Depends(get_current_user)):
+    """Starts a job's report on the cluster (workflow_tools/report/job_report.py); returns {zip, work}: where the zip
+    will be, and the folder job-report-status reads.
+
+    body: {run_id, model}, the model being what the Jobs page shows (the job, its summary, each step).
+    The job's log and the account's licence acceptances are added here."""
+    body = body or {}
+    run_id = str(body.get("run_id") or "").strip()
+    model = body.get("model") or {}
+    out_dir = str((model.get("run") or {}).get("outputDir") or "").strip()
+    if not run_id or not out_dir:
+        raise HTTPException(status_code=400, detail="Which job, and which output folder?")
+    status = _job_status(run_id, current_user)
+    out_dir = _resolve_browse_path(out_dir, current_user).rstrip("/")
+    from bioinformatics_tools.api.database import get_db
+    with get_db() as db:
+        rows = db.execute(
+            "SELECT terms_version, terms_sha256, accepted_items, accepted_at, usage_type, licensed_tools "
+            "FROM license_acceptances WHERE username = ? ORDER BY id", (current_user["username"],)).fetchall()
+    licence = [dict(r) for r in rows]
+    conn = _build_connection(current_user)
+    # The report is made with the account's own clone, brought up to the deployed version first.
+    try:
+        sync_remote_dane_wf(conn)
+    except Exception as exc:
+        LOGGER.warning("dane_wf version-sync before a job report failed, using the clone as it is: %s", exc)
+    q = shlex.quote
+    work = f"{out_dir}/.job-report"
+    code, out = user_stores._run(conn, f"mkdir -p {q(work)}")
+    if code != 0:
+        raise HTTPException(status_code=404, detail=f"Could not write to {out_dir} on the cluster.")
+    ssh_sftp.write_remote_text_file(f"{work}/model.json", json.dumps(model), connection=conn)
+    ssh_sftp.write_remote_text_file(f"{work}/job-log.txt", status.get("logs") or "", connection=conn)
+    ssh_sftp.write_remote_text_file(f"{work}/licence.json", json.dumps(licence, indent=2), connection=conn)
+    repo = f"{current_user['home_dir']}/bioinformatics-tools"
+    script = f"{repo}/bioinformatics_tools/workflow_tools/report/job_report.py"
+    name = f"MARGIE-job-report-{re.sub(r'[^A-Za-z0-9]', '', run_id)[:8]}.zip"
+    # Runs on in the background (a large run's logs take a while); job-report-status follows it.
+    cmd = (f"rm -f {q(work)}/report.exit; PY=${{MARGIE_PYTHON:-{q(repo)}/.venv/bin/python}}; "
+           f"nohup sh -c '\"$0\" {q(script)} --run-dir {q(out_dir)} --work {q(work)} --out {q(out_dir + '/' + name)} "
+           f"> {q(work)}/report.log 2>&1; echo $? > {q(work)}/report.exit' \"$PY\" >/dev/null 2>&1 &")
+    code, out = user_stores._run(conn, cmd, timeout=60)
+    if code != 0:
+        raise HTTPException(status_code=500, detail=f"The report could not be started: {out.strip()[-400:]}")
+    return {"zip": f"{out_dir}/{name}", "work": work}
+
+
+@router.get("/job-report-status")
+def job_report_status(work: str, current_user: dict = Depends(get_current_user)):
+    """Returns {state: running | done | failed, error} for a report started by job-report."""
+    work = _resolve_browse_path(work, current_user).rstrip("/")
+    if not work.endswith("/.job-report"):
+        raise HTTPException(status_code=400, detail="Not a job report folder.")
+    conn = _build_connection(current_user)
+    q = shlex.quote
+    _, out = user_stores._run(conn, f"cat {q(work)}/report.exit 2>/dev/null")
+    code = out.strip()
+    if not code:
+        return {"state": "running", "error": ""}
+    if code == "0":
+        return {"state": "done", "error": ""}
+    _, log = user_stores._run(conn, f"tail -n 12 {q(work)}/report.log 2>/dev/null")
+    return {"state": "failed", "error": log.strip()[-600:]}
+
+
 # ---- AI keys: ~/.config/margie on the cluster, JSON or provider=key lines ----
 
 _AI_KEYS_DIR = ".config/margie"
