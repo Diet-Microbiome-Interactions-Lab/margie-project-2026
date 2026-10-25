@@ -87,3 +87,43 @@ references:
     end: 38
     year: 2020
     doi: "10.1109/SuperCompCloud51944.2020.00011"
+  - type: software
+    title: "bioinformatics-tools"
+    notes: "The backend as used in the thesis (its reference 2026a)."
+    authors:
+      - family-names: "Bhattarai"
+        given-names: "Sajal"
+      - family-names: "Deemer"
+        given-names: "Dane"
+      - family-names: "Lindemann"
+        given-names: "Stephen"
+    version: "1.0.0"
+    year: 2026
+    url: "https://github.com/sajalbhattarai/bioinformatics-tools/releases/tag/v.1.0.0"
+  - type: software
+    title: "biolab-fe"
+    notes: "The web interface as used in the thesis (its reference 2026b)."
+    authors:
+      - family-names: "Bhattarai"
+        given-names: "Sajal"
+      - family-names: "Deemer"
+        given-names: "Dane"
+      - family-names: "Lindemann"
+        given-names: "Stephen"
+    version: "1.0.0"
+    year: 2026
+    url: "https://github.com/sajalbhattarai/biolab-fe/releases/tag/v1.0.0"
+  - type: data
+    title: "Mostly Automated Rapid Genome Inference Environment"
+    notes: "The thesis's data (its reference 2026c), embargoed until 2028-08-30."
+    authors:
+      - family-names: "Bhattarai"
+        given-names: "Sajal"
+      - family-names: "Deemer"
+        given-names: "Dane"
+      - family-names: "Lindemann"
+        given-names: "Stephen"
+    year: 2026
+    publisher:
+      name: "Zenodo"
+    doi: "10.5281/zenodo.21632205"

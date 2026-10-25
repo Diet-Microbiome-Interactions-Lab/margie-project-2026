@@ -39,7 +39,7 @@
 					<FileCode size={26} />
 					<span class="ab-go-text">
 						<b>Read the code behind each step</b>
-						<span>Consolidation | Labeling | Operon database | Scoring | Fingerprinting | Fingerprint databases: the Python scripts as MARGIE runs them, highlighted, with line numbers.</span>
+						<span>Consolidation | Labeling | Operon database | Scoring | Fingerprinting | Fingerprint databases | Genome map | Reports: the Python scripts as MARGIE runs them, highlighted, with line numbers.</span>
 					</span>
 					<span class="ab-go-to">Open the code <ArrowRight size={15} /></span>
 				</a>

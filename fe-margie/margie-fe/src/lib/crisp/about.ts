@@ -38,6 +38,48 @@ url = "https://hammer.purdue.edu/articles/thesis/_b_MOSTLY_AUTOMATED_RAPID_GENOM
 doi = "10.25394/PGS.33103682.v1"
 }`;
 
+/** The code and data as the thesis used and cites them (its references 2026a to 2026c), with BibTeX. */
+export const THESIS_RECORDS: { what: string; text: string; href: string }[] = [
+	{
+		what: 'The backend as used in the thesis',
+		text: 'Bhattarai, S., Deemer, D., & Lindemann, S. (2026a). bioinformatics-tools (Version 1.0.0) [Computer software]. https://github.com/sajalbhattarai/bioinformatics-tools/releases/tag/v.1.0.0',
+		href: 'https://github.com/sajalbhattarai/bioinformatics-tools/releases/tag/v.1.0.0'
+	},
+	{
+		what: 'The web interface as used in the thesis',
+		text: 'Bhattarai, S., Deemer, D., & Lindemann, S. (2026b). biolab-fe (Version 1.0.0) [Computer software]. https://github.com/sajalbhattarai/biolab-fe/releases/tag/v1.0.0',
+		href: 'https://github.com/sajalbhattarai/biolab-fe/releases/tag/v1.0.0'
+	},
+	{
+		what: "The thesis's data, archived (embargoed until 30 August 2028)",
+		text: 'Bhattarai, S., Deemer, D., & Lindemann, S. (2026c). Mostly Automated Rapid Genome Inference Environment [Dataset]. Zenodo. https://doi.org/10.5281/zenodo.21632205',
+		href: 'https://doi.org/10.5281/zenodo.21632205'
+	}
+];
+export const THESIS_RECORDS_BIBTEX = `@software{Bhattarai2026aBioinformaticsTools,
+author = "Sajal Bhattarai and Dane Deemer and Stephen Lindemann",
+title = "{bioinformatics-tools}",
+version = "1.0.0",
+year = "2026",
+url = "https://github.com/sajalbhattarai/bioinformatics-tools/releases/tag/v.1.0.0"
+}
+@software{Bhattarai2026bBiolabFe,
+author = "Sajal Bhattarai and Dane Deemer and Stephen Lindemann",
+title = "{biolab-fe}",
+version = "1.0.0",
+year = "2026",
+url = "https://github.com/sajalbhattarai/biolab-fe/releases/tag/v1.0.0"
+}
+@misc{Bhattarai2026cData,
+doi = {10.5281/ZENODO.21632205},
+url = {https://zenodo.org/doi/10.5281/zenodo.21632205},
+author = {Bhattarai, Sajal and Deemer, Dane and Lindemann, Stephen},
+title = {Mostly Automated Rapid Genome Inference Environment},
+publisher = {Zenodo},
+year = {2026},
+note = {Embargoed until 2028-08-30}
+}`;
+
 /** The base architecture MARGIE was built on (APA 7th): Dane Deemer's backend and web interface. */
 export const BASE_CITATIONS: { what: string; text: string; href: string }[] = [
 	{
@@ -175,7 +217,6 @@ export const SOFTWARE: {
 			{ name: 'xterm.js', what: 'the Terminal', href: 'https://xtermjs.org' },
 			{ name: 'marked and DOMPurify', what: 'Markdown, safely', href: 'https://marked.js.org' },
 			{ name: 'ExcelJS', what: 'workbooks in the browser', href: 'https://github.com/exceljs/exceljs' },
-			{ name: 'Anthropic SDK', what: 'the chat with a genome (Claude)', href: 'https://docs.anthropic.com' },
 			{ name: 'Fontsource', what: 'Bricolage Grotesque and IBM Plex', href: 'https://fontsource.org' }
 		]
 	},
