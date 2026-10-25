@@ -1,5 +1,5 @@
 cff-version: 1.2.0
-message: "If you use this software, please cite it, the thesis in which it was first built, and the base architecture it was built on (bioinformatics-tools and biolab-fe); the last three are under references."
+message: "If you use MARGIE, please cite her, the thesis in which she was first built, the base architecture she was built on (bioinformatics-tools and biolab-fe), and the research computing she runs on (RCAC); these are under references."
 authors:
   - family-names: "Bhattarai"
     given-names: "Sajal"
@@ -49,3 +49,41 @@ references:
     year: 2025
     url: "https://github.com/wintermutant/biolab-fe"
     repository-code: "https://github.com/wintermutant/biolab-fe"
+  - type: magazine-article
+    title: "Empowering Faculty: A Campus Cyberinfrastructure Strategy for Research Communities"
+    notes: "Research computing: RCAC, Purdue University, as RCAC asks to be cited."
+    authors:
+      - family-names: "McCartney"
+        given-names: "Gerry"
+      - family-names: "Hacker"
+        given-names: "Thomas"
+      - family-names: "Yang"
+        given-names: "Baijian"
+    journal: "EDUCAUSE Review"
+    year: 2014
+    url: "https://er.educause.edu/articles/2014/7/empowering-faculty-a-campus-cyberinfrastructure-strategy-for-research-communities"
+  - type: conference-paper
+    title: "The \"Geddes\" Composable Platform - An Evolution of Community Clusters for a Composable World"
+    notes: "Research computing: the Geddes Community Composable Platform, RCAC, Purdue University (NSF award OAC-2018926)."
+    authors:
+      - family-names: "Smith"
+        given-names: "Preston M."
+      - family-names: "Gough"
+        given-names: "Erik"
+      - family-names: "Younts"
+        given-names: "Alexander"
+      - family-names: "Werts"
+        given-names: "Brian"
+      - family-names: "Hacker"
+        given-names: "Thomas J."
+      - family-names: "Neumeister"
+        given-names: "Norbert"
+      - family-names: "Wisecaver"
+        given-names: "Jennifer"
+    collection-title: "2020 IEEE/ACM International Workshop on Interoperability of Supercomputing and Cloud Technologies (SuperCompCloud)"
+    publisher:
+      name: "IEEE"
+    start: 33
+    end: 38
+    year: 2020
+    doi: "10.1109/SuperCompCloud51944.2020.00011"

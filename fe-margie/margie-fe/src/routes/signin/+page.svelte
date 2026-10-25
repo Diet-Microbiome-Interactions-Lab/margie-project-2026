@@ -219,7 +219,7 @@
 							<div class="form">
 								<div class="hint request">
 									<p>
-										MARGIE runs on Purdue's HPC cluster, so it needs an account there. If you are not affiliated with Purdue, or are a
+										MARGIE runs on Purdue's HPC cluster, so she needs an account there. If you are not affiliated with Purdue, or are a
 										collaborator or a reviewer, please email the address below to get a username and password to sign in.
 									</p>
 									<p>
@@ -652,7 +652,7 @@
 		margin-top: 3px;
 		color: var(--mg-danger);
 	}
-	/* The logo, MARGIE's full name and its motto, rising in after it. */
+	/* The logo, MARGIE's full name and her motto, rising in after it. */
 	.welcome {
 		--logo-size: clamp(190px, 19vw, 240px);
 		display: flex;

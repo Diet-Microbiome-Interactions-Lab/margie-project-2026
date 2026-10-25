@@ -1,13 +1,13 @@
 <script lang="ts">
 	import '$lib/crisp/about.css';
 	import { onMount } from 'svelte';
-	import { EXTRA_REFERENCES, LAB, SOFTWARE } from '$lib/crisp/about';
+	import { COMPUTING, EXTRA_REFERENCES, LAB, SOFTWARE } from '$lib/crisp/about';
 	import { fetchTerms, NOT_YET, type CatalogTool } from '$lib/license';
 
 	/**
 	 * Acknowledgements: the tools and databases MARGIE is built on, from the licence catalog (the
 	 * steps running now): each one's version, licence, source code and where its data comes from,
-	 * with its reference; then the software MARGIE itself is built with.
+	 * with its reference; then the software MARGIE herself is built with.
 	 */
 	let tools = $state<CatalogTool[]>([]);
 	let error = $state('');
@@ -64,10 +64,14 @@
 				>) for his mentoring, and for the design and development of the engine and GUI orchestration platform,
 				<a class="mg-link" href="https://github.com/wintermutant/bioinformatics-tools" target="_blank" rel="noreferrer">BSP</a>, on which MARGIE was built.
 				Special thanks go to Dr. {LAB.pi} for his vision, supervision and support throughout its development, and to the members of the
-				{LAB.name} for their feedback and ideas. We thank Purdue RCAC for the research computing environment that supports this work.
+				{LAB.name} for their feedback and ideas.
+			</p>
+			<p>
+				{COMPUTING.thanks.split('OAC-2018926')[0]}<a class="mg-link" href={COMPUTING.award} target="_blank" rel="noreferrer">OAC-2018926</a>{COMPUTING.thanks.split('OAC-2018926')[1]}
+				Please cite RCAC's computing as it asks, below.
 			</p>
 			<p class="ab-lab">
-				If you publish results from MARGIE, please cite the tools and databases it ran for you, below, as well as MARGIE itself
+				If you publish results from MARGIE, please cite the tools and databases she ran for you, below, as well as MARGIE herself
 				(<a class="mg-link" href="/contributors">how to cite</a>).
 			</p>
 		</section>
@@ -137,6 +141,16 @@
 					</div>
 				{/each}
 			</div>
+		</section>
+
+		<section class="ab-box">
+			<h2>Computing</h2>
+			<p class="ab-lab">The research computing MARGIE runs on, to cite beside her (as RCAC asks).</p>
+			<ol class="refs">
+				{#each COMPUTING.refs as r (r.id)}
+					<li>{r.apa} <a class="mg-link" href={r.url} target="_blank" rel="noreferrer">{r.url}</a></li>
+				{/each}
+			</ol>
 		</section>
 
 		<section class="ab-box">
