@@ -11,6 +11,7 @@
 	import { api, fileUrl, viewableUrl } from '$lib/api';
 	import CountUp from '$lib/crisp/CountUp.svelte';
 	import ResultsRing from '$lib/crisp/ResultsRing.svelte';
+	import LoadProgress from '$lib/crisp/LoadProgress.svelte';
 	import FolderView, { type FolderRoot } from '$lib/workspace/FolderView.svelte';
 	import { uiBase } from '$lib/workspace/base.svelte';
 	import { ws, type GenomeSummary } from '$lib/workspace/data.svelte';
@@ -285,6 +286,13 @@
 	 * remount the map and figure viewers (ending full screen and resetting a zoom).
 	 */
 	const pickedResult = $derived(ws.finished.find((r) => r.organism === selected)?.final?.table ?? '');
+	/** The final table's size in bytes, where the results list has it (one folder down), else 0. */
+	const pickedSize = $derived.by(() => {
+		const r = ws.finished.find((x) => x.organism === selected);
+		if (!r?.folder || !pickedResult.startsWith(r.folder + '/')) return 0;
+		const [folder, name, more] = pickedResult.slice(r.folder.length + 1).split('/');
+		return name && more === undefined ? (r.files?.[folder]?.find((f) => f.name === name)?.size ?? 0) : 0;
+	});
 	$effect(() => {
 		const g = selected;
 		if (!g || !pickedResult) {
@@ -718,7 +726,7 @@
 		{:else if loading}
 			<div class="rb-state rb-wait">
 				<ResultsRing size={120} state="running" />
-				<span>Loading</span>
+				<LoadProgress label="Reading {selected}'s final table" path={pickedResult} size={pickedSize} />
 			</div>
 		{:else if selectedRow}
 			<header class="rb-head rb-head-row">

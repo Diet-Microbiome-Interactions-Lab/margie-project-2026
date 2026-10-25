@@ -5,6 +5,7 @@
 	import { cubicOut } from 'svelte/easing';
 	import { fly } from 'svelte/transition';
 	import { api } from '$lib/api';
+	import LoadProgress from '$lib/crisp/LoadProgress.svelte';
 	import './tools.css';
 	import { ChevronLeft, ChevronRight, Columns3, ListFilter, Search, SlidersHorizontal, X } from 'lucide-svelte';
 	import {
@@ -608,7 +609,7 @@
 			{/if}
 		</div>
 	{:else}
-		<p class="vw-pane vw-msg body">Loading…</p>
+		<div class="vw-pane vw-msg body"><LoadProgress label="Reading the table" {path} /></div>
 	{/if}
 </div>
 

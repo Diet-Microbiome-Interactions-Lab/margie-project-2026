@@ -2,6 +2,7 @@
 	import './tools.css';
 	import { Download, ExternalLink, Maximize, Minimize, MousePointerClick } from 'lucide-svelte';
 	import { viewable } from './viewable.svelte';
+	import LoadProgress from '$lib/crisp/LoadProgress.svelte';
 
 	/**
 	 * Frames an HTML result (the genome viewer) to fill its space or the display. `hash` is appended
@@ -17,6 +18,8 @@
 		full: outerFull = false
 	}: { src: string; title: string; hash?: string; download?: string; onfull?: () => void; full?: boolean } = $props();
 	const tail = $derived(hash ? `#${hash}` : '');
+	/** The cluster file behind src, for its progress while it loads. */
+	const filePath = $derived(new URL(src, 'http://x').searchParams.get('path') ?? '');
 	/** Framed: the fitted page (see the download route); standalone: the original. */
 	const framed = $derived(`${src}${src.includes('?') ? '&' : '?'}embed=1`);
 	const shown = viewable(() => framed);
@@ -61,6 +64,8 @@
 	</div>
 	{#if shown.error}
 		<p class="vw-pane vw-msg">{shown.error}</p>
+	{:else if !shown.url}
+		<div class="vw-pane vw-wait"><LoadProgress label="Loading {title}" path={filePath} /></div>
 	{:else}
 		<!-- Sandboxed like the local server's CSP: the page's scripts and downloads, not this app's sign-in or storage. -->
 		<iframe
@@ -91,6 +96,13 @@
 	}
 	.vw-msg {
 		flex-grow: 1;
+	}
+	.vw-wait {
+		display: grid;
+		flex-grow: 1;
+		place-items: center;
+		min-height: 240px;
+		padding: 24px;
 	}
 	iframe {
 		flex-grow: 1;
