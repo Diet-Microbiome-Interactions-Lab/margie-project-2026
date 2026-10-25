@@ -568,5 +568,411 @@
 			}
 		],
 		"explain": "Each hash fits its use: the genome hash ignores line breaks and file names, the protein key changes with a new database release, the fingerprint captures the evidence pattern, and the reference matches a genome by content even under a new name. Consolidation reruns when the tables it merges change."
+	},
+	{
+		"id": "margie-031",
+		"topic": "margie",
+		"level": "easy",
+		"kind": "choice",
+		"question": "What does a user give MARGIE, and what does MARGIE give back?",
+		"options": [
+			"Sequencing reads, and back the assembled contigs with their quality statistics",
+			"Metagenome reads, and back the taxa found with their relative abundance",
+			"Genome assemblies, and back each gene's label, operon and a 0 to 1 confidence",
+			"Protein structures, and back each protein's binding sites with docking scores"
+		],
+		"answer": 2,
+		"explain": "MARGIE takes prokaryotic genome assemblies as FASTA files. She calls their genes, annotates them with many tools at once, finds operons and scores how much the evidence for each gene's label agrees."
+	},
+	{
+		"id": "margie-032",
+		"topic": "margie",
+		"level": "easy",
+		"kind": "choice",
+		"question": "What does the name MARGIE stand for?",
+		"options": [
+			"Microbial Annotation and Reference Genome Inference Engine",
+			"Mostly Automated Rapid Genome Inference Environment",
+			"Multi-tool Automated Reannotation of Genomes In Ecosystems",
+			"Metagenome Assembly and Rapid Gene Identification Environment"
+		],
+		"answer": 1,
+		"explain": "MARGIE is the Mostly Automated Rapid Genome Inference Environment. She is a Snakemake workflow housed in the Bioinformatics Supercomputing Platform (BSP) built by Dane Deemer."
+	},
+	{
+		"id": "margie-033",
+		"topic": "margie",
+		"level": "easy",
+		"kind": "truefalse",
+		"statement": "MARGIE writes a gene's label by combining words from the descriptions that the different tools report for it.",
+		"answer": false,
+		"explain": "MARGIE does not compose new names. The label is one tool's hit description, from the first tool in the trust hierarchy with an informative hit, and the other tools' evidence stays beside it in the same row so the label can be checked."
+	},
+	{
+		"id": "margie-034",
+		"topic": "margie",
+		"level": "easy",
+		"kind": "choice",
+		"question": "Which file in a genome's folder gives each gene's label together with its confidence and tier?",
+		"options": [
+			"labeled-genes.tsv",
+			"consolidated-no-stat.tsv",
+			"envelope_summary.tsv",
+			"FINAL_ANNOTATION_WITH_CONFIDENCE.tsv"
+		],
+		"answer": 3,
+		"explain": "labeled-genes.tsv holds the label and how it was chosen; scoring adds C1 to C4, the confidence and the tier in FINAL_ANNOTATION_WITH_CONFIDENCE.tsv. It stays at the top of the genome folder with its Excel copy, FINAL_GENOME_VIEWER.html and the diagrams/ folder."
+	},
+	{
+		"id": "margie-035",
+		"topic": "margie",
+		"level": "easy",
+		"kind": "match",
+		"question": "Match each page of the MARGIE website to what it is for.",
+		"pairs": [
+			{
+				"left": "Install",
+				"right": "Read the licences, type the statement and check the cluster setup"
+			},
+			{
+				"left": "Settings",
+				"right": "Your SLURM account, folders and databases"
+			},
+			{
+				"left": "Analyze",
+				"right": "Choose the genomes and tools, then start the run"
+			},
+			{
+				"left": "Jobs",
+				"right": "Follow a run's steps as they go"
+			},
+			{
+				"left": "Results",
+				"right": "The tables, figures and genome map of finished genomes"
+			}
+		],
+		"explain": "A first run goes Install, Settings, Analyze, then Jobs while it runs and Results once it is done. Files browses the run's folders on the cluster."
+	},
+	{
+		"id": "margie-036",
+		"topic": "margie",
+		"level": "easy",
+		"kind": "truefalse",
+		"statement": "A run started on the MARGIE website runs on the cluster under the user's own account, with their own SLURM account and storage.",
+		"answer": true,
+		"explain": "Users sign in with their own cluster account, and the pipeline runs under it like any job they submit. The results, the MARGIE database and the operon and fingerprint pools stay in their storage, and the site reads them from there."
+	},
+	{
+		"id": "margie-037",
+		"topic": "margie",
+		"level": "easy",
+		"kind": "choice",
+		"question": "In each tool that reports a gene, its best hit is described as hypothetical protein. What is the gene's C1?",
+		"options": [
+			"7/7, as each of the seven sources reports a hit",
+			"0/7, as no source gives an informative hit",
+			"0.5, the neutral value for a gene with no evidence",
+			"1/7, as RASTtk's call itself counts as one source"
+		],
+		"answer": 1,
+		"explain": "C1 counts a source only when its best-hit description names a function. A hit described as hypothetical protein counts for nothing, so a gene known only as hypothetical scores 0/7."
+	},
+	{
+		"id": "margie-038",
+		"topic": "margie",
+		"level": "easy",
+		"kind": "choice",
+		"question": "Which gene caller does MARGIE recommend, and why?",
+		"options": [
+			"Prodigal, as it is fast and needs neither the domain nor the genetic code",
+			"RASTtk, as it names each product and calls RNA genes with the genome's own code",
+			"Prodigal, as its gene calls are the ones the genome-level cache stores",
+			"RASTtk, as it runs inside the cluster job and needs no outside service"
+		],
+		"answer": 1,
+		"explain": "RASTtk calls protein-coding and RNA genes with the genome's genetic code and names each product from the SEED subsystems, so RASTtk is a labelling source and the seventh C1 source. Prodigal is fast but calls protein-coding genes only and names nothing, so its genomes reach at most 6/7."
+	},
+	{
+		"id": "margie-039",
+		"topic": "margie",
+		"level": "easy",
+		"kind": "choice",
+		"question": "Which of these grows as MARGIE annotates more genomes?",
+		"options": [
+			"The Pfam-A release that HMMER searches against",
+			"The GTDB release that GTDB-Tk classifies against",
+			"The operon reference that C3 scores genes against",
+			"The KOfam profiles that KofamScan searches with"
+		],
+		"answer": 2,
+		"explain": "The tools' reference databases are downloaded at a fixed release and do not grow. MARGIE builds her own: the operon reference and the fingerprint databases grow one genome at a time, and the MARGIE database keeps each genome's results and caches."
+	},
+	{
+		"id": "margie-040",
+		"topic": "margie",
+		"level": "easy",
+		"kind": "match",
+		"question": "Match each confidence tier to the final scores it covers.",
+		"pairs": [
+			{
+				"left": "Highest",
+				"right": "Above 0.9"
+			},
+			{
+				"left": "High",
+				"right": "Above 0.7, up to 0.9"
+			},
+			{
+				"left": "Medium",
+				"right": "Above 0.5, up to 0.7"
+			},
+			{
+				"left": "Fair",
+				"right": "Above 0.3, up to 0.5"
+			},
+			{
+				"left": "Low",
+				"right": "0.3 or below"
+			}
+		],
+		"explain": "The final score runs from 0 to 1 and sets the tier. A gene below 0.5 is also flagged for review."
+	},
+	{
+		"id": "margie-041",
+		"topic": "margie",
+		"level": "easy",
+		"kind": "truefalse",
+		"statement": "MARGIE gives RNA genes, such as tRNAs, a confidence score as she does for protein-coding genes.",
+		"answer": false,
+		"explain": "Scoring covers protein-coding genes. Non-coding features are not scored, and UniOP, which does not see RNA genes, marks them NOT_APPLICABLE_NON_CODING in the operon table."
+	},
+	{
+		"id": "margie-042",
+		"topic": "margie",
+		"level": "easy",
+		"kind": "choice",
+		"question": "Besides each step's progress, what does Jobs show that lets a user start the same run again from a cluster shell?",
+		"options": [
+			"The cluster nodes that each step ran on",
+			"The build recipe of each tool's container",
+			"The licence text of each tool in the run",
+			"The command that started the run"
+		],
+		"answer": 3,
+		"explain": "Jobs shows the command that ran, so the same run can be started from a shell on the cluster, with the same genomes, tools and settings."
+	},
+	{
+		"id": "margie-043",
+		"topic": "margie",
+		"level": "intermediate",
+		"kind": "truefalse",
+		"statement": "When one step fails for a genome, Snakemake stops the whole run, and the other genomes' steps stop with it.",
+		"answer": false,
+		"explain": "A step starts once its input files exist. When one fails, only the steps that depend on it stop, and the rest of the run goes on."
+	},
+	{
+		"id": "margie-044",
+		"topic": "margie",
+		"level": "intermediate",
+		"kind": "choice",
+		"question": "What does phase 7 decide for each genome, and what does that decision change?",
+		"options": [
+			"Its envelope type, which sets the model the localisation tools run with",
+			"Its Gram stain from GTDB-Tk, which sets the gene caller of phase 3",
+			"Its envelope type, which sets the models of Phobius, TMbed and SignalP 6",
+			"Its membrane lipids, which set the operon pool its genes are scored against"
+		],
+		"answer": 0,
+		"explain": "Phase 7 reads marker genes in the TIGRFAM, PGAP, Pfam and UniProt results and calls the genome monoderm, diderm or archaeal. PSORTb, DeepSig and SignalP 4.1 then run with that model; Phobius, TMbed and SignalP 6 do not depend on it."
+	},
+	{
+		"id": "margie-045",
+		"topic": "margie",
+		"level": "intermediate",
+		"kind": "truefalse",
+		"statement": "A genome with no envelope marker hits, such as a wall-less one, gets the diderm model, and default_no_evidence is recorded as the basis.",
+		"answer": true,
+		"explain": "A tie, or no marker, gives the conservative default, diderm. The basis is written to envelope_summary.tsv, so the localisation calls of such a genome can be read with that in mind."
+	},
+	{
+		"id": "margie-046",
+		"topic": "margie",
+		"level": "intermediate",
+		"kind": "choice",
+		"question": "A new genome shares many of its proteins with genomes annotated before. What does the protein-level cache do for a per-protein tool?",
+		"options": [
+			"It restores the whole genome's outputs, as most of its proteins are known",
+			"It sends each protein again, as the cache serves whole genomes only",
+			"It copies the matched proteins' labels, so labelling skips them",
+			"It sends only the proteins not yet stored under that tool's key"
+		],
+		"answer": 3,
+		"explain": "Each protein is stored under its sequence hash and a tool key: a hash of the tool's container, database and the settings that change its answer. Stored proteins come back from the cache, and only the rest go to the tool."
+	},
+	{
+		"id": "margie-047",
+		"topic": "margie",
+		"level": "intermediate",
+		"kind": "choice",
+		"question": "Which file says, for each genome and step, whether the step ran fresh or came back from the cache?",
+		"options": [
+			"envelope_summary.tsv in the genome folder",
+			"consolidated-no-stat.tsv in the genome folder",
+			"cache-report.tsv in the run folder",
+			"fingerprint-database.tsv in the store folder"
+		],
+		"answer": 2,
+		"explain": "cache-report.tsv names, for each genome and step, whether it ran or was restored, and from which cache level: the genome-level cache or the protein-level cache."
+	},
+	{
+		"id": "margie-048",
+		"topic": "margie",
+		"level": "intermediate",
+		"kind": "match",
+		"question": "Match each column of MARGIE's processed tables to what it records.",
+		"pairs": [
+			{
+				"left": "<TOOL>_tool_used",
+				"right": "The tool and its version"
+			},
+			{
+				"left": "<TOOL>_command_used",
+				"right": "The command and its settings"
+			},
+			{
+				"left": "<TOOL>_database_used",
+				"right": "The database and where it came from"
+			},
+			{
+				"left": "product_descriptor_source",
+				"right": "The tool the gene's label came from"
+			},
+			{
+				"left": "product_descriptor_hierarchy",
+				"right": "The tool chain labelling walked for the gene"
+			}
+		],
+		"explain": "Each tool's table carries its own provenance on each row, and consolidation keeps those columns as they are. Labelling adds where the label came from and how it was reached."
+	},
+	{
+		"id": "margie-049",
+		"topic": "margie",
+		"level": "intermediate",
+		"kind": "choice",
+		"question": "Which of these genes does MARGIE flag for review?",
+		"options": [
+			"Final score 0.82, in a three-gene operon of named genes with C2 = 0.9",
+			"Final score 0.78, whose EC numbers from two tools conflict",
+			"Final score 0.55, a single gene with no EC number from any tool",
+			"Final score 0.95, in a two-gene operon with C2 = 0.7"
+		],
+		"answer": 1,
+		"explain": "A gene is flagged when its EC numbers conflict, its final score is below 0.5, it sits in an operon with C2 below 0.5, or half or more of its operon's adjacent pairs involve an uncharacterised protein and context gave no boost. A high score does not clear an EC conflict."
+	},
+	{
+		"id": "margie-050",
+		"topic": "margie",
+		"level": "intermediate",
+		"kind": "truefalse",
+		"statement": "In labelling, a UniProt Swiss-Prot hit can set the label only at 40% identity or more, while the other tools' hits are used under the cutoffs they applied when they searched.",
+		"answer": true,
+		"explain": "UniProt is the one tool gated at labelling. The other tools applied their own cutoffs when they searched, such as the trusted cutoffs of PGAP and TIGRFAM and KofamScan's adaptive thresholds for KEGG."
+	},
+	{
+		"id": "margie-051",
+		"topic": "margie",
+		"level": "intermediate",
+		"kind": "choice",
+		"question": "Why does MARGIE leave uninformative labels, such as hypothetical protein, out of the operon reference?",
+		"options": [
+			"One such label covers many unrelated proteins, so it would pair genes of unrelated function",
+			"They carry no EC number, and the operon reference stores EC numbers rather than labels",
+			"UniOP predicts no operons for genes that have no named function in phase 4",
+			"Their proteins are left out of the protein-level cache, so they have no hash to count"
+		],
+		"answer": 0,
+		"explain": "C3 uses each gene's label as its identity. Counted as one identity, hypothetical protein would pair genes of unrelated function, so the pool takes only operons where informative members outnumber uninformative ones and skips pairs with an uninformative member."
+	},
+	{
+		"id": "margie-052",
+		"topic": "margie",
+		"level": "intermediate",
+		"kind": "choice",
+		"question": "What does the MARGIE database, one SQLite file in the user's storage, hold?",
+		"options": [
+			"The final tables only, one per genome, as the other outputs stay in folders",
+			"The containers and reference databases that the tools run with",
+			"Each step's result tables, the genome and protein caches, and the run log",
+			"The operon reference and the fingerprint pools that C3 and fingerprinting read"
+		],
+		"answer": 2,
+		"explain": "Results, caches and provenance share the file, so copying it carries them along; it also keeps the site's job history. The operon reference and fingerprint databases are separate files in the store folder."
+	},
+	{
+		"id": "margie-053",
+		"topic": "margie",
+		"level": "intermediate",
+		"kind": "case",
+		"scenario": "After a run, a student opens one genome's folder. At the top are FINAL_ANNOTATION_WITH_CONFIDENCE.tsv, its Excel copy, FINAL_GENOME_VIEWER.html and a diagrams/ folder; the step folders have moved into per-tool-phased-output/.",
+		"parts": [
+			{
+				"question": "They want Pfam's own output, as the tool wrote it. Where is it?",
+				"options": [
+					"In per-tool-phased-output/, as the cleaned Pfam results table",
+					"Under original_container_outputs/, in the genome's Pfam folder, raw/",
+					"In the PFAM_ columns of FINAL_ANNOTATION_WITH_CONFIDENCE.tsv",
+					"In the MARGIE database only, as the raw files are deleted after loading"
+				],
+				"answer": 1,
+				"explain": "Each container's own output is kept under original_container_outputs/<genome>/<tool>/: raw/ holds what the tool wrote, and processed/ the cleaned table MARGIE takes from it."
+			},
+			{
+				"question": "A gene's label came from KEGG, though PGAP ranks higher in the trust hierarchy. Where do they see why PGAP did not set it?",
+				"options": [
+					"In cache-report.tsv, which lists the tools skipped for each gene",
+					"In the C4 formula column, which names the tools that conflicted",
+					"In the labelling audit trail, which tags each tool, such as no_hit",
+					"In envelope_summary.tsv, which lists the tools each gene passed"
+				],
+				"answer": 2,
+				"explain": "labeled-genes.tsv tags each decision tool as winner, no_hit, uninformative, gate_failed or available_but_lower_priority, so PGAP's tag says why it did not set the label."
+			},
+			{
+				"question": "Where else does MARGIE keep a copy of the genome's final table?",
+				"options": [
+					"In the user's final-tables store, which keeps the latest table per genome",
+					"In the BV-BRC workspace that RASTtk sent the genome to",
+					"In the operon reference, beside the genome's operon counts",
+					"In the browser's storage, for the Results page to open"
+				],
+				"answer": 0,
+				"explain": "A copy of each final table goes to the final-tables store in the user's storage, and the scoring archive keeps each run's scores."
+			}
+		],
+		"explain": "A genome folder puts the final table, its Excel copy, the genome viewer and the diagrams first. The raw tool outputs, the step tables and the reasons behind each label stay alongside for checking."
+	},
+	{
+		"id": "margie-054",
+		"topic": "margie",
+		"level": "hard",
+		"kind": "truefalse",
+		"statement": "In C3, a label pair that the pool's genomes carry but that shares an operon in none of them (k = 0) is scored low and pulls the operon's geometric mean down.",
+		"answer": false,
+		"explain": "A pair with k = 0 counts as no evidence and is left out, not scored low; the adjacency C3 is the geometric mean over the operon's supported pairs. An operon with no supported pair gets 0, which leaves the gene's own evidence as its score."
+	},
+	{
+		"id": "margie-055",
+		"topic": "margie",
+		"level": "hard",
+		"kind": "choice",
+		"question": "Why does MARGIE write a hybrid C3 beside the default adjacency C3?",
+		"options": [
+			"Gene order changes between prokaryotic genomes, and the hybrid score holds when it does",
+			"The adjacency score needs GTDB-Tk, and the hybrid score works without a taxonomy",
+			"The hybrid score compares protein sequences, so it can score hypothetical genes",
+			"The adjacency score is cached between runs, and the hybrid score is computed fresh"
+		],
+		"answer": 0,
+		"explain": "The hybrid C3 is a gene's strongest single partner, adjacent or anywhere in its operon, so it is order-free and holds when a hypothetical gene breaks the chain. Adjacency stays the default, and a second final score and tier from the hybrid C3 are written beside it."
 	}
 ]
