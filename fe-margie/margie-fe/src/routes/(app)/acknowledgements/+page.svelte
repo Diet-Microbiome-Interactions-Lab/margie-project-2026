@@ -1,7 +1,7 @@
 <script lang="ts">
 	import '$lib/crisp/about.css';
 	import { Download } from 'lucide-svelte';
-	import { COMPUTING, LAB, SOFTWARE } from '$lib/crisp/about';
+	import { COMPUTING, FUNDING, LAB, SOFTWARE } from '$lib/crisp/about';
 	import { SOFTWARE_CREDITS } from '$lib/crisp/credits';
 	import { CITED_SOFTWARE, RUN_TOOLS, downloadBibtex } from '$lib/crisp/bibtex';
 
@@ -56,6 +56,18 @@
 				If you publish results from MARGIE, please cite the tools and databases she ran for you, below, as well as MARGIE herself
 				(<a class="mg-link" href="/contributors">how to cite</a>).
 			</p>
+		</section>
+
+		<section class="ab-box fund">
+			<h2>Funding</h2>
+			<p>MARGIE was developed in the {LAB.name} with support from these grants (PI: {LAB.pi}):</p>
+			<ul class="fund-list">
+				{#each FUNDING as f (f.award)}
+					<li>
+						<b>{f.funder}</b>, <a class="mg-link" href={f.url} target="_blank" rel="noreferrer">{f.award}</a>: <i>{f.title}</i>.
+					</li>
+				{/each}
+			</ul>
 		</section>
 
 		<section class="ab-box">
@@ -158,6 +170,17 @@
 </div>
 
 <style>
+	.fund {
+		border-left: 4px solid var(--mg-accent);
+	}
+	.fund-list {
+		display: flex;
+		flex-direction: column;
+		gap: 12px;
+		margin: 0;
+		padding: 0;
+		list-style: none;
+	}
 	.tl-scroll {
 		overflow-x: auto;
 	}

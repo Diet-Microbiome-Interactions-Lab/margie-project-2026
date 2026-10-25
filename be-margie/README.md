@@ -290,4 +290,6 @@ I also thank members of Diet-Microbiome-Interactions Laboratory for their feedba
 
 MARGIE's runs use research computing resources of the Rosen Center for Advanced Computing (RCAC), Information Technology at Purdue University: the Negishi community cluster and the Geddes Community Composable Platform, which the National Science Foundation funded under award [OAC-2018926](https://www.nsf.gov/awardsearch/showAward?AWD_ID=2018926) (CC* Compute: Private Campus Cloud for Data Analytics and Machine Learning). We thank RCAC and its staff for these resources and their support.
 
+MARGIE was developed with support from the U.S. National Science Foundation under [Grant No. 2125155](https://www.nsf.gov/awardsearch/showAward?AWD_ID=2125155) (MIM: Microbial Division of Labor in Polysaccharide-Degrading Communities) and the National Institute of General Medical Sciences of the National Institutes of Health under [Award No. R35 GM133634](https://reporter.nih.gov/project-details/10645210) (Carbohydrate Structure Controls on Human Gut Microbial Ecology); PI: Stephen R. Lindemann.
+
 We also thank the developers and maintainers of the upstream tools, databases, and scientific software used throughout the pipeline. Their contributions make reproducible computational biology more powerful, more accessible, and more exciting to do.
