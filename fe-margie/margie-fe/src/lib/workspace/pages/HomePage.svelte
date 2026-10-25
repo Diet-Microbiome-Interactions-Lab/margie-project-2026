@@ -6,6 +6,8 @@
 	import { ui } from '../ui.svelte';
 	import TabPicture from './home/TabPicture.svelte';
 	import LogoPuzzle from '../LogoPuzzle.svelte';
+	import MargieLogo from '../MargieLogo.svelte';
+	import { LOGO_PUZZLE } from '$lib/features';
 	import { CITE_URL, LAB, THESIS_DOI } from '$lib/crisp/about';
 
 	/**
@@ -70,8 +72,12 @@
 
 <div class="home">
 	<section class="hero">
-		<!-- The logo turns in and turns again under the pointer; a click breaks it into a jigsaw (LogoPuzzle). -->
-		<LogoPuzzle size="clamp(220px, 24vw, 300px)" />
+		<!-- The logo turns in and turns again under the pointer; with LOGO_PUZZLE on, a click breaks it into a jigsaw. -->
+		{#if LOGO_PUZZLE}
+			<LogoPuzzle size="clamp(220px, 24vw, 300px)" />
+		{:else}
+			<h1 class="logo-h1"><MargieLogo size="clamp(220px, 24vw, 300px)" /></h1>
+		{/if}
 		<p class="full">Mostly Automated Rapid Genome Inference Environment</p>
 		<p class="motto">Annotate with confidence: a genome-centric, context-dependent approach</p>
 		<div class="cta">
@@ -245,6 +251,10 @@
 	}
 	.hero > :nth-child(4) {
 		animation-delay: 200ms;
+	}
+	.logo-h1 {
+		margin: 0;
+		line-height: 0;
 	}
 	.full {
 		font-size: 1.15rem;
