@@ -106,11 +106,11 @@
 <style>
 	/* Easier reading: body text at the large size, tables at the base size (both follow Customize → text size). */
 	.mt-read :global(.ab-box) {
-		font-size: var(--mg-fs-lg);
-		line-height: 1.65;
+		font-size: calc(var(--mg-fs) + 3px);
+		line-height: 1.75;
 	}
 	.mt-read :global(.ab-table) {
-		font-size: var(--mg-fs);
+		font-size: calc(var(--mg-fs) + 1px);
 	}
 	.mt-read :global(.ab-formula) {
 		font-size: var(--mg-fs-sm);

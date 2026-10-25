@@ -1,6 +1,6 @@
 <script lang="ts">
 	import { onMount, tick } from 'svelte';
-	import { ChevronRight, ChevronsDownUp, ChevronsUpDown, Lightbulb, LockKeyhole, Search } from 'lucide-svelte';
+	import { ChevronRight, ChevronsDownUp, ChevronsUpDown, CodeXml, Database, Gauge, Library, Lightbulb, LockKeyhole, Search, Server, Workflow } from 'lucide-svelte';
 	import { LAB } from './about';
 	import { FAQS, GROUPS, REFS, type Faq } from './faq';
 	import FaqCode from './FaqCode.svelte';
@@ -25,6 +25,15 @@
 	const count = $derived(shown.reduce((n, x) => n + x.faqs.length, 0));
 	/** The references the answers cite, in alphabetical order, numbered for the list at the foot. */
 	const cited = $derived([...new Set(FAQS.flatMap((f) => f.refs))].filter((id) => REFS[id]).sort((a, b) => REFS[a].apa.localeCompare(REFS[b].apa)));
+
+	/** Each group's icon and what its questions cover. */
+	const META: Record<string, { icon: typeof Server; blurb: string }> = {
+		'Running MARGIE': { icon: Server, blurb: 'How she reaches your cluster, calls genes, writes results, and which versions and licences she works under.' },
+		'Inside the pipeline': { icon: Workflow, blurb: 'Hashing, consolidation, labels, envelopes, operons and fingerprints: what each step does and why.' },
+		'Databases and provenance': { icon: Database, blurb: 'What MARGIE keeps, how it grows with each genome, and how each result can be traced.' },
+		Scoring: { icon: Gauge, blurb: 'How confident she is in each label: the four measures, C3 in depth, and how it was checked.' }
+	};
+	const slug = (g: string) => 'g-' + g.toLowerCase().replace(/[^a-z]+/g, '-');
 
 	function setAll(open: boolean) {
 		opened = Object.fromEntries(FAQS.map((f) => [f.id, open]));
@@ -56,91 +65,156 @@
 </script>
 
 <div class="fq-list">
-		<div class="fq-bar">
-			<label class="fq-search">
-				<Search size={15} />
-				<input class="mg-input" type="search" placeholder="Search the questions" bind:value={query} aria-label="Search the questions" />
-			</label>
-			<button type="button" class="mg-btn small" onclick={() => setAll(true)}><ChevronsUpDown size={14} /> Expand all</button>
-			<button type="button" class="mg-btn small" onclick={() => setAll(false)}><ChevronsDownUp size={14} /> Collapse all</button>
-			<a class="mg-btn small" href="/quiz?topic=margie"><Lightbulb size={14} /> MARGIE quiz</a>
-		</div>
-		{#if words.length}<p class="ab-lab">{count} question{count === 1 ? '' : 's'} match.</p>{/if}
-
-		{#each shown as { g, faqs } (g)}
-			<section class="ab-box fq-group">
-				<h2>{g}</h2>
-				{#each faqs as f (f.id)}
-					{@const n = FAQS.indexOf(f) + 1}
-					<details id={f.id} class="fq" bind:open={opened[f.id]}>
-						<summary><ChevronRight size={16} class="fq-chev" /><span class="fq-n">{n}</span><span class="fq-q">{f.q}</span></summary>
-						<div class="fq-a">
-							{#each f.a as p, i (i)}{@html p}{/each}
-
-							{#if f.code.length}
-								<div class="fq-code">
-									<h3>The code</h3>
-									{#each f.code as c (c.path + c.symbol)}<FaqCode code={c} />{/each}
-								</div>
-							{/if}
-
-							{#if f.thesis}
-								<div class="fq-thesis">
-									<h3><LockKeyhole size={13} /> From the thesis</h3>
-									{#if thesis?.sections[f.id]}
-										<div class="fq-thesis-body">{@html thesis.sections[f.id]}</div>
-									{:else}
-										<p class="ab-lab">
-											More on this, with figures, from the thesis, which is under embargo. It opens with a password; ask the {LAB.name}
-											(<a class="mg-link" href="mailto:{LAB.email}?subject=MARGIE%20FAQ">{LAB.email}</a>).
-										</p>
-										<form class="fq-form" onsubmit={unlock}>
-											<input class="mg-input" type="password" autocomplete="off" placeholder="Password" aria-label="Password" bind:value={password} disabled={busy} />
-											<button type="submit" class="mg-btn small" disabled={!password || busy}>{busy ? 'Opening…' : 'Open'}</button>
-										</form>
-										{#if lockError}<p class="fq-error" role="alert">{lockError}</p>{/if}
-									{/if}
-								</div>
-							{/if}
-
-							{#if f.refs.length}
-								<div class="fq-refs">
-									<h3>References</h3>
-									<ul>
-										{#each f.refs.filter((r) => REFS[r]) as r (r)}
-											<li>{REFS[r].apa} {#if REFS[r].url}<a class="mg-link" href={REFS[r].url} target="_blank" rel="noreferrer">{REFS[r].url}</a>{/if}</li>
-										{/each}
-									</ul>
-								</div>
-							{/if}
-							<a class="fq-link" href="#{f.id}">Link to this question</a>
-						</div>
-					</details>
-				{/each}
-			</section>
+	<nav class="fq-groups" aria-label="Groups of questions">
+		{#each GROUPS as g (g)}
+			{@const Icon = META[g]?.icon ?? Server}
+			<a class="fq-pill" href="#{slug(g)}"><Icon size={17} /><span>{g}</span><b>{FAQS.filter((f) => f.group === g).length}</b></a>
 		{/each}
+	</nav>
 
-		{#if !count}<section class="ab-box"><p>No question matches “{query}”.</p></section>{/if}
+	<div class="fq-bar">
+		<label class="fq-search">
+			<Search size={16} />
+			<input class="mg-input" type="search" placeholder="Search the questions" bind:value={query} aria-label="Search the questions" />
+		</label>
+		<button type="button" class="mg-btn small" onclick={() => setAll(true)}><ChevronsUpDown size={14} /> Expand all</button>
+		<button type="button" class="mg-btn small" onclick={() => setAll(false)}><ChevronsDownUp size={14} /> Collapse all</button>
+		<a class="mg-btn small" href="/quiz?topic=margie"><Lightbulb size={14} /> MARGIE quiz</a>
+	</div>
+	{#if words.length}<p class="ab-lab">{count} question{count === 1 ? '' : 's'} match.</p>{/if}
 
-		<section class="ab-box">
-			<h2>References</h2>
+	{#each shown as { g, faqs } (g)}
+		{@const Icon = META[g]?.icon ?? Server}
+		<section class="fq-group" id={slug(g)}>
+			<header class="fq-ghead">
+				<span class="fq-gicon" aria-hidden="true"><Icon size={24} /></span>
+				<div>
+					<h2>{g}</h2>
+					{#if META[g]}<p>{META[g].blurb}</p>{/if}
+				</div>
+			</header>
+			{#each faqs as f (f.id)}
+				{@const n = FAQS.indexOf(f) + 1}
+				<details id={f.id} class="fq" bind:open={opened[f.id]}>
+					<summary><span class="fq-n">{n}</span><span class="fq-q">{f.q}</span><ChevronRight size={20} class="fq-chev" /></summary>
+					<div class="fq-a">
+						<div class="fq-text">{#each f.a as p, i (i)}{@html p}{/each}</div>
+
+						{#if f.code.length}
+							<div class="fq-part">
+								<h3><CodeXml size={15} /> The code</h3>
+								{#each f.code as c (c.path + c.symbol)}<FaqCode code={c} />{/each}
+							</div>
+						{/if}
+
+						{#if f.thesis}
+							<div class="fq-part fq-thesis">
+								<h3><LockKeyhole size={15} /> From the thesis</h3>
+								{#if thesis?.sections[f.id]}
+									<div class="fq-text fq-thesis-body">{@html thesis.sections[f.id]}</div>
+								{:else}
+									<p class="ab-lab">
+										More on this, with figures, from the thesis, which is under embargo. It opens with a password; ask the {LAB.name}
+										(<a class="mg-link" href="mailto:{LAB.email}?subject=MARGIE%20FAQ">{LAB.email}</a>).
+									</p>
+									<form class="fq-form" onsubmit={unlock}>
+										<input class="mg-input" type="password" autocomplete="off" placeholder="Password" aria-label="Password" bind:value={password} disabled={busy} />
+										<button type="submit" class="mg-btn small" disabled={!password || busy}>{busy ? 'Opening…' : 'Open'}</button>
+									</form>
+									{#if lockError}<p class="fq-error" role="alert">{lockError}</p>{/if}
+								{/if}
+							</div>
+						{/if}
+
+						{#if f.refs.length}
+							<details class="fq-part fq-refs">
+								<summary><h3><Library size={15} /> References ({f.refs.filter((r) => REFS[r]).length})</h3><ChevronRight size={15} class="fq-fold" /></summary>
+								<ul>
+									{#each f.refs.filter((r) => REFS[r]) as r (r)}
+										<li>{REFS[r].apa} {#if REFS[r].url}<a class="mg-link" href={REFS[r].url} target="_blank" rel="noreferrer">{REFS[r].url}</a>{/if}</li>
+									{/each}
+								</ul>
+							</details>
+						{/if}
+						<a class="fq-link" href="#{f.id}">Link to this question</a>
+					</div>
+				</details>
+			{/each}
+		</section>
+	{/each}
+
+	{#if !count}<section class="fq-group"><p>No question matches “{query}”.</p></section>{/if}
+
+	<section class="fq-group fq-allrefs">
+		<header class="fq-ghead">
+			<span class="fq-gicon" aria-hidden="true"><Library size={24} /></span>
+			<div>
+				<h2>References</h2>
+				<p>{cited.length} works the answers rest on.</p>
+			</div>
+		</header>
+		<details class="fq-refs-all">
+			<summary>Show the {cited.length} references <ChevronRight size={15} class="fq-fold" /></summary>
 			<ol class="fq-all">
 				{#each cited as r (r)}
 					<li>{REFS[r].apa} {#if REFS[r].url}<a class="mg-link" href={REFS[r].url} target="_blank" rel="noreferrer">{REFS[r].url}</a>{/if}</li>
 				{/each}
 			</ol>
-			<p class="ab-lab">
-				To cite MARGIE herself, see <a class="mg-link" href="/contributors">Contributors</a>; the tools and databases she runs, with their versions and
-				licences, are on <a class="mg-link" href="/acknowledgements">Acknowledgements</a>.
-			</p>
-		</section>
-	</div>
+		</details>
+		<p class="ab-lab">
+			To cite MARGIE herself, see <a class="mg-link" href="/contributors">Contributors</a>; the tools and databases she runs, with their versions and
+			licences, are on <a class="mg-link" href="/acknowledgements">Acknowledgements</a>.
+		</p>
+	</section>
+</div>
 
 <style>
 	.fq-list {
+		--fq-body: calc(var(--mg-fs) + 3px);
+		--fq-tint: color-mix(in srgb, var(--mg-accent) 9%, var(--mg-surface));
 		display: flex;
 		flex-direction: column;
-		gap: var(--cr-gutter, 16px);
+		gap: 18px;
+	}
+	/* Jump to a group. */
+	.fq-groups {
+		display: grid;
+		grid-template-columns: repeat(auto-fit, minmax(210px, 1fr));
+		gap: 10px;
+	}
+	.fq-pill {
+		display: flex;
+		align-items: center;
+		gap: 10px;
+		padding: 12px 14px;
+		border: 1px solid color-mix(in srgb, var(--mg-accent) 35%, var(--mg-border));
+		border-radius: var(--mg-r);
+		background: var(--fq-tint);
+		color: var(--mg-text);
+		font-size: var(--mg-fs);
+		font-weight: 600;
+		text-decoration: none;
+		transition: transform 120ms ease, box-shadow 120ms ease;
+	}
+	.fq-pill:hover {
+		transform: translateY(-1px);
+		box-shadow: 0 4px 14px color-mix(in srgb, var(--mg-accent) 18%, transparent);
+	}
+	.fq-pill :global(svg) {
+		flex: 0 0 auto;
+		color: var(--mg-accent);
+	}
+	.fq-pill span {
+		flex: 1;
+	}
+	.fq-pill b {
+		min-width: 1.8em;
+		padding: 1px 8px;
+		border-radius: 999px;
+		background: var(--mg-accent);
+		color: var(--mg-on-accent, #fff);
+		font-size: var(--mg-fs-sm);
+		text-align: center;
 	}
 	.fq-bar {
 		display: flex;
@@ -152,41 +226,100 @@
 		display: flex;
 		flex: 1;
 		align-items: center;
-		gap: 6px;
+		gap: 8px;
 		min-width: 220px;
 		color: var(--mg-text-3);
 	}
 	.fq-search input {
 		flex: 1;
+		font-size: var(--mg-fs);
 	}
+	/* A group: a white card with a header. */
 	.fq-group {
-		gap: 0;
+		display: flex;
+		flex-direction: column;
+		padding: 18px 20px 8px;
+		border: 1px solid var(--cr-card-edge, var(--mg-border));
+		border-radius: var(--mg-r);
+		background: var(--cr-card, var(--mg-surface));
+		scroll-margin-top: 12px;
 	}
-	.fq-group > h2 {
-		margin-bottom: 6px;
+	.fq-ghead {
+		display: flex;
+		align-items: center;
+		gap: 14px;
+		padding-bottom: 12px;
 	}
+	.fq-gicon {
+		display: grid;
+		flex: 0 0 auto;
+		place-items: center;
+		width: 46px;
+		height: 46px;
+		border-radius: 12px;
+		background: var(--fq-tint);
+		color: var(--mg-accent);
+	}
+	.fq-ghead h2 {
+		margin: 0;
+		font-size: var(--mg-fs-xl);
+		font-weight: 700;
+		letter-spacing: -0.01em;
+		color: var(--mg-text);
+	}
+	.fq-ghead p {
+		margin: 2px 0 0;
+		color: var(--mg-text-2);
+		font-size: var(--mg-fs);
+	}
+	/* A question. */
 	.fq {
 		border-top: 1px solid var(--mg-border);
+		scroll-margin-top: 12px;
 	}
 	.fq summary {
 		display: flex;
-		align-items: baseline;
-		gap: 8px;
-		padding: 10px 2px;
+		align-items: center;
+		gap: 14px;
+		padding: 14px 6px;
+		border-radius: var(--mg-r-sm);
 		cursor: pointer;
 		list-style: none;
-		font-size: var(--mg-fs-lg);
-		font-weight: 600;
 	}
 	.fq summary::-webkit-details-marker {
 		display: none;
 	}
-	.fq summary:hover .fq-q {
+	.fq summary:hover {
+		background: var(--fq-tint);
+	}
+	.fq-n {
+		display: grid;
+		flex: 0 0 auto;
+		place-items: center;
+		width: 34px;
+		height: 34px;
+		border-radius: 50%;
+		background: var(--fq-tint);
+		color: var(--mg-accent);
+		font-size: var(--mg-fs);
+		font-weight: 700;
+		font-variant-numeric: tabular-nums;
+	}
+	.fq[open] .fq-n {
+		background: var(--mg-accent);
+		color: var(--mg-on-accent, #fff);
+	}
+	.fq-q {
+		flex: 1;
+		font-size: calc(var(--mg-fs) + 4px);
+		font-weight: 650;
+		line-height: 1.35;
+	}
+	.fq[open] .fq-q {
 		color: var(--mg-accent);
 	}
 	.fq summary :global(.fq-chev) {
 		flex: 0 0 auto;
-		align-self: center;
 		color: var(--mg-text-3);
 		transition: transform 150ms ease;
 	}
@@ -194,101 +327,119 @@
 		transform: rotate(90deg);
 		color: var(--mg-accent);
 	}
-	.fq-n {
-		flex: 0 0 auto;
-		min-width: 1.6em;
-		color: var(--mg-text-3);
-		font-variant-numeric: tabular-nums;
-	}
+	/* The answer: large, airy text in a readable column. */
 	.fq-a {
 		display: flex;
 		flex-direction: column;
-		gap: 10px;
-		padding: 0 4px 16px calc(16px + 1.6em + 16px);
-		max-width: 980px;
+		gap: 16px;
+		padding: 4px 6px 22px 54px;
 	}
-	.fq-a :global(p) {
+	.fq-text {
+		display: flex;
+		flex-direction: column;
+		gap: 12px;
+		max-width: 78ch;
+		font-size: var(--fq-body);
+		line-height: 1.75;
+		color: var(--mg-text);
+	}
+	.fq-text > :global(p:first-child) {
+		font-size: calc(var(--fq-body) + 1px);
+	}
+	.fq-text :global(p) {
 		margin: 0;
 	}
-	.fq-a :global(ul),
-	.fq-a :global(ol) {
-		margin: 0;
-		padding-left: 1.4em;
+	.fq-text :global(b) {
+		color: var(--mg-text);
+		font-weight: 650;
 	}
-	.fq-a :global(ul) {
+	.fq-text :global(ul),
+	.fq-text :global(ol) {
+		margin: 0;
+		padding-left: 1.5em;
+	}
+	.fq-text :global(ul) {
 		list-style: disc;
 	}
-	.fq-a :global(ol) {
+	.fq-text :global(ol) {
 		list-style: decimal;
 	}
-	.fq-a :global(li + li) {
-		margin-top: 3px;
+	.fq-text :global(li::marker) {
+		color: var(--mg-accent);
+		font-weight: 700;
 	}
-	/* Tables in an answer, as on the About pages. */
-	.fq-a :global(table) {
+	.fq-text :global(li + li) {
+		margin-top: 6px;
+	}
+	.fq-text :global(code) {
+		padding: 1px 5px;
+		border-radius: 4px;
+		background: var(--mg-surface-2);
+		font-family: var(--mg-mono);
+		font-size: 0.88em;
+	}
+	/* Formulas, as cards. */
+	.fq-text :global(pre) {
+		margin: 0;
+		padding: 12px 16px;
+		border-left: 4px solid var(--mg-accent);
+		border-radius: var(--mg-r-sm);
+		background: var(--fq-tint);
+		font-family: var(--mg-mono);
+		font-size: var(--mg-fs);
+		line-height: 1.6;
+		white-space: pre-wrap;
+	}
+	/* Tables: a tinted head, striped rows. */
+	.fq-text :global(table) {
 		width: 100%;
 		border-collapse: collapse;
+		overflow: hidden;
+		border-radius: var(--mg-r-sm);
 		font-size: var(--mg-fs);
+		line-height: 1.5;
 	}
-	.fq-a :global(th) {
-		padding: 6px 8px;
-		border-bottom: 1px solid var(--mg-border);
-		color: var(--mg-text-3);
-		font-size: var(--mg-fs-sm);
-		font-weight: 600;
+	.fq-text :global(th) {
+		padding: 9px 10px;
+		background: var(--fq-tint);
+		color: var(--mg-text);
+		font-weight: 650;
 		text-align: left;
 	}
-	.fq-a :global(td) {
-		padding: 6px 8px;
+	.fq-text :global(td) {
+		padding: 8px 10px;
 		border-top: 1px solid var(--mg-border);
 		vertical-align: top;
 		overflow-wrap: anywhere;
 	}
-	.fq-a :global(tr:first-child td) {
-		border-top: none;
+	.fq-text :global(tbody tr:nth-child(even) td) {
+		background: color-mix(in srgb, var(--mg-surface-2) 70%, transparent);
 	}
-	.fq-a :global(pre) {
-		margin: 0;
-		padding: 8px 12px;
-		border-radius: var(--mg-r-sm);
-		background: var(--mg-surface-2);
-		font-family: var(--mg-mono);
-		font-size: var(--mg-fs-sm);
-		white-space: pre-wrap;
+	/* The parts under an answer. */
+	.fq-part {
+		display: flex;
+		flex-direction: column;
+		gap: 8px;
 	}
-	.fq-a :global(code) {
-		font-family: var(--mg-mono);
-		font-size: 0.92em;
-	}
-	.fq-a h3 {
+	.fq-part h3 {
 		display: flex;
 		align-items: center;
-		gap: 6px;
+		gap: 7px;
 		margin: 0;
+		color: var(--mg-text-2);
 		font-size: var(--mg-fs-sm);
-		font-weight: 650;
+		font-weight: 700;
 		letter-spacing: 0.05em;
 		text-transform: uppercase;
-		color: var(--mg-text-2);
 	}
-	.fq-code {
-		display: flex;
-		flex-direction: column;
-		gap: 6px;
+	.fq-part h3 :global(svg) {
+		color: var(--mg-accent);
 	}
 	.fq-thesis {
-		display: flex;
-		flex-direction: column;
-		gap: 8px;
-		padding: 10px 12px;
-		border-left: 3px solid var(--mg-accent);
+		padding: 14px 16px;
+		border-left: 4px solid var(--mg-accent);
 		border-radius: var(--mg-r-sm);
-		background: var(--mg-surface-2);
-	}
-	.fq-thesis-body {
-		display: flex;
-		flex-direction: column;
-		gap: 8px;
+		background: var(--fq-tint);
 	}
 	.fq-thesis-body :global(figure) {
 		margin: 4px 0;
@@ -296,7 +447,7 @@
 	.fq-thesis-body :global(img) {
 		display: block;
 		width: 100%;
-		max-width: 820px;
+		max-width: 860px;
 		height: auto;
 		border: 1px solid var(--mg-border);
 		border-radius: var(--mg-r-sm);
@@ -318,13 +469,48 @@
 		max-width: 320px;
 	}
 	.fq-error {
+		margin: 0;
 		color: var(--mg-danger, #c0392b);
 	}
+	/* References fold away until asked for. */
+	.fq-refs > summary,
+	.fq-refs-all > summary {
+		display: flex;
+		align-items: center;
+		gap: 6px;
+		width: max-content;
+		cursor: pointer;
+		list-style: none;
+	}
+	.fq-refs > summary::-webkit-details-marker,
+	.fq-refs-all > summary::-webkit-details-marker {
+		display: none;
+	}
+	.fq-refs-all > summary {
+		margin-bottom: 8px;
+		color: var(--mg-accent);
+		font-size: var(--mg-fs);
+		font-weight: 600;
+	}
+	.fq-refs :global(.fq-fold),
+	.fq-refs-all :global(.fq-fold) {
+		color: var(--mg-text-3);
+		transition: transform 150ms ease;
+	}
+	.fq-refs[open] :global(.fq-fold),
+	.fq-refs-all[open] :global(.fq-fold) {
+		transform: rotate(90deg);
+	}
 	.fq-refs ul {
-		margin: 4px 0 0;
-		padding-left: 1.2em;
+		margin: 0;
+		padding-left: 1.3em;
+		list-style: disc;
 		color: var(--mg-text-2);
 		font-size: var(--mg-fs-sm);
+		line-height: 1.55;
+	}
+	.fq-refs li + li {
+		margin-top: 4px;
 	}
 	.fq-refs a,
 	.fq-all a {
@@ -335,17 +521,28 @@
 		color: var(--mg-text-3);
 		font-size: var(--mg-fs-sm);
 	}
+	.fq-allrefs {
+		padding-bottom: 18px;
+	}
 	.fq-all {
-		margin: 0;
-		padding-left: 1.6em;
+		margin: 0 0 10px;
+		padding-left: 1.8em;
+		list-style: decimal;
 		font-size: var(--mg-fs-sm);
+		line-height: 1.55;
 	}
 	.fq-all li + li {
-		margin-top: 4px;
+		margin-top: 5px;
 	}
 	@media (max-width: 640px) {
+		.fq-group {
+			padding: 14px 12px 6px;
+		}
 		.fq-a {
 			padding-left: 4px;
+		}
+		.fq-q {
+			font-size: calc(var(--mg-fs) + 2px);
 		}
 	}
 </style>
