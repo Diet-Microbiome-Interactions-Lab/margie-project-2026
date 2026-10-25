@@ -243,6 +243,8 @@ export const SOFTWARE: {
 			{ name: 'xterm.js', what: 'the Terminal', href: 'https://xtermjs.org' },
 			{ name: 'marked and DOMPurify', what: 'Markdown, safely', href: 'https://marked.js.org' },
 			{ name: 'ExcelJS', what: 'workbooks in the browser', href: 'https://github.com/exceljs/exceljs' },
+			{ name: 'highlight.js', what: 'colours the code on the Code page and in the FAQ', href: 'https://highlightjs.org' },
+			{ name: 'fflate', what: 'zips the figures saved from Results', href: 'https://github.com/101arrowz/fflate' },
 			{ name: 'Fontsource', what: 'Bricolage Grotesque, IBM Plex, Lato and Roboto Slab', href: 'https://fontsource.org' }
 		]
 	},
