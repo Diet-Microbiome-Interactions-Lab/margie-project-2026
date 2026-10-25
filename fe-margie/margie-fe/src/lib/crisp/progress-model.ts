@@ -12,7 +12,7 @@ import type { Run } from '$lib/api';
 import { COMPARE_TOOLS, RESULT_STAGES, logSteps } from '$lib/crisp/steps';
 import { columnOf, sourceSay, type SourceRow } from '$lib/crisp/cache-report';
 import { uiBase } from '$lib/workspace/base.svelte';
-import type { Genome, OrganismResult, ToolClock } from '$lib/workspace/data.svelte';
+import type { Genome, OrganismResult, ToolClock, ToolJob } from '$lib/workspace/data.svelte';
 
 export type State = 'done' | 'run' | 'wait' | 'failed' | 'partial' | 'none' | 'na';
 
@@ -35,7 +35,8 @@ export interface Store {
 	loaded: boolean;
 }
 
-export type GridCell = Cell & { t: string; href?: string; src?: SourceRow; store?: Store };
+/** jobs: the SLURM jobs that ran the step for this genome (or for the whole run, a batch). */
+export type GridCell = Cell & { t: string; href?: string; src?: SourceRow; store?: Store; jobs?: ToolJob[] };
 
 export interface RowProgress {
 	g: string;
@@ -304,6 +305,14 @@ export function buildProgress(i: ProgressInput): Progress {
 	};
 	const phaseOf = new Map(phases.flatMap((g, k) => g.cols.map((t) => [t, k] as const)));
 
+	/** A step's SLURM jobs for a genome: its own and the run's batch job; the genes column has both callers'. */
+	const jobsOf = (t: string, g: string): ToolJob[] | undefined => {
+		const by = i.clock?.jobs;
+		if (!by) return undefined;
+		const list = (t === 'genes' ? CALLERS : [t]).flatMap((k) => [...(by[`${k}\t${g}`] ?? []), ...(by[`${k}\t`] ?? [])]);
+		return list.length ? list : undefined;
+	};
+
 	const rows: RowProgress[] = i.genomes.map((g) => {
 		const cs: GridCell[] = cols.map((t) => {
 			const store = storeOf(t, g);
@@ -313,7 +322,7 @@ export function buildProgress(i: ProgressInput): Progress {
 			const src = sourceOf.get(`${t}\t${g}`);
 			// The tooltip says where a step's results came from too, once the report has it.
 			const say = src && src.source !== 'not run' && c.state !== 'na' ? `${c.say}; ${sourceSay(src)}` : c.say;
-			return { t, ...c, say, href: hrefOf(t, g, c), src, store };
+			return { t, ...c, say, href: hrefOf(t, g, c), src, store, jobs: jobsOf(t, g) };
 		});
 		const on = cs.filter((c) => c.state !== 'na');
 		const pct = Math.round(avg(cs) ?? 0);

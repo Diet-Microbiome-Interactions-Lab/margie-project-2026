@@ -209,6 +209,11 @@
 	const LIST = 'jobs:list';
 	const listShut = $derived(ui.isFolded(LIST));
 	const listWidth = $derived(ui.size(LIST, 300));
+	// The top row's height (the list beside the job's details): tall enough for the details to start
+	// with, then as dragged at its bottom edge.
+	const TOP = 'jobs:top';
+	const topFallback = typeof innerHeight === 'number' ? Math.min(900, Math.max(620, Math.round(innerHeight * 0.75))) : 680;
+	const topHeight = $derived(ui.size(TOP, topFallback));
 	// The log's height: most of the window to start with, then as dragged at its bottom edge.
 	const LOG = 'jobs:log';
 	const logFallback = typeof innerHeight === 'number' ? Math.max(560, Math.round(innerHeight * 0.8)) : 640;
@@ -237,6 +242,7 @@
 
 {#if ws.runs.length}
 	<div class="board">
+		<div class="top-wrap" style="height: {topHeight}px">
 		<div class="top" style="--list-w: {listShut ? '40px' : `${listWidth}px`}">
 		<div class="list-pane" class:shut={listShut}>
 			{#if listShut}
@@ -361,6 +367,8 @@
 			{/if}
 		</div>
 		</div>
+			<Resizer id={TOP} fallback={topFallback} min={220} max={2400} edge="bottom" label="Drag to make the job list and its details taller or shorter" />
+		</div>
 		{#if prog && shown}
 			<ProgressGrid {prog} {going} runDir={shown.outputDir ?? ''} fromLog={srcFromLog} reported={!!srcRows} {elapsedOf} onLog={showLog} />
 		{/if}
@@ -405,13 +413,17 @@
 	.side :global(.mg-mono) {
 		font-size: 0.94em;
 	}
-	/* As tall as the job's lines need; a long list scrolls inside it. */
+	/* As tall as dragged at its bottom edge; the list and the details scroll inside it. */
+	.top-wrap {
+		position: relative;
+		min-width: 0;
+	}
 	.top {
 		display: grid;
 		grid-template-columns: var(--list-w, 300px) minmax(0, 1fr);
 		grid-template-rows: minmax(0, 1fr);
+		height: 100%;
 		min-height: 150px;
-		max-height: clamp(260px, 44vh, 520px);
 		border-radius: var(--mg-r);
 		background: var(--cr-card, var(--mg-surface));
 		overflow: hidden;
@@ -948,10 +960,13 @@
 
 	/* On a narrow screen the list sits above the job, and the card grows with both. */
 	@media (max-width: 900px) {
+		.top-wrap {
+			height: auto !important;
+		}
 		.top {
 			grid-template-columns: minmax(0, 1fr);
 			grid-template-rows: auto auto;
-			max-height: none;
+			height: auto;
 		}
 		.list-pane {
 			border-right: none;
