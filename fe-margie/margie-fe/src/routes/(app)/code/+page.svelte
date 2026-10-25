@@ -1,19 +1,17 @@
 <script lang="ts">
 	import '$lib/crisp/about.css';
-	import hljs from 'highlight.js/lib/core';
-	import python from 'highlight.js/lib/languages/python';
 	import { Copy, Download, ExternalLink, FileCode } from 'lucide-svelte';
 	import { goto } from '$app/navigation';
 	import { page } from '$app/state';
 	import { api, formatBytes } from '$lib/api';
 	import { ui } from '$lib/workspace/ui.svelte';
+	import CodeBlock from '$lib/crisp/CodeBlock.svelte';
 
 	/**
 	 * Code: the Python scripts behind MARGIE's own steps (consolidation to the fingerprint
 	 * databases), read from the server's installed pipeline when opened (routers/code.py) and
-	 * shown highlighted, with line numbers. Reached from the README's How does MARGIE work.
+	 * shown highlighted, with line numbers (CodeBlock). Reached from the README's How does MARGIE work.
 	 */
-	hljs.registerLanguage('python', python);
 
 	interface CodeFile {
 		path: string;
@@ -72,35 +70,6 @@
 				loading = false;
 			}
 		);
-	});
-
-	/** Splits highlight.js HTML into lines: a span open at a line's end is closed there and reopened on the next. */
-	function splitLines(html: string): string[] {
-		const out: string[] = [];
-		const open: string[] = [];
-		let line = '';
-		for (const part of html.split(/(<span[^>]*>|<\/span>|\n)/)) {
-			if (part === '\n') {
-				out.push(line + '</span>'.repeat(open.length));
-				line = open.join('');
-			} else if (part.startsWith('<span')) {
-				open.push(part);
-				line += part;
-			} else if (part === '</span>') {
-				open.pop();
-				line += part;
-			} else line += part;
-		}
-		out.push(line + '</span>'.repeat(open.length));
-		return out;
-	}
-
-	const rows = $derived.by(() => {
-		if (!source) return [];
-		const html = hljs.highlight(source.text, { language: 'python', ignoreIllegals: true }).value;
-		const lines = splitLines(html);
-		// A file's final newline ends its last line rather than opening an empty one.
-		return source.text.endsWith('\n') ? lines.slice(0, -1) : lines;
 	});
 
 	function pick(path: string) {
@@ -191,7 +160,7 @@
 					{#if fileError}
 						<p>{fileError}</p>
 					{:else if source && source.path === picked}
-						<pre class="cd-src" aria-label="{source.name}, {source.lines} lines"><code>{#each rows as r, i (i)}<span class="cd-row"><span class="cd-ln" aria-hidden="true">{i + 1}</span><span class="cd-t">{@html r || ' '}</span></span>{/each}</code></pre>
+						<CodeBlock text={source.text} label="{source.name}, {source.lines} lines" />
 					{:else if loading}
 						<p class="ab-lab">Reading {pickedFile.name}…</p>
 					{/if}
@@ -207,30 +176,11 @@
 
 <style>
 	.cd {
-		/* Syntax colours on the code box (light); the dark theme's are below. */
-		--cd-kw: #0b57d0;
-		--cd-str: #0a7d38;
-		--cd-com: #6b7280;
-		--cd-num: #b54708;
-		--cd-fn: #7c3aed;
-		--cd-bi: #0e7490;
-		--cd-meta: #a1450e;
-		--cd-ln: #9aa3af;
 		display: grid;
 		grid-template-columns: minmax(220px, 280px) minmax(0, 1fr);
 		gap: var(--cr-gutter, 16px);
 		align-items: start;
 		max-width: 1400px;
-	}
-	:global(.crisp[data-theme='dark']) .cd {
-		--cd-kw: #8ab4f8;
-		--cd-str: #81c995;
-		--cd-com: #9aa0a6;
-		--cd-num: #fcad70;
-		--cd-fn: #c58af9;
-		--cd-bi: #78d9ec;
-		--cd-meta: #f6aea9;
-		--cd-ln: #6b7280;
 	}
 	.cd-steps {
 		position: sticky;
@@ -324,72 +274,6 @@
 	.cd-meta {
 		font-size: var(--mg-fs-xs);
 	}
-	.cd-src {
-		margin: 0;
-		padding: 10px 0;
-		overflow: auto;
-		max-height: calc(100vh - 260px);
-		border: 1px solid var(--mg-border);
-		border-radius: var(--mg-r-sm);
-		background: var(--mg-surface);
-		font-family: var(--mg-mono);
-		font-size: 12.5px;
-		line-height: 1.55;
-		tab-size: 4;
-	}
-	.cd-src code {
-		display: block;
-		min-width: max-content;
-	}
-	.cd-row {
-		display: flex;
-	}
-	.cd-row:hover {
-		background: var(--mg-surface-2);
-	}
-	.cd-ln {
-		flex: 0 0 auto;
-		width: 4.5ch;
-		padding-right: 1.5ch;
-		color: var(--cd-ln);
-		text-align: right;
-		user-select: none;
-	}
-	.cd-t {
-		padding-right: 16px;
-		white-space: pre;
-	}
-	.cd-src :global(.hljs-keyword),
-	.cd-src :global(.hljs-literal) {
-		color: var(--cd-kw);
-	}
-	.cd-src :global(.hljs-string),
-	.cd-src :global(.hljs-doctag) {
-		color: var(--cd-str);
-	}
-	.cd-src :global(.hljs-comment) {
-		color: var(--cd-com);
-		font-style: italic;
-	}
-	.cd-src :global(.hljs-number) {
-		color: var(--cd-num);
-	}
-	.cd-src :global(.hljs-title),
-	.cd-src :global(.hljs-title.function_),
-	.cd-src :global(.hljs-title.class_) {
-		color: var(--cd-fn);
-		font-weight: 600;
-	}
-	.cd-src :global(.hljs-built_in),
-	.cd-src :global(.hljs-type) {
-		color: var(--cd-bi);
-	}
-	.cd-src :global(.hljs-meta) {
-		color: var(--cd-meta);
-	}
-	.cd-src :global(.hljs-subst) {
-		color: var(--mg-text);
-	}
 	@media (max-width: 900px) {
 		.cd {
 			grid-template-columns: minmax(0, 1fr);
@@ -397,9 +281,6 @@
 		.cd-steps {
 			position: static;
 			max-height: none;
-		}
-		.cd-src {
-			max-height: 70vh;
 		}
 	}
 </style>

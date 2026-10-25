@@ -745,11 +745,16 @@ class Workspace {
 	/** Copies whichever databases are missing on scratch (from your newest backup, else the base). */
 	/** fresh (with the build password): every database starts empty, as a new lab's own, instead of copies. */
 	async setupStores(fresh?: { password: string }) {
+		// The install statement, the first time for this place (installLock).
+		if (!(await installLock.confirm('Set up your databases'))) {
+			this.#runAfterSetup = null;
+			return;
+		}
 		const where = this.stores?.root ? ` in ${this.stores.root}` : ' in your databases folder';
 		if (fresh) {
 			if (!confirm(`Create fresh, empty databases${where}? The MARGIE database, operon reference, fingerprint databases and genome pool start empty, as new versions; your current copies stay where they are, and runs use the new ones.`)) return;
 		} else {
-			// MARGIE's own databases, not licensed tools: a plain yes or no, saying what is copied where.
+			// Then a plain yes or no, saying what is copied where.
 			// Read again first: a copy put in the working folder since counts.
 			await this.loadStores();
 			const todo = (this.stores?.stores ?? []).filter((x) => !x.version);
@@ -939,7 +944,7 @@ class Workspace {
 		});
 	}
 
-	/** Builds or downloads, once the install statement is typed (installLock.confirm). */
+	/** Builds or downloads; the first one for a place asks for the install statement (installLock.confirm). */
 	async build(what: 'containers' | 'databases' | 'all', tools?: string[]) {
 		const noun = what === 'containers' ? 'Build' : what === 'databases' ? 'Download' : 'Install';
 		const password = await installLock.confirm(`${noun} ${tools?.length ? tools.join(', ') : what === 'all' ? 'what is missing' : `all missing ${what}`}`);

@@ -7,7 +7,7 @@ import { fileURLToPath } from 'node:url';
 
 const dir = path.join(path.dirname(fileURLToPath(import.meta.url)), '..', 'src', 'lib', 'quiz', 'bank');
 const LEVELS = ['easy', 'intermediate', 'hard'];
-const TOPICS = ['physiology', 'metabolism', 'bioinformatics', 'gut'];
+const TOPICS = ['physiology', 'metabolism', 'bioinformatics', 'gut', 'margie'];
 const WORDS = /\b(never|always|every|all)\b/i;
 const problems = [];
 const ids = new Set();

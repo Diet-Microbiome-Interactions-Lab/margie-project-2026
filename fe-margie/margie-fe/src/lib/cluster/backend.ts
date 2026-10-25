@@ -675,10 +675,10 @@ async function overview(): Promise<Overview> {
 			id: 'terms',
 			label: 'Licence terms',
 			value: lic.accepted ? 'Accepted' : 'Not accepted',
-			detail: lic.accepted ? `For ${lic.usage_type ?? 'your'} use` : 'Accepted once, before the first run',
+			detail: lic.accepted ? `For ${lic.usage_type ?? 'your'} use` : 'Accepted once on Analyze, before the first run',
 			tone: lic.accepted ? 'ok' : 'warn',
 			required: true,
-			href: '/install#terms'
+			href: '/analyze#licence'
 		},
 		{
 			id: 'history',
@@ -1383,6 +1383,8 @@ export async function clusterApi<T = any>(path: string, init: RequestInit = {}):
 				return get('/v1/code');
 			case 'GET /code/file':
 				return get(`/v1/code/file?path=${q(params.get('path') ?? '')}`);
+			case 'GET /code/snippet':
+				return get(`/v1/code/snippet?path=${q(params.get('path') ?? '')}&symbol=${q(params.get('symbol') ?? '')}`);
 			case 'GET /runs':
 				return listRuns();
 			case 'POST /runs':
