@@ -1663,6 +1663,10 @@ rule run_gtdbtk_batch:
         """
 
 
+# A second's work per genome: run by Snakemake itself, not sent to SLURM.
+localrules: split_gtdbtk_batch_per_genome
+
+
 rule split_gtdbtk_batch_per_genome:
     """Writes one genome's gtdbtk_results.tsv and translation_table.tsv from the batch files."""
     input:
@@ -1842,7 +1846,9 @@ rule run_rasttk:
     threads: rc('rasttk.threads', 8, config=config)
     resources:
         mem_mb=rc('rasttk.mem_mb', 8000, config=config),
-        runtime=runtime_min('rasttk.runtime', 120, config=config)
+        runtime=runtime_min('rasttk.runtime', 120, config=config),
+        # One RASTtk job at a time within a run (workflow.py caps it at 1); the lock below spans runs.
+        margie_sb_bvbrc=1
     params:
         output_dir=lambda wildcards: rc('rasttk.output_dir', f"{CONTAINER_OUTPUTS_PREFIX}rasttk".format(genome=wildcards.genome), config=config),
         db=db_path('rasttk', config=config, workflow_id='margie_sb'),

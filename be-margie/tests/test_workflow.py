@@ -436,7 +436,7 @@ def _fake_launchers(wf, *, stage2_returncodes=(), stage1_running_until=None):
 
 class TestRunPipelineBatchSequential:
     """Stage 1 runs as waves of background snakemake processes over explicit
-    file targets (_Stage1Waves, --jobs=1); Stage 2 is one background process
+    file targets (_Stage1Waves, at the account's job limit); Stage 2 is one background process
     per genome (rule phase4_12_one_genome with target_genome=<name>) started in
     RASTtk-token order; Stage 3 (llm_all) and the finalize targets run through
     _run_subprocess afterwards."""
@@ -449,7 +449,7 @@ class TestRunPipelineBatchSequential:
     def test_stage1_targets_rasttk_all_stage2_targets_phase4_8_one_genome(self, mock_sleep, mock_locate, mock_cache, wf):
         """Checks that Stage 1 and Stage 2 request the right margie_sb.smk targets:
         Stage 1 the genome's RASTtk/GTDB-Tk db tokens as file targets with
-        --jobs=1, Stage 2 rule phase4_12_one_genome with target_genome=<name>,
+        the account's job limit, Stage 2 rule phase4_12_one_genome with target_genome=<name>,
         then the two finalize targets (no llm_all while LLM is off)."""
         genome_files = {'genome1': '/g1.fa'}
 
@@ -464,7 +464,8 @@ class TestRunPipelineBatchSequential:
         waves = [c for c in rec['stage1'] if not any(t.endswith('/quast/quast_db.tkn') for t in c)]
         assert len(waves) == 1
         stage1_cmd = waves[0]
-        assert '--jobs=1' in stage1_cmd
+        # RASTtk alone goes one at a time, by its slot (do_margie_sb's resources); the rest runs alongside.
+        assert '--jobs=1' not in stage1_cmd
         assert '--nolock' in stage1_cmd
         assert any(tok.endswith('/genome1/rasttk/rasttk_db.tkn') for tok in stage1_cmd)
         assert any(tok.endswith('/genome1/gtdbtk/gtdbtk_db.tkn') for tok in stage1_cmd)
@@ -610,6 +611,7 @@ class TestDoMargieSb:
 
         def fake_run_pipeline_batch_sequential(key_name, smk_config, genome_files, **kwargs):
             captured['cache_map_fn'] = kwargs['cache_map_fn']
+            captured['resources'] = kwargs.get('extra_resources')
 
         entitlement = {'usage_type': 'academic', 'licensed_tools': [], 'source': 'test'}
         with patch('bioinformatics_tools.workflow_tools.workflow.discover_genomes',
@@ -621,6 +623,9 @@ class TestDoMargieSb:
             wf.do_margie_sb(mode='dev')
 
         cache_map = captured['cache_map_fn']('genome1')
+        # One RASTtk (BV-BRC) job and one database load at a time within a run.
+        assert captured['resources']['margie_sb_bvbrc'] == 1
+        assert captured['resources']['margie_sb_db_writer'] == 1
 
         consolidation = _scripts_versioned('consolidation')
         labeling = _scripts_versioned('labeling')
