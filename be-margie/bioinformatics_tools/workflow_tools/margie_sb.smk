@@ -4,6 +4,7 @@ All MARGIE rules. No games.
 MARGIE(SB): QC, taxonomy, gene calling, annotation, localization and scoring, per genome.
 """
 
+import math
 import os
 import re
 import sys
@@ -99,11 +100,29 @@ def _llm_mem_mb() -> int:
     return int(min(sizes) * 0.8) if sizes else 32000
 
 
-# Database loads (load_*_to_db): 10-minute SLURM jobs (load_db.runtime), one at a time within a
-# run (margie_sb_db_writer) so none waits out another's lock, retried twice. Each table loads in one
-# transaction, so a retry loads what an attempt did not finish and skips what it did.
+# Database loads (load_*_to_db): one at a time within a run (margie_sb_db_writer), retried twice. A
+# load's SLURM time (load_minutes) grows with its input and with main_database: load_db.runtime
+# minutes, plus one for each load_db.input_mb_per_minute MB of input and each load_db.db_gb_per_minute
+# GB of database, doubled on each retry. Each table loads in one transaction, so a retry loads what an
+# attempt did not finish and skips what it did; deletes go through an organism_name index (load_to_db).
 LOAD_RUNTIME = int(rc('load_db.runtime', 10, config=config))
+LOAD_INPUT_MB_PER_MINUTE = float(rc('load_db.input_mb_per_minute', 50, config=config) or 50)
+LOAD_DB_GB_PER_MINUTE = float(rc('load_db.db_gb_per_minute', 10, config=config) or 10)
 LOAD_RETRIES = 2
+
+
+def load_minutes(wildcards, input, attempt):
+    """A database load's SLURM time in minutes, from its input, the database's size and the attempt."""
+    try:
+        input_mb = float(input.size_mb)
+    except Exception:
+        input_mb = 0.0
+    try:
+        db_gb = os.path.getsize(MAIN_DATABASE) / 1e9
+    except (OSError, TypeError):
+        db_gb = 0.0
+    minutes = LOAD_RUNTIME + input_mb / LOAD_INPUT_MB_PER_MINUTE + db_gb / LOAD_DB_GB_PER_MINUTE
+    return math.ceil(minutes * 2 ** (max(1, attempt) - 1))
 
 # Lock that lets one RASTtk job at a time submit to BV-BRC, across the account's runs.
 RASTTK_BVBRC_LOCK = _resolve_shared_dir(
@@ -922,7 +941,7 @@ rule load_consolidation_to_db:
         tkn=CONSOLIDATION_TOKEN
     retries: LOAD_RETRIES
     resources:
-        runtime=LOAD_RUNTIME,
+        runtime=load_minutes,
         margie_sb_db_writer=1
     params:
         db=MAIN_DATABASE,
@@ -950,7 +969,7 @@ rule load_labeling_to_db:
         tkn=LABELING_TOKEN
     retries: LOAD_RETRIES
     resources:
-        runtime=LOAD_RUNTIME,
+        runtime=load_minutes,
         margie_sb_db_writer=1
     params:
         db=MAIN_DATABASE,
@@ -985,7 +1004,7 @@ rule load_scoring_to_db:
         tkn=SCORING_TOKEN
     retries: LOAD_RETRIES
     resources:
-        runtime=LOAD_RUNTIME,
+        runtime=load_minutes,
         margie_sb_db_writer=1
     params:
         db=MAIN_DATABASE,
@@ -1328,7 +1347,7 @@ rule load_llm_to_db:
         tkn=LLM_TOKEN
     retries: LOAD_RETRIES
     resources:
-        runtime=LOAD_RUNTIME,
+        runtime=load_minutes,
         margie_sb_db_writer=1
     params:
         db=MAIN_DATABASE,
@@ -1357,7 +1376,7 @@ rule load_fingerprint_to_db:
         tkn=FINGERPRINT_TOKEN
     retries: LOAD_RETRIES
     resources:
-        runtime=LOAD_RUNTIME,
+        runtime=load_minutes,
         margie_sb_db_writer=1
     params:
         db=MAIN_DATABASE,
@@ -1436,7 +1455,7 @@ rule load_ani_to_db:
     group: "ani"
     retries: LOAD_RETRIES
     resources:
-        runtime=LOAD_RUNTIME,
+        runtime=load_minutes,
         margie_sb_db_writer=1
     params:
         db=MAIN_DATABASE,
@@ -1489,7 +1508,7 @@ rule load_aai_to_db:
     group: "aai"
     retries: LOAD_RETRIES
     resources:
-        runtime=LOAD_RUNTIME,
+        runtime=load_minutes,
         margie_sb_db_writer=1
     params:
         db=MAIN_DATABASE,
@@ -1543,7 +1562,7 @@ rule load_closest_to_db:
     group: "closest"
     retries: LOAD_RETRIES
     resources:
-        runtime=LOAD_RUNTIME,
+        runtime=load_minutes,
         margie_sb_db_writer=1
     params:
         db=MAIN_DATABASE,
@@ -1591,7 +1610,7 @@ rule load_quast_to_db:
     group: "quast"
     retries: LOAD_RETRIES
     resources:
-        runtime=LOAD_RUNTIME,
+        runtime=load_minutes,
         margie_sb_db_writer=1
     params:
         db=MAIN_DATABASE,
@@ -1776,7 +1795,7 @@ rule load_gtdbtk_to_db:
         tkn=GTDBTK_TOKEN
     retries: LOAD_RETRIES
     resources:
-        runtime=LOAD_RUNTIME,
+        runtime=load_minutes,
         margie_sb_db_writer=1
     params:
         db=MAIN_DATABASE,
@@ -1955,7 +1974,7 @@ rule load_rasttk_to_db:
         tkn=RASTTK_TOKEN
     retries: LOAD_RETRIES
     resources:
-        runtime=LOAD_RUNTIME,
+        runtime=load_minutes,
         margie_sb_db_writer=1
     params:
         db=MAIN_DATABASE,
@@ -2011,7 +2030,7 @@ rule load_cog_to_db:
         tkn=PHASE4_TOKENS['cog']
     retries: LOAD_RETRIES
     resources:
-        runtime=LOAD_RUNTIME,
+        runtime=load_minutes,
         margie_sb_db_writer=1
     params:
         db=MAIN_DATABASE,
@@ -2065,7 +2084,7 @@ rule load_pfam_to_db:
         tkn=PHASE4_TOKENS['pfam']
     retries: LOAD_RETRIES
     resources:
-        runtime=LOAD_RUNTIME,
+        runtime=load_minutes,
         margie_sb_db_writer=1
     params:
         db=MAIN_DATABASE,
@@ -2120,7 +2139,7 @@ rule load_tigrfam_to_db:
         tkn=PHASE4_TOKENS['tigrfam']
     retries: LOAD_RETRIES
     resources:
-        runtime=LOAD_RUNTIME,
+        runtime=load_minutes,
         margie_sb_db_writer=1
     params:
         db=MAIN_DATABASE,
@@ -2174,7 +2193,7 @@ rule load_merops_to_db:
         tkn=PHASE4_TOKENS['merops']
     retries: LOAD_RETRIES
     resources:
-        runtime=LOAD_RUNTIME,
+        runtime=load_minutes,
         margie_sb_db_writer=1
     params:
         db=MAIN_DATABASE,
@@ -2229,7 +2248,7 @@ rule load_tcdb_to_db:
         tkn=PHASE4_TOKENS['tcdb']
     retries: LOAD_RETRIES
     resources:
-        runtime=LOAD_RUNTIME,
+        runtime=load_minutes,
         margie_sb_db_writer=1
     params:
         db=MAIN_DATABASE,
@@ -2284,7 +2303,7 @@ rule load_uniprot_to_db:
         tkn=PHASE4_TOKENS['uniprot']
     retries: LOAD_RETRIES
     resources:
-        runtime=LOAD_RUNTIME,
+        runtime=load_minutes,
         margie_sb_db_writer=1
     params:
         db=MAIN_DATABASE,
@@ -2337,7 +2356,7 @@ rule load_kegg_to_db:
         tkn=PHASE4_TOKENS['kegg']
     retries: LOAD_RETRIES
     resources:
-        runtime=LOAD_RUNTIME,
+        runtime=load_minutes,
         margie_sb_db_writer=1
     params:
         db=MAIN_DATABASE,
@@ -2390,7 +2409,7 @@ rule load_eggnog_to_db:
         tkn=PHASE4_TOKENS['eggnog']
     retries: LOAD_RETRIES
     resources:
-        runtime=LOAD_RUNTIME,
+        runtime=load_minutes,
         margie_sb_db_writer=1
     params:
         db=MAIN_DATABASE,
@@ -2444,7 +2463,7 @@ rule load_dbcan_to_db:
         tkn=PHASE4_TOKENS['dbcan']
     retries: LOAD_RETRIES
     resources:
-        runtime=LOAD_RUNTIME,
+        runtime=load_minutes,
         margie_sb_db_writer=1
     params:
         db=MAIN_DATABASE,
@@ -2497,7 +2516,7 @@ rule load_pgap_to_db:
         tkn=PHASE4_TOKENS['pgap']
     retries: LOAD_RETRIES
     resources:
-        runtime=LOAD_RUNTIME,
+        runtime=load_minutes,
         margie_sb_db_writer=1
     params:
         db=MAIN_DATABASE,
@@ -2559,7 +2578,7 @@ rule load_interpro_to_db:
         tkn=PHASE4_TOKENS['interpro']
     retries: LOAD_RETRIES
     resources:
-        runtime=LOAD_RUNTIME,
+        runtime=load_minutes,
         margie_sb_db_writer=1,
         mem_mb=rc('interpro.load_mem_mb', 2000, config=config)
     params:
@@ -2581,7 +2600,7 @@ rule load_interpro_perdb_to_db:
         db="|".join(INTERPRO_DB_BASENAMES)
     retries: LOAD_RETRIES
     resources:
-        runtime=LOAD_RUNTIME,
+        runtime=load_minutes,
         margie_sb_db_writer=1,
         mem_mb=rc('interpro.load_mem_mb', 2000, config=config)
     params:
@@ -2631,7 +2650,7 @@ rule load_geneprop_to_db:
         tkn=PHASE4_TOKENS['geneprop']
     retries: LOAD_RETRIES
     resources:
-        runtime=LOAD_RUNTIME,
+        runtime=load_minutes,
         margie_sb_db_writer=1
     params:
         db=MAIN_DATABASE,
@@ -2676,7 +2695,7 @@ rule load_operon_to_db:
         tkn=OPERON_TOKEN
     retries: LOAD_RETRIES
     resources:
-        runtime=LOAD_RUNTIME,
+        runtime=load_minutes,
         margie_sb_db_writer=1
     params:
         db=MAIN_DATABASE,
@@ -2727,7 +2746,7 @@ rule load_phobius_to_db:
         tkn=PHOBIUS_TOKEN
     retries: LOAD_RETRIES
     resources:
-        runtime=LOAD_RUNTIME,
+        runtime=load_minutes,
         margie_sb_db_writer=1
     params:
         db=MAIN_DATABASE,
@@ -2787,7 +2806,7 @@ rule load_tmbed_to_db:
         tkn=TMBED_TOKEN
     retries: LOAD_RETRIES
     resources:
-        runtime=LOAD_RUNTIME,
+        runtime=load_minutes,
         margie_sb_db_writer=1
     params:
         db=MAIN_DATABASE,
@@ -2852,7 +2871,7 @@ rule load_signalp6_to_db:
         tkn=SIGNALP6_TOKEN
     retries: LOAD_RETRIES
     resources:
-        runtime=LOAD_RUNTIME,
+        runtime=load_minutes,
         margie_sb_db_writer=1
     params:
         db=MAIN_DATABASE,
@@ -2902,7 +2921,7 @@ rule load_envelope_to_db:
         tkn=ENVELOPE_TOKEN
     retries: LOAD_RETRIES
     resources:
-        runtime=LOAD_RUNTIME,
+        runtime=load_minutes,
         margie_sb_db_writer=1
     params:
         db=MAIN_DATABASE,
@@ -2955,7 +2974,7 @@ rule load_deepsig_to_db:
         tkn=DEEPSIG_TOKEN
     retries: LOAD_RETRIES
     resources:
-        runtime=LOAD_RUNTIME,
+        runtime=load_minutes,
         margie_sb_db_writer=1
     params:
         db=MAIN_DATABASE,
@@ -3010,7 +3029,7 @@ rule load_psortb_to_db:
         tkn=PSORTB_TOKEN
     retries: LOAD_RETRIES
     resources:
-        runtime=LOAD_RUNTIME,
+        runtime=load_minutes,
         margie_sb_db_writer=1
     params:
         db=MAIN_DATABASE,
@@ -3080,7 +3099,7 @@ rule load_signalp4_to_db:
         tkn=SIGNALP4_TOKEN
     retries: LOAD_RETRIES
     resources:
-        runtime=LOAD_RUNTIME,
+        runtime=load_minutes,
         margie_sb_db_writer=1
     params:
         db=MAIN_DATABASE,

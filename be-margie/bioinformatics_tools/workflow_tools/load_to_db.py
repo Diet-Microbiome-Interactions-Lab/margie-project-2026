@@ -120,6 +120,19 @@ def _ensure_run_log(conn: sqlite3.Connection) -> None:
     for col, col_type in _RUN_LOG_NEW_COLS:
         if col not in existing:
             conn.execute(f"ALTER TABLE run_log ADD COLUMN {col} {col_type}")
+    # The already-loaded and earlier-name lookups go by genome.
+    conn.execute("CREATE INDEX IF NOT EXISTS run_log__fasta_hash ON run_log(fasta_hash, tool)")
+
+
+def _ensure_organism_index(conn: sqlite3.Connection, table_name: str) -> None:
+    """Indexes table_name by organism_name, so a genome's delete reads that genome's rows
+    rather than the whole table. Built the first time a load meets the table without one:
+    that once costs one read of the table, as an unindexed delete did each time."""
+    name = f"{table_name}__organism_name"
+    if conn.execute("SELECT 1 FROM sqlite_master WHERE type='index' AND name=?", (name,)).fetchone():
+        return
+    print(f"Indexing {table_name} by organism_name (once per table)")
+    conn.execute(f'CREATE INDEX IF NOT EXISTS "{name}" ON "{table_name}"(organism_name)')
 
 
 def _already_loaded(db_path: str, input_hash: str, tool: str,
@@ -240,6 +253,7 @@ def _delete_stale_organism_rows(db_path: str, table_name: str,
             cols = {row[1] for row in conn.execute(f'PRAGMA table_info("{table_name}")')}
             if "organism_name" not in cols:
                 return 0
+            _ensure_organism_index(conn, table_name)
             placeholders = ",".join("?" * len(targets))
             cursor = conn.execute(
                 f'DELETE FROM "{table_name}" WHERE organism_name IN ({placeholders})',
@@ -502,6 +516,8 @@ def load_csv_to_db(csv_path: str, db_path: str, table_name: str,
                 if h.lower() not in existing:
                     conn.execute(f'ALTER TABLE {table_name} ADD COLUMN "{h}" {t}')
                     existing.add(h.lower())
+            if "organism_name" in existing:
+                _ensure_organism_index(conn, table_name)
             conn.executemany(insert_sql, rows)
             conn.commit()
         finally:
