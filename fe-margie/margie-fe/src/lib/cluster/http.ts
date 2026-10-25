@@ -26,15 +26,36 @@ function signedOut(): never {
 	throw new ApiError('Your sign-in has ended. Sign in again to reach the cluster.', 401);
 }
 
+/**
+ * A 503 that is not the API's own JSON comes from the proxy while the API restarts after an update:
+ * the request did not reach the API, so it can be sent again once the API is back.
+ */
+const restarting = (res: Response) => res.status === 503 && !res.headers.get('content-type')?.includes('json');
+const RESTARTING = 'MARGIE’s API is restarting after an update. Try again in a minute.';
+
+/** Waits up to 90 s for the API to answer (/v1/ssh/health, which the API serves); true once it does. */
+async function apiBack(): Promise<boolean> {
+	for (let k = 0; k < 30; k++) {
+		await new Promise((r) => setTimeout(r, 3000));
+		const up = await fetch(`${getApiUrl()}/v1/ssh/health`, { cache: 'no-store' }).then(
+			(r) => r.ok && !!r.headers.get('content-type')?.includes('json'),
+			() => false
+		);
+		if (up) return true;
+	}
+	return false;
+}
+
 /** Returns the raw response (for files); throws on anything but success. */
 export async function fetchRaw(path: string): Promise<Response> {
 	const headers = authHeaders();
 	delete headers['Content-Type'];
-	const res = await fetch(`${getApiUrl()}${path}`, { headers });
+	let res = await fetch(`${getApiUrl()}${path}`, { headers });
+	if (restarting(res) && (await apiBack())) res = await fetch(`${getApiUrl()}${path}`, { headers });
 	if (res.status === 401) signedOut();
 	if (!res.ok) {
 		const data = await res.json().catch(() => ({}));
-		throw new ApiError(detailOf(data) ?? `Request failed (${res.status}).`, res.status);
+		throw new ApiError(detailOf(data) ?? (restarting(res) ? RESTARTING : `Request failed (${res.status}).`), res.status);
 	}
 	return res;
 }
@@ -69,10 +90,11 @@ export async function call<T = any>(method: string, path: string, body?: unknown
 		const why = e instanceof Error && e.message && e.message !== 'Failed to fetch' ? ` (${e.message})` : '';
 		throw new ApiError(`MARGIE’s API at ${getApiUrl() || location.origin} did not answer ${method} ${path}${why}. Is the HPC still connected? Reconnect from the start page.`, 503);
 	}
+	if (restarting(res) && (await apiBack())) res = await send().catch(() => res);
 	lastAnswer = Date.now();
 	if (res.status === 401) signedOut();
 	const data = await res.json().catch(() => ({}));
-	if (!res.ok) throw new ApiError(detailOf(data) ?? `Request failed (${res.status}).`, res.status);
+	if (!res.ok) throw new ApiError(detailOf(data) ?? (restarting(res) ? RESTARTING : `Request failed (${res.status}).`), res.status);
 	return data as T;
 }
 
