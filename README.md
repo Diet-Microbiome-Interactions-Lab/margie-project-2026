@@ -189,13 +189,18 @@ MARGIE itself is built with open-source software: [Snakemake](https://snakemake.
 
 ## Citations
 
-APA 7th (software):
+APA 7th (this pipeline):
 
 Bhattarai, S., Deemer, D., & Lindemann, S. R. (2026). *MARGIE: Mostly Automated Rapid Genome Inference Environment* [Computer software]. Purdue University. https://github.com/Diet-Microbiome-Interactions-Lab/margie-project-2026
 
 APA 7th (thesis, in which MARGIE was first built):
 
 Bhattarai, S. (2026). *Mostly Automated Rapid Genome Inference Environment* [Thesis, Purdue University]. Purdue University Graduate School. https://doi.org/10.25394/PGS.33103682.v1
+
+APA 7th (base architecture on which MARGIE was built, by Dane Deemer):
+
+- Deemer, D. (2020). *bioinformatics-tools* [Computer software]. GitHub. https://github.com/wintermutant/bioinformatics-tools (the backend that be-margie grew from: API, command line and workflow engine)
+- Deemer, D. (2025). *biolab-fe* [Computer software]. GitHub. https://github.com/wintermutant/biolab-fe (the web interface that fe-margie grew from)
 
 BibTeX:
 
@@ -207,6 +212,20 @@ year = "2026",
 month = "7",
 url = "https://hammer.purdue.edu/articles/thesis/_b_MOSTLY_AUTOMATED_RAPID_GENOME_INFERENCE_ENVIRONMENT_b_/33103682",
 doi = "10.25394/PGS.33103682.v1"
+}
+@software{Deemer2020,
+author = "Dane Deemer",
+title = "{bioinformatics-tools}",
+year = "2020",
+publisher = "GitHub",
+url = "https://github.com/wintermutant/bioinformatics-tools"
+}
+@software{Deemer2025,
+author = "Dane Deemer",
+title = "{biolab-fe}",
+year = "2025",
+publisher = "GitHub",
+url = "https://github.com/wintermutant/biolab-fe"
 }
 ```
 

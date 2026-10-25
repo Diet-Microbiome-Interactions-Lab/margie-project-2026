@@ -1,5 +1,5 @@
 cff-version: 1.2.0
-message: "If you use this software, please cite it and the thesis in which it was first built (under references), as below."
+message: "If you use this software, please cite it, the thesis in which it was first built, and the base architecture it was built on (bioinformatics-tools and biolab-fe); the last three are under references."
 authors:
   - family-names: "Bhattarai"
     given-names: "Sajal"
@@ -28,3 +28,24 @@ references:
       name: "Purdue University"
     doi: "10.25394/PGS.33103682.v1"
     url: "https://hammer.purdue.edu/articles/thesis/_b_MOSTLY_AUTOMATED_RAPID_GENOME_INFERENCE_ENVIRONMENT_b_/33103682"
+  - type: software
+    title: "bioinformatics-tools"
+    notes: "Base architecture: the backend (API, command line and workflow engine) that MARGIE's be-margie grew from."
+    authors:
+      - family-names: "Deemer"
+        given-names: "Dane"
+        orcid: "https://orcid.org/0000-0002-4485-0280"
+    year: 2020
+    license: MIT
+    url: "https://github.com/wintermutant/bioinformatics-tools"
+    repository-code: "https://github.com/wintermutant/bioinformatics-tools"
+  - type: software
+    title: "biolab-fe"
+    notes: "Base architecture: the web interface that MARGIE's fe-margie grew from."
+    authors:
+      - family-names: "Deemer"
+        given-names: "Dane"
+        orcid: "https://orcid.org/0000-0002-4485-0280"
+    year: 2025
+    url: "https://github.com/wintermutant/biolab-fe"
+    repository-code: "https://github.com/wintermutant/biolab-fe"

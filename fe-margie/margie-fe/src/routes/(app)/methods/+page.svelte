@@ -77,6 +77,7 @@
 				many tools at once, groups genes into operons, works out where proteins sit in the cell, gives every gene one label, and scores
 				how much the evidence for that label agrees. Every step's output is kept, so each label can be traced to the hits behind it.
 			</p>
+			<p>The Python scripts behind MARGIE's own steps are on the <a class="mg-link" href="/code">Code</a> page, as the server runs them.</p>
 		</section>
 
 		<section class="ab-box">

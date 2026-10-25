@@ -38,6 +38,35 @@ url = "https://hammer.purdue.edu/articles/thesis/_b_MOSTLY_AUTOMATED_RAPID_GENOM
 doi = "10.25394/PGS.33103682.v1"
 }`;
 
+/** The base architecture MARGIE was built on (APA 7th): Dane Deemer's backend and web interface. */
+export const BASE_CITATIONS: { what: string; text: string; href: string }[] = [
+	{
+		what: 'The backend (API, command line and workflow engine) that be-margie grew from',
+		text: 'Deemer, D. (2020). bioinformatics-tools [Computer software]. GitHub. https://github.com/wintermutant/bioinformatics-tools',
+		href: 'https://github.com/wintermutant/bioinformatics-tools'
+	},
+	{
+		what: 'The web interface that fe-margie grew from',
+		text: 'Deemer, D. (2025). biolab-fe [Computer software]. GitHub. https://github.com/wintermutant/biolab-fe',
+		href: 'https://github.com/wintermutant/biolab-fe'
+	}
+];
+/** The base architecture as BibTeX. */
+export const BASE_BIBTEX = `@software{Deemer2020,
+author = "Dane Deemer",
+title = "{bioinformatics-tools}",
+year = "2020",
+publisher = "GitHub",
+url = "https://github.com/wintermutant/bioinformatics-tools"
+}
+@software{Deemer2025,
+author = "Dane Deemer",
+title = "{biolab-fe}",
+year = "2025",
+publisher = "GitHub",
+url = "https://github.com/wintermutant/biolab-fe"
+}`;
+
 /** Where the desktop app is downloaded from (its releases, for now). */
 export const DESKTOP_URL = `${CITE_URL}/releases`;
 

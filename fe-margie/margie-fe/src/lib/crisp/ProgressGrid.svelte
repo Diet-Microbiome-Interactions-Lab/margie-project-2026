@@ -634,19 +634,27 @@
 		border-color: var(--mg-danger, #c0392b);
 		background: var(--mg-danger, #c0392b);
 	}
-	/* Under way: filled as far as its own tool has got. */
+	/* Under way: amber, unlike done's blue, filled as far as its own tool has got (a pale disc when
+	   there is nothing to estimate from), glowing and pulsing while SLURM runs it. */
+	.pie.run,
+	.pie.wait {
+		--run: #f59e0b;
+		border-color: var(--run);
+		background: conic-gradient(var(--run) calc(var(--p) * 1%), color-mix(in srgb, var(--run) 32%, transparent) 0);
+		animation: glow 1.6s ease-in-out infinite;
+	}
 	.pie.run {
-		border-color: var(--mg-accent);
 		transition: --p 2s linear;
 	}
-	/* Under way with nothing to estimate from: its ring breathes, and it fills no further than the truth. */
-	.pie.wait {
-		border-color: var(--mg-accent);
-		animation: breathe 2.4s ease-in-out infinite;
-	}
-	@keyframes breathe {
+	@keyframes glow {
+		0%,
+		100% {
+			box-shadow: 0 0 0 0 color-mix(in srgb, var(--run) 0%, transparent);
+			filter: brightness(1);
+		}
 		50% {
-			border-color: color-mix(in srgb, var(--mg-accent) 25%, transparent);
+			box-shadow: 0 0 7px 2px color-mix(in srgb, var(--run) 75%, transparent);
+			filter: brightness(1.18);
 		}
 	}
 	.pie.partial {
