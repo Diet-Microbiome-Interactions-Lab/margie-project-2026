@@ -75,6 +75,7 @@
 			<span class="an-dot" class:going={!!ws.active} aria-hidden="true"></span>
 			<span class="an-text">{status.text}</span>
 			{#if status.action}<a class="mg-link" href={status.action.href}>{status.action.label}</a>{/if}
+			{#if ws.active}<a class="mg-link quiet an-quiz" href="/quiz">Bored while waiting? Try Quizzes!</a>{/if}
 		</p>
 	{:else}
 		<ul class="an-check" aria-label="Before a run">
@@ -100,6 +101,9 @@
 		padding: 0 2px;
 		font-size: var(--mg-fs-sm);
 		color: var(--mg-text-2);
+	}
+	.an-quiz {
+		margin-left: auto;
 	}
 	/* The checklist: one row of small items, green when done, amber when it needs doing. */
 	.an-check {

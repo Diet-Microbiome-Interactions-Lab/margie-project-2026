@@ -561,8 +561,9 @@
 										<span>
 											{summary.mapCurrent === false && !mapVersion
 												? 'This map was drawn by an earlier version of MARGIE; drawing it again brings in what has been added since.'
-												: "Drawing the map again rebuilds the whole interactive map from this genome's report table."}
+												: 'Slow to open? Download the map and open it in your browser: the same interactive page, and it works offline.'}
 										</span>
+										<a class="rb-btn" href={fileUrl(summary.final.viewer)} download><Download size={15} />Download</a>
 										<button type="button" class="rb-btn" disabled={remaking} onclick={() => remakeMap(summary!.final.dir)}>
 											{remaking ? 'Drawing…' : 'Redraw the map'}
 										</button>
@@ -1515,6 +1516,9 @@
 		.rb-tab {
 			padding: 0 10px;
 		}
+	}
+	.rb-remake > span {
+		flex: 1 1 260px;
 	}
 	.rb-remake {
 		display: flex;

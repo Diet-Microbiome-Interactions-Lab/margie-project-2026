@@ -10,7 +10,7 @@
 	import { cubicOut } from 'svelte/easing';
 	import { fade, fly } from 'svelte/transition';
 	import { page } from '$app/state';
-	import { BookOpen, ChartPie, Check, Eye, FlaskConical, FolderOpen, Gauge, HeartHandshake, House, ListChecks, LogOut, Menu, Monitor, MonitorDown, Moon, Package, Palette, Play, RotateCcw, SlidersHorizontal, SquareTerminal, Sun, UserRound, Users, X } from 'lucide-svelte';
+	import { BookOpen, ChartPie, Check, Eye, FlaskConical, FolderOpen, Gauge, HeartHandshake, House, Lightbulb, ListChecks, LogOut, Menu, Monitor, MonitorDown, Moon, Package, Palette, Play, RotateCcw, SlidersHorizontal, SquareTerminal, Sun, UserRound, Users, X } from 'lucide-svelte';
 	import { DESKTOP_URL } from './about';
 	import { AppBar } from '@skeletonlabs/skeleton-svelte';
 	import avatar from '$lib/assets/neuromancer.jpg';
@@ -68,7 +68,8 @@
 			name: 'Account',
 			items: [
 				{ href: '/settings', label: 'Settings', icon: SlidersHorizontal, note: 'Folders, cores and the steps a run takes' },
-				{ href: '/profile', label: 'User profile', icon: UserRound, note: 'Your details, cluster account and SSH key' }
+				{ href: '/profile', label: 'User profile', icon: UserRound, note: 'Your details, cluster account and SSH key' },
+				{ href: '/quiz', label: 'Try Quizzes!', lead: 'Bored while waiting?', icon: Lightbulb, note: 'Bored while waiting? Microbes, metabolism, bioinformatics and the gut' }
 			]
 		}
 	];
@@ -426,8 +427,8 @@
 			{#each GROUPS as g (g.name)}
 				<p class="mg-side-h">{g.name}</p>
 				{#each g.items as n (n.href)}
-					<a href={n.href} class="mg-side-item" aria-current={current(n.href) ? 'page' : undefined} title={railShut ? n.label : n.note}>
-						<n.icon size={18} /><span>{n.label}</span>
+					<a href={n.href} class="mg-side-item" class:two={'lead' in n} aria-current={current(n.href) ? 'page' : undefined} title={railShut ? n.label : n.note}>
+						<n.icon size={18} />{#if 'lead' in n}<span><small>{n.lead}</small>{n.label}</span>{:else}<span>{n.label}</span>{/if}
 					</a>
 				{/each}
 			{/each}
@@ -680,6 +681,24 @@
 	}
 	.mg-side :global(.mg-side-item svg) {
 		flex: none;
+	}
+	/* "Bored while waiting?" over "Try Quizzes!". */
+	.mg-side :global(.mg-side-item.two) {
+		height: auto;
+		min-height: 32px;
+		padding-block: 5px;
+	}
+	.mg-side :global(.mg-side-item.two span) {
+		display: flex;
+		flex-direction: column;
+		line-height: 1.25;
+	}
+	.mg-side :global(.mg-side-item.two small) {
+		font-size: 0.72rem;
+		opacity: 0.75;
+	}
+	.mg-side.shut :global(.mg-side-item.two span) {
+		display: none;
 	}
 	.mg-side :global(.mg-side-item:hover) {
 		background: color-mix(in oklab, var(--mg-text) 7%, transparent);

@@ -89,6 +89,8 @@ export interface UiPrefs {
 	board: number;
 	/** Unused; kept so older saved files still load. */
 	step: 0 | 1 | 2 | 3;
+	/** The quiz was opened by answering one of its unlock questions (routes/(app)/quiz); kept with the account. */
+	quizOpen: boolean;
 }
 
 export const SPEEDS = [0.5, 0.75, 1, 1.5, 2] as const;
@@ -176,7 +178,8 @@ export const DEFAULT_PREFS: UiPrefs = {
 	quast: false,
 	panels: LAYOUTS.default(),
 	board: BOARD,
-	step: 0
+	step: 0,
+	quizOpen: false
 };
 
 /** Keys "Set as default" keeps: the look, not folded sections, pane widths or panels. */
@@ -321,7 +324,8 @@ export function sanitizePrefs(raw: unknown, base: UiPrefs = DEFAULT_PREFS): UiPr
 				: base.toolPick,
 		panels,
 		board: BOARD,
-		step: oneOf(r.step, [0, 1, 2, 3] as const, base.step)
+		step: oneOf(r.step, [0, 1, 2, 3] as const, base.step),
+		quizOpen: typeof r.quizOpen === 'boolean' ? r.quizOpen : base.quizOpen
 	};
 }
 
