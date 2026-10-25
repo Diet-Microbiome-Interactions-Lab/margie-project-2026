@@ -1789,7 +1789,7 @@ class WorkflowBase(ProgramBase):
         max_parallel_tools = self.conf.get('margie_sb', {}).get('phase4', {}).get('max_parallel_tools', 4)
         extra_resources = {
             'margie_sb_phase4_slot': max_parallel_tools,
-            # One database load at a time (margie_sb.smk, LOAD_RUNTIME).
+            # One database load at a time (margie_sb.smk, load_minutes).
             'margie_sb_db_writer': 1,
             # One RASTtk (BV-BRC) job at a time (margie_sb.smk, run_rasttk).
             'margie_sb_bvbrc': 1,
