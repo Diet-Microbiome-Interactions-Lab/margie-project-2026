@@ -42,7 +42,7 @@
 	const STATE_WORD: Record<string, string> = { done: 'Done', run: 'Running', wait: 'Running', failed: 'Failed', partial: 'Stopped before it finished', none: 'Not started', na: 'Not chosen' };
 	const ROW_WORD: Record<RowProgress['state'], string> = { done: 'Done', running: 'Running', failed: 'Failed', stopped: 'Stopped before it finished', queued: 'Not started' };
 
-	/** The pie or genome clicked, and where to put its popup. */
+	/** The pie or genome clicked, and where it was clicked (the popup is placed by fit). */
 	let pick = $state<{ g: string; t: string; x: number; y: number } | null>(null);
 	const picked = $derived.by(() => {
 		if (!pick) return null;
@@ -53,10 +53,35 @@
 	});
 	function open(g: string, t: string, e: MouseEvent) {
 		const W = 340;
-		const H = 300;
 		const x = Math.min(Math.max(8, e.clientX - W / 2), window.innerWidth - W - 8);
-		const y = e.clientY + H + 24 > window.innerHeight ? Math.max(8, e.clientY - H - 12) : e.clientY + 14;
-		pick = pick?.g === g && pick?.t === t ? null : { g, t, x, y };
+		pick = pick?.g === g && pick?.t === t ? null : { g, t, x, y: e.clientY };
+	}
+	/**
+	 * Keeps the popup inside the window as its content changes: below the click when it fits, else
+	 * above it, else from the top with its own scroll (max-height in the styles).
+	 */
+	function fit(node: HTMLElement, y: number) {
+		const place = () => {
+			const h = node.offsetHeight;
+			const room = window.innerHeight;
+			let top = y + 14;
+			if (top + h > room - 8) top = y - h - 12 >= 8 ? y - h - 12 : Math.max(8, room - h - 8);
+			node.style.top = `${top}px`;
+		};
+		const watch = new ResizeObserver(place);
+		watch.observe(node);
+		window.addEventListener('resize', place);
+		place();
+		return {
+			update(next: number) {
+				y = next;
+				place();
+			},
+			destroy() {
+				watch.disconnect();
+				window.removeEventListener('resize', place);
+			}
+		};
 	}
 	/** Mounts the popup at the interface's root, so no page transform moves it off the pie. */
 	function toRoot(node: HTMLElement) {
@@ -189,7 +214,7 @@
 	{@const c = picked.c}
 	<div class="popwrap" use:toRoot>
 		<button type="button" class="pop-scrim" aria-label="Close" onclick={() => (pick = null)}></button>
-		<div class="pop" role="dialog" aria-label={c ? `${c.t} on ${row.g}` : row.g} style="left: {pick.x}px; top: {pick.y}px">
+		<div class="pop" role="dialog" aria-label={c ? `${c.t} on ${row.g}` : row.g} style="left: {pick.x}px" use:fit={pick.y}>
 			{#if c}
 				<header class="pop-head">
 					<span class="pie {c.state}" style="--p: {c.pct ?? 0}">
@@ -472,6 +497,8 @@
 		position: fixed;
 		z-index: 61;
 		width: 300px;
+		max-height: calc(100vh - 16px);
+		overflow-y: auto;
 		padding: 12px 14px 12px;
 		border: 1px solid var(--mg-border);
 		border-radius: var(--mg-r);

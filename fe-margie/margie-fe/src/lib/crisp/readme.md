@@ -13,7 +13,7 @@ MARGIE annotates prokaryotic genomes with many tools at once and scores how much
 
 ## A first run
 
-1. **Install**: type the install statement once, after reading the licences it refers to. Check that the cluster, SLURM account and partition are ready, and accept the licence terms.
+1. **Install**: the first installation, database download or database setup asks you to type the install statement once, after reading the licences it refers to. Check that the cluster, SLURM account and partition are ready, and accept the licence terms.
 2. **Settings**: the one place for what a run reads: folders, databases, SLURM resources per phase and per tool. Changes apply to the next run.
 3. **Analyze**:
    1. *Genomes*: the folder they are in, or drop FASTA files; give each its domain and genetic code if you know them.

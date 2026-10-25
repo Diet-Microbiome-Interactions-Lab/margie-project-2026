@@ -1,7 +1,7 @@
 /**
- * Client state for the Install lock of the current place ('local' or
- * user@host), checked by the server at clusterParts.lockApi. Every
- * installation asks for the password again via confirm() and InstallGate.
+ * Client state for the install statement of the current place ('local' or user@host), kept by the
+ * server at clusterParts.lockApi (in this browser on the website). The first installation, database
+ * download or database setup asks for it (confirm() and InstallGate); later ones go ahead.
  */
 
 import { HOSTED } from '$lib/hosted';
@@ -34,28 +34,38 @@ class InstallLock {
 		return backend.user && backend.host ? `${backend.user}@${backend.host}` : '';
 	}
 
-	/** Asks the server about the place in use now (once per place). */
-	async check() {
+	#pending: Promise<void> = Promise.resolve();
+
+	/** Asks the server about the place in use now (once per place; a second call waits for the first). */
+	check(): Promise<void> {
 		const place = this.place;
-		if (!place || place === this.#asked) return;
+		if (!place || place === this.#asked) return this.#pending;
 		this.#asked = place;
 		this.known = false;
-		if (HOSTED) {
-			this.unlocked = browserPlaces().includes(place);
-			this.known = true;
-			return;
-		}
-		try {
-			const r = await fetch(`${clusterParts.lockApi}?place=${encodeURIComponent(place)}`);
-			this.unlocked = r.ok && !!(await r.json()).unlocked;
-		} catch {
-			this.unlocked = false;
-		}
-		if (place === this.place) this.known = true;
+		this.#pending = (async () => {
+			if (HOSTED) {
+				this.unlocked = browserPlaces().includes(place);
+				this.known = true;
+				return;
+			}
+			try {
+				const r = await fetch(`${clusterParts.lockApi}?place=${encodeURIComponent(place)}`);
+				this.unlocked = r.ok && !!(await r.json()).unlocked;
+			} catch {
+				this.unlocked = false;
+			}
+			if (place === this.place) this.known = true;
+		})();
+		return this.#pending;
 	}
 
-	/** Asks for the password before an installation; the password, or null when it was cancelled. */
-	confirm(what: string): Promise<string | null> {
+	/**
+	 * Before an installation: the statement, at once when this place has it already, else after the
+	 * user types it (InstallGate); null when it was cancelled.
+	 */
+	async confirm(what: string): Promise<string | null> {
+		await this.check();
+		if (this.unlocked) return INSTALL_STATEMENT;
 		this.request?.resolve(null);
 		return new Promise((resolve) => {
 			this.request = {

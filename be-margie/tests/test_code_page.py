@@ -47,3 +47,23 @@ def test_only_listed_files_are_read(client, path):
 
 def test_signing_in_is_needed():
     assert TestClient(app).get('/v1/code').status_code == 401
+
+
+def test_a_snippet_is_the_file_s_own_lines(client):
+    got = client.get('/v1/code/snippet', params={'path': 'genome_identity.py', 'symbol': 'genome_hash'}).json()
+    lines = (code.WORKFLOW_TOOLS / 'genome_identity.py').read_text(encoding='utf-8').splitlines()
+    assert got['text'] == '\n'.join(lines[got['start'] - 1:got['end']]) + '\n'
+    assert got['text'].lstrip().startswith(('def genome_hash', '#'))
+
+
+def test_a_rule_runs_to_the_next_rule(client):
+    got = client.get('/v1/code/snippet', params={'path': 'margie_sb.smk', 'symbol': 'rule:load_scoring_to_db'}).json()
+    assert got['text'].startswith('rule load_scoring_to_db:') or got['text'].startswith('#')
+    assert 'rule ' not in got['text'].split('\n', 1)[1]
+    assert 'runtime=load_minutes' in got['text']
+
+
+@pytest.mark.parametrize('path,symbol', [('workflow.py', 'WorkflowRunner'), ('../api/auth.py', 'get_current_user'),
+                                         ('genome_identity.py', 'no_such_name')])
+def test_a_snippet_comes_only_from_quoted_files(client, path, symbol):
+    assert client.get('/v1/code/snippet', params={'path': path, 'symbol': symbol}).status_code == 404

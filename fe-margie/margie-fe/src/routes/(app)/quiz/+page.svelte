@@ -1,5 +1,6 @@
 <script lang="ts">
 	import { untrack } from 'svelte';
+	import { page } from '$app/state';
 	import { Lock, RotateCcw, Shuffle } from 'lucide-svelte';
 	import { ui } from '$lib/workspace/ui.svelte';
 	import { QUESTIONS, shuffled } from '$lib/quiz/bank';
@@ -58,7 +59,9 @@
 		levels: [...LEVELS],
 		kinds: KINDS.map((k) => k.id)
 	});
-	let topics = $state<Topic[]>(saved.topics);
+	// ?topic=<id> (the FAQ links to ?topic=margie) starts on that topic alone.
+	const asked = TOPICS.find((t) => t.id === page.url.searchParams.get('topic'))?.id;
+	let topics = $state<Topic[]>(asked ? [asked] : saved.topics);
 	let levels = $state<Level[]>(saved.levels);
 	let kinds = $state<Question['kind'][]>(saved.kinds);
 	$effect(() => save(FILTERS, { topics: $state.snapshot(topics), levels: $state.snapshot(levels), kinds: $state.snapshot(kinds) }));

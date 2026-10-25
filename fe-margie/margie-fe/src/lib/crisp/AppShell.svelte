@@ -10,13 +10,14 @@
 	import { cubicOut } from 'svelte/easing';
 	import { fade, fly } from 'svelte/transition';
 	import { page } from '$app/state';
-	import { BookOpen, ChartPie, Check, Eye, FlaskConical, FolderOpen, Gauge, HeartHandshake, House, Lightbulb, ListChecks, LogOut, Menu, Monitor, MonitorDown, Moon, Package, Palette, Play, RotateCcw, SlidersHorizontal, SquareTerminal, Sun, UserRound, Users, X } from 'lucide-svelte';
+	import { BookOpen, ChartPie, Check, CircleQuestionMark, Eye, FlaskConical, FolderOpen, Gauge, HeartHandshake, House, Lightbulb, ListChecks, LogOut, Menu, Monitor, MonitorDown, Moon, Package, Palette, Play, RotateCcw, SlidersHorizontal, SquareTerminal, Sun, UserRound, Users, X } from 'lucide-svelte';
 	import { DESKTOP_URL } from './about';
 	import { AppBar } from '@skeletonlabs/skeleton-svelte';
 	import avatar from '$lib/assets/neuromancer.jpg';
 	import RunRing from '$lib/crisp/RunRing.svelte';
 	import GenomeDrop from '$lib/workspace/GenomeDrop.svelte';
 	import InstallGate from '$lib/workspace/blocks/InstallGate.svelte';
+	import { FAQS } from './faq';
 	import Field from '$lib/workspace/Field.svelte';
 	import Seg from '$lib/workspace/Seg.svelte';
 	import AppearanceControls from '$lib/workspace/AppearanceControls.svelte';
@@ -69,7 +70,7 @@
 			items: [
 				{ href: '/settings', label: 'Settings', icon: SlidersHorizontal, note: 'Folders, cores and the steps a run takes' },
 				{ href: '/profile', label: 'User profile', icon: UserRound, note: 'Your details, cluster account and SSH key' },
-				{ href: '/quiz', label: 'Try Quizzes!', lead: 'Bored while waiting?', icon: Lightbulb, note: 'Bored while waiting? Microbes, metabolism, bioinformatics and the gut' }
+				{ href: '/quiz', label: 'Try Quizzes!', lead: 'Bored while waiting?', icon: Lightbulb, note: 'Bored while waiting? Microbes, metabolism, bioinformatics, the gut and MARGIE itself' }
 			]
 		}
 	];
@@ -77,6 +78,8 @@
 	const ABOUT: { href: string; label: string; icon: typeof Users; external?: boolean }[] = [
 		{ href: '/methods', label: 'Methods', icon: FlaskConical },
 		{ href: '/readme', label: 'README', icon: BookOpen },
+		// The FAQ, on Methods, once it has questions.
+		...(FAQS.length ? [{ href: '/methods#faq', label: 'FAQ', icon: CircleQuestionMark }] : []),
 		{ href: '/contributors', label: 'Contributors', icon: Users },
 		{ href: '/acknowledgements', label: 'Acknowledgements', icon: HeartHandshake },
 		{ href: DESKTOP_URL, label: 'Desktop app', icon: MonitorDown, external: true }

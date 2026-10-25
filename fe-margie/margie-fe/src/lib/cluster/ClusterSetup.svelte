@@ -11,11 +11,10 @@
 	import { ui } from '$lib/workspace/ui.svelte';
 	import { forget } from './backend';
 	import { call, get } from './http';
-	import Licence from './Licence.svelte';
 	import StoresCheck from './StoresCheck.svelte';
 
 	/**
-	 * Cluster Install page: connection, SLURM account, licence terms, containers
+	 * Cluster Install page: connection, SLURM account, containers
 	 * and databases (setting up missing ones by copy, pull or margie-build), and a
 	 * self-test SLURM job.
 	 */
@@ -279,13 +278,9 @@
 	</header>
 {/snippet}
 
-<!-- Below Install's two boxes (ready, what a run can use): the licence terms, the tools and data, the self-test. -->
+<!-- Below Install's two boxes (ready, what a run can use): your databases, the tools and data, the self-test. The licence
+     terms are accepted on Analyze, before a first run. -->
 <div class="cs-grid mg-in">
-	<section class="mg-card cs-wide" id="terms" data-shade="licences">
-		{@render head('terms', 'Licence terms', ws.overview?.licences ? '' : '')}
-		<Fold id="setup:terms"><Licence /></Fold>
-	</section>
-
 	<section class="mg-card cs-wide" id="databases" data-shade="folders">
 		{@render head('databases', 'Your databases', storesMeta)}
 		<Fold id="setup:databases"><StoresCheck /></Fold>

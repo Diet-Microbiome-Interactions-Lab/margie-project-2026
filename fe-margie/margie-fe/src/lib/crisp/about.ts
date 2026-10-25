@@ -82,7 +82,10 @@ export const EXTRA_REFERENCES: { phase: number; what: string; text: string }[] =
 ];
 
 /** The open-source software MARGIE itself is built with (be-margie/pyproject.toml, fe-margie/margie-fe/package.json). */
-export const SOFTWARE: { group: string; items: { name: string; what: string; href: string }[] }[] = [
+export const SOFTWARE: {
+	group: string;
+	items: { name: string; what: string; href: string; version?: string; licence?: string; licenceUrl?: string; source?: string }[];
+}[] = [
 	{
 		group: 'Workflow and computing',
 		items: [
