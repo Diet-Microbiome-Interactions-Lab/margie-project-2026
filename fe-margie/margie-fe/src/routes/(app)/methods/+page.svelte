@@ -25,7 +25,7 @@
 					n: '3',
 					step: 'Gene calling',
 					tools: ['RASTtk', 'Prodigal'],
-					does: "RASTtk calls and names the genes of each genome with a known domain and genetic code; Prodigal calls the others, in RASTtk's file layout, so the later steps are shared.",
+					does: "RASTtk calls and names the genes of each genome with a known domain and genetic code; Prodigal calls those of the others, in prodigal/ with RASTtk's columns, so the later steps are shared.",
 					more: { href: '/faq#gene-calling', label: 'How MARGIE calls genes' }
 				}
 			]
@@ -261,6 +261,9 @@
 			<li><b>Before the run: the genome hash.</b> A genome annotated before comes back from the genome cache: its gene calls, GTDB-Tk and each tool's results. Consolidation, labeling and scoring run again: the first two take about a minute, and scoring reads an operon reference that grows with each genome.</li>
 			<li><b>After gene calling: the protein hash.</b> A protein annotated before with a tool comes back from the protein cache; the tool runs on the new proteins. A tool new to a protein runs and is added; the protein's other tools stay.</li>
 		</ol>
+		<p>
+			The caches keep RASTtk-based results. A genome bound for Prodigal takes RASTtk's gene calls and results when its genome hash has them, so Prodigal annotates novel genomes. A Prodigal genome reads the protein cache, and its results are loaded into the database without entering the caches. A later RASTtk run of the genome replaces them; a Prodigal run leaves RASTtk-based results in place.
+		</p>
 		<p>
 			Each genome runs as its file name and the first 8 characters of its genome hash (<span class="mg-mono">coli--a1b2c3d4</span>), so genomes that share a file name stay apart in the database and the results. The website shows the name you gave it, with the hash beside it on the Jobs page.
 		</p>

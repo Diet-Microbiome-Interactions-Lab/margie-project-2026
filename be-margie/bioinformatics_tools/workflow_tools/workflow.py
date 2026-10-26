@@ -31,7 +31,7 @@ from bioinformatics_tools.workflow_tools.load_to_db import is_already_processed,
 from bioinformatics_tools.workflow_tools import cache_report, protein_cache
 from bioinformatics_tools.workflow_tools.programs import ProgramBase
 from bioinformatics_tools.workflow_tools.workflow_helpers import (
-    discover_genomes, genome_stem, get_workflow_prefix_for, WORKFLOW_PATH_DEFAULTS, genome_calls)
+    discover_genomes, genome_stem, get_workflow_prefix_for, WORKFLOW_PATH_DEFAULTS, genome_calls, gene_call_files)
 from bioinformatics_tools.workflow_tools.workflow_registry import (
     MARGIE_SB_PHASED_TOOLS,
     MARGIE_SB_REQUIRED_TOOLS,
@@ -921,12 +921,31 @@ class WorkflowBase(ProgramBase):
                 gtdbtk_restored, rasttk_restored = self._restore_gene_calls(db_path, genome_files, smk_config, prodigal_genomes)
                 gtdbtk_stored |= {g for g, hit in gtdbtk_restored.items() if hit}
                 gtdbtk_loaded |= {g for g in gtdbtk_stored if Path(self._gtdbtk_split_paths(g, smk_config)[2]).exists()}
+            # A genome bound for Prodigal takes RASTtk's gene calls when its sequence has them in the
+            # database, and with them its RASTtk-based results: Prodigal annotates novel genomes only.
+            for g in sorted(prodigal_genomes):
+                paths = self._rasttk_paths(g, smk_config)
+                if _safely(f'Restoring the RASTtk gene calls of {g}', restore, db_path, genome_files[g], 'rasttk', paths) is True:
+                    self._mark_restored([*paths, f"{get_workflow_prefix_for(g, smk_config)}rasttk/rasttk_compute.tkn"])
+                    rasttk_restored[g] = True
+                    LOGGER.info('RASTtk gene calls for %s came from the MARGIE database: they stand in for Prodigal', g)
+            prodigal_genomes = frozenset(g for g in prodigal_genomes if not rasttk_restored.get(g))
             LOGGER.info('From the MARGIE database: GTDB-Tk for %d of %d genome(s), RASTtk for %d',
                         sum(gtdbtk_restored.values()), len(genome_files), sum(rasttk_restored.values()))
         # margie_sb.smk takes these genomes' GTDB-Tk and RASTtk outputs as they are (rules
         # gtdbtk_from_cache, rasttk_from_cache), and leaves them out of the GTDB-Tk batch.
         smk_config['cached_gtdbtk'] = ','.join(sorted(g for g, hit in gtdbtk_restored.items() if hit))
         smk_config['cached_rasttk'] = ','.join(sorted(g for g, hit in rasttk_restored.items() if hit))
+
+        # Genome-level results are RASTtk-based: a Prodigal genome neither restores nor stores them.
+        if cache_map_fn is not None:
+            genome_cache_map = cache_map_fn
+            cache_map_fn = lambda genome: {} if genome in prodigal_genomes else genome_cache_map(genome)
+
+        def _gene_calls(genome: str) -> dict[str, str]:
+            '''The genome's gene-call files: Prodigal's for a Prodigal genome, else RASTtk's.'''
+            return gene_call_files(get_workflow_prefix_for(genome, smk_config),
+                                   'prodigal' if genome in prodigal_genomes else 'rasttk')
 
         # Where each step's results come from (cache_report.py), written as the run goes.
         provenance = cache_report.CacheReport(smk_config.get('output_dir') or '', db_path or '')
@@ -947,7 +966,9 @@ class WorkflowBase(ProgramBase):
             if run_quast_enabled:
                 provenance.set(g, 'quast', cache_report.FRESH, "measured fresh on this run's assembly")
             if g in prodigal_genomes:
-                provenance.set(g, 'prodigal', cache_report.FRESH, 'genes called fresh by Prodigal')
+                provenance.set(g, 'prodigal', cache_report.FRESH,
+                               'genes called fresh by Prodigal: no RASTtk gene calls for this genome in the MARGIE database'
+                               if db_path else 'genes called fresh by Prodigal')
             elif rasttk_restored.get(g):
                 provenance.set(g, 'rasttk', cache_report.RESTORED, SAME_GENOME, when.get(g, {}).get('rasttk', ''), cache_report.GENOME_LEVEL)
             elif Path(f"{prefix}rasttk/rasttk_db.tkn").exists():
@@ -958,12 +979,12 @@ class WorkflowBase(ProgramBase):
 
         # Stage 1: phases 1-3 in waves with --jobs=1, one BV-BRC submission at a time.
         def _stage1_targets(genome: str) -> list[str]:
-            '''Returns Stage 1's files for one genome: its genome_info.tsv and RASTtk DB
+            '''Returns Stage 1's files for one genome: its genome_info.tsv and its gene calls' DB
             token, plus GTDB-Tk's when it is selected. QUAST is not here: it runs on its own.'''
             prefix = get_workflow_prefix_for(genome, smk_config)
             # genome_info.tsv too: for a genome whose gene calls came from the database it is
             # not made on the way to RASTtk, and Stage 2's restored tool outputs must be newer.
-            targets = [f"{prefix}genome_info/genome_info.tsv", f"{prefix}rasttk/rasttk_db.tkn"]
+            targets = [f"{prefix}genome_info/genome_info.tsv", _gene_calls(genome)['loaded']]
             if run_gtdbtk_enabled:
                 targets.append(f"{prefix}gtdbtk/gtdbtk_db.tkn")
             return targets
@@ -1016,9 +1037,6 @@ class WorkflowBase(ProgramBase):
             quast_proc = self._start_background_subprocess(quast_command)
             if quast_proc is None:
                 LOGGER.warning('QUAST could not be started; the annotation goes on without it')
-
-        def _rasttk_token_path(genome: str) -> str:
-            return f"{get_workflow_prefix_for(genome, smk_config)}rasttk/rasttk_db.tkn"
 
         # With LLM on, Stage 2 stops before the GPU step; Stage 3 runs the LLM jobs.
         _run_llm_val = smk_config.get('run_llm', False)
@@ -1107,11 +1125,11 @@ class WorkflowBase(ProgramBase):
             genes: dict = {}
             if genome not in prodigal_genomes:
                 hashed = _safely(f'Hashing the genes of {genome}', gene_hashes,
-                                 f"{get_workflow_prefix_for(genome, smk_config)}rasttk/rast.gff",
-                                 f"{get_workflow_prefix_for(genome, smk_config)}rasttk/rast.faa")
+                                 _gene_calls(genome)['gff'], _gene_calls(genome)['faa'])
                 genes = hashed if isinstance(hashed, dict) else {}
-            # Restored after rast.faa so mtimes are newer; must precede the skip below.
-            if db_path:
+            # Restored after rast.faa so mtimes are newer; must precede the skip below. A Prodigal
+            # genome restores nothing: the MARGIE database keeps RASTtk-based results.
+            if db_path and genome not in prodigal_genomes:
                 genome_cache_map_now = cache_map_fn(genome)
                 tools_map = {k: v for k, v in genome_cache_map_now.items() if not input_keyed(k)}
                 genome_restored = _safely(f'Restoring {genome} from the cache', restore_all,
@@ -1175,9 +1193,9 @@ class WorkflowBase(ProgramBase):
 
             # Per-protein cache: only proteins not in the cache go to each tool.
             pc_prefix = get_workflow_prefix_for(genome, smk_config)
-            pc_faa_path = f"{pc_prefix}rasttk/rast.faa"
-            # Which genome each protein and gene belongs to, by hash.
-            if db_path and Path(pc_faa_path).exists():
+            pc_faa_path = _gene_calls(genome)['faa']
+            # Which genome each protein and gene belongs to, by hash (RASTtk's genes only).
+            if db_path and genome not in prodigal_genomes and Path(pc_faa_path).exists():
                 _safely(f'Linking the proteins and genes of {genome} to its genome hash', protein_cache.link_genome,
                         db_path, pc_faa_path, genome_hash, genome, genes)
             pc_tools: list[str] = []
@@ -1213,10 +1231,16 @@ class WorkflowBase(ProgramBase):
             # level), partly restored, kept from an earlier attempt, or fresh.
             off = lambda step: smk_config.get(f'run_{step}', True) in (False, 'false', '0', 'no')
             if genome in prodigal_genomes:
-                # Prodigal's feature ids differ from RASTtk's, so neither cache serves it.
+                # Prodigal's genes: no genome-level results come back, and the protein cache serves the
+                # proteins it holds (a protein's results are the same whichever tool called its gene).
                 for t in MARGIE_SB_PHASED_TOOLS:
-                    if t.get('key') and 4 <= t.get('phase', 0) <= 10 and not off(t['key']):
-                        provenance.set(genome, t['key'], cache_report.FRESH, 'run fresh on a Prodigal genome')
+                    key = t.get('key')
+                    if not key or not 4 <= t.get('phase', 0) <= 10 or off(key):
+                        continue
+                    if key in pc_counts:
+                        provenance.set(genome, key, **cache_report.proteins(*pc_counts[key], sources=pc_sources.get(key)))
+                    else:
+                        provenance.set(genome, key, cache_report.FRESH, 'run fresh on Prodigal genes')
             for key, paths in cache_map_fn(genome).items():
                 step = key.split('@')[0]
                 if db_path and genome_restored.get(key):
@@ -1283,8 +1307,9 @@ class WorkflowBase(ProgramBase):
             if not db_path:
                 return
             genome, pc_prefix = slot['genome'], slot['pc_prefix']
-            # Each tool's proteins, once its results are loaded (its db token).
-            for t in slot['pc_tools']:
+            # Each tool's proteins, once its results are loaded (its db token); a Prodigal genome's
+            # proteins are not kept, as the MARGIE database keeps RASTtk-based results.
+            for t in ([] if genome in prodigal_genomes else slot['pc_tools']):
                 if t in slot['pc_stored'] or not Path(f"{pc_prefix}{t}/{t}_db.tkn").exists():
                     continue
                 slot['pc_stored'].add(t)
@@ -1335,10 +1360,13 @@ class WorkflowBase(ProgramBase):
                 failed.append(genome)
                 return
             finished.append(genome)
+            prodigal = genome in prodigal_genomes
             if db_path:
                 tools_to_store = {tool: paths for tool, paths in slot['cache_map'].items()
                                   if tool not in slot['stored'] and not slot['restored'].get(tool, False)}
-                if tools_to_store:
+                if prodigal:
+                    LOGGER.info('%s: Prodigal genes, so its results stay out of the MARGIE caches', genome)
+                elif tools_to_store:
                     merged_fp = merged_inputs_fingerprint(slot['pc_prefix'])
                     _safely(f'Caching the rest of {genome}', store_all, db_path, genome_files[genome],
                             {cache_name(t, merged_fp): p for t, p in tools_to_store.items()}, genes=slot['genes'])
@@ -1346,12 +1374,13 @@ class WorkflowBase(ProgramBase):
                     LOGGER.info('All outputs were already cached incrementally or were cache hits for %s', genome)
                 _safely(f'Recording {genome} in the run log table', log_workflow_run, db_path, run_id, genome_files[genome],
                         key_name, self._build_result(key_name, proc)['rules_summary'].get('completed', 0), status='success')
-                # Each gene's fingerprint, beside its gene hash.
-                _safely(f'Recording the fingerprints of {genome}', protein_cache.record_fingerprints, db_path, slot['genome_hash'],
-                        f"{slot['pc_prefix']}fingerprint/labeled-genes-fingerprint-hash-label.tsv", slot['genes'])
-                # Each protein's record: its descriptors tool by tool, and its core and additional fingerprints.
-                _safely(f'Recording the proteins of {genome}', protein_cache.record_proteins, db_path,
-                        f"{slot['pc_prefix']}labeling/labeled-genes.tsv", slot['pc_prefix'], slot['genome_hash'])
+                if not prodigal:
+                    # Each gene's fingerprint, beside its gene hash.
+                    _safely(f'Recording the fingerprints of {genome}', protein_cache.record_fingerprints, db_path, slot['genome_hash'],
+                            f"{slot['pc_prefix']}fingerprint/labeled-genes-fingerprint-hash-label.tsv", slot['genes'])
+                    # Each protein's record: its descriptors tool by tool, and its core and additional fingerprints.
+                    _safely(f'Recording the proteins of {genome}', protein_cache.record_proteins, db_path,
+                            f"{slot['pc_prefix']}labeling/labeled-genes.tsv", slot['pc_prefix'], slot['genome_hash'])
             LOGGER.info(provenance.summary(genome))
 
         while pending or queue or active:
@@ -1371,7 +1400,7 @@ class WorkflowBase(ProgramBase):
                             gtdbtk_loaded.add(genome)
 
             for genome in list(pending):
-                if Path(_rasttk_token_path(genome)).exists():
+                if Path(_gene_calls(genome)['loaded']).exists():
                     pending.discard(genome)
                     queue.append(genome)
                     if db_path:
@@ -1897,7 +1926,8 @@ class WorkflowBase(ProgramBase):
                 ', '.join(sorted(_disabled)),
             )
 
-        # Prodigal genomes (GTDB-Tk off, no genome_info entry) never touch output_cache.
+        # Prodigal genomes (GTDB-Tk off, no genome_info entry): RASTtk-based results stand in when the
+        # database has them; otherwise their results stay out of the MARGIE caches.
         _calls = genome_calls(genomes, {'run_gtdbtk': config_overrides.get('run_gtdbtk', True),
                                         'margie_sb': self._margie_sb_dict()})
         prodigal_genomes = {g for g, c in _calls.items() if c['gene_caller'] == 'prodigal'}
@@ -1913,10 +1943,8 @@ class WorkflowBase(ProgramBase):
 
             Excludes gtdbtk/rasttk, which run as batches the DAG replans anyway, and
             QUAST, never cached: it measures the assembly submitted, and two assemblies
-            of one strain can differ in quality. Empty for Prodigal genomes, whose
-            feature ids differ from RASTtk's.'''
-            if genome in prodigal_genomes:
-                return {}
+            of one strain can differ in quality. _run_pipeline_batch_sequential leaves
+            out the genomes Prodigal calls the genes of.'''
             prefix = get_workflow_prefix_for(genome, config_overrides)
             simple_tools = ['cog', 'pfam', 'merops', 'tcdb', 'uniprot', 'kegg', 'eggnog',
                             'dbcan', 'pgap', 'geneprop', 'operon', 'tmbed', 'signalp6',

@@ -90,7 +90,9 @@ CREATE TABLE IF NOT EXISTS run_log (
 
 _RUN_LOG_NEW_COLS = [("fasta_hash", "TEXT"), ("pipeline_version", "TEXT"),
                      # Lets a reload clear rows written under an earlier name.
-                     ("organism_name", "TEXT")]
+                     ("organism_name", "TEXT"),
+                     # The tool that called the genome's genes (empty: RASTtk).
+                     ("gene_caller", "TEXT")]
 
 
 def _compute_file_hash(file_path: str) -> str:
@@ -136,11 +138,12 @@ def _ensure_organism_index(conn: sqlite3.Connection, table_name: str, col: str =
 
 
 def _already_loaded(db_path: str, input_hash: str, tool: str,
-                    fasta_hash=None) -> bool:
+                    fasta_hash=None, gene_caller: str | None = None) -> bool:
     """Returns True if this tool's data is already current in the DB.
 
-    With fasta_hash the check is (fasta_hash, PIPELINE_VERSION, tool); without
-    it, (input_hash, tool), for non-genome tables such as prodigal GFF.
+    With fasta_hash the check is (fasta_hash, PIPELINE_VERSION, tool, gene caller), so
+    RASTtk-based results load over Prodigal-based ones; without it, (input_hash, tool),
+    for non-genome tables such as prodigal GFF.
     """
     if not Path(db_path).exists():
         return False
@@ -154,8 +157,9 @@ def _already_loaded(db_path: str, input_hash: str, tool: str,
                 row = conn.execute(
                     "SELECT id FROM run_log "
                     f"WHERE fasta_hash IN ({','.join('?' * len(hashes))}) "
-                    "AND pipeline_version = ? AND tool = ? AND status = 'success'",
-                    (*hashes, PIPELINE_VERSION, tool),
+                    "AND pipeline_version = ? AND tool = ? AND status = 'success' "
+                    "AND coalesce(gene_caller, 'rasttk') = ?",
+                    (*hashes, PIPELINE_VERSION, tool, gene_caller or 'rasttk'),
                 ).fetchone()
             else:
                 row = conn.execute(
@@ -251,6 +255,37 @@ def _name_taken(db_path: str, name: str, fasta_hash) -> bool:
         return True
 
 
+def _has_rasttk_genes(db_path: str, fasta_hash) -> bool:
+    """Whether the rasttk table holds this genome's gene calls: rows under its hash, or rows from
+    before genome_hash under a name run_log ties to it. True when the database cannot say."""
+    hashes = _hash_list(fasta_hash)
+    if not hashes:
+        return False
+    names = sorted(_organism_names_for_fasta(db_path, hashes))
+
+    def _query() -> bool:
+        conn = _get_connection(db_path)
+        try:
+            cols = {row[1] for row in conn.execute('PRAGMA table_info("rasttk")')}
+            if "genome_hash" in cols:
+                _ensure_organism_index(conn, "rasttk", "genome_hash")
+                if conn.execute(f'SELECT 1 FROM rasttk WHERE genome_hash IN ({",".join("?" * len(hashes))}) LIMIT 1',
+                                tuple(hashes)).fetchone():
+                    return True
+            if names and "organism" in cols:
+                untagged = "genome_hash IS NULL AND " if "genome_hash" in cols else ""
+                return conn.execute(f'SELECT 1 FROM rasttk WHERE {untagged}organism IN ({",".join("?" * len(names))}) LIMIT 1',
+                                    tuple(names)).fetchone() is not None
+            return False
+        finally:
+            conn.close()
+
+    try:
+        return _retry_operation(_query)
+    except sqlite3.OperationalError:
+        return True
+
+
 def _delete_stale_organism_rows(db_path: str, table_name: str,
                                 organism_name: str,
                                 fasta_hash=None) -> int:
@@ -310,7 +345,8 @@ def _delete_stale_organism_rows(db_path: str, table_name: str,
 def _record_load(db_path: str, input_hash: str, tool: str,
                  input_path: str, row_count: int,
                  fasta_hash: str | None = None,
-                 organism_name: str | None = None) -> None:
+                 organism_name: str | None = None,
+                 gene_caller: str | None = None) -> None:
     """Records a successful annotation load in the run_log table."""
     def _insert() -> None:
         conn = _get_connection(db_path)
@@ -319,11 +355,11 @@ def _record_load(db_path: str, input_hash: str, tool: str,
             conn.execute(
                 "INSERT OR IGNORE INTO run_log "
                 "(run_id, input_hash, tool, input_path, row_count, rules_completed, "
-                " status, loaded_at, fasta_hash, pipeline_version, organism_name) "
-                "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+                " status, loaded_at, fasta_hash, pipeline_version, organism_name, gene_caller) "
+                "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
                 (str(uuid.uuid4()), input_hash, tool, input_path, row_count, 0, 'success',
                  datetime.now(timezone.utc).isoformat(),
-                 fasta_hash, PIPELINE_VERSION if fasta_hash else None, organism_name),
+                 fasta_hash, PIPELINE_VERSION if fasta_hash else None, organism_name, gene_caller),
             )
             conn.commit()
         finally:
@@ -576,6 +612,9 @@ def _add_common_args(p: argparse.ArgumentParser) -> None:
     p.add_argument("--delete-organism", metavar="NAME",
                    help="Delete existing rows for this organism before loading "
                         "(used when pipeline_version changed)")
+    p.add_argument("--gene-caller", choices=("rasttk", "prodigal"),
+                   help="The tool that called the genome's genes: Prodigal-based results do not "
+                        "replace RASTtk-based ones")
     p.add_argument("--force", action="store_true",
                    help="Reload even if this input was already loaded at the "
                         "current pipeline version (bypasses the version-aware "
@@ -618,9 +657,19 @@ def main():
     fasta_hash = hashes[0] if hashes else None
     organism_name = getattr(args, "delete_organism", None)
 
+    # RASTtk-based results replace Prodigal-based ones; Prodigal-based results leave RASTtk-based ones.
+    if getattr(args, "gene_caller", None) == "prodigal" and _has_rasttk_genes(args.db_path, hashes):
+        print(f"Kept {label}: the database holds RASTtk-based results for this genome")
+        if args.token:
+            Path(args.token).parent.mkdir(parents=True, exist_ok=True)
+            Path(args.token).write_text(f"0 rows loaded from {label} (RASTtk-based results kept)\n")
+        return
+
     # Skips a FASTA already loaded at PIPELINE_VERSION unless --force.
     input_hash = _compute_file_hash(args.input_file)
-    if not getattr(args, "force", False) and _already_loaded(args.db_path, input_hash, label, fasta_hash=hashes):
+    gene_caller = getattr(args, "gene_caller", None)
+    if not getattr(args, "force", False) and _already_loaded(args.db_path, input_hash, label, fasta_hash=hashes,
+                                                             gene_caller=gene_caller):
         print(f"Skipped {label}: already at pipeline version {PIPELINE_VERSION}")
         if args.token:
             Path(args.token).parent.mkdir(parents=True, exist_ok=True)
@@ -633,6 +682,11 @@ def main():
                                               fasta_hash=hashes)
         if deleted:
             print(f"Deleted {deleted} stale rows from {label} (pre-delete before reload)")
+        # RASTtk's gene calls replace Prodigal's.
+        if label == "rasttk":
+            replaced = _delete_stale_organism_rows(args.db_path, "prodigal", organism_name, fasta_hash=hashes)
+            if replaced:
+                print(f"Deleted {replaced} rows of Prodigal's gene calls for this genome (RASTtk's replace them)")
 
     if args.format == "gff":
         n = load_gff_to_db(args.input_file, args.db_path, args.source_tool)
@@ -643,7 +697,7 @@ def main():
         n = load_csv_to_db(args.input_file, args.db_path, args.table_name, genome_hash=fasta_hash)
 
     _record_load(args.db_path, input_hash, label, args.input_file, n,
-                 fasta_hash=fasta_hash, organism_name=organism_name)
+                 fasta_hash=fasta_hash, organism_name=organism_name, gene_caller=gene_caller)
     print(f"Loaded {n} rows from {label} into {args.db_path}")
 
     if args.token:

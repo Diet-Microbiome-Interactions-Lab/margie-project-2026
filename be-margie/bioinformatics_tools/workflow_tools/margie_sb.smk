@@ -153,12 +153,19 @@ GTDBTK_BATCH_RESULTS = f"{GTDBTK_BATCH_PREFIX}/gtdbtk_results.tsv"
 GTDBTK_BATCH_TRANSLATION_TABLE = f"{GTDBTK_BATCH_PREFIX}/gtdbtk.translation_table_summary.tsv"
 GTDBTK_BATCH_DONE = f"{GTDBTK_BATCH_PREFIX}/gtdbtk_batch.done"
 
-# RASTtk outputs; rast.faa and rast.gff feed phase4 and operon.
+# RASTtk's gene calls; GENE_FAA and GENE_GFF (below) give each genome's own to phase4 and operon.
 RASTTK_RESULTS = f"{GENOME_PREFIX}rasttk/rast.tsv"
 RASTTK_TOKEN = f"{GENOME_PREFIX}rasttk/rasttk_db.tkn"
 RASTTK_COMPUTE_TOKEN = f"{GENOME_PREFIX}rasttk/rasttk_compute.tkn"
 RASTTK_FAA = f"{GENOME_PREFIX}rasttk/rast.faa"
 RASTTK_GFF = f"{GENOME_PREFIX}rasttk/rast.gff"
+
+# Prodigal's gene calls, for PRODIGAL_GENOMES (workflow_helpers.gene_call_files).
+PRODIGAL_RESULTS = f"{GENOME_PREFIX}prodigal/prodigal.tsv"
+PRODIGAL_TOKEN = f"{GENOME_PREFIX}prodigal/prodigal_db.tkn"
+PRODIGAL_COMPUTE_TOKEN = f"{GENOME_PREFIX}prodigal/prodigal_compute.tkn"
+PRODIGAL_FAA = f"{GENOME_PREFIX}prodigal/prodigal.faa"
+PRODIGAL_GFF = f"{GENOME_PREFIX}prodigal/prodigal.gff"
 
 # Per-protein cache: a rule annotates novel.faa (the uncached proteins) when present,
 # and PC_MERGE adds the cached rows.
@@ -172,23 +179,11 @@ def pc_dir(tool):
 
 
 def pc_faa(tool):
-    # Returns the tool's novel.faa if present, else rast.faa.
+    # Returns the tool's novel.faa if present, else the genome's proteins.
     def _faa(wildcards):
         novel = f"{GENOME_PREFIX}{tool}/{_protein_cache.PC_DIR}/novel.faa".format(genome=wildcards.genome)
-        return novel if os.path.exists(novel) else RASTTK_FAA.format(genome=wildcards.genome)
+        return novel if os.path.exists(novel) else gene_call_path(wildcards.genome, 'faa')
     return _faa
-
-# Each genome's domain, genetic code and gene caller (RASTtk with both known, else Prodigal).
-RUN_GTDBTK = rc_bool('run_gtdbtk', True, config=config)
-GENOME_CALLS = genome_calls(GENOMES, config)
-RASTTK_GENOMES = sorted(g for g, c in GENOME_CALLS.items() if c['gene_caller'] == 'rasttk')
-PRODIGAL_GENOMES = sorted(g for g, c in GENOME_CALLS.items() if c['gene_caller'] == 'prodigal')
-
-
-def _one_of(names):
-    """Returns a {genome} wildcard regex matching exactly these genomes."""
-    return '|'.join(re.escape(n) for n in names) if names else '(?!)'
-
 
 def _cached(key):
     """Genomes named in config[key], comma-joined: those whose output workflow.py took from the MARGIE database."""
@@ -196,15 +191,52 @@ def _cached(key):
     return [g for g in str(value).split(',') if g in GENOMES] if value not in (None, '') else []
 
 
-# Genomes whose GTDB-Tk and RASTtk outputs came from the MARGIE database (workflow.py).
+# Each genome's domain, genetic code and gene caller (RASTtk with both known, else Prodigal).
+RUN_GTDBTK = rc_bool('run_gtdbtk', True, config=config)
+GENOME_CALLS = genome_calls(GENOMES, config)
+
+# Genomes whose GTDB-Tk and RASTtk outputs came from the MARGIE database (workflow.py). RASTtk's
+# gene calls from the database stand in for Prodigal's, so Prodigal calls the genes of novel genomes.
 CACHED_GTDBTK = _cached('cached_gtdbtk')
-CACHED_RASTTK = [g for g in _cached('cached_rasttk') if g in RASTTK_GENOMES]
+CACHED_RASTTK = _cached('cached_rasttk')
+RASTTK_GENOMES = sorted(g for g, c in GENOME_CALLS.items() if c['gene_caller'] == 'rasttk' or g in CACHED_RASTTK)
+PRODIGAL_GENOMES = sorted(g for g in GENOME_CALLS if g not in RASTTK_GENOMES)
+
+_GENE_CALL_PATHS = {
+    'table': (RASTTK_RESULTS, PRODIGAL_RESULTS), 'faa': (RASTTK_FAA, PRODIGAL_FAA),
+    'gff': (RASTTK_GFF, PRODIGAL_GFF), 'loaded': (RASTTK_TOKEN, PRODIGAL_TOKEN),
+}
+
+
+def gene_call_path(genome, kind):
+    """The genome's gene-call file of this kind: Prodigal's for PRODIGAL_GENOMES, else RASTtk's."""
+    rasttk, prodigal = _GENE_CALL_PATHS[kind]
+    return (prodigal if genome in PRODIGAL_GENOMES else rasttk).format(genome=genome)
+
+
+def gene_calls(kind):
+    """gene_call_path as a rule input."""
+    return lambda wildcards: gene_call_path(wildcards.genome, kind)
+
+
+GENE_FAA = gene_calls('faa')
+GENE_GFF = gene_calls('gff')
+
+
+def gene_caller(wildcards):
+    """The genome's gene caller, for the loads: Prodigal-based results do not replace RASTtk-based ones (load_to_db.py)."""
+    return 'prodigal' if wildcards.genome in PRODIGAL_GENOMES else 'rasttk'
+
+
+def _one_of(names):
+    """Returns a {genome} wildcard regex matching exactly these genomes."""
+    return '|'.join(re.escape(n) for n in names) if names else '(?!)'
 
 
 # Each genome's domain and genetic code, from GTDB-Tk or genome_info (the config wins).
 GENOME_INFO = f"{GENOME_PREFIX}genome_info/genome_info.tsv"
 
-# Prodigal's container output; its gene calls go to the RASTTK_* paths.
+# Prodigal's container output; run_prodigal copies its gene calls to the PRODIGAL_* paths.
 PRODIGAL_CONTAINER_OUTPUTS = f"{CONTAINER_OUTPUTS_PREFIX}prodigal"
 
 # Phase4 outputs: functional annotation, one results.tsv per tool.
@@ -432,7 +464,7 @@ FINGERPRINT_FULL_WITH_SCORES = f"{GENOME_PREFIX}fingerprint/labeled-genes-finger
 FINAL_ANNOTATED = f"{GENOME_PREFIX}scoring/scored-raw-labeled-genes-final-annotated.tsv"
 # Publication subset (~43 columns) with the scoring columns.
 FINAL_ANNOTATED_PUBLICATION = f"{GENOME_PREFIX}scoring/FINAL-scored-labeled-genes-annotated.tsv"
-# GFF3 from the publication table and rast.gff.
+# GFF3 from the publication table and the gene-call GFF.
 ANNOTATION_GFF = f"{GENOME_PREFIX}scoring/annotation.gff3"
 FINGERPRINT_COMPUTE_TOKEN = f"{GENOME_PREFIX}fingerprint/fingerprint_compute.tkn"
 FINGERPRINT_TOKEN = f"{GENOME_PREFIX}fingerprint/fingerprint_db.tkn"
@@ -578,7 +610,7 @@ rule all:
     input:
         (expand(QUAST_TOKEN, genome=list(GENOMES.keys())) if rc_bool('run_quast', False, config=config) else []),
         (expand(GTDBTK_TOKEN, genome=list(GENOMES.keys())) if rc_bool('run_gtdbtk', True, config=config) else []),
-        (expand(RASTTK_TOKEN, genome=list(GENOMES.keys())) if rc_bool('run_rasttk', True, config=config) else []),
+        ([gene_call_path(g, 'loaded') for g in GENOMES] if rc_bool('run_rasttk', True, config=config) else []),
         [_phase4_8_targets_for_genome(genome) for genome in GENOMES.keys()],
         [_phase9_12_targets_for_genome(genome) for genome in GENOMES.keys()],
         ([SQLITE_SNAPSHOT_QUEUE_TOKEN]
@@ -590,7 +622,7 @@ rule all:
 rule rasttk_all:
     """Stage 1: GTDB-Tk and gene calling for all genomes."""
     input:
-        expand(RASTTK_TOKEN, genome=list(GENOMES.keys())),
+        [gene_call_path(g, 'loaded') for g in GENOMES],
         (expand(GTDBTK_TOKEN, genome=list(GENOMES.keys())) if rc_bool('run_gtdbtk', True, config=config) else [])
 
 
@@ -965,18 +997,19 @@ rule load_labeling_to_db:
         runtime=load_minutes,
         margie_sb_db_writer=1
     params:
+        gene_caller=gene_caller,
         db=MAIN_DATABASE,
         script=LOAD_SCRIPT
     shell:
         """
         {LOADER_PYTHON} {params.script} tsv {input.labeled} {params.db} labeling_labeled \
-            --fasta {input.fasta} --delete-organism {wildcards.genome}
+            --fasta {input.fasta} --delete-organism {wildcards.genome} --gene-caller {params.gene_caller}
         {LOADER_PYTHON} {params.script} tsv {input.ec_consensus} {params.db} labeling_ec_consensus \
-            --fasta {input.fasta} --delete-organism {wildcards.genome}
+            --fasta {input.fasta} --delete-organism {wildcards.genome} --gene-caller {params.gene_caller}
         {LOADER_PYTHON} {params.script} tsv {input.operon_info} {params.db} labeling_operon_info \
-            --fasta {input.fasta} --delete-organism {wildcards.genome}
+            --fasta {input.fasta} --delete-organism {wildcards.genome} --gene-caller {params.gene_caller}
         {LOADER_PYTHON} {params.script} tsv {input.cluster_agreement} {params.db} labeling_cluster_agreement \
-            --fasta {input.fasta} --delete-organism {wildcards.genome}
+            --fasta {input.fasta} --delete-organism {wildcards.genome} --gene-caller {params.gene_caller}
         echo "labeling loaded for {wildcards.genome}" > {output.tkn}
         """
 
@@ -1000,24 +1033,25 @@ rule load_scoring_to_db:
         runtime=load_minutes,
         margie_sb_db_writer=1
     params:
+        gene_caller=gene_caller,
         db=MAIN_DATABASE,
         script=LOAD_SCRIPT
     shell:
         """
         {LOADER_PYTHON} {params.script} tsv {input.hierarchy_tier} {params.db} scoring_hierarchy_tier \
-            --fasta {input.fasta} --delete-organism {wildcards.genome} --force
+            --fasta {input.fasta} --delete-organism {wildcards.genome} --gene-caller {params.gene_caller} --force
         {LOADER_PYTHON} {params.script} tsv {input.confidence_tier} {params.db} scoring_confidence_tier \
-            --fasta {input.fasta} --delete-organism {wildcards.genome} --force
+            --fasta {input.fasta} --delete-organism {wildcards.genome} --gene-caller {params.gene_caller} --force
         {LOADER_PYTHON} {params.script} tsv {input.c1} {params.db} scoring_c1_tool_coverage \
-            --fasta {input.fasta} --delete-organism {wildcards.genome} --force
+            --fasta {input.fasta} --delete-organism {wildcards.genome} --gene-caller {params.gene_caller} --force
         {LOADER_PYTHON} {params.script} tsv {input.c2} {params.db} scoring_c2_operon_probability \
-            --fasta {input.fasta} --delete-organism {wildcards.genome} --force
+            --fasta {input.fasta} --delete-organism {wildcards.genome} --gene-caller {params.gene_caller} --force
         {LOADER_PYTHON} {params.script} tsv {input.c3} {params.db} scoring_c3_operon_context \
-            --fasta {input.fasta} --delete-organism {wildcards.genome} --force
+            --fasta {input.fasta} --delete-organism {wildcards.genome} --gene-caller {params.gene_caller} --force
         {LOADER_PYTHON} {params.script} tsv {input.c4} {params.db} scoring_c4_ec_agreement \
-            --fasta {input.fasta} --delete-organism {wildcards.genome} --force
+            --fasta {input.fasta} --delete-organism {wildcards.genome} --gene-caller {params.gene_caller} --force
         {LOADER_PYTHON} {params.script} tsv {input.confidence_final} {params.db} scoring_confidence_final \
-            --fasta {input.fasta} --delete-organism {wildcards.genome} --force
+            --fasta {input.fasta} --delete-organism {wildcards.genome} --gene-caller {params.gene_caller} --force
         echo "scoring loaded for {wildcards.genome}" > {output.tkn}
         """
 
@@ -1238,10 +1272,10 @@ rule queue_sqlite_backup_snapshot:
 
 
 rule make_annotation_gff:
-    """Builds scoring/annotation.gff3 from the publication table and rast.gff."""
+    """Builds scoring/annotation.gff3 from the publication table and the gene-call GFF."""
     input:
         final=FINAL_ANNOTATED_PUBLICATION,
-        rast_gff=RASTTK_GFF,
+        rast_gff=GENE_GFF,
         scoring_tkn=SCORING_TOKEN
     output:
         gff=ANNOTATION_GFF
@@ -1373,24 +1407,25 @@ rule load_fingerprint_to_db:
         runtime=load_minutes,
         margie_sb_db_writer=1
     params:
+        gene_caller=gene_caller,
         db=MAIN_DATABASE,
         script=LOAD_SCRIPT
     shell:
         """
-        {LOADER_PYTHON} {params.script} tsv {input.hash_pattern} {params.db} fingerprint_hash_pattern --fasta {input.fasta} --delete-organism {wildcards.genome}
-        {LOADER_PYTHON} {params.script} tsv {input.hash_label} {params.db} fingerprint_hash_label --fasta {input.fasta} --delete-organism {wildcards.genome}
-        {LOADER_PYTHON} {params.script} tsv {input.label_pattern} {params.db} fingerprint_label_pattern --fasta {input.fasta} --delete-organism {wildcards.genome}
-        {LOADER_PYTHON} {params.script} tsv {input.full} {params.db} fingerprint_full --fasta {input.fasta} --delete-organism {wildcards.genome}
-        {LOADER_PYTHON} {params.script} tsv {input.full_with_scores} {params.db} fingerprint_full_with_scores --fasta {input.fasta} --delete-organism {wildcards.genome} --force
+        {LOADER_PYTHON} {params.script} tsv {input.hash_pattern} {params.db} fingerprint_hash_pattern --fasta {input.fasta} --delete-organism {wildcards.genome} --gene-caller {params.gene_caller}
+        {LOADER_PYTHON} {params.script} tsv {input.hash_label} {params.db} fingerprint_hash_label --fasta {input.fasta} --delete-organism {wildcards.genome} --gene-caller {params.gene_caller}
+        {LOADER_PYTHON} {params.script} tsv {input.label_pattern} {params.db} fingerprint_label_pattern --fasta {input.fasta} --delete-organism {wildcards.genome} --gene-caller {params.gene_caller}
+        {LOADER_PYTHON} {params.script} tsv {input.full} {params.db} fingerprint_full --fasta {input.fasta} --delete-organism {wildcards.genome} --gene-caller {params.gene_caller}
+        {LOADER_PYTHON} {params.script} tsv {input.full_with_scores} {params.db} fingerprint_full_with_scores --fasta {input.fasta} --delete-organism {wildcards.genome} --gene-caller {params.gene_caller} --force
         echo "fingerprint loaded for {wildcards.genome}" > {output.tkn}
         """
 
 
 rule copy_to_genome_pool:
-    """Copies this genome's .fna and rast.faa into the shared genome pool."""
+    """Copies this genome's .fna and proteins into the shared genome pool."""
     input:
         fna=lambda wildcards: GENOMES[wildcards.genome],
-        faa=RASTTK_FAA,
+        faa=GENE_FAA,
         scoring_tkn=SCORING_COMPUTE_TOKEN
     output:
         tkn=GENOME_POOL_TOKEN
@@ -1841,7 +1876,7 @@ rule resolve_genome_info:
         with target.open('w', newline='') as fh:
             writer = csv.writer(fh, delimiter='\t', lineterminator='\n')
             writer.writerow(['genome', 'GTDBTK_domain', 'translation_table', 'gene_caller', 'source'])
-            writer.writerow([wildcards.genome, domain or 'Unknown', code, call['gene_caller'], source])
+            writer.writerow([wildcards.genome, domain or 'Unknown', code, 'prodigal' if wildcards.genome in PRODIGAL_GENOMES else 'rasttk', source])
 
 
 rule run_rasttk:
@@ -1855,7 +1890,7 @@ rule run_rasttk:
         faa=RASTTK_FAA,
         gff=RASTTK_GFF,
         tkn=RASTTK_COMPUTE_TOKEN
-    # RASTtk genomes only; run_prodigal makes the same files for the rest.
+    # RASTtk genomes only; run_prodigal calls the others' genes in prodigal/.
     wildcard_constraints:
         genome=_one_of(RASTTK_GENOMES)
     threads: rc('rasttk.threads', 8, config=config)
@@ -1926,15 +1961,16 @@ rule run_rasttk:
 
 
 rule run_prodigal:
-    """Phase3: Prodigal gene calls in RASTtk's layout, for PRODIGAL_GENOMES (domain or code unknown)."""
+    """Phase3: Prodigal gene calls for PRODIGAL_GENOMES (domain or code unknown): the proteins, the GFF
+    and the gene table (in rast.tsv's columns), in prodigal/."""
     input:
         fasta=lambda wildcards: GENOMES[wildcards.genome],
         info=GENOME_INFO
     output:
-        results=RASTTK_RESULTS,
-        faa=RASTTK_FAA,
-        gff=RASTTK_GFF,
-        tkn=RASTTK_COMPUTE_TOKEN
+        results=PRODIGAL_RESULTS,
+        faa=PRODIGAL_FAA,
+        gff=PRODIGAL_GFF,
+        tkn=PRODIGAL_COMPUTE_TOKEN
     wildcard_constraints:
         genome=_one_of(PRODIGAL_GENOMES)
     threads: rc('prodigal.threads', 1, config=config)
@@ -1950,12 +1986,9 @@ rule run_prodigal:
         DOMAIN=$(awk -F'\\t' 'NR==1{{for(i=1;i<=NF;i++) if($i=="GTDBTK_domain") c=i}} NR==2{{print $c}}' {input.info})
         GCODE=$(awk -F'\t' 'NR==1{{for(i=1;i<=NF;i++){{gsub(/\r/,"",$i); if($i=="translation_table") c=i}}}} NR>1{{gsub(/\r/,"",$c); if(c && $c!=""){{print $c; exit}}}}' {input.info})
         /usr/local/bin/run -i {input.fasta} -o {params.output_dir} -g "${{GCODE:-11}}" --domain "${{DOMAIN:-Unknown}}" --organism-name {wildcards.genome} --force
-        mkdir -p $(dirname {output.results})
-        cp {params.output_dir}/gene_calls/* $(dirname {output.results})/
         cp {params.output_dir}/gene_calls/genome.faa {output.faa}
         cp {params.output_dir}/gene_calls/genome.gff {output.gff}
         cp {params.output_dir}/processed/prodigal_gene_calls.tsv {output.results}
-        echo prodigal > $(dirname {output.results})/gene_caller.txt
         echo "prodigal complete for {wildcards.genome}" > {output.tkn}
         """
 
@@ -1997,6 +2030,27 @@ rule load_rasttk_to_db:
     shell:
         """
         {LOADER_PYTHON} {params.script} tsv {input.results} {params.db} rasttk --token {output.tkn} --fasta {input.fasta} --delete-organism {wildcards.genome}
+        """
+
+
+rule load_prodigal_to_db:
+    """Loads Prodigal's gene table into main_database."""
+    input:
+        results=PRODIGAL_RESULTS,
+        fasta=lambda wildcards: GENOMES[wildcards.genome]
+    output:
+        tkn=PRODIGAL_TOKEN
+    retries: LOAD_RETRIES
+    resources:
+        runtime=load_minutes,
+        margie_sb_db_writer=1
+    params:
+        gene_caller=gene_caller,
+        db=MAIN_DATABASE,
+        script=LOAD_SCRIPT
+    shell:
+        """
+        {LOADER_PYTHON} {params.script} tsv {input.results} {params.db} prodigal --token {output.tkn} --fasta {input.fasta} --delete-organism {wildcards.genome} --gene-caller {params.gene_caller}
         """
 
 
@@ -2049,11 +2103,12 @@ rule load_cog_to_db:
         runtime=load_minutes,
         margie_sb_db_writer=1
     params:
+        gene_caller=gene_caller,
         db=MAIN_DATABASE,
         script=LOAD_SCRIPT
     shell:
         """
-        {LOADER_PYTHON} {params.script} tsv {input.results} {params.db} cog --token {output.tkn} --fasta {input.fasta} --delete-organism {wildcards.genome}
+        {LOADER_PYTHON} {params.script} tsv {input.results} {params.db} cog --token {output.tkn} --fasta {input.fasta} --delete-organism {wildcards.genome} --gene-caller {params.gene_caller}
         """
 
 
@@ -2104,11 +2159,12 @@ rule load_pfam_to_db:
         runtime=load_minutes,
         margie_sb_db_writer=1
     params:
+        gene_caller=gene_caller,
         db=MAIN_DATABASE,
         script=LOAD_SCRIPT
     shell:
         """
-        {LOADER_PYTHON} {params.script} tsv {input.results} {params.db} pfam --token {output.tkn} --fasta {input.fasta} --delete-organism {wildcards.genome}
+        {LOADER_PYTHON} {params.script} tsv {input.results} {params.db} pfam --token {output.tkn} --fasta {input.fasta} --delete-organism {wildcards.genome} --gene-caller {params.gene_caller}
         """
 
 
@@ -2160,11 +2216,12 @@ rule load_tigrfam_to_db:
         runtime=load_minutes,
         margie_sb_db_writer=1
     params:
+        gene_caller=gene_caller,
         db=MAIN_DATABASE,
         script=LOAD_SCRIPT
     shell:
         """
-        {LOADER_PYTHON} {params.script} tsv {input.results} {params.db} tigrfam --token {output.tkn} --fasta {input.fasta} --delete-organism {wildcards.genome}
+        {LOADER_PYTHON} {params.script} tsv {input.results} {params.db} tigrfam --token {output.tkn} --fasta {input.fasta} --delete-organism {wildcards.genome} --gene-caller {params.gene_caller}
         """
 
 
@@ -2215,11 +2272,12 @@ rule load_merops_to_db:
         runtime=load_minutes,
         margie_sb_db_writer=1
     params:
+        gene_caller=gene_caller,
         db=MAIN_DATABASE,
         script=LOAD_SCRIPT
     shell:
         """
-        {LOADER_PYTHON} {params.script} tsv {input.results} {params.db} merops --token {output.tkn} --fasta {input.fasta} --delete-organism {wildcards.genome}
+        {LOADER_PYTHON} {params.script} tsv {input.results} {params.db} merops --token {output.tkn} --fasta {input.fasta} --delete-organism {wildcards.genome} --gene-caller {params.gene_caller}
         """
 
 
@@ -2271,11 +2329,12 @@ rule load_tcdb_to_db:
         runtime=load_minutes,
         margie_sb_db_writer=1
     params:
+        gene_caller=gene_caller,
         db=MAIN_DATABASE,
         script=LOAD_SCRIPT
     shell:
         """
-        {LOADER_PYTHON} {params.script} tsv {input.results} {params.db} tcdb --token {output.tkn} --fasta {input.fasta} --delete-organism {wildcards.genome}
+        {LOADER_PYTHON} {params.script} tsv {input.results} {params.db} tcdb --token {output.tkn} --fasta {input.fasta} --delete-organism {wildcards.genome} --gene-caller {params.gene_caller}
         """
 
 
@@ -2327,11 +2386,12 @@ rule load_uniprot_to_db:
         runtime=load_minutes,
         margie_sb_db_writer=1
     params:
+        gene_caller=gene_caller,
         db=MAIN_DATABASE,
         script=LOAD_SCRIPT
     shell:
         """
-        {LOADER_PYTHON} {params.script} tsv {input.results} {params.db} uniprot --token {output.tkn} --fasta {input.fasta} --delete-organism {wildcards.genome}
+        {LOADER_PYTHON} {params.script} tsv {input.results} {params.db} uniprot --token {output.tkn} --fasta {input.fasta} --delete-organism {wildcards.genome} --gene-caller {params.gene_caller}
         """
 
 
@@ -2381,11 +2441,12 @@ rule load_kegg_to_db:
         runtime=load_minutes,
         margie_sb_db_writer=1
     params:
+        gene_caller=gene_caller,
         db=MAIN_DATABASE,
         script=LOAD_SCRIPT
     shell:
         """
-        {LOADER_PYTHON} {params.script} tsv {input.results} {params.db} kegg --token {output.tkn} --fasta {input.fasta} --delete-organism {wildcards.genome}
+        {LOADER_PYTHON} {params.script} tsv {input.results} {params.db} kegg --token {output.tkn} --fasta {input.fasta} --delete-organism {wildcards.genome} --gene-caller {params.gene_caller}
         """
 
 
@@ -2435,11 +2496,12 @@ rule load_eggnog_to_db:
         runtime=load_minutes,
         margie_sb_db_writer=1
     params:
+        gene_caller=gene_caller,
         db=MAIN_DATABASE,
         script=LOAD_SCRIPT
     shell:
         """
-        {LOADER_PYTHON} {params.script} tsv {input.results} {params.db} eggnog --token {output.tkn} --fasta {input.fasta} --delete-organism {wildcards.genome}
+        {LOADER_PYTHON} {params.script} tsv {input.results} {params.db} eggnog --token {output.tkn} --fasta {input.fasta} --delete-organism {wildcards.genome} --gene-caller {params.gene_caller}
         """
 
 
@@ -2490,11 +2552,12 @@ rule load_dbcan_to_db:
         runtime=load_minutes,
         margie_sb_db_writer=1
     params:
+        gene_caller=gene_caller,
         db=MAIN_DATABASE,
         script=LOAD_SCRIPT
     shell:
         """
-        {LOADER_PYTHON} {params.script} tsv {input.results} {params.db} dbcan --token {output.tkn} --fasta {input.fasta} --delete-organism {wildcards.genome}
+        {LOADER_PYTHON} {params.script} tsv {input.results} {params.db} dbcan --token {output.tkn} --fasta {input.fasta} --delete-organism {wildcards.genome} --gene-caller {params.gene_caller}
         """
 
 
@@ -2544,11 +2607,12 @@ rule load_pgap_to_db:
         runtime=load_minutes,
         margie_sb_db_writer=1
     params:
+        gene_caller=gene_caller,
         db=MAIN_DATABASE,
         script=LOAD_SCRIPT
     shell:
         """
-        {LOADER_PYTHON} {params.script} tsv {input.results} {params.db} pgap --token {output.tkn} --fasta {input.fasta} --delete-organism {wildcards.genome}
+        {LOADER_PYTHON} {params.script} tsv {input.results} {params.db} pgap --token {output.tkn} --fasta {input.fasta} --delete-organism {wildcards.genome} --gene-caller {params.gene_caller}
         """
 
 
@@ -2608,11 +2672,12 @@ rule load_interpro_to_db:
         margie_sb_db_writer=1,
         mem_mb=rc('interpro.load_mem_mb', 2000, config=config)
     params:
+        gene_caller=gene_caller,
         db=MAIN_DATABASE,
         script=LOAD_SCRIPT
     shell:
         """
-        {LOADER_PYTHON} {params.script} tsv {input.results} {params.db} interpro --token {output.tkn} --fasta {input.fasta} --delete-organism {wildcards.genome}
+        {LOADER_PYTHON} {params.script} tsv {input.results} {params.db} interpro --token {output.tkn} --fasta {input.fasta} --delete-organism {wildcards.genome} --gene-caller {params.gene_caller}
         """
 
 
@@ -2631,19 +2696,20 @@ rule load_interpro_perdb_to_db:
         margie_sb_db_writer=1,
         mem_mb=rc('interpro.load_mem_mb', 2000, config=config)
     params:
+        gene_caller=gene_caller,
         db_file=MAIN_DATABASE,
         script=LOAD_SCRIPT,
         table_name=lambda wildcards: f"interpro_{wildcards.db}"
     shell:
         """
-        {LOADER_PYTHON} {params.script} tsv {input.results} {params.db_file} {params.table_name} --token {output.tkn} --fasta {input.fasta} --delete-organism {wildcards.genome}
+        {LOADER_PYTHON} {params.script} tsv {input.results} {params.db_file} {params.table_name} --token {output.tkn} --fasta {input.fasta} --delete-organism {wildcards.genome} --gene-caller {params.gene_caller}
         """
 
 
 rule run_geneprop:
     """Phase4: Genome Properties from TIGRFAM's domtblout."""
     input:
-        faa=RASTTK_FAA,
+        faa=GENE_FAA,
         gtdbtk_results=GENOME_INFO,
         tigrfam_domtbl=TIGRFAM_DOMTBL
     output:
@@ -2681,19 +2747,20 @@ rule load_geneprop_to_db:
         runtime=load_minutes,
         margie_sb_db_writer=1
     params:
+        gene_caller=gene_caller,
         db=MAIN_DATABASE,
         script=LOAD_SCRIPT
     shell:
         """
-        {LOADER_PYTHON} {params.script} tsv {input.results} {params.db} geneprop --token {output.tkn} --fasta {input.fasta} --delete-organism {wildcards.genome}
+        {LOADER_PYTHON} {params.script} tsv {input.results} {params.db} geneprop --token {output.tkn} --fasta {input.fasta} --delete-organism {wildcards.genome} --gene-caller {params.gene_caller}
         """
 
 
 rule run_operon:
-    """Phase5: UniOP operons from rast.faa and rast.gff."""
+    """Phase5: UniOP operons from the genome's gene calls (proteins and GFF)."""
     input:
-        faa=RASTTK_FAA,
-        gff=RASTTK_GFF,
+        faa=GENE_FAA,
+        gff=GENE_GFF,
         gtdbtk_results=GENOME_INFO
     output:
         results=OPERON_RESULTS,
@@ -2727,11 +2794,12 @@ rule load_operon_to_db:
         runtime=load_minutes,
         margie_sb_db_writer=1
     params:
+        gene_caller=gene_caller,
         db=MAIN_DATABASE,
         script=LOAD_SCRIPT
     shell:
         """
-        {LOADER_PYTHON} {params.script} tsv {input.results} {params.db} operon --token {output.tkn} --fasta {input.fasta} --delete-organism {wildcards.genome}
+        {LOADER_PYTHON} {params.script} tsv {input.results} {params.db} operon --token {output.tkn} --fasta {input.fasta} --delete-organism {wildcards.genome} --gene-caller {params.gene_caller}
         """
 
 
@@ -2779,11 +2847,12 @@ rule load_phobius_to_db:
         runtime=load_minutes,
         margie_sb_db_writer=1
     params:
+        gene_caller=gene_caller,
         db=MAIN_DATABASE,
         script=LOAD_SCRIPT
     shell:
         """
-        {LOADER_PYTHON} {params.script} tsv {input.results} {params.db} phobius --token {output.tkn} --fasta {input.fasta} --delete-organism {wildcards.genome}
+        {LOADER_PYTHON} {params.script} tsv {input.results} {params.db} phobius --token {output.tkn} --fasta {input.fasta} --delete-organism {wildcards.genome} --gene-caller {params.gene_caller}
         """
 
 
@@ -2840,11 +2909,12 @@ rule load_tmbed_to_db:
         runtime=load_minutes,
         margie_sb_db_writer=1
     params:
+        gene_caller=gene_caller,
         db=MAIN_DATABASE,
         script=LOAD_SCRIPT
     shell:
         """
-        {LOADER_PYTHON} {params.script} tsv {input.results} {params.db} tmbed --token {output.tkn} --fasta {input.fasta} --delete-organism {wildcards.genome}
+        {LOADER_PYTHON} {params.script} tsv {input.results} {params.db} tmbed --token {output.tkn} --fasta {input.fasta} --delete-organism {wildcards.genome} --gene-caller {params.gene_caller}
         """
 
 
@@ -2906,11 +2976,12 @@ rule load_signalp6_to_db:
         runtime=load_minutes,
         margie_sb_db_writer=1
     params:
+        gene_caller=gene_caller,
         db=MAIN_DATABASE,
         script=LOAD_SCRIPT
     shell:
         """
-        {LOADER_PYTHON} {params.script} tsv {input.results} {params.db} signalp6 --token {output.tkn} --fasta {input.fasta} --delete-organism {wildcards.genome}
+        {LOADER_PYTHON} {params.script} tsv {input.results} {params.db} signalp6 --token {output.tkn} --fasta {input.fasta} --delete-organism {wildcards.genome} --gene-caller {params.gene_caller}
         """
 
 
@@ -2957,18 +3028,19 @@ rule load_envelope_to_db:
         runtime=load_minutes,
         margie_sb_db_writer=1
     params:
+        gene_caller=gene_caller,
         db=MAIN_DATABASE,
         script=LOAD_SCRIPT
     shell:
         """
-        {LOADER_PYTHON} {params.script} tsv {input.results} {params.db} envelope --token {output.tkn} --fasta {input.fasta} --delete-organism {wildcards.genome}
+        {LOADER_PYTHON} {params.script} tsv {input.results} {params.db} envelope --token {output.tkn} --fasta {input.fasta} --delete-organism {wildcards.genome} --gene-caller {params.gene_caller}
         """
 
 
 rule run_deepsig:
     """Phase8: DeepSig signal peptides, with the required -k mapped from ENVELOPE_SUMMARY."""
     input:
-        faa=RASTTK_FAA,
+        faa=GENE_FAA,
         envelope_summary=ENVELOPE_SUMMARY
     output:
         results=DEEPSIG_RESULTS,
@@ -3011,20 +3083,21 @@ rule load_deepsig_to_db:
         runtime=load_minutes,
         margie_sb_db_writer=1
     params:
+        gene_caller=gene_caller,
         db=MAIN_DATABASE,
         script=LOAD_SCRIPT,
         enrich_script=ENRICH_SCRIPT
     shell:
         """
         {LOADER_PYTHON} {params.enrich_script} --input {input.results} --envelope-summary {input.envelope_summary} --output {input.results}
-        {LOADER_PYTHON} {params.script} tsv {input.results} {params.db} deepsig --token {output.tkn} --fasta {input.fasta} --delete-organism {wildcards.genome}
+        {LOADER_PYTHON} {params.script} tsv {input.results} {params.db} deepsig --token {output.tkn} --fasta {input.fasta} --delete-organism {wildcards.genome} --gene-caller {params.gene_caller}
         """
 
 
 rule run_psortb:
     """Phase8: PSORTb v3 localization, with the required -k (n|p|a) mapped from ENVELOPE_SUMMARY."""
     input:
-        faa=RASTTK_FAA,
+        faa=GENE_FAA,
         envelope_summary=ENVELOPE_SUMMARY
     output:
         results=PSORTB_RESULTS,
@@ -3067,20 +3140,21 @@ rule load_psortb_to_db:
         runtime=load_minutes,
         margie_sb_db_writer=1
     params:
+        gene_caller=gene_caller,
         db=MAIN_DATABASE,
         script=LOAD_SCRIPT,
         enrich_script=ENRICH_SCRIPT
     shell:
         """
         {LOADER_PYTHON} {params.enrich_script} --input {input.results} --envelope-summary {input.envelope_summary} --output {input.results}
-        {LOADER_PYTHON} {params.script} tsv {input.results} {params.db} psortb --token {output.tkn} --fasta {input.fasta} --delete-organism {wildcards.genome}
+        {LOADER_PYTHON} {params.script} tsv {input.results} {params.db} psortb --token {output.tkn} --fasta {input.fasta} --delete-organism {wildcards.genome} --gene-caller {params.gene_caller}
         """
 
 
 rule run_signalp4:
     """Phase8: SignalP 4.1 via the signalp4 module (command `signalp`); archaea map to gram-."""
     input:
-        faa=RASTTK_FAA,
+        faa=GENE_FAA,
         envelope_summary=ENVELOPE_SUMMARY
     output:
         results=SIGNALP4_RESULTS,
@@ -3138,13 +3212,14 @@ rule load_signalp4_to_db:
         runtime=load_minutes,
         margie_sb_db_writer=1
     params:
+        gene_caller=gene_caller,
         db=MAIN_DATABASE,
         script=LOAD_SCRIPT,
         enrich_script=ENRICH_SCRIPT
     shell:
         """
         {LOADER_PYTHON} {params.enrich_script} --input {input.results} --envelope-summary {input.envelope_summary} --output {input.results}
-        {LOADER_PYTHON} {params.script} tsv {input.results} {params.db} signalp4 --token {output.tkn} --fasta {input.fasta} --delete-organism {wildcards.genome}
+        {LOADER_PYTHON} {params.script} tsv {input.results} {params.db} signalp4 --token {output.tkn} --fasta {input.fasta} --delete-organism {wildcards.genome} --gene-caller {params.gene_caller}
         """
 
 
@@ -3161,7 +3236,7 @@ rule load_signalp4_to_db:
 # rule run_newtool:
 #     """Phase4: newtool"""
 #     input:
-#         faa=RASTTK_FAA
+#         faa=GENE_FAA
 #     output:
 #         results=NEWTOOL_RESULTS
 #     group: "newtool"

@@ -389,8 +389,13 @@ def database_facts(path: str) -> dict:
             try:
                 log(f"Counting the genomes and genes in {path}")
                 # A genome loaded more than once has its rows more than once; each gene counts once.
+                # The gene calls are RASTtk's, and Prodigal's for novel genomes RASTtk has not run on.
+                tables = [t for (t,) in db.execute(
+                    "SELECT name FROM sqlite_master WHERE type = 'table' AND name IN ('rasttk', 'prodigal')")]
+                calls = " UNION ALL ".join(f"SELECT organism, feature_id FROM {t}" for t in tables)
                 genes, genomes = db.execute(
-                    "SELECT count(DISTINCT organism || '|' || feature_id), count(DISTINCT organism) FROM rasttk").fetchone()
+                    f"SELECT count(DISTINCT organism || '|' || feature_id), count(DISTINCT organism) FROM ({calls})"
+                ).fetchone() if calls else (0, 0)
                 facts["genes"], facts["genomes"] = genes, genomes
                 facts["first"], facts["latest"] = db.execute(
                     "SELECT min(loaded_at), max(loaded_at) FROM run_log WHERE status = 'success'").fetchone()
