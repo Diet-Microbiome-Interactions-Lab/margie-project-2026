@@ -91,7 +91,7 @@ export interface UiPrefs {
 	step: 0 | 1 | 2 | 3;
 	/** The quiz was opened by answering one of its unlock questions (routes/(app)/quiz); kept with the account. */
 	quizOpen: boolean;
-	/** The look's version: 2 since Modern took Graphite as its accent (see sanitizePrefs). */
+	/** The look's version: 2 since Modern took Graphite as its accent, 3 since animations are off by default (see sanitizePrefs). */
 	looks: number;
 }
 
@@ -155,7 +155,7 @@ export const DEFAULT_PREFS: UiPrefs = {
 	fieldScale: 1,
 	typeface: 'arial',
 	monoface: 'menlo',
-	motion: 'full',
+	motion: 'off',
 	speed: 1,
 	folded: [],
 	unfolded: [],
@@ -182,7 +182,7 @@ export const DEFAULT_PREFS: UiPrefs = {
 	board: BOARD,
 	step: 0,
 	quizOpen: false,
-	looks: 2
+	looks: 3
 };
 
 /** Keys "Set as default" keeps: the look, not folded sections, pane widths or panels. */
@@ -214,7 +214,8 @@ export const LOOK_KEYS = [
 	'previewVision',
 	'recolour',
 	'marks',
-	'backdrop'
+	'backdrop',
+	'looks'
 ] as const satisfies readonly (keyof UiPrefs)[];
 
 /** The look part of some preferences, checked as saved preferences are. */
@@ -265,7 +266,7 @@ export function sanitizePrefs(raw: unknown, base: UiPrefs = DEFAULT_PREFS): UiPr
 	// A look saved before version 2 with Modern's former blue, and no colours of its own, takes Graphite.
 	const own = (side: unknown) => side && typeof side === 'object' && Object.keys(side).length > 0;
 	const colours = r.colours as { light?: unknown; dark?: unknown } | undefined;
-	if (r.looks !== 2 && 'accent' in r && accent === 'blue' && (!r.palette || r.palette === 'crisp') && !own(colours?.light) && !own(colours?.dark)) accent = 'graphite';
+	if (!(typeof r.looks === 'number' && r.looks >= 2) && 'accent' in r && accent === 'blue' && (!r.palette || r.palette === 'crisp') && !own(colours?.light) && !own(colours?.dark)) accent = 'graphite';
 	let panels = base.panels;
 	if (Array.isArray(r.panels) && r.board === BOARD) {
 		const seen = new Set<PanelId>();
@@ -295,7 +296,8 @@ export function sanitizePrefs(raw: unknown, base: UiPrefs = DEFAULT_PREFS): UiPr
 		// Helvetica Neue was the default before Arial; a saved 'helvetica' is the old default, not a choice.
 		typeface: oneOf(r.typeface === 'helvetica' ? 'arial' : r.typeface, TYPEFACES, base.typeface),
 		monoface: oneOf(r.monoface, TYPEFACES, base.monoface),
-		motion: oneOf(r.motion, ['full', 'subtle', 'off'] as const, base.motion),
+		// Animations are off by default from version 3: a look saved before it held the old default.
+		motion: typeof r.looks === 'number' && r.looks >= 3 ? oneOf(r.motion, ['full', 'subtle', 'off'] as const, base.motion) : base.motion,
 		speed: oneOf(r.speed, SPEEDS, base.speed),
 		folded: Array.isArray(r.folded)
 			? [...new Set((r.folded as unknown[]).filter((x): x is string => typeof x === 'string' && ID.test(x)))].slice(0, 200)
@@ -333,7 +335,7 @@ export function sanitizePrefs(raw: unknown, base: UiPrefs = DEFAULT_PREFS): UiPr
 		board: BOARD,
 		step: oneOf(r.step, [0, 1, 2, 3] as const, base.step),
 		quizOpen: typeof r.quizOpen === 'boolean' ? r.quizOpen : base.quizOpen,
-		looks: 2
+		looks: 3
 	};
 }
 
