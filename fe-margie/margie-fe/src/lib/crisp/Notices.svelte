@@ -2,9 +2,10 @@
 	/**
 	 * Notices, in the top bar instead of on the page: a bell with a count of what needs
 	 * attention (what blocks a run, a run that failed or was stopped) and a short list with
-	 * a link to each fix; beside it, the latest message for a few seconds. The bell keeps the
-	 * recent messages too. Clear all (or an item's ×) dismisses them; a dismissed notice stays
-	 * away until it changes (a new failed run, another value), even after a reload.
+	 * a link to each fix; beside it, the latest message for a few seconds, which a click opens in
+	 * full until it is closed. The bell keeps the recent messages too, each opening to its full
+	 * text on a click. Clear all (or an item's ×) dismisses them; a dismissed notice stays away
+	 * until it changes (a new failed run, another value), even after a reload.
 	 */
 	import { ArrowRight, Bell, X } from 'lucide-svelte';
 	import { fade, fly } from 'svelte/transition';
@@ -14,6 +15,10 @@
 	import { ui, type Toast } from '$lib/workspace/ui.svelte';
 
 	let open = $state(false);
+	/** The bar's message opened in full, and the list's items opened to their full text. */
+	let full = $state<Toast | null>(null);
+	let wide = $state<string[]>([]);
+	const toggle = (key: string) => (wide = wide.includes(key) ? wide.filter((k) => k !== key) : [...wide, key]);
 
 	// ------------------------------------------------ dismissed notices (kept in this browser)
 	const DISMISSED = 'margie.notices.dismissed';
@@ -70,13 +75,27 @@
 	}
 </script>
 
-<svelte:window onkeydown={(e) => e.key === 'Escape' && (open = false)} />
+<svelte:window
+	onkeydown={(e) => {
+		if (e.key !== 'Escape') return;
+		open = false;
+		full = null;
+	}}
+/>
 
-{#if live}
-	{#key live.id}
-		<button type="button" class="flash {live.tone}" aria-live="polite" title="{live.text} (click to close)" transition:fade={{ duration: ui.ms(150) }} onclick={() => (ui.toasts = ui.toasts.filter((t) => t.id !== live.id))}>{live.text}</button>
-	{/key}
-{/if}
+<span class="flash-wrap">
+	{#if live}
+		{#key live.id}
+			<button type="button" class="flash {live.tone}" aria-live="polite" aria-expanded={full?.id === live.id} title="Click to read it all" transition:fade={{ duration: ui.ms(150) }} onclick={() => (full = full?.id === live.id ? null : live)}>{live.text}</button>
+		{/key}
+	{/if}
+	{#if full}
+		<div class="full {full.tone}" role="status" transition:fly={{ y: -6, duration: ui.ms(140) }}>
+			<p>{full.text}</p>
+			<button type="button" class="x" aria-label="Close" title="Close" onclick={() => (full = null)}><X size={12} /></button>
+		</div>
+	{/if}
+</span>
 
 <span class="relative">
 	<button
@@ -108,7 +127,7 @@
 					{#each blocking as b (b.id)}
 						<li class={b.tone}>
 							<span class="dot" aria-hidden="true"></span>
-							<span class="t">{b.text}</span>
+							<button type="button" class="t" class:wide={wide.includes(b.key)} aria-expanded={wide.includes(b.key)} onclick={() => toggle(b.key)}>{b.text}</button>
 							<a href={b.href} onclick={() => (open = false)}>Fix <ArrowRight size={13} /></a>
 							<button type="button" class="x" aria-label="Dismiss" title="Dismiss" onclick={() => dismiss(b.key)}><X size={12} /></button>
 						</li>
@@ -120,7 +139,7 @@
 				<ul>
 					<li class={lastBad.status === 'failed' ? 'danger' : 'warn'}>
 						<span class="dot" aria-hidden="true"></span>
-						<span class="t" title={lastBad.reason}>{lastBad.status === 'failed' ? 'Failed' : 'Stopped'} {ago(lastBad.started)}{lastBad.reason ? `: ${lastBad.reason}` : ''}</span>
+						<button type="button" class="t" class:wide={wide.includes('last')} aria-expanded={wide.includes('last')} onclick={() => toggle('last')}>{lastBad.status === 'failed' ? 'Failed' : 'Stopped'} {ago(lastBad.started)}{lastBad.reason ? `: ${lastBad.reason}` : ''}</button>
 						<a href={uiBase.to(`/jobs?job=${encodeURIComponent(lastBad.id)}`)} onclick={() => (open = false)}>Open <ArrowRight size={13} /></a>
 						<button type="button" class="x" aria-label="Dismiss" title="Dismiss" onclick={() => lastBad && dismiss(`run:${lastBad.id}:${lastBad.status}`)}><X size={12} /></button>
 					</li>
@@ -132,7 +151,7 @@
 					{#each recent as m (m.id)}
 						<li class={m.tone === 'error' ? 'danger' : m.tone === 'ok' ? 'ok' : 'info'}>
 							<span class="dot" aria-hidden="true"></span>
-							<span class="t">{m.text}</span>
+							<button type="button" class="t" class:wide={wide.includes(`m${m.id}`)} aria-expanded={wide.includes(`m${m.id}`)} onclick={() => toggle(`m${m.id}`)}>{m.text}</button>
 							<span class="when">{ago(new Date(m.at).toISOString())}</span>
 							<button type="button" class="x" aria-label="Dismiss" title="Dismiss" onclick={() => (recent = recent.filter((x) => x.id !== m.id))}><X size={12} /></button>
 						</li>
@@ -225,6 +244,41 @@
 		background: color-mix(in oklab, var(--mg-danger) 16%, var(--mg-surface));
 		color: var(--mg-danger);
 	}
+	/* The bar's message in full, under it until closed. */
+	.flash-wrap {
+		position: relative;
+		display: inline-flex;
+	}
+	.full {
+		position: absolute;
+		top: calc(100% + 8px);
+		right: 0;
+		z-index: 50;
+		display: flex;
+		align-items: flex-start;
+		gap: 8px;
+		width: min(420px, 90vw);
+		padding: 10px 10px 10px 14px;
+		border: 1px solid var(--mg-border);
+		border-left: 3px solid var(--mg-accent);
+		border-radius: var(--mg-r);
+		background: var(--mg-surface);
+		box-shadow: 0 10px 30px rgb(0 0 0 / 0.16);
+		color: var(--mg-text);
+		font-size: var(--mg-fs-sm);
+		line-height: 1.5;
+	}
+	.full.ok {
+		border-left-color: var(--mg-ok);
+	}
+	.full.error {
+		border-left-color: var(--mg-danger);
+	}
+	.full p {
+		flex: 1;
+		margin: 0;
+		overflow-wrap: anywhere;
+	}
 	.panel {
 		position: absolute;
 		top: calc(100% + 8px);
@@ -290,12 +344,28 @@
 	li.ok .dot {
 		background: var(--mg-ok);
 	}
+	/* An item's text on one line; a click opens it to its full text. */
 	.t {
 		flex: 1;
 		min-width: 0;
+		padding: 0;
+		border: none;
+		background: none;
+		color: inherit;
+		font: inherit;
+		text-align: left;
 		overflow: hidden;
 		text-overflow: ellipsis;
 		white-space: nowrap;
+		cursor: pointer;
+	}
+	.t.wide {
+		overflow: visible;
+		white-space: normal;
+		overflow-wrap: anywhere;
+	}
+	li:has(.t.wide) {
+		align-items: flex-start;
 	}
 	li a {
 		display: inline-flex;
