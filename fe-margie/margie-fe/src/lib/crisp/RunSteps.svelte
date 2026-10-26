@@ -109,8 +109,8 @@
 		pgap: 'NCBI PGAP models',
 		interpro: 'Member databases',
 		dbcan: 'CAZymes',
-		merops: 'Peptidases; not used in scoring',
-		tcdb: 'Transporters; not used in scoring',
+		merops: 'Peptidases',
+		tcdb: 'Transporters',
 		deepsig: 'Signal peptides',
 		signalp6: 'Signal peptides, v6',
 		psortb: 'Cell location',
@@ -324,8 +324,8 @@
 					transporter calls, and need their licence terms accepted. KEGG uses only the public KOfam data. Gene calling, operons,
 					consolidation, labeling, fingerprints and scoring are part of every run.
 				{:else}
-					Recommended runs the phase 4 tools, which the envelope stage and scoring read. MEROPS and TCDB are not used in scoring but add
-					peptidase and transporter calls. Tools with licence terms (MEROPS, Phobius, SignalP and others) stay off until you accept their
+					Recommended runs the phase 4 tools, which the envelope stage and scoring read. MEROPS and TCDB add peptidase and
+					transporter calls. Tools with licence terms (MEROPS, Phobius, SignalP and others) stay off until you accept their
 					terms; add them yourself. KEGG uses only the public KOfam data. Gene calling, operons, consolidation, labeling, fingerprints and
 					scoring are part of every run.
 				{/if}
