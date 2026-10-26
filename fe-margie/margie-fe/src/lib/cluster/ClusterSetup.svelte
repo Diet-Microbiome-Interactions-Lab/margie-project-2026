@@ -152,6 +152,8 @@
 		source: 'settings' | 'lab' | 'yours' | null;
 		clone_to: string;
 		url: string;
+		/** This server has its own copy of margie-build to put on the cluster. */
+		bundled?: boolean;
 	}
 	let recipes = $state<Recipes | null>(null);
 	let recipesUrl = $state('');
@@ -165,11 +167,11 @@
 			})
 			.catch(() => (recipes = null));
 	});
-	/** Clones margie-build on the cluster from the given URL. */
-	async function cloneRecipes() {
+	/** Clones margie-build on the cluster from the given URL, or puts the server's own copy there (`bundled`). */
+	async function cloneRecipes(bundled = false) {
 		cloning = true;
 		try {
-			recipes = await call<Recipes>('POST', '/v1/ssh/assets/build-recipes', { url: recipesUrl, build_password: buildPass });
+			recipes = await call<Recipes>('POST', '/v1/ssh/assets/build-recipes', bundled ? { bundled: true, build_password: buildPass } : { url: recipesUrl, build_password: buildPass });
 			forget('config');
 			ui.notify(`margie-build is in ${recipes.path}.`, 'ok');
 		} catch (e) {
@@ -316,11 +318,21 @@
 				<div class="assets-recipes">
 					{#if recipes.path}
 						<span>Build recipes: <span class="mg-mono">{recipes.path}</span> <span class="mg-note">({WHERE[recipes.source ?? ''] ?? ''})</span></span>
+					{:else if recipes.bundled}
+						<!-- MARGIE has her own copy: one click puts it in the home folder, and a build does so on its own. -->
+						<span>Build recipes (margie-build) are not on the cluster. MARGIE puts her copy in <span class="mg-mono">{recipes.clone_to}</span> to build what cannot be copied:</span>
+						{#if buildPass}
+							<button type="button" class="mg-btn small" disabled={cloning} onclick={() => cloneRecipes(true)}>
+								{cloning ? 'Putting it there…' : 'Set up margie-build'}
+							</button>
+						{:else}
+							<button type="button" class="mg-btn small" onclick={() => (askingPass = true)}>Set up margie-build (needs the build password)</button>
+						{/if}
 					{:else}
 						<span>Build recipes (margie-build) are not on the cluster. Clone them into <span class="mg-mono">{recipes.clone_to}</span> to build what cannot be copied:</span>
 						<input class="mg-input mg-mono" aria-label="margie-build repository" bind:value={recipesUrl} />
 						{#if buildPass}
-							<button type="button" class="mg-btn small" disabled={cloning || !recipesUrl.trim()} onclick={cloneRecipes}>
+							<button type="button" class="mg-btn small" disabled={cloning || !recipesUrl.trim()} onclick={() => cloneRecipes()}>
 								{cloning ? 'Cloning…' : 'Clone'}
 							</button>
 						{:else}

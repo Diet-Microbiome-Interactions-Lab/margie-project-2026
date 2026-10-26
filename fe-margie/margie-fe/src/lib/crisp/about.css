@@ -204,11 +204,11 @@
 		--rp-pre: #f8f8f8;
 		--rp-paper: #ffffff;
 		--rp-lit: #e74c3c;
-		--rp-body: calc(var(--mg-fs) * 1.15);
-		--rp-small: calc(var(--mg-fs) * 1.02);
-		--rp-h1: calc(var(--rp-body) * 1.95);
-		--rp-h2: calc(var(--rp-body) * 1.5);
-		--rp-h3: calc(var(--rp-body) * 1.2);
+		--rp-body: var(--mg-fs);
+		--rp-small: calc(var(--mg-fs) * 0.92);
+		--rp-h1: calc(var(--rp-body) * 1.75);
+		--rp-h2: calc(var(--rp-body) * 1.35);
+		--rp-h3: calc(var(--rp-body) * 1.12);
 		--rp-head-font: 'MARGIE Roboto Slab', 'Roboto Slab', Georgia, serif;
 		/* Names the page parts share. */
 		--rp-ink: var(--rp-link);

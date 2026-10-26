@@ -3,6 +3,8 @@
 	import { api, formatBytes } from '$lib/api';
 	import { ui } from '$lib/workspace/ui.svelte';
 	import CodeBlock from './CodeBlock.svelte';
+	import CodeUnlock from './CodeUnlock.svelte';
+	import { isCodeLocked } from '$lib/cluster/code-key';
 
 	/**
 	 * One script on the Code page, as the FAQ's code previews are: a toggle with the file's kind, name,
@@ -33,12 +35,16 @@
 
 	let source = $state<Source | null>(null);
 	let error = $state('');
+	/** The server keeps the code behind its password, and this visit has not given it yet. */
+	let locked = $state(false);
+	let tries = $state(0);
 
 	$effect(() => {
-		if (!open || source || error) return;
+		void tries;
+		if (!open || source || error || locked) return;
 		api<Source>(`/code/file?path=${encodeURIComponent(file.path)}`).then(
 			(r) => (source = r),
-			(e) => (error = e?.message ?? `${file.name} could not be read here.`)
+			(e) => (isCodeLocked(e) ? (locked = true) : (error = e?.message ?? `${file.name} could not be read here.`))
 		);
 	});
 
@@ -84,6 +90,8 @@
 				<div data-copy>
 					<CodeBlock text={source.text} label="{file.name}, {source.lines} lines" maxHeight="70vh" />
 				</div>
+			{:else if locked}
+				<CodeUnlock onopen={() => ((locked = false), tries++)} />
 			{:else if error}
 				<p class="cf-note">{error} <a class="mg-link" href={BLOB + file.path} target="_blank" rel="noreferrer">{file.path} on GitHub</a>.</p>
 			{:else}

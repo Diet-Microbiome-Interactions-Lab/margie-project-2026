@@ -143,6 +143,20 @@ export interface SetupRow {
 	href?: string;
 }
 
+/** First-time setup on a cluster (GET /setup): the working folder and the folders a run uses. */
+export interface FirstSetup {
+	configured: boolean;
+	/** As set; '' before the first setup. */
+	working_folder: string;
+	/** The one MARGIE suggests: margie in the account's scratch. */
+	default: string;
+	folders: { input: string; output: string; databases: string; containers: string; references: string };
+	/** The group's containers and reference databases, and whether this account reads them. */
+	group: Record<'sif_path' | 'db_root', { path: string; readable: boolean }>;
+	/** Where margie-build was found ('' when nowhere yet), where Install would put it, and whether this server has a copy. */
+	build: { path: string; source: string; clone_to: string; bundled?: boolean };
+}
+
 export interface Setting {
 	key: string;
 	label: string;
@@ -152,6 +166,8 @@ export interface Setting {
 	choices?: string[];
 	value: string;
 	default: string;
+	/** Shown in the empty field in place of the default (a folder of this account's own). */
+	placeholder?: string;
 	overridden: boolean;
 }
 
@@ -243,6 +259,8 @@ class Workspace {
 	settings = $state<Setting[]>([]);
 	/** The cluster has no config.yaml yet (Settings offers to write the default one). */
 	configMissing = $state(false);
+	/** First-time setup on a cluster; null until read. */
+	firstSetup = $state<FirstSetup | null>(null);
 	loaded = $state(false);
 	/** The genome list has been read once (pages show what they have without waiting on the rest). */
 	genomesRead = $state(false);
@@ -436,7 +454,7 @@ class Workspace {
 	});
 
 	async loadAll() {
-		await Promise.allSettled([this.loadGenomes(), this.loadTools(), this.loadOverview(), this.loadRuns(), this.loadResults(), this.loadSettings()]);
+		await Promise.allSettled([this.loadGenomes(), this.loadTools(), this.loadOverview(), this.loadRuns(), this.loadResults(), this.loadSettings(), this.loadSetup()]);
 		this.loaded = true;
 		this.loadCheck();
 	}
@@ -486,6 +504,34 @@ class Workspace {
 		const d = await api<{ settings: Setting[]; configMissing?: boolean }>('/settings');
 		this.settings = d.settings;
 		this.configMissing = !!d.configMissing;
+	}
+
+	/** Reads the working folder and the folders a run uses (on a cluster). */
+	async loadSetup() {
+		if (!backend.cluster) return;
+		try {
+			this.firstSetup = await api<FirstSetup>('/setup');
+		} catch {
+			// Read again when Analyze or Settings opens.
+		}
+	}
+
+	/**
+	 * Sets the working folder (`path`, else the suggested one): margie-input, margie-output and
+	 * margie-databases go in it, with sif and db where the group's cannot be read. Then reads
+	 * everything that depends on it again.
+	 */
+	async setWorkingFolder(path = '') {
+		try {
+			this.firstSetup = await post<FirstSetup>('/setup/working-folder', { path });
+			await this.loadSettings();
+			await Promise.allSettled([this.loadOverview(), this.loadTools(), this.loadGenomes()]);
+			ui.notify(`Working folder set: ${this.firstSetup.working_folder}`, 'ok');
+			return true;
+		} catch (e) {
+			ui.notify(message(e), 'error');
+			return false;
+		}
 	}
 
 	/** Writes the default config.yaml on the cluster, then reads everything that depends on it again. */
@@ -1068,7 +1114,7 @@ class Workspace {
 			this.settings = d.settings;
 			this.configMissing = !!d.configMissing;
 			// The databases' status follows the folders (a new working folder has none set up yet).
-			await Promise.allSettled([this.loadOverview(), this.loadTools(), this.loadGenomes(), ...(this.stores ? [this.loadStores()] : [])]);
+			await Promise.allSettled([this.loadOverview(), this.loadTools(), this.loadGenomes(), ...(this.stores ? [this.loadStores()] : []), ...(this.firstSetup ? [this.loadSetup()] : [])]);
 			return true;
 		} catch (e) {
 			ui.notify(message(e), 'error');

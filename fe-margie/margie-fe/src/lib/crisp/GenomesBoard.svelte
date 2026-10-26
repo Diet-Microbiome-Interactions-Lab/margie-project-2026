@@ -10,12 +10,14 @@
 	import FoldToggle from '$lib/workspace/motion/FoldToggle.svelte';
 	import Resizer from '$lib/workspace/motion/Resizer.svelte';
 	import FolderField from './FolderField.svelte';
+	import WorkingFolderSetup from './WorkingFolderSetup.svelte';
 
 	/**
-	 * Genomes, on Analyze, as Install's boxes: the folders a run uses (the genomes', the results', and on
-	 * a cluster the working folder and the databases'; the same settings Settings shows) and the genome
-	 * table (GenomesPanel), folded until opened. FASTA files dropped anywhere on the box are added; an
-	 * empty folder shows a large place to drop them.
+	 * Genomes, on Analyze, as Install's boxes: the folders a run uses (on a cluster the working folder
+	 * first, then the genomes', the results', the databases' and the tools'; the same settings Settings
+	 * shows) and the genome table (GenomesPanel), folded until opened. On a cluster with no working
+	 * folder yet, the box opens on its setup (WorkingFolderSetup). FASTA files dropped anywhere on the
+	 * box are added; an empty folder shows a large place to drop them.
 	 */
 	let { foldId }: { foldId: string } = $props();
 	const described = $derived(ws.genomes.filter((g) => g.domain && g.domain !== 'Unknown' && g.genetic_code).length);
@@ -28,8 +30,13 @@
 	let dragging = $state(0);
 	let adding = $state(false);
 
+	/** On a cluster, the working folder comes first: the genomes, results and databases folders go in it. */
+	const needsWorking = $derived(backend.cluster && (ws.configMissing || (!!ws.firstSetup && !ws.firstSetup.working_folder)));
+	$effect(() => {
+		if (needsWorking && ui.isFolded(foldId, true)) ui.toggleFold(foldId, true);
+	});
 	/** On the cluster, files go into its genomes folder, so there must be one. */
-	const canAdd = $derived(!backend.cluster || !!ws.genomeFolder);
+	const canAdd = $derived(!backend.cluster || (!needsWorking && !!ws.genomeFolder));
 
 	// ------------------------------------------------ the folders a run uses
 	const folder = $derived(ws.genomeFolder || ws.setting('USER_INPUT_DIR'));
@@ -38,6 +45,10 @@
 	/** The databases folder: as set, or margie-databases in the working folder. */
 	const stores = $derived(ws.setting('margie_sb.stores_root'));
 	const storesShown = $derived(stores || (working ? `${working.replace(/\/+$/, '')}/margie-databases` : ''));
+	const containers = $derived(ws.setting('margie_sb.sif_path'));
+	const references = $derived(ws.setting('margie_sb.db_root'));
+	/** A folder in the working folder, as it would be named there. */
+	const inWorking = (name: string) => (working ? `${working.replace(/\/+$/, '')}/${name}` : `/scratch/cluster/you/margie/${name}`);
 	/** The folders' last names for the one-line summary; the whole path shows on hover. */
 	const last = (p: string) => p.replace(/\/+$/, '').split('/').pop() || p;
 	/** The folder fields: closed under the folders' line, open while no genomes folder is set. */
@@ -47,6 +58,7 @@
 	/** The head's one line: how many genomes, how many are chosen, and who calls their genes. */
 	const summary = $derived.by(() => {
 		const n = ws.genomes.length;
+		if (needsWorking) return 'set up the working folder first';
 		if (!n) return folder ? 'none in the folder yet' : 'set the genomes folder first';
 		const parts = [`${n} genome${n === 1 ? '' : 's'}`];
 		const chosen = ws.selectedGenomes.length;
@@ -98,30 +110,38 @@
 
 	<Fold id={foldId} closed>
 		<div class="gb-body">
+			{#if needsWorking}
+				<WorkingFolderSetup />
+			{:else}
 			<!-- Where genomes come from and results go: one line, the fields behind Change folders. -->
 			<div class="gb-where">
 				<span>
-					From <b class="mg-mono" title={folder}>{folder ? last(folder) : 'no folder yet'}</b> | results to
-					<b class="mg-mono" title={output}>{output ? last(output) : 'your home folder'}</b>{#if backend.cluster}{' | '}working folder
-						<b class="mg-mono" title={working}>{working ? last(working) : 'margie'}</b>{' | '}databases in
+					{#if backend.cluster}Working folder <b class="mg-mono" title={working}>{working ? last(working) : 'margie'}</b>{' | '}genomes from{:else}From{/if}
+					<b class="mg-mono" title={folder}>{folder ? last(folder) : 'no folder yet'}</b> | results to
+					<b class="mg-mono" title={output}>{output ? last(output) : 'your home folder'}</b>{#if backend.cluster}{' | '}databases in
 						<b class="mg-mono" title={storesShown}>{storesShown ? last(storesShown) : 'margie-databases'}</b>{/if}
 				</span>
 				{#if folder}<button type="button" class="mg-link quiet" aria-expanded={foldersOpen} onclick={() => (foldersOpen = !foldersOpen)}>{foldersOpen ? 'Done' : 'Change folders'}</button>{/if}
 			</div>
 			{#if showFolders}
 				<div class="gb-folders">
-					<FolderField label="Genomes folder" key="USER_INPUT_DIR" value={folder} placeholder="/path/to/genomes" />
-					<FolderField label="Results folder" key="OUTPUT_ROOT" value={output} placeholder="/path/to/results" />
 					{#if backend.cluster}
 						<FolderField label="MARGIE working folder" key="margie_sb.working_folder" value={working} placeholder="/scratch/cluster/you/margie">
 							{#snippet help()}
 								<p>
-									MARGIE's own folder on the cluster. The folders left empty go in it: margie-databases (MARGIE's databases), margie-input
-									(genomes) and margie-output (results). A new path here points the next runs at those in the new folder; the old folder keeps
-									its files.
+									MARGIE's own folder on the cluster. margie-input (genomes), margie-output (results) and margie-databases (MARGIE's
+									databases) go in it, and sif and reference-databases/db when your account cannot read your group's containers and reference databases.
+								</p>
+								<p>
+									A new path here moves the folders that sit in the working folder with it; a folder you set yourself stays where it is. The
+									containers and reference databases stay where they are set up, and files stay in the old folder.
 								</p>
 							{/snippet}
 						</FolderField>
+					{/if}
+					<FolderField label="Genomes folder" key="USER_INPUT_DIR" value={folder} placeholder={backend.cluster ? inWorking('margie-input') : '/path/to/genomes'} />
+					<FolderField label="Results folder" key="OUTPUT_ROOT" value={output} placeholder={backend.cluster ? inWorking('margie-output') : '/path/to/results'} />
+					{#if backend.cluster}
 						<FolderField
 							label="MARGIE databases"
 							key="margie_sb.stores_root"
@@ -148,12 +168,33 @@
 								</p>
 							{/snippet}
 						</FolderField>
+						<FolderField label="Containers folder (sif)" key="margie_sb.sif_path" value={containers} placeholder={inWorking('sif')}>
+							{#snippet help()}
+								<p>
+									The Apptainer containers (.sif) the tools run in. MARGIE uses your group's containers folder when your account can read it,
+									else sif in the working folder, where <a class="mg-link" href={uiBase.to('/install')}>Install</a> builds or copies them.
+								</p>
+							{/snippet}
+						</FolderField>
+						<FolderField label="Reference databases folder" key="margie_sb.db_root" value={references} placeholder={inWorking('reference-databases/db')}>
+							{#snippet help()}
+								<p>
+									The reference databases the annotation tools search (Pfam, KEGG, COG, eggNOG, InterPro, GTDB-Tk's and the others), one
+									folder per tool. MARGIE uses your group's when your account can read them, else reference-databases/db in the working folder, where
+									<a class="mg-link" href={uiBase.to('/install')}>Install</a> downloads them.
+								</p>
+								<p>
+									They take many hours to set up. Once they are, back them up, ideally in your group's shared space where the whole group can
+									use them, and point this setting there. These are not MARGIE's own databases (margie-databases), which grow with your runs.
+								</p>
+							{/snippet}
+						</FolderField>
 					{/if}
 				</div>
 				<p class="gb-note mg-explain">
-					Genomes are read from the first folder and results written to the second.{backend.cluster
-						? " The working folder holds MARGIE's own folders, and the databases folder the databases MARGIE builds from your runs (left empty: margie-databases in the working folder); each ? says more."
-						: ''}
+					{backend.cluster
+						? "The working folder holds the genomes, results and MARGIE's databases folders unless you point them elsewhere; the containers and reference databases are the tools'. Each ? says more."
+						: 'Genomes are read from the first folder and results written to the second.'}
 				</p>
 			{/if}
 
@@ -193,6 +234,7 @@
 						<Upload size={20} /><b>Drop genome FASTA files here</b><span>or <u>select them</u> | .fna, .fa, .fasta{target ? ` | copied${target}` : ''}</span>
 					{/if}
 				</button>
+			{/if}
 			{/if}
 		</div>
 	</Fold>

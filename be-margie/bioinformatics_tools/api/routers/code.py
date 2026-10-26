@@ -2,19 +2,48 @@
 
 The files are read from this server's installed copy of workflow_tools, the code a run executes,
 so the pages show each script as it stands. Routes: GET / (the steps and their files),
-GET /file?path=<path under workflow_tools> (one file's text), GET /snippet?path=&symbol= (one
-function, class, constant or Snakemake rule of a file, with its line numbers, for the FAQ).
+POST /file {path} (one file's text), POST /snippet {path, symbol} (one function, class, constant
+or Snakemake rule of a file, with its line numbers, for the FAQ), and POST /unlock {password}.
+
+Where the server names a code password (MARGIE_CODE_PASSWORD_SHA256, its SHA-256, a secret on the
+server and not in this repository), the text of a file or snippet comes only with that password
+in the request body; unset, the code is open.
 """
 import ast
 import hashlib
+import hmac
+import os
 import re
+import time
 from pathlib import Path
 
-from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi import APIRouter, Body, Depends, HTTPException, Query
 
 from bioinformatics_tools.api.auth import get_current_user
 
 router = APIRouter(prefix="/v1/code", tags=["code"])
+
+CODE_ENV = "MARGIE_CODE_PASSWORD_SHA256"
+# Answers that name the lock, so the pages ask for the password.
+LOCKED = "code-locked: the code is shown with its password."
+
+
+def code_open(password: str | None) -> bool:
+    """Whether password opens the code (compared in constant time); True when none is set."""
+    expected = (os.getenv(CODE_ENV) or "").strip().lower()
+    if not expected:
+        return True
+    given = hashlib.sha256((password or "").strip().encode("utf-8")).hexdigest()
+    return hmac.compare_digest(given, expected)
+
+
+def _check(password: str | None) -> None:
+    """Refuses the code without its password, a second after a wrong one."""
+    if code_open(password):
+        return
+    if password:
+        time.sleep(1)
+    raise HTTPException(status_code=403, detail=LOCKED)
 
 WORKFLOW_TOOLS = Path(__file__).resolve().parents[2] / "workflow_tools"
 
@@ -217,8 +246,29 @@ def list_code(current_user: dict = Depends(get_current_user)):
     return {"steps": steps}
 
 
+@router.post("/unlock")
+def unlock(password: str = Body("", embed=True, max_length=200), current_user: dict = Depends(get_current_user)):
+    """Whether the password opens the code (403 when it does not)."""
+    _check(password)
+    return {"open": True}
+
+
 @router.get("/file")
-def read_code(path: str = Query(..., max_length=200), current_user: dict = Depends(get_current_user)):
+def read_code_get(path: str = Query(..., max_length=200), current_user: dict = Depends(get_current_user)):
+    """One listed script's text, while no code password is set (else POST /file)."""
+    _check(None)
+    return _file(path)
+
+
+@router.post("/file")
+def read_code(path: str = Body(..., embed=True, max_length=200), password: str = Body("", embed=True, max_length=200),
+              current_user: dict = Depends(get_current_user)):
+    """One listed script's text, as installed, with its SHA-256."""
+    _check(password)
+    return _file(path)
+
+
+def _file(path: str) -> dict:
     """One listed script's text, as installed, with its SHA-256."""
     text = _read(path)
     return {"path": path, "name": Path(path).name, "text": text, "lines": len(text.splitlines()),
@@ -226,8 +276,22 @@ def read_code(path: str = Query(..., max_length=200), current_user: dict = Depen
 
 
 @router.get("/snippet")
-def read_snippet(path: str = Query(..., max_length=200), symbol: str = Query(..., max_length=120),
-                 current_user: dict = Depends(get_current_user)):
+def read_snippet_get(path: str = Query(..., max_length=200), symbol: str = Query(..., max_length=120),
+                     current_user: dict = Depends(get_current_user)):
+    """One quoted function, class, constant or rule, while no code password is set (else POST /snippet)."""
+    _check(None)
+    return _snippet(path, symbol)
+
+
+@router.post("/snippet")
+def read_snippet(path: str = Body(..., embed=True, max_length=200), symbol: str = Body(..., embed=True, max_length=120),
+                 password: str = Body("", embed=True, max_length=200), current_user: dict = Depends(get_current_user)):
+    """One function, class, constant or rule of a quoted file, as installed, with its line numbers."""
+    _check(password)
+    return _snippet(path, symbol)
+
+
+def _snippet(path: str, symbol: str) -> dict:
     """One function, class, constant or rule of a quoted file, as installed, with its line numbers."""
     if path not in SNIPPET_FILES:
         raise HTTPException(status_code=404, detail="That file is not one the FAQ quotes.")

@@ -61,3 +61,6 @@ MANIFEST
 secret.yaml
 secrets.yaml
 *-secret.yaml
+
+# margie-build for the hosted image, added only when the image is built (private)
+margie-build-bundle/
