@@ -39,7 +39,7 @@ export const FAQS: Faq[] = [
 		"group": "Running MARGIE",
 		"q": "How does MARGIE connect with the HPC?",
 		"a": [
-			"<p>MARGIE runs on the cluster as you. You sign in to the site with your own cluster account, and a run starts the pipeline under that account, so it uses your own SLURM account and storage, under the same rules as any job you submit yourself.</p>",
+			"<p>MARGIE runs on the cluster as you. You sign in to the site with your own cluster account, and a run starts the pipeline under that account, so the run uses your own SLURM account and storage, under the same rules as any job you submit yourself.</p>",
 			"<p>The pipeline is a Snakemake workflow. Snakemake works out which steps each genome needs from the files each step reads and writes, and its SLURM executor plugin submits each step as its own SLURM job, with the threads, memory and run time set for that tool on Settings. A step starts once its input files exist; when one fails, only the steps that depend on it stop, and the rest of the run goes on. GTDB-Tk asks for a large-memory node, and RASTtk sends one genome at a time to the BV-BRC annotation service.</p>",
 			"<p>Each annotation tool runs inside its own Apptainer container, which holds the tool at a recorded version and reads its reference database from your database folder. MARGIE's own steps, from consolidation to the fingerprint databases, are Python scripts that run as jobs beside them.</p>",
 			"<p>Results, the MARGIE database and the shared operon and fingerprint databases stay in your own storage on the cluster; the site reads them from there for Jobs, Results and Files. Jobs also shows the command that ran, so the same run can be started again from a cluster shell.</p>",
@@ -191,12 +191,11 @@ export const FAQS: Faq[] = [
 		"q": "Why does licensing matter?",
 		"a": [
 			"<p>MARGIE runs third-party tools and databases, each under its own licence, and some of these licences limit who may use a tool or whether it may be passed on. The licence catalog puts each tool in a tier: <b>blocked</b> (academic use only, distributed by the provider alone) | <b>commercial_restricted</b> (free for academic or non-profit use, permission needed for commercial use) | <b>verify</b> | <b>attribution</b> | <b>permissive</b>. The first two tiers gate a run; the others carry citation or licence duties.</p>",
-			"<p>Before a first run, a user reads the terms and each tool's licence details, accepts them, says whether their use is academic or commercial, and names the licence-required tools they hold a licence for. Phobius | SignalP 4.x | SignalP 6.0 | the MEROPS database are blocked: their licences let only the provider distribute them, so a user obtains them from the provider. MARGIE runs them for a user who holds that licence and disables them for the run otherwise. For commercial use, TMbed's ProtT5 weights (CC-BY-NC-SA 4.0) | TCDB | the full KEGG database also need the user's own licence; MARGIE uses the public KOfam subset of KEGG.</p>",
+			"<p>Before a first run, a user reads the terms and each tool's licence details, accepts them, says whether their use is academic or commercial, and names the licence-required tools they hold a licence for. Phobius | SignalP 6.0 | the MEROPS database are blocked: their licences let only the provider distribute them, so a user obtains them from the provider. MARGIE runs them for a user who holds that licence and disables them for the run otherwise. For commercial use, TMbed's ProtT5 weights (CC-BY-NC-SA 4.0) | TCDB | the full KEGG database also need the user's own licence; she uses the public KOfam subset of KEGG.</p>",
 			"<p>The terms ask users to cite MARGIE and the authors of each tool whose output they use, and offer eggNOG-mapper's source as its AGPL-3.0 licence requires. On the command line MARGIE saves the acceptance with the terms version, a SHA-256 hash of the terms and a copy of the catalog as shown, asks again when the terms change, and stops a non-interactive run that lacks a saved acceptance. Each tool's citation is on <a href=\"/contributors#cite-with\">Contributors</a>.</p>"
 		],
 		"refs": [
 			"kall2004",
-			"petersen2011",
 			"teufel2022",
 			"rawlings2018",
 			"bernhofer2022",
@@ -257,7 +256,7 @@ export const FAQS: Faq[] = [
 		"group": "Inside the pipeline",
 		"q": "How does MARGIE consolidate the results from the various phases, and which phases?",
 		"a": [
-			"<p>Consolidation is phase 9. It joins the per-gene result tables of phases 3 to 8 into one table per genome, one row per gene, keyed by feature id. The tables come from the gene caller (RASTtk, or Prodigal in RASTtk's columns), the phase 4 annotation tools, with InterPro split into its member databases (HAMAP | NCBIfam | CDD | PIRSF), UniOP's operons, the topology tools (Phobius | TMbed | SignalP 6) and the localisation tools (PSORTb | DeepSig | SignalP 4), which carry phase 7's envelope call as extra columns. QUAST and GTDB-Tk describe the whole genome, so they stay out; the domain comes from <code>genome_info.tsv</code>.</p>",
+			"<p>Consolidation is phase 9. It joins the per-gene result tables of phases 3 to 8 into one table per genome, one row per gene, keyed by feature id. The tables come from the gene caller (RASTtk, or Prodigal in RASTtk's columns), the phase 4 annotation tools, with InterPro split into its member databases (HAMAP | NCBIfam | CDD | PIRSF), UniOP's operons, the topology tools (Phobius | TMbed | SignalP 6) and the localisation tools (PSORTb | DeepSig), which carry phase 7's envelope call as extra columns. QUAST and GTDB-Tk describe the whole genome, so they stay out; the domain comes from <code>genome_info.tsv</code>.</p>",
 			"<p>Each tool's columns get the tool's prefix (<code>COG_</code>, <code>PFAM_</code> and so on), and the gene's coordinates, lengths and sequences come from the gene caller's row. When a tool reports several rows for one gene, they join into one cell as <code>key: value</code> pairs, keyed by accession for database hits or by start–end range for segment tools such as TMbed. A tool's columns are filled for the genes it hit and left empty for the rest, so each genome's table has the same shape. KEGG keeps only rows above KofamScan's threshold, and the merge stops when a tool's gene ids come from a different RASTtk submission.</p>",
 			"<p>The step writes <code>consolidated-merged-all-columns.tsv</code> (each column kept) and <code>consolidated-no-stat.tsv</code> (identity, ids, descriptions and core topology and localisation calls, with the statistics left out), with the detected columns and a manifest of the tables read. Both tables load into the MARGIE database, and labeling reads the merged one. The scripts are on <a href=\"/code?file=consolidation/merge-all-columns.py\">Code</a>.</p>"
 		],
@@ -275,7 +274,6 @@ export const FAQS: Faq[] = [
 			"teufel2022",
 			"yu2010",
 			"savojardo2018",
-			"petersen2011",
 			"aramaki2020",
 			"gurevich2013",
 			"chaumeil2022"
@@ -440,7 +438,7 @@ export const FAQS: Faq[] = [
 			"<p>Phase 7 infers one envelope type per genome, so that the localisation tools of phase 8 run with the right model. She reads the genome's TIGRFAM | PGAP | Pfam | UniProt results from phase 4 and looks in their descriptions and names for marker genes of each envelope architecture. Each hit counts towards the diderm or the monoderm side, a well-established marker more than a motif or a domain.</p>",
 			"<table><thead><tr><th>Side</th><th>Marker group</th><th>Published basis</th></tr></thead><tbody><tr><td>Diderm</td><td>β-barrel assembly</td><td>Hagan et al., 2011; Konovalova et al., 2017</td></tr><tr><td>Diderm</td><td>lipid A and LPS synthesis</td><td>Raetz et al., 2007</td></tr><tr><td>Diderm</td><td>LPS transport</td><td>Okuda et al., 2016; Sperandeo et al., 2017</td></tr><tr><td>Diderm</td><td>lipoprotein trafficking</td><td>Grabowicz, 2018</td></tr><tr><td>Diderm</td><td>outer-membrane proteins</td><td>Silhavy et al., 2010</td></tr><tr><td>Monoderm</td><td>wall teichoic acid</td><td>Brown et al., 2013</td></tr><tr><td>Monoderm</td><td>lipoteichoic acid</td><td>Percy &amp; Gründling, 2014</td></tr><tr><td>Monoderm</td><td>D-alanylation</td><td>Neuhaus &amp; Baddiley, 2003</td></tr><tr><td>Monoderm</td><td>sortase anchoring</td><td>Mazmanian et al., 1999; Spirig et al., 2011</td></tr><tr><td>Monoderm</td><td>mycolic acid (actinobacteria)</td><td>Marrakchi et al., 2014; Portevin et al., 2004</td></tr><tr><td>Monoderm</td><td>pili and surface layer</td><td>–</td></tr></tbody></table>",
 			"<p>The first rule that applies decides the type:</p><ol><li>A genome whose domain is Archaea (genome table or GTDB-Tk) is archaeal.</li><li>Several high-confidence markers of one side, with zero from the other, decide that side.</li><li>Otherwise the side with more weighted evidence wins.</li><li>A tie, or zero markers, gives the conservative default, diderm.</li></ol>",
-			"<ol><li>Evidence: marker hits from TIGRFAM | PGAP | Pfam | UniProt, and the genome's domain.</li><li>Rule: the steps above, in order.</li><li>Envelope type: one row in <code>envelope_summary.tsv</code> with the type, its basis and the evidence.</li><li>Localisation model: PSORTb runs with <code>-k n | p | a</code>, DeepSig with <code>-k GRAM- | GRAM+ | ARCH</code>, SignalP 4.1 with <code>-t gram- | gram+</code> (archaea as gram-); an unknown type takes the diderm model.</li><li>The three <code>ENVELOPE_</code> columns are added to each localisation table before loading, and consolidation carries them into each gene's row.</li></ol>",
+			"<ol><li>Evidence: marker hits from TIGRFAM | PGAP | Pfam | UniProt, and the genome's domain.</li><li>Rule: the steps above, in order.</li><li>Envelope type: one row in <code>envelope_summary.tsv</code> with the type, its basis and the evidence.</li><li>Localisation model: PSORTb runs with <code>-k n | p | a</code> and DeepSig with <code>-k GRAM- | GRAM+ | ARCH</code>; an unknown type takes the diderm model.</li><li>The three <code>ENVELOPE_</code> columns are added to each localisation table before loading, and consolidation carries them into each gene's row.</li></ol>",
 			"<p>Phobius | TMbed | SignalP 6 run with the same model for each genome, whatever its envelope. A genome with zero marker hits, such as a wall-less one, gets the diderm default with basis <code>default_no_evidence</code>, so its localisation calls can be read with that in mind.</p>"
 		],
 		"refs": [
@@ -466,7 +464,6 @@ export const FAQS: Faq[] = [
 			"chaumeil2022",
 			"yu2010",
 			"savojardo2018",
-			"petersen2011",
 			"kall2004",
 			"bernhofer2022",
 			"teufel2022"
@@ -710,7 +707,7 @@ export const FAQS: Faq[] = [
 			"<p>MARGIE gives each protein-coding gene's label a confidence from 0 to 1 in two stages. The first stage uses the gene's own evidence: how many independent sources give it an informative hit (C1), lowered only when the EC numbers from different tools conflict (C4). The second stage adds operon context: how likely the gene is to share an operon with its neighbours (C2, from UniOP), times how well its operon partnerships recur in other genomes (C3).</p>",
 			"<pre>preliminary = C1 × C4\ncontext     = C2 × C3   for a gene in an operon of two or more, else 0\nfinal       = clip(preliminary + context, 0, 1)</pre>",
 			"<p>Context only adds, so a gene outside an operon, or in an operon unique to its genome, keeps the score of its own evidence. The final score sets the tier: highest above 0.9 | high above 0.7 | medium above 0.5 | fair above 0.3 | low otherwise. A gene is flagged for review when its EC numbers conflict | its final score is below 0.5 | it sits in an operon with C2 below 0.5 | half or more of its operon's adjacent pairs involve an uncharacterised protein and context added 0. Scoring covers the protein-coding genes.</p>",
-			"<p>Beside the default, MARGIE writes a second final score and tier from the hybrid C3. Each part comes with its formula and reasoning in <b>FINAL_ANNOTATION_WITH_CONFIDENCE.tsv</b>. Per-gene confidence from cross-genome and gene-neighbourhood evidence has earlier forms (Yang et al., 2010; Jun et al., 2017); MARGIE reports the four parts separately. See <a href=\"/methods\">Methods</a> and <a href=\"/methods/scores\">Reading the scores</a>.</p>"
+			"<p>Beside the default, MARGIE writes a second final score and tier from the hybrid C3. Each part comes with its formula and reasoning in <b>FINAL_ANNOTATION_WITH_CONFIDENCE.tsv</b>. Per-gene confidence from cross-genome and gene-neighbourhood evidence has earlier forms (Yang et al., 2010; Jun et al., 2017); she reports the four parts separately. See <a href=\"/methods\">Methods</a> and <a href=\"/methods/scores\">Reading the scores</a>.</p>"
 		],
 		"refs": [
 			"yang2010",
@@ -782,7 +779,7 @@ export const FAQS: Faq[] = [
 		"group": "Scoring",
 		"q": "How does C3 work, in detail?",
 		"a": [
-			"<p>C3 asks whether a gene's operon partnerships recur in other genomes. MARGIE keeps an operon pool of additive counts over the genomes annotated so far: which pairs of labels share an operon, and which sit side by side. It counts only qualifying operons, where informative members outnumber uninformative ones, and uses each gene's cleaned consensus label as its identity. The pool starts from a 29-genome reference shipped with MARGIE (<code>operon-db.pkl</code>), and a rule adds each annotated genome to it before scoring.</p>",
+			"<p>C3 asks whether a gene's operon partnerships recur in other genomes. MARGIE keeps an operon pool of additive counts over the genomes annotated so far: which pairs of labels share an operon, and which sit side by side. She counts only qualifying operons, where informative members outnumber uninformative ones, and uses each gene's cleaned consensus label as its identity. The pool starts from a 29-genome reference shipped with MARGIE (<code>operon-db.pkl</code>), and a rule adds each annotated genome to it before scoring.</p>",
 			"<p>For a pair of labels the pool gives n, the genomes in which both labels occur in qualifying operons, and k, the genomes in which the pair shares an operon (or is adjacent). The pair's reliability ρ is the Jeffreys posterior mean (k + ½)/(n + 1) (Jeffreys, 1946) times an enrichment weight that discounts chance pairings of common labels (Newman, 2006). The adjacency C3, the default, is the geometric mean of ρ over the operon's supported adjacent pairs, shared by its members; the hybrid C3 is a gene's strongest single partner, adjacent or anywhere in its operon.</p>",
 			"<p>Before scoring, MARGIE subtracts the genome's own counts from the pool (leave-one-out), matched by a SHA-256 fingerprint of its proteins, so C3 is an out-of-sample estimate. A single gene, a non-coding feature or an operon made only of hypothetical proteins gets 0.5; an operon with zero supported pairs gets 0. The 95% Jeffreys lower bound (Brown et al., 2001) is written beside each score for reference only; see <a href=\"/code?file=scoring/c3_score_organism.py\">c3_score_organism.py</a>.</p>"
 		],
@@ -1217,11 +1214,6 @@ export const REFS: Record<string, Ref> = {
 		"id": "perezrueda2000",
 		"apa": "Pérez-Rueda, E., & Collado-Vides, J. (2000). The repertoire of DNA-binding transcriptional regulators in Escherichia coli K-12. Nucleic Acids Research, 28(8), 1838–1847. https://doi.org/10.1093/nar/28.8.1838",
 		"url": "https://doi.org/10.1093/nar/28.8.1838"
-	},
-	"petersen2011": {
-		"id": "petersen2011",
-		"apa": "Petersen, T. N., Brunak, S., von Heijne, G., & Nielsen, H. (2011). SignalP 4.0: Discriminating signal peptides from transmembrane regions. Nature Methods, 8(10), 785–786. https://doi.org/10.1038/nmeth.1701",
-		"url": "https://doi.org/10.1038/nmeth.1701"
 	},
 	"portevin2004": {
 		"id": "portevin2004",

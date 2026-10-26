@@ -78,32 +78,6 @@ export const TOOLS: ToolCredit[] = [
 		]
 	},
 	{
-		"id": "signalp4",
-		"name": "SignalP 4.0 / 4.1",
-		"role": "signal peptide prediction (SignalP 4.1)",
-		"phase": 7,
-		"version": "4.1",
-		"versionExact": true,
-		"licence": "DTU Health Tech academic software licence (academic use only; each user obtains it from DTU)",
-		"licenceUrl": "https://services.healthtech.dtu.dk/cgi-bin/sw_request?software=signalp&version=4.1&packageversion=4.1g&platform=Linux",
-		"catalogLicence": "",
-		"source": "https://services.healthtech.dtu.dk/services/SignalP-4.1/",
-		"downloads": [
-			"https://services.healthtech.dtu.dk/services/SignalP-4.1/ (register)"
-		],
-		"citeRequired": true,
-		"citeRule": "For publication of results, please cite:",
-		"citeRuleUrl": "https://services.healthtech.dtu.dk/services/SignalP-4.1/",
-		"cite": [
-			{
-				"key": "petersen2011signalp4",
-				"apa": "Petersen, T. N., Brunak, S., von Heijne, G., & Nielsen, H. (2011). SignalP 4.0: discriminating signal peptides from transmembrane regions. Nature Methods, 8(10), 785–786. https://doi.org/10.1038/nmeth.1701",
-				"doi": "10.1038/nmeth.1701",
-				"bibtex": "@article{petersen2011signalp4, title={SignalP 4.0: discriminating signal peptides from transmembrane regions}, volume={8}, ISSN={1548-7105}, url={http://dx.doi.org/10.1038/nmeth.1701}, DOI={10.1038/nmeth.1701}, number={10}, journal={Nature Methods}, publisher={Springer Science and Business Media LLC}, author={Petersen, Thomas Nordahl and Brunak, Søren and von Heijne, Gunnar and Nielsen, Henrik}, year={2011}, month=Sept, pages={785–786} }"
-			}
-		]
-	},
-	{
 		"id": "signalp6",
 		"name": "SignalP 6.0",
 		"role": "signal peptide prediction (SignalP 6.0)",

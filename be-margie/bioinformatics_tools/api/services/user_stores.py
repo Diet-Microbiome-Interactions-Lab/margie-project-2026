@@ -354,9 +354,10 @@ def _probe(conn, root: str, user: str, cfg: dict | None = None) -> dict:
     for st in STORES:
         parts.append(f'echo "@@depot {st["id"]}"; ls -1p {shlex.quote(backup_dir(st, cfg))} 2>/dev/null | grep "^{user}-{st["name"]}-v"')
     # What is in the working folder, for copies put there by hand (own_copy).
-    parts.append(f'echo "@@here"; ls -1pA {shlex.quote(root)} 2>/dev/null')
+    # Newest first, so a copy found by its extension is the newest one (own_copy).
+    parts.append(f'echo "@@here"; ls -1pAt {shlex.quote(root)} 2>/dev/null')
     for sub in sorted({st['sub'] for st in STORES}):
-        parts.append(f'echo "@@here {sub}"; ls -1pA {shlex.quote(root + "/" + sub)} 2>/dev/null')
+        parts.append(f'echo "@@here {sub}"; ls -1pAt {shlex.quote(root + "/" + sub)} 2>/dev/null')
     code, out = _run(conn, '; '.join(parts), timeout=60)
     sections: dict[str, list[str]] = {}
     current = None
@@ -403,12 +404,16 @@ def _probe(conn, root: str, user: str, cfg: dict | None = None) -> dict:
 
 def own_copy(store: dict, user: str, root: str, top: list[str], inside: list[str]) -> dict | None:
     """Finds a copy of the store already in the working folder that MARGIE has no record of, from
-    `ls -1p` of the folder (top) and of the store's subfolder (inside): one under MARGIE's own name
-    (<user>-<name>-vN, the newest), the base's own name at either level (a file store), or the base
-    folder's files laid straight into the subfolder (a folder store). None when there is none."""
+    `ls -1pt` of the folder (top) and of the store's subfolder (inside), newest first: one under
+    MARGIE's own name (<user>-<name>-vN, the newest), the base's own name at either level or else the
+    newest file with the store's extension (.db, .pkl) in the subfolder and then at the top (a file
+    store), or the base folder's files laid straight into the subfolder (a folder store, whose files
+    the pipeline reads by name). A file under another user's MARGIE name is left alone. None when
+    there is none."""
     sub = f"{root}/{store['sub']}"
     is_dir = store['kind'] == 'dir'
-    listed = lambda names: {(n.rstrip('/'), n.endswith('/')) for n in names if n.strip()}
+    # In the listing's order (newest first), each name once.
+    listed = lambda names: list(dict.fromkeys((n.rstrip('/'), n.endswith('/')) for n in names if n.strip()))
     top, inside = listed(top), listed(inside)
     named = [(v, n) for n, d in inside if d == is_dir and (v := _version_of(store, user, n)) is not None]
     if named:
@@ -419,6 +424,12 @@ def own_copy(store: dict, user: str, root: str, top: list[str], inside: list[str
         for where, names in ((sub, inside), (root, top)):
             if (base, False) in names:
                 return {'path': f'{where}/{base}', 'how': 'base', 'version': 1}
+        ext = store.get('ext', '')
+        someone_elses = re.compile(rf".+-{re.escape(store['name'])}-v\d+{re.escape(ext)}")
+        for where, names in ((sub, inside), (root, top)):
+            for n, d in names:
+                if not d and ext and n.endswith(ext) and n != ext and not n.startswith('.') and not someone_elses.fullmatch(n):
+                    return {'path': f'{where}/{n}', 'how': 'ext', 'version': 1}
         return None
     need = store.get('base_files') or []
     if need and all(any(n == f for n, _ in inside) for f in need):
@@ -477,7 +488,7 @@ def adopt(conn, store: dict, found: dict, root: str, user: str) -> int:
         return found['version']
     dst = working_path(store, root, user, 1)
     q = shlex.quote
-    if found['how'] == 'base':
+    if found['how'] in ('base', 'ext'):
         src = found['path']
         # Never onto something already there (test ! -e first: mv onto a folder would move into it).
         steps = [f'mkdir -p {q(posixpath.dirname(dst))}', f'test ! -e {q(dst)}', f'mv -n -- {q(src)} {q(dst)}', f'test -e {q(dst)}']

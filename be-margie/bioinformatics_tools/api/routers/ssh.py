@@ -41,6 +41,7 @@ from bioinformatics_tools.utilities.ssh_connection import (
 from bioinformatics_tools.workflow_tools import cache_report
 from bioinformatics_tools.workflow_tools.workflow_helpers import GENOME_EXTENSIONS
 from bioinformatics_tools.workflow_tools.workflow_registry import (
+    HIDDEN_TOOLS,
     MARGIE_SB_PHASED_TOOLS,
     MARGIE_SB_REQUIRED_TOOLS,
     WORKFLOWS,
@@ -2059,7 +2060,7 @@ def _check_margie_sb_assets(genome_data: GenomeSend, genome_path: str, user_conf
         tools = set(genome_data.selected_tools)
     else:
         ent = licensing.get_entitlement(current_user["username"])
-        tools = all_keys - licensing.disabled_tool_ids(ent.get("usage_type"), ent.get("licensed_tools"))
+        tools = all_keys - licensing.disabled_tool_ids(ent.get("usage_type"), ent.get("licensed_tools")) - HIDDEN_TOOLS
     names = genome_data.genomes
     if names is None:
         try:

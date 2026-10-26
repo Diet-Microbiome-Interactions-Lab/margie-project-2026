@@ -65,7 +65,6 @@
 		merops: 'Peptidases; not used in scoring',
 		tcdb: 'Transporters; not used in scoring',
 		deepsig: 'Signal peptides',
-		signalp4: 'Signal peptides, v4',
 		signalp6: 'Signal peptides, v6',
 		psortb: 'Cell location',
 		phobius: 'Membrane topology',
@@ -96,13 +95,6 @@
 				: t.gated
 					? 'Licence accepted'
 					: '';
-
-	// SignalP 4 and 6 both predict signal peptides: picked together, a note says so once (OK closes it).
-	const bothSignalp = $derived(inRun.has('signalp4') && inRun.has('signalp6'));
-	let signalpSeen = $state(false);
-	$effect(() => {
-		if (!bothSignalp) signalpSeen = false;
-	});
 
 	/** Some tools run every time (the cluster's); then "None" is not a choice. */
 	const anyRequired = $derived(ws.tools.some((t) => t.required));
@@ -282,12 +274,6 @@
 			</section>
 		{/each}
 	</div>
-	{#if bothSignalp && !signalpSeen}
-		<div class="rs-both" role="status">
-			<span>SignalP 4 and SignalP 6 both predict signal peptides, so one of them is enough. Both run while both are picked.</span>
-			<button type="button" class="mg-btn small" onclick={() => (signalpSeen = true)}>OK</button>
-		</div>
-	{/if}
 	{#if locked.length}
 		<p class="mg-note rs-locked">
 			<Lock size={11} /> {locked.length} need their licence terms accepted first:
@@ -523,21 +509,6 @@
 	/* A disabled button shows no tooltip: its box (the li) carries the hint. */
 	.rs-tool:disabled {
 		pointer-events: none;
-	}
-	.rs-both {
-		display: flex;
-		flex-wrap: wrap;
-		align-items: center;
-		gap: 8px 12px;
-		margin-top: 10px;
-		padding: 8px 12px;
-		border: 1px solid color-mix(in srgb, var(--mg-accent) 30%, var(--mg-border));
-		border-radius: var(--mg-r-sm);
-		background: color-mix(in srgb, var(--mg-accent) 5%, var(--mg-surface));
-		font-size: var(--mg-fs-sm);
-	}
-	.rs-both span {
-		flex: 1 1 280px;
 	}
 	/* In every run, so not a choice: plain, with a grey tick, apart from the tools to pick. */
 	.rs-tool.required:disabled {

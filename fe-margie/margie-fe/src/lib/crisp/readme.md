@@ -99,7 +99,7 @@ Cite the version you ran, and each tool and database MARGIE ran for you; their r
 
 ## Licences
 
-MARGIE is released under the MIT licence. The tools and databases she runs keep their own licences, several of them for academic use only. Install lists each one with links, and MARGIE runs the tools whose terms you have accepted.
+MARGIE is released under the MIT licence. The tools and databases she runs keep their own licences, several of them for academic use only. Install lists each one with links, and she runs the tools whose terms you have accepted.
 
 ## Funding
 
@@ -107,7 +107,7 @@ MARGIE was developed in the Diet-Microbiome Interactions Lab with support from t
 
 ## AI usage in the project
 
-MARGIE's platform orchestration, the engine, API and interface MARGIE runs on, was developed by Dane Deemer (Deemer, 2020; Deemer, 2025). The methods and the host scripts of the pipeline were developed by Sajal Bhattarai, who designed and implemented the phase 9 to 12 scripts (consolidation, labeling, scoring and fingerprinting) and defined their core ideas, architecture and intended behaviour. Sajal Bhattarai also improved MARGIE's graphical interface, building on Dane Deemer's architecture.
+MARGIE's platform orchestration, the engine, API and interface she runs on, was developed by Dane Deemer (Deemer, 2020; Deemer, 2025). The methods and the host scripts of the pipeline were developed by Sajal Bhattarai, who designed and implemented the phase 9 to 12 scripts (consolidation, labeling, scoring and fingerprinting) and defined their core ideas, architecture and intended behaviour. Sajal Bhattarai also improved MARGIE's graphical interface, building on Dane Deemer's architecture.
 
 Claude models (Anthropic, Inc.) were used interactively during development to debug the code and scripts, to improve their robustness, and to help refine the visualizations: the circular operon diagrams and the interactive genome map pages. Sajal Bhattarai checked the code, scripts and visualizations repeatedly and validated that they run as intended.
 

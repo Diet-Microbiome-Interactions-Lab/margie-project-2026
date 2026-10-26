@@ -180,7 +180,8 @@ MARGIE_SB_PHASED_TOOLS = [
     {'key': 'envelope', 'label': 'Envelope', 'phase': 7, 'sif': 'envelope.sif', 'purpose': 'Gram envelope type inference'},
     {'key': 'psortb', 'label': 'PSORTb', 'phase': 8, 'sif': 'psortb.sif', 'purpose': 'Subcellular localization'},
     {'key': 'deepsig', 'label': 'DeepSig', 'phase': 8, 'sif': 'deepsig.sif', 'purpose': 'Signal peptide prediction'},
-    {'key': 'signalp4', 'label': 'SignalP4', 'phase': 8, 'sif': 'signalP4.sif', 'purpose': 'Signal peptide prediction (HPC module; kept until SignalP6 is confirmed)', 'uses_container': False},
+    # 'hidden': left out of the website's lists and off in each run; its rule stays in margie_sb.smk.
+    {'key': 'signalp4', 'label': 'SignalP4', 'phase': 8, 'sif': 'signalP4.sif', 'purpose': 'Signal peptide prediction (HPC module; kept until SignalP6 is confirmed)', 'uses_container': False, 'hidden': True},
     {'key': 'consolidation', 'label': 'Consolidation', 'phase': 9, 'sif': 'consolidation.sif', 'purpose': 'Consolidate upstream outputs', 'uses_container': False},
     {'key': 'labeling', 'label': 'Labeling', 'phase': 10, 'sif': 'labeling.sif', 'purpose': 'Label assignment', 'uses_container': False},
     # Host-side Python with no container: in margie_sb.smk, so no .sif is checked.
@@ -242,6 +243,10 @@ def _margie_sb_default_runtime(tool_key: str) -> int:
     return 240
 
 
+# Tools the website leaves out and each run switches off (see 'hidden' above).
+HIDDEN_TOOLS = frozenset(tool['key'] for tool in MARGIE_SB_PHASED_TOOLS if tool.get('hidden'))
+
+
 def margie_sb_sif_files(selected_tool_keys: set[str] | None = None) -> list[tuple]:
     """Returns the SIF entries to validate for a margie_sb run.
 
@@ -286,6 +291,8 @@ def _margie_sb_location_params() -> list[dict]:
 def _margie_sb_tool_params() -> list[dict]:
     params: list[dict] = []
     for tool in MARGIE_SB_PHASED_TOOLS:
+        if tool.get('hidden'):
+            continue
         key = tool['key']
         label = tool['label']
         phase = tool['phase']
@@ -557,7 +564,7 @@ WORKFLOWS: dict[str, WorkflowKey] = {
                 'version': 'latest',
                 'output': 'Phase report in margie_sb/phases plus stage-specific outputs in later functional commits'
             }
-            for tool in MARGIE_SB_PHASED_TOOLS
+            for tool in MARGIE_SB_PHASED_TOOLS if not tool.get('hidden')
         ],
         configurable_params=[
             {

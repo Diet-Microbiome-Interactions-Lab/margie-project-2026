@@ -755,7 +755,7 @@
 		margin-top: 3px;
 		color: var(--mg-danger);
 	}
-	/* The logo, MARGIE's full name and her motto, rising in after it. */
+	/* The logo, MARGIE's full name and motto, rising in after it. */
 	.welcome {
 		--logo-size: clamp(190px, 19vw, 240px);
 		display: flex;

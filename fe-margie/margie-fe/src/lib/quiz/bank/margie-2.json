@@ -136,7 +136,7 @@
 		"scenario": "A scientist at a biotech company sets up MARGIE for commercial work. Before the first run they read the terms and each tool's licence details, accept them, choose commercial use and name TCDB as the one licence-required tool they hold a licence for.",
 		"parts": [
 			{
-				"question": "In MARGIE's licence catalogue, which tier holds Phobius | SignalP 4.x | SignalP 6.0 | the MEROPS database?",
+				"question": "In MARGIE's licence catalogue, which tier holds Phobius | SignalP 6.0 | the MEROPS database?",
 				"options": [
 					"attribution",
 					"commercial_restricted",
@@ -258,18 +258,18 @@
 					"One model for each genome, as TMbed does"
 				],
 				"answer": 2,
-				"explain": "DeepSig runs with -k GRAM- | GRAM+ | ARCH, and PSORTb (-k n | p | a) and SignalP 4.1 (-t gram- | gram+) follow the envelope type in the same way. Phobius | TMbed | SignalP 6 run with the same model for each genome."
+				"explain": "DeepSig runs with -k GRAM- | GRAM+ | ARCH, and PSORTb (-k n | p | a) follows the envelope type in the same way. Phobius | TMbed | SignalP 6 run with the same model for each genome."
 			},
 			{
-				"question": "Which envelope type and SignalP 4.1 model does genome Q get?",
+				"question": "Which envelope type and PSORTb model does genome Q get?",
 				"options": [
-					"Archaeal, by the first rule, with SignalP 4.1 run as gram-",
-					"Diderm, from its β-barrel hits, with SignalP 4.1 run as gram-",
-					"Archaeal, with SignalP 4.1 run on its own archaeal model",
-					"Diderm by default, with SignalP 4.1 run as gram+ instead"
+					"Archaeal, by the first rule, with PSORTb run as -k a",
+					"Diderm, from its β-barrel hits, with PSORTb run as -k n",
+					"Archaeal, with PSORTb run as -k n, its diderm model",
+					"Diderm by default, with PSORTb run as -k p instead"
 				],
 				"answer": 0,
-				"explain": "The first rule that applies decides the type, and the first rule makes a genome whose domain is Archaea archaeal. SignalP 4.1 has gram- and gram+ models and runs archaea as gram-."
+				"explain": "The first rule that applies decides the type, and the first rule makes a genome whose domain is Archaea archaeal. PSORTb has a model for each type and runs an archaeal genome with -k a."
 			}
 		],
 		"explain": "Phase 7 weighs marker genes from TIGRFAM | PGAP | Pfam | UniProt and writes one row to envelope_summary.tsv. Phase 8's localisation tools run with the matching model, and consolidation carries the three ENVELOPE_ columns into each gene's row."

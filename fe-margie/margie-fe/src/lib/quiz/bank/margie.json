@@ -257,7 +257,7 @@
 		"kind": "truefalse",
 		"statement": "PSORTb's results are kept in MARGIE's protein-level cache, since a protein's predicted location depends on its sequence alone.",
 		"answer": false,
-		"explain": "PSORTb, DeepSig and SignalP 4 run with the genome's inferred envelope type (monoderm or diderm), so their answer depends on the genome as well as the protein. The protein-level cache covers tools whose answer depends on the protein alone, such as COG, KEGG, Pfam, Phobius and TMbed."
+		"explain": "PSORTb and DeepSig run with the genome's inferred envelope type (monoderm or diderm), so their answer depends on the genome as well as the protein. The protein-level cache covers tools whose answer depends on the protein alone, such as COG, KEGG, Pfam, Phobius and TMbed."
 	},
 	{
 		"id": "margie-018",
@@ -783,7 +783,7 @@
 			"Its membrane lipids, which set the operon pool its genes are scored against"
 		],
 		"answer": 0,
-		"explain": "Phase 7 reads marker genes in the TIGRFAM, PGAP, Pfam and UniProt results and calls the genome monoderm, diderm or archaeal. PSORTb, DeepSig and SignalP 4.1 then run with that model; Phobius, TMbed and SignalP 6 run with the same model for each genome."
+		"explain": "Phase 7 reads marker genes in the TIGRFAM, PGAP, Pfam and UniProt results and calls the genome monoderm, diderm or archaeal. PSORTb and DeepSig then run with that model; Phobius, TMbed and SignalP 6 run with the same model for each genome."
 	},
 	{
 		"id": "margie-045",

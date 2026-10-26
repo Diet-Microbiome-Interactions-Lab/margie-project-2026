@@ -169,3 +169,33 @@ def test_the_install_list_joins_folders_with_one_slash():
     paths = [r["path"] for r in rows] + [r["shared"] for r in rows]
     assert not [x for x in paths if "//" in x]
     assert "/refs/gtdbtk" in paths and "/gtdbtk.sif" in paths
+
+
+# ---- by extension: any .db or .pkl the user put there, under any name ----
+
+def test_a_database_under_any_name_is_found_by_its_extension_newest_first():
+    f = us.own_copy(JOB_DB, "u", ROOT, [], ["lab-genomes.db", "older.db", "notes.txt"])
+    assert f == {"path": f"{ROOT}/sqlite/lab-genomes.db", "how": "ext", "version": 1}
+    assert us.own_copy(JOB_DB, "u", ROOT, ["sqlite/", "mine.db"], [])["path"] == f"{ROOT}/mine.db"
+    assert us.own_copy(OCC, "u", ROOT, [], ["mine.pkl", "mine.pkl.members.tsv"])["path"] == f"{ROOT}/operon-database/mine.pkl"
+
+
+def test_margies_names_and_the_base_name_come_before_the_extension():
+    assert us.own_copy(JOB_DB, "u", ROOT, [], ["lab.db", "u-margie-thesis-22-prokaryotes-base-v2.db"])["how"] == "named"
+    assert us.own_copy(JOB_DB, "u", ROOT, [], ["lab.db", "margie-thesis-22-prokaryotes-base.db"])["how"] == "base"
+
+
+def test_journals_hidden_files_folders_and_other_extensions_are_not_taken():
+    assert us.own_copy(JOB_DB, "u", ROOT, [], ["x.db-journal", ".hidden.db", "snapshots/", "x.pkl", ".db"]) is None
+
+
+def test_a_copy_found_by_extension_needs_no_size_match_with_the_groups():
+    f = _check({"job_db": {"path": "/x.db", "how": "ext", "version": 1}}, "10000\njob_db 300 1000\njob_db.base 500\n")
+    assert f["job_db"]["ready"]
+
+
+def test_a_copy_found_by_extension_is_renamed_into_place(tmp_path):
+    (tmp_path / "lab.db").write_text("db")
+    v = _adopt(tmp_path, JOB_DB, {"path": str(tmp_path / "lab.db"), "how": "ext", "version": 1})
+    assert v == 1 and (tmp_path / "sqlite" / "u-margie-thesis-22-prokaryotes-base-v1.db").read_text() == "db"
+    assert not (tmp_path / "lab.db").exists()
