@@ -25,8 +25,12 @@ def test_each_listed_script_is_installed():
 
 def test_the_steps_list_their_files_with_summaries(client):
     steps = client.get('/v1/code').json()['steps']
-    assert [s['title'] for s in steps] == ['Genome, protein and gene hashes', 'Consolidation', 'Labeling', 'Operon database', 'Scoring',
-                                           'Fingerprinting', 'Fingerprint databases', 'Genome map and diagrams', 'Reports']
+    assert [s['title'] for s in steps] == ['The workflow', 'Genome, protein and gene hashes', 'Loading into the MARGIE database',
+                                           'Envelope and localisation', 'Consolidation', 'Labeling', 'Operon database', 'Scoring',
+                                           'Fingerprinting', 'Fingerprint databases', 'Genome map and diagrams', 'Reports',
+                                           "A run's folders and records"]
+    smk = next(f for s in steps for f in s['files'] if f['name'] == 'margie_sb.smk')
+    assert smk['summary'].startswith("MARGIE's rules")
     merge = next(f for s in steps for f in s['files'] if f['name'] == 'merge-all-columns.py')
     assert merge['summary'] == 'Stage 2 of consolidation.'
     assert merge['lines'] > 100

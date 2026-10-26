@@ -21,16 +21,38 @@ WORKFLOW_TOOLS = Path(__file__).resolve().parents[2] / "workflow_tools"
 # The steps in run order (margie_sb.smk), each with its scripts in the order they run.
 STEPS = [
     {
+        "key": "workflow",
+        "title": "The workflow",
+        "what": "The Snakemake workflow, rule by rule, with each step's inputs, outputs and container; the tools and "
+                "phases MARGIE knows; and the helpers that set each genome's paths and gene caller (RASTtk, or "
+                "Prodigal for a genome new to MARGIE).",
+        "files": ["margie_sb.smk", "workflow_registry.py", "workflow_helpers.py"],
+    },
+    {
         "key": "hashes",
         "title": "Genome, protein and gene hashes",
         "what": "Recognises each genome, protein and gene by a hash of its sequence, restores what was annotated "
                 "before and records each protein's results once, linked to the genomes it occurs in.",
-        "files": ["genome_identity.py", "output_cache.py", "protein_cache.py", "load_to_db.py"],
+        "files": ["genome_identity.py", "output_cache.py", "protein_cache.py"],
+    },
+    {
+        "key": "loading",
+        "title": "Loading into the MARGIE database",
+        "what": "Loads each step's table with each row's genome hash. A reload replaces the genome's rows; "
+                "RASTtk-based results replace Prodigal-based ones, and Prodigal-based results leave RASTtk-based ones.",
+        "files": ["load_to_db.py"],
+    },
+    {
+        "key": "localisation",
+        "title": "Envelope and localisation",
+        "what": "Adds the genome's envelope call (phase 7) to the localisation tools' tables, and turns SignalP 6.0's "
+                "output into a results table.",
+        "files": ["enrich_with_envelope.py", "process_signalp6.py"],
     },
     {
         "key": "consolidation",
         "title": "Consolidation",
-        "what": "Merges each tool's table into one row per gene.",
+        "what": "Merges each tool's table into one row per gene, on the genes of the genome's gene caller.",
         "files": ["consolidation/detect-columns.py", "consolidation/merge-all-columns.py",
                   "consolidation/filter-no-stat.py", "consolidation/_shared.py"],
     },
@@ -89,6 +111,13 @@ STEPS = [
                   "scoring/analysis/report_figures/reportfig_lib.py",
                   "scoring/analysis/report_figures/verify_report.py"],
     },
+    {
+        "key": "run-records",
+        "title": "A run's folders and records",
+        "what": "Says where each step's results came from (the cache report), leaves each genome's folder with its final "
+                "files on top and the step folders under per-tool-phased-output/, and writes a job's PDF report.",
+        "files": ["cache_report.py", "reorganize_outputs.py", "report/job_report.py"],
+    },
 ]
 
 _LISTED = {f for step in STEPS for f in step["files"]}
@@ -104,11 +133,13 @@ _RULE_START = re.compile(r"^(?:rule|checkpoint) (\w+):")
 
 
 def _summary(text: str, path: str) -> str:
-    """The first line of the module docstring, without a leading "<name> —" (or "-")."""
+    """The first line of the module docstring (a Snakefile's first triple-quoted string), without a
+    leading "<name> —" (or "-")."""
     try:
         doc = ast.get_docstring(ast.parse(text)) or ""
     except SyntaxError:
-        return ""
+        m = re.search(r'"""(.*?)"""', text, re.S)
+        doc = m.group(1) if m else ""
     first = doc.strip().splitlines()[0] if doc.strip() else ""
     name = Path(path).name
     for sep in (" — ", " - ", " -- "):

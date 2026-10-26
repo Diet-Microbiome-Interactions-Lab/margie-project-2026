@@ -19,8 +19,17 @@
 		lede = '',
 		shade,
 		actions,
+		crumbs = [],
 		children
-	}: { title: string; lede?: string; shade: string; actions?: Snippet; children: Snippet } = $props();
+	}: {
+		title: string;
+		lede?: string;
+		shade: string;
+		actions?: Snippet;
+		/** Pages between Home and this one in the breadcrumb. */
+		crumbs?: { href: string; label: string }[];
+		children: Snippet;
+	} = $props();
 
 	/** In the sidebar's order. */
 	const PAGES = [
@@ -55,25 +64,43 @@
 	let current = $state('');
 
 	onMount(() => {
-		const els = [...(doc?.querySelectorAll<HTMLElement>('[data-toc][id]') ?? [])];
-		sections = els.map((el) => ({ id: el.id, label: el.dataset.toc ?? el.id }));
-		for (const el of els) {
-			const h = el.querySelector(':scope > h2, :scope > header h2');
-			if (h && !h.querySelector('.rp-anchor')) {
-				const a = Object.assign(document.createElement('a'), { className: 'rp-anchor', href: `#${el.id}`, textContent: '¶', title: 'Link to this section' });
-				h.append(a);
-			}
-		}
 		const seen = new Map<string, boolean>();
-		const io = new IntersectionObserver(
-			(entries) => {
-				for (const e of entries) seen.set(e.target.id, e.isIntersecting);
-				current = sections.find((s) => seen.get(s.id))?.id ?? current;
-			},
-			{ rootMargin: '-15% 0px -60% 0px' }
-		);
-		els.forEach((el) => io.observe(el));
-		return () => io.disconnect();
+		let io: IntersectionObserver | undefined;
+		const collect = () => {
+			const els = [...(doc?.querySelectorAll<HTMLElement>('[data-toc][id]') ?? [])];
+			const found = els.map((el) => ({ id: el.id, label: el.dataset.toc ?? el.id }));
+			if (io && found.map((s) => `${s.id}|${s.label}`).join() === sections.map((s) => `${s.id}|${s.label}`).join()) return;
+			sections = found;
+			for (const el of els) {
+				const h = el.querySelector(':scope > h2, :scope > header h2');
+				if (h && !h.querySelector('.rp-anchor')) {
+					const a = Object.assign(document.createElement('a'), { className: 'rp-anchor', href: `#${el.id}`, textContent: '¶', title: 'Link to this section' });
+					h.append(a);
+				}
+			}
+			io?.disconnect();
+			io = new IntersectionObserver(
+				(entries) => {
+					for (const e of entries) seen.set(e.target.id, e.isIntersecting);
+					current = sections.find((s) => seen.get(s.id))?.id ?? current;
+				},
+				{ rootMargin: '-15% 0px -60% 0px' }
+			);
+			els.forEach((el) => io?.observe(el));
+		};
+		collect();
+		// Sections a page adds once its content loads join the list.
+		let queued = 0;
+		const mo = new MutationObserver(() => {
+			cancelAnimationFrame(queued);
+			queued = requestAnimationFrame(collect);
+		});
+		if (doc) mo.observe(doc, { childList: true, subtree: true });
+		return () => {
+			mo.disconnect();
+			io?.disconnect();
+			cancelAnimationFrame(queued);
+		};
 	});
 </script>
 
@@ -81,11 +108,12 @@
 
 <div class="cr-page rp" data-shade={shade} style={font ? `--rp-font: ${font}` : undefined}>
 	<div class="rp-paper">
-		<div class="rp-grid">
+		<div class="rp-grid" class:rp-solo={sections.length <= 2}>
 			<article class="rp-doc" bind:this={doc}>
 				<nav class="rp-crumbs" aria-label="Breadcrumb">
 					<ol>
 						<li><a href="/">Home</a></li>
+						{#each crumbs as c (c.href)}<li><a href={c.href}>{c.label}</a></li>{/each}
 						<li aria-current="page">{title}</li>
 					</ol>
 					{#if actions}<div class="rp-acts">{@render actions()}</div>{/if}
