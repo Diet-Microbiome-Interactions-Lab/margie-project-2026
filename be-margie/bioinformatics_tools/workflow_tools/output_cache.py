@@ -22,10 +22,12 @@ import time
 from datetime import datetime, timezone
 from pathlib import Path
 
+from urllib.parse import unquote
+
 try:
-    from bioinformatics_tools.workflow_tools.genome_identity import genome_hash, legacy_file_hash
+    from bioinformatics_tools.workflow_tools.genome_identity import genome_hash, legacy_file_hash, normalise_protein, read_fasta
 except ImportError:  # imported from margie_sb.smk, with this folder on sys.path
-    from genome_identity import genome_hash, legacy_file_hash
+    from genome_identity import genome_hash, legacy_file_hash, normalise_protein, read_fasta
 
 LOGGER = logging.getLogger(__name__)
 
@@ -164,7 +166,7 @@ def _extract_pattern_suffix(filename: str) -> str:
 
 
 def restore(db_path: str, input_file: str, tool_name: str,
-            output_paths: list[str], optional: list[str] = ()) -> bool:
+            output_paths: list[str], optional: list[str] = (), genes: dict[str, str] | None = None) -> bool:
     """Restore cached outputs for *tool_name* from the DB using pattern matching.
 
     Matches files by pattern suffix rather than exact filename, allowing cache hits
@@ -230,6 +232,15 @@ def restore(db_path: str, input_file: str, tool_name: str,
         if pattern in cached_patterns:
             matched[path] = cached_patterns[pattern]
 
+    # Tables stored with genes by hash come back under this run's gene ids, when each gene is here.
+    ids_by_hash = {h: fid for fid, h in (genes or {}).items()}
+    for path, blob in list(matched.items()):
+        back = _from_gene_hashes(blob, ids_by_hash)
+        if back is None:
+            LOGGER.info("Cache miss for %s: its genes are not this run's gene calls", tool_name)
+            return False
+        matched[path] = back
+
     # Write all matched BLOBs to expected paths
     for path, blob in matched.items():
         Path(path).parent.mkdir(parents=True, exist_ok=True)
@@ -237,6 +248,57 @@ def restore(db_path: str, input_file: str, tool_name: str,
         LOGGER.info("Restored from cache: %s", path)
 
     return True
+
+
+# ---- Genes by hash: cached tables name a gene by what it is, not by its number ----
+
+# RASTtk's gene ids, and the token a cached table names a gene by instead.
+_GENE_ID_RE = re.compile(rb"fig\|6666666\.\d+\.(?:peg|rna)\.\d+")
+_GENE_TOKEN = b"margie-gene:"
+_GENE_TOKEN_RE = re.compile(rb"margie-gene:([0-9a-f]{24})")
+
+
+def gene_hashes(gff: str, faa: str) -> dict[str, str]:
+    """{gene id: gene hash} for a genome's RASTtk gene calls. A gene's hash is of its contig, start,
+    end, strand and protein (an RNA's feature type), so a gene keeps it whatever number a gene
+    caller gives it. {} when the files are missing or two genes share a hash."""
+    try:
+        proteins = {fid: normalise_protein(seq) for fid, _, seq in read_fasta(faa) if fid}
+        lines = Path(gff).read_text(encoding="utf-8", errors="replace").splitlines()
+    except OSError:
+        return {}
+    out: dict[str, str] = {}
+    for line in lines:
+        cols = line.split("\t")
+        if line.startswith("#") or len(cols) < 9:
+            continue
+        m = re.search(r"(?:^|;)ID=([^;]+)", cols[8])
+        if not m:
+            continue
+        fid = unquote(m.group(1))
+        what = proteins.get(fid) or cols[2]
+        out[fid] = hashlib.sha256(f"{cols[0]}\t{cols[3]}\t{cols[4]}\t{cols[6]}\t{what}".encode()).hexdigest()[:24]
+    return out if len(set(out.values())) == len(out) else {}
+
+
+def _to_gene_hashes(blob: bytes, genes: dict[str, str]) -> bytes:
+    """The table with each gene id written as its gene hash; unchanged when a gene id in it is not
+    among `genes`, or when a RASTtk id remains in another form."""
+    found = {m.decode() for m in _GENE_ID_RE.findall(blob)}
+    if not found or any(fid not in genes for fid in found):
+        return blob
+    out = _GENE_ID_RE.sub(lambda m: _GENE_TOKEN + genes[m.group(0).decode()].encode(), blob)
+    return blob if _RAST_GENOME_ID_RE.search(out) else out
+
+
+def _from_gene_hashes(blob: bytes, ids_by_hash: dict[str, str]) -> bytes | None:
+    """The table with each gene hash written as this run's gene id; None when a gene in it is not
+    among this run's gene calls. A table stored with gene ids comes back as it is."""
+    if _GENE_TOKEN not in blob:
+        return blob
+    if any(h.decode() not in ids_by_hash for h in set(_GENE_TOKEN_RE.findall(blob))):
+        return None
+    return _GENE_TOKEN_RE.sub(lambda m: ids_by_hash[m.group(1).decode()].encode(), blob)
 
 
 # ---- RASTtk genome-id realignment ----
@@ -401,10 +463,11 @@ def cached_when(db_path: str, input_file: str) -> dict[str, str]:
 
 
 def store(db_path: str, input_file: str, tool_name: str,
-          output_paths: list[str]) -> None:
+          output_paths: list[str], genes: dict[str, str] | None = None) -> None:
     """Read each output file and INSERT OR REPLACE into output_cache.
 
-    Missing files are skipped (handles partial workflow success).
+    Missing files are skipped (handles partial workflow success). With `genes` ({gene id: gene
+    hash}), each table names its genes by hash, so it comes back under any gene caller numbering.
     """
     input_hash = genome_hash(input_file)
     now = datetime.now(timezone.utc).isoformat()
@@ -426,6 +489,8 @@ def store(db_path: str, input_file: str, tool_name: str,
             if size_mb > 1:
                 LOGGER.info("  Reading %s (%.1f MB)...", p.name, size_mb)
             blob = p.read_bytes()
+            if genes:
+                blob = _to_gene_hashes(blob, genes)
             conn.execute(
                 "INSERT OR REPLACE INTO output_cache "
                 "(input_hash, tool, filename, content, size_bytes, cached_at) "
@@ -444,7 +509,7 @@ def store(db_path: str, input_file: str, tool_name: str,
 # ──────────────────────── multi-tool wrappers ──────────────────────── #
 
 def restore_all(db_path: str, input_file: str,
-                build_filepaths_map: dict[str, list[str]]) -> dict[str, bool]:
+                build_filepaths_map: dict[str, list[str]], genes: dict[str, str] | None = None) -> dict[str, bool]:
     """Restore cached outputs for every tool in *build_filepaths_map*.
 
     Returns ``{tool_name: hit_bool}`` so the caller can log which tools
@@ -457,7 +522,7 @@ def restore_all(db_path: str, input_file: str,
     results: dict[str, bool] = {}
     restored_paths: list[str] = []
     for tool_name, output_paths in build_filepaths_map.items():
-        hit = restore(db_path, input_file, tool_name, output_paths)
+        hit = restore(db_path, input_file, tool_name, output_paths, genes=genes)
         results[tool_name] = hit
         if hit:
             restored_paths.extend(output_paths)
@@ -477,13 +542,13 @@ def restore_all(db_path: str, input_file: str,
 
 
 def store_all(db_path: str, input_file: str,
-              build_filepaths_map: dict[str, list[str]]) -> None:
+              build_filepaths_map: dict[str, list[str]], genes: dict[str, str] | None = None) -> None:
     """Store outputs for every tool in *build_filepaths_map* into the DB."""
     total_tools = len(build_filepaths_map)
     LOGGER.info("Storing outputs to cache for %d tools...", total_tools)
     for idx, (tool_name, output_paths) in enumerate(build_filepaths_map.items(), 1):
         LOGGER.info("Caching %s (%d/%d)...", tool_name, idx, total_tools)
-        store(db_path, input_file, tool_name, output_paths)
+        store(db_path, input_file, tool_name, output_paths, genes=genes)
         LOGGER.info("✓ Cached outputs for %s", tool_name)
 
 

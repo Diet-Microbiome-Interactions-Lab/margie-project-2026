@@ -22,7 +22,7 @@ from bioinformatics_tools.workflow_tools.bapptainer import (
     CacheSifError, cache_sif_files, locate_local_sif_files)
 from bioinformatics_tools.workflow_tools.models import WorkflowKey
 from bioinformatics_tools.workflow_tools.output_cache import (
-    cached_tools, cached_when, current_rast_genome_id, gene_calls_match, log_workflow_run, rast_genome_ids,
+    cached_tools, cached_when, current_rast_genome_id, gene_calls_match, gene_hashes, log_workflow_run, rast_genome_ids,
     realign_rast_genome_id, restore, restore_all, store, store_all,
 )
 from bioinformatics_tools.workflow_tools.load_to_db import is_already_processed, PIPELINE_VERSION, fasta_hashes
@@ -1052,12 +1052,23 @@ class WorkflowBase(ProgramBase):
             None when its selected steps all came back from the cache."""
             genome_restored: dict = {}
             merged_fp = ''
+            # The genome's sequence hash: its proteins and genes are linked to it in the database.
+            hashed = _safely(f'Hashing {genome}', fasta_hashes, genome_files[genome]) if db_path else None
+            genome_hash = hashed[0] if isinstance(hashed, list) and hashed else ''
+            # This genome's genes by hash (RASTtk gene calls): cached tables are stored and come back
+            # by them, whatever numbers a submission gives the genes.
+            genes: dict = {}
+            if genome not in prodigal_genomes:
+                hashed = _safely(f'Hashing the genes of {genome}', gene_hashes,
+                                 f"{get_workflow_prefix_for(genome, smk_config)}rasttk/rast.gff",
+                                 f"{get_workflow_prefix_for(genome, smk_config)}rasttk/rast.faa")
+                genes = hashed if isinstance(hashed, dict) else {}
             # Restored after rast.faa so mtimes are newer; must precede the skip below.
             if db_path:
                 genome_cache_map_now = cache_map_fn(genome)
                 tools_map = {k: v for k, v in genome_cache_map_now.items() if not input_keyed(k)}
                 genome_restored = _safely(f'Restoring {genome} from the cache', restore_all,
-                                          db_path, genome_files[genome], tools_map) or {}
+                                          db_path, genome_files[genome], tools_map, genes=genes) or {}
                 if genome_restored is _FAILED:
                     genome_restored = {}
                 # Gene-call guard: cached tables name genes by number under the RASTtk id they were
@@ -1091,7 +1102,8 @@ class WorkflowBase(ProgramBase):
                 merged_fp = merged_inputs_fingerprint(get_workflow_prefix_for(genome, smk_config))
                 merged_back = _safely(f'Restoring {genome} merged tables from the cache', restore_all,
                                       db_path, genome_files[genome],
-                                      {cache_name(k, merged_fp): v for k, v in genome_cache_map_now.items() if input_keyed(k)})
+                                      {cache_name(k, merged_fp): v for k, v in genome_cache_map_now.items() if input_keyed(k)},
+                                      genes=genes)
                 genome_restored.update(merged_back if isinstance(merged_back, dict) else {})
                 # Back under the cache-map keys, for the checks and the report below.
                 genome_restored = {k: genome_restored.get(cache_name(k, merged_fp), False) for k in genome_cache_map_now}
@@ -1117,6 +1129,10 @@ class WorkflowBase(ProgramBase):
             # Per-protein cache: only proteins not in the cache go to each tool.
             pc_prefix = get_workflow_prefix_for(genome, smk_config)
             pc_faa_path = f"{pc_prefix}rasttk/rast.faa"
+            # Which genome each protein and gene belongs to, by hash.
+            if db_path and Path(pc_faa_path).exists():
+                _safely(f'Linking the proteins and genes of {genome} to its genome hash', protein_cache.link_genome,
+                        db_path, pc_faa_path, genome_hash, genome, genes)
             pc_tools: list[str] = []
             pc_stored: set[str] = set()
             # {tool: (proteins from the protein cache, proteins to annotate)} for this genome's report.
@@ -1212,7 +1228,8 @@ class WorkflowBase(ProgramBase):
 
             return {'genome': genome, 'proc': stage2_proc, 'command': stage2_command, 'pc_prefix': pc_prefix,
                     'pc_faa_path': pc_faa_path, 'pc_tools': pc_tools, 'pc_stored': pc_stored,
-                    'cache_map': cache_map_fn(genome), 'restored': restored.get(genome, {}), 'stored': set()}
+                    'cache_map': cache_map_fn(genome), 'restored': restored.get(genome, {}), 'stored': set(),
+                    'genes': genes, 'genome_hash': genome_hash}
 
         def _store_ready(slot: dict) -> None:
             """Stores each of a genome's tools once its outputs and db token (written last) exist."""
@@ -1236,7 +1253,8 @@ class WorkflowBase(ProgramBase):
                 if all(Path(p).exists() for p in paths):
                     # Consolidation is done, so every table it merged is final.
                     name = cache_name(tool, merged_inputs_fingerprint(pc_prefix)) if input_keyed(tool) else tool
-                    if _safely(f'Caching {tool} for {genome}', store, db_path, genome_files[genome], name, paths) is _FAILED:
+                    if _safely(f'Caching {tool} for {genome}', store, db_path, genome_files[genome], name, paths,
+                               genes=slot['genes']) is _FAILED:
                         # Asked again at the next look; after five tries the step stays uncached this time.
                         slot.setdefault('tries', {})[tool] = slot.get('tries', {}).get(tool, 0) + 1
                         if slot['tries'][tool] >= 5:
@@ -1276,11 +1294,14 @@ class WorkflowBase(ProgramBase):
                 if tools_to_store:
                     merged_fp = merged_inputs_fingerprint(slot['pc_prefix'])
                     _safely(f'Caching the rest of {genome}', store_all, db_path, genome_files[genome],
-                            {cache_name(t, merged_fp): p for t, p in tools_to_store.items()})
+                            {cache_name(t, merged_fp): p for t, p in tools_to_store.items()}, genes=slot['genes'])
                 else:
                     LOGGER.info('All outputs were already cached incrementally or were cache hits for %s', genome)
                 _safely(f'Recording {genome} in the run log table', log_workflow_run, db_path, run_id, genome_files[genome],
                         key_name, self._build_result(key_name, proc)['rules_summary'].get('completed', 0), status='success')
+                # Each gene's fingerprint, beside its gene hash.
+                _safely(f'Recording the fingerprints of {genome}', protein_cache.record_fingerprints, db_path, slot['genome_hash'],
+                        f"{slot['pc_prefix']}fingerprint/labeled-genes-fingerprint-hash-label.tsv", slot['genes'])
             LOGGER.info(provenance.summary(genome))
 
         while pending or queue or active:

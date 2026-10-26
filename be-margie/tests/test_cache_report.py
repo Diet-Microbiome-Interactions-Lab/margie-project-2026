@@ -85,7 +85,7 @@ def test_a_run_writes_where_each_step_came_from(mock_sleep, mock_locate, mock_ca
     restored = {'cog': True, 'pfam': False, 'kegg': False, 'merops': False, 'consolidation@abc': True}
     with patch.object(wf, '_restore_gene_calls', return_value=({'g1': True}, {'g1': True})), \
             patch(f'{w}.restore', return_value=True), \
-            patch(f'{w}.restore_all', side_effect=lambda db_path, f, m: {k: restored.get(k.split('#')[0], False) for k in m}), \
+            patch(f'{w}.restore_all', side_effect=lambda db_path, f, m, **kw: {k: restored.get(k.split('#')[0], False) for k in m}), \
             patch(f'{w}.cached_when', return_value={'gtdbtk': '2026-09-01T00:00:00+00:00', 'cog': '2026-09-02T00:00:00+00:00'}), \
             patch(f'{w}.store'), patch(f'{w}.store_all'), patch(f'{w}.log_workflow_run'), \
             patch(f'{w}.is_already_processed', return_value=False), patch(f'{w}.fasta_hashes', return_value='h'), \
