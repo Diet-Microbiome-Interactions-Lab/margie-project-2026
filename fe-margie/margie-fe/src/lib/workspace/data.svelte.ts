@@ -976,6 +976,19 @@ class Workspace {
 		}
 	}
 
+	/** Takes one finished job off the history, after the same backup as clearRuns. */
+	async clearRun(id: string) {
+		try {
+			const r = await del<{ backup: string; removed: number; kept: number }>(`/runs/${encodeURIComponent(id)}`);
+			await this.loadRuns();
+			ui.notify(r.removed ? `Cleared from the history. Backup: ${r.backup}` : 'This job stays in the list while it is going.', r.removed ? 'ok' : 'info');
+			return r;
+		} catch (e) {
+			ui.notify(message(e), 'error');
+			return null;
+		}
+	}
+
 	async stop(id: string) {
 		try {
 			await post(`/runs/${id}/stop`);

@@ -4,7 +4,10 @@
 	 * double-stranded DNA in the logo's colours, joined by two-base sticky ends; some pieces are
 	 * taken out and shuffled into the tray. A piece fits a gap when the rungs at both of its ends
 	 * pair (A with T, G with C), as in ligation. Pick a piece, then a gap (or drag it there); a
-	 * placed piece goes back to the tray on a click. Any order whose ends all pair closes the ring.
+	 * placed piece goes back to the tray on a click. Each sticky end is its own pair of bases, so
+	 * each piece has one gap. Pointing at a gap with a piece picked shows whether its ends would
+	 * pair (green or red dots); two pieces may go into a wrong gap, and after that a piece goes
+	 * only into its own.
 	 */
 	import { RotateCcw } from 'lucide-svelte';
 
@@ -49,13 +52,15 @@
 	/** What a gap answers to: the middle of the ring along the piece. */
 	const TARGET = `M${xy(J0, R)} A${R} ${R} 0 0 1 ${xy(J0 + SPAN, R)}`;
 
-	type Rung = { x1: number; y1: number; x2: number; y2: number; colour: string };
+	type Rung = { x1: number; y1: number; x2: number; y2: number; colour: string; end: boolean };
 	/** Half a rung: from a strand to the middle of the helix, in its base's colour. */
-	function half(d: number, s: 1 | -1, base: Base): Rung {
+	function half(d: number, s: 1 | -1, base: Base, end = false): Rung {
 		const [x1, y1] = at(d, radius(s, d));
 		const [x2, y2] = at(d, R);
-		return { x1, y1, x2, y2, colour: COLOUR[base] };
+		return { x1, y1, x2, y2, colour: COLOUR[base], end };
 	}
+	/** Wrong gaps a piece may go into before each piece goes only into its own. */
+	const FREE_MISSES = 2;
 
 	let level = $state(3);
 	let ends = $state<Base[][]>([]);
@@ -67,6 +72,10 @@
 	let moves = $state(0);
 	let took = $state(0);
 	let began = 0;
+	/** The gap pointed at with a piece picked, wrong placements so far, and the gap that just refused one. */
+	let hover = $state<number | null>(null);
+	let misses = $state(0);
+	let nope = $state<number | null>(null);
 
 	function shuffle<T>(xs: T[]): T[] {
 		const a = [...xs];
@@ -90,15 +99,18 @@
 		moves = 0;
 		took = 0;
 		began = 0;
+		hover = null;
+		misses = 0;
+		nope = null;
 	}
 	start(LEVELS[0].out);
 
 	/** Piece p's rungs where it sits at the top: its left sticky end (bottom halves), its core, its right sticky end (top halves). */
 	const shapes = $derived(
 		ends.map((_, p): Rung[] => [
-			...END.map((o, i) => half(J0 + o, -1, PAIR[ends[p][i]])),
+			...END.map((o, i) => half(J0 + o, -1, PAIR[ends[p][i]], true)),
 			...CORE.flatMap((o, i) => [half(J0 + o, 1, cores[p][i]), half(J0 + o, -1, PAIR[cores[p][i]])]),
-			...END.map((o, i) => half(J0 + SPAN + o, 1, ends[(p + 1) % N][i]))
+			...END.map((o, i) => half(J0 + SPAN + o, 1, ends[(p + 1) % N][i], true))
 		])
 	);
 	/** Each junction: null while a side is empty, else whether its sticky ends pair. */
@@ -112,9 +124,39 @@
 	const wrong = $derived(joins.filter((j) => j === false).length);
 	const done = $derived(placed === N && wrong === 0);
 
+	/** Whether piece p's ends would pair at gap s: its left join and its right one (null beside a gap). */
+	function preview(p: number, s: number): [boolean | null, boolean | null] {
+		const a = slots[(s + N - 1) % N];
+		const b = slots[(s + 1) % N];
+		return [a === null ? null : ends[(a + 1) % N].join('') === ends[p].join(''), b === null ? null : ends[(p + 1) % N].join('') === ends[b].join('')];
+	}
+	const shown = $derived(picked !== null && hover !== null && slots[hover] === null ? preview(picked, hover) : null);
+	/**
+	 * How far the ring is turned from the pieces' own gaps: none while some pieces stay put (Easy,
+	 * Medium); on Hard, the turn most placed pieces share, and any turn while the ring is empty.
+	 */
+	const shift = $derived.by(() => {
+		if (fixed.some(Boolean)) return 0;
+		const count = new Map<number, number>();
+		slots.forEach((q, g) => q !== null && count.set((g - q + N) % N, (count.get((g - q + N) % N) ?? 0) + 1));
+		let best: number | null = null;
+		for (const [k, n] of count) if (best === null || n > (count.get(best) ?? 0)) best = k;
+		return best;
+	});
+	const fits = (p: number, s: number) => shift === null || (s - p + N) % N === shift;
+
 	function place(s: number) {
 		if (picked === null || slots[s] !== null) return;
 		const p = picked;
+		if (!fits(p, s) && misses >= FREE_MISSES) {
+			// Refused: the gap flashes and the piece stays in the tray.
+			nope = s;
+			moves += 1;
+			setTimeout(() => nope === s && (nope = null), 650);
+			return;
+		}
+		if (!fits(p, s)) misses += 1;
+		hover = null;
 		slots[s] = p;
 		tray = tray.filter((q) => q !== p);
 		picked = null;
@@ -145,7 +187,7 @@
 
 {#snippet dna(p: number)}
 	{#each shapes[p] as r, i (i)}
-		<line x1={r.x1} y1={r.y1} x2={r.x2} y2={r.y2} stroke={r.colour} class="rung" />
+		<line x1={r.x1} y1={r.y1} x2={r.x2} y2={r.y2} stroke={r.colour} class="rung" class:end={r.end} />
 	{/each}
 	<path d={BOTTOM} class="strand blue" />
 	<path d={TOP} class="strand orange" />
@@ -158,6 +200,9 @@
 				<button type="button" role="radio" aria-checked={level === l.out} onclick={() => start(l.out)}>{l.name}</button>
 			{/each}
 		</div>
+		<span class="chances" role="img" aria-label="{FREE_MISSES - misses} free wrong gaps left">
+			{#each Array(FREE_MISSES) as _, k (k)}<i class:used={k < misses}></i>{/each}
+		</span>
 		<button type="button" class="again" onclick={() => start(level)}><RotateCcw size={14} /> New genome</button>
 	</div>
 
@@ -174,12 +219,21 @@
 								data-slot={s}
 								class="target"
 								class:ready={picked !== null}
+								class:nope={nope === s}
 								role="button"
 								tabindex="0"
 								aria-label="Gap {s + 1}"
 								onclick={() => place(s)}
 								onkeydown={(e) => onKey(e, () => place(s))}
-								ondragover={(e) => e.preventDefault()}
+								onpointerenter={() => (hover = s)}
+								onpointerleave={() => hover === s && (hover = null)}
+								onfocus={() => (hover = s)}
+								onblur={() => hover === s && (hover = null)}
+								ondragleave={() => hover === s && (hover = null)}
+								ondragover={(e) => {
+									e.preventDefault();
+									hover = s;
+								}}
 								ondrop={(e) => {
 									e.preventDefault();
 									place(s);
@@ -201,6 +255,15 @@
 						<circle cx={x} cy={y} r="4.5" class="join" class:ok class:bad={!ok} />
 					{/if}
 				{/each}
+				<!-- With a piece picked: how its ends would pair at the gap pointed at. -->
+				{#if shown && hover !== null}
+					{#each shown as ok, k (k)}
+						{#if ok !== null}
+							{@const [x, y] = at(J0 + ((hover + k) % N) * SPAN, R + A + 11)}
+							<circle cx={x} cy={y} r="5.5" class="join preview" class:ok class:bad={!ok} />
+						{/if}
+					{/each}
+				{/if}
 			</g>
 			{#if done}
 				<text x={C} y={C - 4} class="big">Closed!</text>
@@ -217,6 +280,8 @@
 			Genome closed in {time(took)} with {moves} moves.
 		{:else if wrong}
 			Red dots mark ends that pair wrongly: click a piece you placed to take it back.
+		{:else if misses >= FREE_MISSES && picked !== null}
+			Each piece now goes only into its own gap.
 		{:else if picked !== null}
 			Now click a gap in the ring for it.
 		{:else}
@@ -231,6 +296,7 @@
 					type="button"
 					class="piece"
 					class:picked={picked === p}
+					class:shake={picked === p && nope !== null}
 					draggable="true"
 					aria-label={label(p)}
 					aria-pressed={picked === p}
@@ -345,6 +411,10 @@
 		stroke-width: 3.6;
 		stroke-linecap: butt;
 	}
+	/* The sticky ends, bolder: the bases a piece joins by. */
+	.rung.end {
+		stroke-width: 6.4;
+	}
 	.strand {
 		fill: none;
 		stroke-width: 5.5;
@@ -397,6 +467,41 @@
 	}
 	.join.ok {
 		fill: var(--mg-ok);
+	}
+	.join.preview {
+		stroke: var(--mg-surface);
+		stroke-width: 2;
+	}
+	.target.nope {
+		stroke: color-mix(in srgb, var(--mg-danger) 30%, transparent);
+	}
+	.chances {
+		display: inline-flex;
+		gap: 4px;
+	}
+	.chances i {
+		width: 9px;
+		height: 9px;
+		border-radius: 50%;
+		background: var(--mg-accent);
+	}
+	.chances i.used {
+		background: none;
+		box-shadow: inset 0 0 0 1.5px var(--mg-border-strong);
+	}
+	.piece.shake {
+		animation: shake 420ms ease-in-out;
+		border-color: var(--mg-danger);
+	}
+	@keyframes shake {
+		20%,
+		60% {
+			transform: translateX(-5px);
+		}
+		40%,
+		80% {
+			transform: translateX(5px);
+		}
 	}
 	.join.bad {
 		fill: var(--mg-danger);

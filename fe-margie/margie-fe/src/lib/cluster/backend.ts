@@ -1371,6 +1371,12 @@ export async function clusterApi<T = any>(path: string, init: RequestInit = {}):
 			// Where each step's results came from: the run's cache report, or its job log for an older run.
 			if (run[2] === 'sources') return get(`/v1/ssh/job_sources/${q(id)}`);
 			if (run[2] === 'resume' || run[2] === 'restart') return relaunchRun(id, run[2]);
+			// One finished job leaves the list, after a backup of it (job-history-backups).
+			if (method === 'DELETE') {
+				const cleared = await call('POST', '/v1/ssh/job_history/clear', { job_ids: [id] });
+				jobs.drop();
+				return cleared;
+			}
 			return runDetail(id, params);
 		}
 		// A copy or move under way (Files): its state and each item's outcome.
