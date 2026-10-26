@@ -8,8 +8,8 @@
 		"options": [
 			"Electrons passing through the F1 head on their way to O2",
 			"A phosphoryl group handed to ADP from phosphoenolpyruvate",
-			"Protons flowing back into the cell through Fo, which turns a rotor coupled to F1",
-			"Hydrolysis of GTP made in the TCA cycle"
+			"Protons flowing back in through Fo, which turns a rotor coupled to F1",
+			"Hydrolysis of GTP made by succinyl-CoA synthetase in the TCA cycle"
 		],
 		"answer": 2,
 		"explain": "Protons pumped out by the respiratory chain flow back down the proton motive force through the membrane-embedded Fo part and turn its ring of c subunits. The rotating central stalk changes the shape of the catalytic subunits in F1, which bind ADP and phosphate, form ATP and release it. Some anaerobes, such as Acetobacterium woodii, drive the same kind of enzyme with a sodium ion gradient."
@@ -79,9 +79,9 @@
 				"question": "Why does the anoxic culture take up glucose faster?",
 				"options": [
 					"The anoxic cells oxidise each glucose fully to CO2 and so need more of it",
-					"Fermentation yields far less ATP per glucose than respiration, so more glucose must be broken down for the same growth",
+					"Fermentation yields far less ATP per glucose than respiration does",
 					"Without O2, glucose enters by simple diffusion, which is faster than transport",
-					"Without O2 the cells need no ATP for biosynthesis"
+					"The anoxic cells divert most of the extra glucose into stored glycogen"
 				],
 				"answer": 1,
 				"explain": "A fermenting cell gains only a few ATP per glucose, mostly by substrate-level phosphorylation, whereas respiration that oxidises glucose to CO2 with O2 gains several times more, most of it through the proton motive force. To make the ATP needed for the same growth, the fermenting culture has to break down much more glucose."
@@ -89,10 +89,10 @@
 			{
 				"question": "Why do the anoxic cells reduce pyruvate and its products to lactate and ethanol rather than release pyruvate?",
 				"options": [
-					"To make extra ATP at each reduction step",
-					"To use up CO2 that would otherwise acidify the cell",
-					"To build a proton motive force for the flagella",
-					"To reoxidise the NADH formed in glycolysis, so that NAD+ is available to keep glycolysis running"
+					"To make extra ATP by substrate-level phosphorylation at each reduction step",
+					"To use up CO2 from glycolysis that would otherwise acidify the cytoplasm",
+					"To build a proton motive force that drives the flagellar motor",
+					"To reoxidise the NADH from glycolysis, so that glycolysis can keep running"
 				],
 				"answer": 3,
 				"explain": "Glyceraldehyde-3-phosphate dehydrogenase needs NAD+, and the cell holds only a small NAD pool. Lactate dehydrogenase and the aldehyde and alcohol dehydrogenases pass the electrons of NADH back onto carbon compounds made from glucose, which balances the fermentation, and these reduction steps make no ATP themselves."
@@ -191,8 +191,8 @@
 				"question": "Why is O2 used up first, at the top, while nitrate and sulfate remain deeper down?",
 				"options": [
 					"O2 has the most negative E°′ of the acceptors, so it is the easiest to reduce",
-					"Sulfate is toxic to aerobic bacteria",
-					"Of the acceptors present, O2 gives the most energy per electron from the same organic donor, so aerobic respirers win while it lasts",
+					"Sulfate poisons aerobic bacteria, so they keep to the top layer where sulfate is scarce",
+					"O2 yields the most energy per electron, so aerobic respirers outgrow the rest while it lasts",
 					"Nitrate and sulfate can take electrons only after O2 has oxidised them"
 				],
 				"answer": 2,
@@ -201,10 +201,10 @@
 			{
 				"question": "Which process forms the black colour and the rotten-egg smell?",
 				"options": [
-					"Sulfate reduction, which releases H2S that also reacts with Fe(II) to form black iron sulfide",
-					"Methanogenesis, which releases H2S from CO2",
-					"Nitrate reduction, which releases ammonia",
-					"Oxidation of sulfide to sulfate by O2"
+					"Sulfate reduction, which releases H2S that forms black iron sulfide with Fe(II)",
+					"Methanogenesis, which forms H2S along with methane as CO2 is reduced by H2",
+					"Nitrate reduction, which releases ammonia with a sharp, foul smell",
+					"Oxidation of sulfide to sulfate by O2 within the black layer"
 				],
 				"answer": 0,
 				"explain": "Sulfate-reducing bacteria and archaea pass electrons from organic compounds or H2 to sulfate and release H2S, which smells of rotten eggs. The sulfide combines with dissolved Fe(II) to form black iron sulfides."
@@ -212,10 +212,10 @@
 			{
 				"question": "Why is methane formed mainly below the sulfate zone?",
 				"options": [
-					"Methanogens need O2 to make methane",
-					"Methanogens use sulfate as their electron acceptor",
+					"Methanogens are strict aerobes that need O2 to turn CO2 into methane",
+					"Methanogens use sulfate as their electron acceptor, as sulfate reducers do",
 					"The deepest mud is the coldest, and methanogens grow only in the cold",
-					"Sulfate reducers take up H2 and acetate at lower concentrations than methanogens can use, so methanogens thrive once sulfate is gone"
+					"Sulfate reducers outcompete methanogens for H2 and acetate while sulfate lasts"
 				],
 				"answer": 3,
 				"explain": "Sulfate reducers and methanogens compete for the same H2 and acetate, and while sulfate lasts the sulfate reducers keep these substrates at concentrations too low for methanogens to use well. Once sulfate is used up, methanogens that reduce CO2 with H2 or split acetate take over."
@@ -230,9 +230,9 @@
 		"kind": "choice",
 		"question": "A protonophore that collapses the proton motive force is added to Escherichia coli growing aerobically on glucose. Which of these keeps working in the first minutes?",
 		"options": [
-			"ATP formation by phosphoglycerate kinase and pyruvate kinase in glycolysis",
-			"ATP synthesis by the F1Fo ATP synthase",
-			"Rotation of the flagella",
+			"ATP formation by the kinases of glycolysis in the cytoplasm",
+			"ATP synthesis by the F1Fo ATP synthase in the membrane",
+			"Rotation of the flagella by the MotA–MotB stator",
 			"Drug export by the proton-driven efflux pump AcrAB–TolC"
 		],
 		"answer": 0,
@@ -283,9 +283,9 @@
 			{
 				"question": "Which electron donor do the purple sulfur bacteria use, and what are the globules?",
 				"options": [
-					"Water, with the globules made of glycogen",
-					"O2, with the globules made of polyphosphate",
-					"Nitrate, with the globules made of gas vesicles",
+					"Water, with the globules made of glycogen from fixed CO2",
+					"O2, with the globules made of polyphosphate stored for energy",
+					"Nitrate, with the globules made of gas vesicles that keep them afloat",
 					"Sulfide, with the globules made of elemental sulfur formed from it"
 				],
 				"answer": 3,
@@ -294,9 +294,9 @@
 			{
 				"question": "How can the purple bacteria still harvest light beneath the dense cyanobacterial layer?",
 				"options": [
-					"Their bacteriochlorophylls absorb near-infrared light, which passes through the cyanobacterial layer above",
-					"They use heat from the mud in place of light",
-					"They take up ATP released by the cyanobacteria",
+					"Their bacteriochlorophylls absorb near-infrared light, which the cyanobacteria let through",
+					"They capture heat from the warm mud through their reaction centres in place of light",
+					"They take up ATP and NADPH released by the cyanobacteria above them",
 					"They absorb ultraviolet light, which reaches deepest into the mat"
 				],
 				"answer": 0,
@@ -354,7 +354,7 @@
 			"It splits water and releases O2, as photosystem II does",
 			"It passes excited electrons to NADP+, making NADPH for CO2 fixation",
 			"It hands the light energy to bacteriochlorophyll in a reaction centre",
-			"It pumps protons out of the cell, building a proton motive force that ATP synthase can use"
+			"It pumps protons out of the cell, building a proton motive force"
 		],
 		"answer": 3,
 		"explain": "Like bacteriorhodopsin of haloarchaea, proteorhodopsin is a light-driven proton pump: light isomerises its bound retinal and the protein moves a proton outward, with no electron transport, chlorophyll or O2 involved. Escherichia coli given a proteorhodopsin gene and the genes for making its retinal made ATP in the light."
@@ -389,10 +389,10 @@
 			{
 				"question": "Why does the bacterium have to oxidise a large amount of Fe2+ for each cell it makes?",
 				"options": [
-					"The Fe3+/Fe2+ couple has a very positive E°′ (about +0.77 V at pH 2), so each electron passed to O2 releases little energy",
-					"Most of the Fe2+ is built into iron–sulfur proteins",
+					"The Fe3+/Fe2+ couple has a very positive E°′ (about +0.77 V at pH 2), so each electron yields little energy",
+					"Most of the Fe2+ taken up is built into the iron–sulfur proteins and cytochromes of the chain",
 					"Fe2+ oxidation releases more energy than the cell can use, so the excess is wasted",
-					"Fe3+ is reduced back to Fe2+ inside the cell"
+					"Fe3+ is reduced back to Fe2+ inside the cell to make the NADH needed for CO2 fixation"
 				],
 				"answer": 0,
 				"explain": "Each Fe2+ gives up a single electron, and the drop from the Fe3+/Fe2+ couple to O2 is small compared with the drop from H2 or NADH to O2. The cell also has to push some electrons uphill to NAD+ to make the reducing power for CO2 fixation, which costs it further energy."
@@ -400,10 +400,10 @@
 			{
 				"question": "Why does the acid help the bacterium compete for Fe2+?",
 				"options": [
-					"Acid makes each Fe2+ give up two electrons in place of one",
-					"Acid lets the cell use Fe3+ as its electron donor",
-					"At low pH, Fe2+ reacts only slowly with O2 on its own, whereas near neutral pH it oxidises quickly without help",
-					"At low pH the bacterium has no need for O2"
+					"Acid makes each Fe2+ give up two electrons in place of one, doubling the yield",
+					"Acid lets the cell use Fe3+ as its electron donor once the Fe2+ runs short",
+					"At low pH, Fe2+ reacts only slowly with O2 on its own, unlike near neutral pH",
+					"At low pH the bacterium needs no O2, so it escapes the competition for oxygen"
 				],
 				"answer": 2,
 				"explain": "Near neutral pH, Fe2+ reacts quickly with O2 by itself, so neutrophilic iron oxidisers that use O2 grow mainly at oxic–anoxic boundaries, where little O2 is present. At pH 2 the chemical reaction is very slow, which leaves the Fe2+ to acidophiles, and in such waters they carry out most of the iron oxidation."
@@ -418,10 +418,10 @@
 		"kind": "choice",
 		"question": "In the textbook form of the TCA cycle, which set of products does one turn give as it oxidises the acetyl group of one acetyl-CoA?",
 		"options": [
-			"2 pyruvate, 2 NADH and 2 ATP",
+			"2 pyruvate, 2 NADH, 2 ATP and 1 enzyme-bound FADH2",
 			"2 CO2, 3 NAD(P)H, 1 enzyme-bound FADH2 and 1 ATP or GTP",
-			"1 CO2, 2 NADH, 1 FADH2 and 1 ATP",
-			"2 CO2, 1 NADH and 4 ATP"
+			"1 CO2, 2 NAD(P)H, 1 enzyme-bound FADH2 and 1 ATP or GTP",
+			"2 CO2, 1 NADH, 2 enzyme-bound FADH2 and 4 ATP"
 		],
 		"answer": 1,
 		"explain": "Isocitrate dehydrogenase and 2-oxoglutarate dehydrogenase each release one CO2, and with malate dehydrogenase they reduce three NAD(P)+; the isocitrate dehydrogenase of E. coli uses NADP+. Succinate dehydrogenase reduces its bound FAD and passes the electrons to quinone, and succinyl-CoA synthetase makes one ATP or GTP by substrate-level phosphorylation."
@@ -748,9 +748,9 @@
 				"question": "What does the inside-positive membrane potential do for the cell?",
 				"options": [
 					"It drives ATP synthesis on its own, without the pH gradient",
-					"It shows that the membrane has been damaged by the acid",
-					"It comes from protons pumped into the cytoplasm",
-					"It opposes the inflow of protons, helping the cell hold a gradient of several pH units"
+					"It shows that the acid has damaged the membrane, letting protons leak in",
+					"It comes from protons pumped into the cytoplasm by the respiratory chain",
+					"It opposes the inflow of protons down the steep pH gradient"
 				],
 				"answer": 3,
 				"explain": "A positive interior repels protons and slows their leak inwards down the steep pH gradient; acidophiles are thought to build it mainly by taking up cations such as K+. ATP synthase then runs largely on the pH gradient."
@@ -833,10 +833,10 @@
 			{
 				"question": "How does the mutant keep its Na+ gradient when no CCCP is present?",
 				"options": [
-					"Its respiratory chain pumps H+, and Na+/H+ antiporters swap internal Na+ for external H+",
-					"It takes up Na+ through the PTS",
-					"Its ATP synthase pumps Na+ out",
-					"Na+ diffuses out of the cell down its gradient"
+					"Its proton pumps drive Na+/H+ antiporters that expel Na+",
+					"It pumps Na+ out through the PTS as it takes up sugars",
+					"Its ATP synthase runs backwards, using ATP to pump Na+ out",
+					"Na+ diffuses out of the cell down its own concentration gradient"
 				],
 				"answer": 0,
 				"explain": "This secondary route turns the proton motive force into a Na+ gradient, which is why CCCP stops the mutant: once protons move freely, the antiporters lose their driving force. E. coli, which lacks a respiratory Na+ pump, makes its Na+ gradient the same way, with NhaA exchanging 2 H+ for each Na+."
@@ -854,10 +854,10 @@
 			{
 				"question": "Why is nitrate used first?",
 				"options": [
-					"Nitrate/nitrite sits at +0.42 V against +0.03 V for fumarate/succinate, so more energy is released per electron",
+					"Nitrate/nitrite at +0.42 V yields more energy per electron than fumarate/succinate at +0.03 V",
 					"Nitrate is reduced by substrate-level phosphorylation, which is faster than respiration",
-					"Fumarate reductase works only once O2 is present",
-					"Nitrite has to build up before fumarate reductase can be made"
+					"Fumarate reductase is an aerobic enzyme that works only once O2 is present",
+					"Nitrite has to build up first, since it induces the fumarate reductase genes"
 				],
 				"answer": 0,
 				"explain": "Electrons from the quinone pool fall about 0.4 V further to nitrate than to fumarate, and the Nar redox loop adds to the proton motive force, so nitrate respiration gives the higher growth yield. E. coli preferentially uses the acceptor with the highest potential available."
@@ -943,8 +943,8 @@
 			{
 				"question": "What does a fractional yield of this kind require?",
 				"options": [
-					"ATP comes in whole molecules, so about three acetate are made per ATP, and the ion gradient is the pool that lets the cell average over turns of the pathway",
-					"The cell makes a third of an ATP molecule at a time",
+					"The ion gradient pools the energy of about three turns of the pathway into each whole ATP",
+					"The ATP synthase makes one third of an ATP at each of its three catalytic sites per turn",
 					"The ATP synthase runs backwards part of the time, so the figure is a net of two directions",
 					"A second substrate-level phosphorylation supplies the rest of the ATP during autotrophic growth"
 				],
@@ -964,9 +964,9 @@
 			{
 				"question": "Which reaction does an Ech complex couple to the membrane?",
 				"options": [
-					"Transfer of a methyl group to coenzyme M, coupled to Na+ export",
-					"Oxidation of NADH with a quinone as acceptor, coupled to H+ export",
-					"Reversible exchange of electrons between reduced ferredoxin and protons, releasing or consuming H2 and translocating ions",
+					"Transfer of a methyl group from methyl-H4MPT to coenzyme M, coupled to Na+ export",
+					"Oxidation of NADH with menaquinone as acceptor, coupled to H+ export",
+					"Reversible transfer of electrons between ferredoxin and H+/H2, translocating ions",
 					"Reduction of CO2 to formate with electrons from H2, without ion movement"
 				],
 				"answer": 2,
@@ -976,8 +976,8 @@
 				"question": "What do the missing rnf cluster and the lack of a Na+ requirement suggest about this acetogen?",
 				"options": [
 					"It conserves no energy chemiosmotically and relies on substrate-level phosphorylation",
-					"An Ech complex is its coupling site, and its gradient is a proton gradient rather than the Na+ gradient of Rnf-type acetogens",
-					"It fixes CO2 by the Calvin cycle instead",
+					"An Ech complex is its coupling site, with H+ rather than Na+ as the coupling ion",
+					"It fixes CO2 by the Calvin cycle instead, which needs no Rnf or Na+",
 					"Its ATP synthase works without an ion gradient at high temperature"
 				],
 				"answer": 1,
@@ -987,9 +987,9 @@
 				"question": "Deleting the whole ech2 cluster leaves growth on sugars and on H2 plus CO2 much as before, while growth on CO fails and growth on pyruvate is slow at first. What does that pattern suggest?",
 				"options": [
 					"Ech2 is the one coupling site in this organism, so the mutant conserves no energy on any of these substrates",
-					"Ech2 serves only as a sensor of H2 pressure and takes no part in energy metabolism",
-					"CO and pyruvate are oxidised by ferredoxin-dependent enzymes, so losing Ech2 hurts most there, while on the other substrates Ech1 or another enzyme can take over the ferredoxin step",
-					"The mutant switches to Rnf, which the cell keeps in reserve"
+					"Ech2 serves only as a sensor of H2 pressure, regulating other genes, and takes no part in energy metabolism",
+					"CO and pyruvate are oxidised by ferredoxin-dependent enzymes; on the other substrates Ech1 or another enzyme can stand in",
+					"The mutant switches on a silent rnf cluster kept in reserve, which takes over the ferredoxin step"
 				],
 				"answer": 2,
 				"explain": "Carbon monoxide and pyruvate are oxidised by ferredoxin-dependent enzymes, so reduced ferredoxin has to be reoxidised for the pathway to turn, which is where loss of Ech2 bites. On sugars and on H2 plus CO2 the mutant grows as fast as the wild type, where Ech1 or, as the authors propose, the hydrogen-dependent CO2 reductase can supply the H2-dependent ferredoxin reduction instead."
@@ -1060,9 +1060,9 @@
 				"question": "Taking about −20 kJ/mol as the smallest free energy change that supports growth, what follows for the two H2 values?",
 				"options": [
 					"Both values leave enough energy, so the H2 pressure makes little difference here",
-					"At 10 Pa the yield falls short of that quantum, and butyrate oxidation becomes worthwhile once the partner holds H2 near 1 Pa or below",
+					"At 10 Pa the yield falls short of the quantum, and at 1 Pa it is enough to support growth",
 					"The quantum applies to respiring cells rather than to syntrophs, so it can be set aside",
-					"At 1 Pa H2 the partner's methanogenesis turns endergonic, so the pair stalls"
+					"At 1 Pa H2 the partner's own methanogenesis turns endergonic, so the pair stalls"
 				],
 				"answer": 1,
 				"explain": "At 10 Pa the oxidiser gains about 15 kJ/mol, less than one ion crossing is worth, so growth needs the lower H2 pressure. Methanogenesis from H2 and CO2 stays exergonic down to roughly 0.1 Pa, so the partner's own reaction does not turn around at 1 Pa, although measured methanogen thresholds often lie a few Pa higher, and syntrophic cultures sometimes work closer to equilibrium than the quantum suggests."
@@ -1077,10 +1077,10 @@
 		"kind": "choice",
 		"question": "Syntrophic partners often share a reaction that leaves each of them about −20 kJ/mol. Why is that figure treated as the smallest useful amount of energy?",
 		"options": [
-			"It is the free energy of hydrolysing one ATP under cellular conditions",
-			"It is roughly the work of moving one monovalent ion across a charged membrane, about a third of what an ATP costs, so it is the smallest amount an ion pump can bank",
+			"It is the free energy of hydrolysing one ATP to ADP and phosphate under the conditions in a growing cell",
+			"It is about the work of moving one monovalent ion across the membrane, a third of an ATP and the least a pump can bank",
 			"Below that figure enzymes turn over too slowly for the reaction to proceed at a measurable rate",
-			"It is the free energy change at which a reaction reaches equilibrium"
+			"It is the free energy change at which a reaction reaches equilibrium, so no net flux remains below it"
 		],
 		"answer": 1,
 		"explain": "Making an ATP in a growing cell costs some 50 to 70 kJ/mol and the synthase couples three to four ions to each ATP, so one ion crossing is worth around 20 kJ/mol. Measurements on syntrophic co-cultures have found some of them working closer to equilibrium than this, so the quantum is a useful guide rather than a hard floor."
@@ -1116,10 +1116,10 @@
 		"kind": "choice",
 		"question": "Hydrogenotrophic methanogens without cytochromes reduce ferredoxin for the first step of methanogenesis with the cytoplasmic HdrABC–MvhADG complex rather than with a hydrogenase on its own. Which account fits their habitat?",
 		"options": [
-			"H2 is plentiful where they grow, so the complex serves mainly to dispose of surplus reducing power as methane",
-			"The complex draws on the membrane potential to push electrons from H2 onto ferredoxin",
+			"H2 is plentiful where they grow, so the complex serves mainly to dispose of surplus reducing power, much as a fermenter makes lactate",
+			"The cytoplasmic complex draws on the Na+ motive force built by Mtr to push electrons from H2 uphill onto ferredoxin",
 			"At the H2 pressures of their habitat the 2H+/H2 couple still lies below ferredoxin, so a hydrogenase on its own would reduce it",
-			"Near 10 Pa H2, where they grow, the 2H+/H2 couple sits at about −0.30 V, so reducing ferredoxin at −0.41 V is endergonic; the complex pays for it by reducing CoM-S-S-CoB at about −0.14 V in the same cycle"
+			"Near 10 Pa H2 the 2H+/H2 couple sits at about −0.30 V, so reducing ferredoxin at −0.41 V is endergonic, paid for by reducing CoM-S-S-CoB at about −0.14 V"
 		],
 		"answer": 3,
 		"explain": "The purified complex reduces one ferredoxin by two electrons per heterodisulfide reduced: 2 H2 + Fdox + CoM-S-S-CoB → Fdred²⁻ + CoM-SH + CoB-SH + 2 H+. Each tenfold fall in H2 pressure raises the 2H+/H2 potential by about 30 mV, so at 10 Pa ferredoxin reduction costs roughly 20 kJ/mol, which the exergonic heterodisulfide branch supplies."
@@ -1157,10 +1157,10 @@
 		"kind": "choice",
 		"question": "In Methanosarcina the heterodisulfide CoM-S-S-CoB is reduced at the membrane, whereas cytochrome-free methanogens reduce it with a cytoplasmic complex. What lets the step in Methanosarcina conserve energy as a proton gradient?",
 		"options": [
-			"Its heterodisulfide reductase HdrDE sits in the membrane and draws its electrons from reduced methanophenazine, a lipid-soluble carrier much like a quinone, so the reduction works as a loop",
-			"Methyl-coenzyme M reductase pumps the protons out of the cell as the methane leaves",
+			"Membrane-bound HdrDE takes its electrons from reduced methanophenazine, a quinone-like carrier, so the reduction works as a loop",
+			"Methyl-coenzyme M reductase sits in the membrane and pumps protons out of the cell as the methane leaves",
 			"The heterodisulfide is reduced on the outer face of the membrane, so the protons it takes up come from outside rather than from the cytoplasm",
-			"Methanophenazine stands in for coenzyme B, so no heterodisulfide forms"
+			"Methanophenazine stands in for coenzyme B, so no heterodisulfide forms and the reductase step is skipped"
 		],
 		"answer": 0,
 		"explain": "A hydrogenase or an F420H2 dehydrogenase keeps the membrane pool of methanophenazine reduced, and HdrDE then releases protons on the outer face as it oxidises the dihydro form, while reducing the heterodisulfide at the cytoplasmic face with two protons taken from inside; the two half reactions sit on opposite sides of the membrane, which is how the step is thought to translocate protons. Cytochrome-free methanogens carry out the same reduction in the cytoplasm, inside the bifurcating HdrABC–MvhADG complex, so that step builds no gradient of its own."
@@ -1175,9 +1175,9 @@
 			{
 				"question": "How does the cell make the NADH its biosynthesis needs?",
 				"options": [
-					"Part of the electrons from Fe(II) are driven uphill through a bc1 complex and a NADH:quinone oxidoreductase working in reverse, at the expense of the proton motive force",
-					"Fe(II) reduces NAD+ directly, since the two couples sit close together",
-					"Formate dehydrogenase supplies the NADH from CO2",
+					"Some electrons run uphill through bc1 and a reversed NADH:quinone oxidoreductase, driven by the proton motive force",
+					"Fe(II) reduces NAD+ directly through a soluble Fe(II):NAD+ oxidoreductase, since the two couples sit close together",
+					"Formate dehydrogenase makes the NADH as it reduces CO2 to formate in the cytoplasm",
 					"NADH comes from the oxidative pentose phosphate pathway, running on glycogen laid down earlier"
 				],
 				"answer": 0,
@@ -1186,10 +1186,10 @@
 			{
 				"question": "Why is the growth yield per Fe(II) oxidised so small?",
 				"options": [
-					"Fe(III) is toxic, so the cells stop growing well before the iron is used up",
-					"The terminal oxidase translocates no protons, so the chain conserves nothing",
-					"Each Fe(II) gives up one electron across a modest span, and part of that gain is spent again on reverse electron transport and on fixing CO2",
-					"Most of the iron is oxidised abiotically, so the cells see little of it"
+					"Fe(III) is toxic, so the cells stop growing well before the Fe(II) in the medium is used up",
+					"The terminal oxidase translocates no protons, so the chain conserves nothing from the iron it oxidises",
+					"Each Fe(II) gives one electron over a small span, and part of the gain goes on reverse electron transport and CO2 fixation",
+					"Most of the iron is oxidised abiotically by O2 at pH 2, so the cells see little of the Fe(II)"
 				],
 				"answer": 2,
 				"explain": "One electron per iron atom and a small potential difference leave little energy per iron oxidised, and an autotroph then has to pay for carbon fixation and for the uphill electrons. The outcome is a large amount of iron oxidised for each gram of cells formed."
@@ -1198,8 +1198,8 @@
 				"question": "The medium is about 4.5 pH units more acidic than the cytoplasm, which on its own would be worth more than 250 mV. Why is the measured proton motive force smaller than that?",
 				"options": [
 					"The cytoplasm is at pH 2 as well, so there is no gradient to speak of",
-					"Protons leak in so fast that no gradient forms",
-					"Acidophiles of this kind hold a membrane potential that is positive inside, and it offsets part of the pH gradient",
+					"Protons leak in through the membrane so fast that no pH gradient can form",
+					"A membrane potential that is positive inside offsets part of the pH gradient",
 					"The ATP synthase runs backwards and cancels the gradient it would otherwise use"
 				],
 				"answer": 2,
@@ -1224,10 +1224,10 @@
 		"kind": "choice",
 		"question": "What did cryo-electron microscopy of conductive filaments from Geobacter sulfurreducens show, and what is still disputed?",
 		"options": [
-			"The filaments proved to be flagella coated with riboflavin, and the role of cytochromes is settled",
-			"The filaments imaged there are micrometre-long polymers of the hexahaem cytochrome OmcS, with haems stacked a few ångström apart; how much type IV pili themselves carry current in a biofilm is still argued",
-			"The filaments conduct by proton hopping along a chain of ordered water molecules, so no haem is needed",
-			"The filaments are type IV pili whose aromatic side chains conduct, and the cytochrome question has been closed"
+			"The filaments proved to be flagella coated with riboflavin, which shuttles the electrons, and the role of cytochromes is settled",
+			"The filaments imaged there are polymers of the hexahaem cytochrome OmcS, haems a few ångström apart; how far type IV pili carry current in biofilms is still argued",
+			"The filaments conduct by proton hopping along a chain of ordered water molecules in a hollow core, so no haem is needed",
+			"The filaments are type IV pili whose stacked aromatic side chains conduct like a metal, and the cytochrome question has been closed"
 		],
 		"answer": 1,
 		"explain": "The 2019 structure identified polymerised OmcS with haems within about 3.5 to 6 Å of one another, and filaments from a strain lacking omcS were far less conductive. Further filament types have since been described, among them OmcZ fibres, and the contribution of pili to conduction in intact biofilms remains contested."
@@ -1274,10 +1274,10 @@
 		"kind": "choice",
 		"question": "A marine bacterium carries a proteorhodopsin gene and grows on dissolved organic carbon. What does the pigment contribute?",
 		"options": [
-			"Electrons from water, which the cell hands to its quinone pool",
+			"Electrons from water, split in the light, which the cell hands to its quinone pool for respiration",
 			"A light-driven Na+ pump whose gradient drives CO2 fixation, so the cell grows autotrophically in the light",
-			"A light-driven proton pump, so part of the proton motive force is made without respiring substrate; it yields no reduced carrier, and in some strains light raises cell yield or survival when carbon is scarce",
-			"A second photosystem that works with bacteriochlorophyll to reduce NADP+"
+			"A light-driven proton pump that adds to the proton motive force and spares substrate, but yields no reduced carrier",
+			"A second photosystem that works with bacteriochlorophyll a to reduce NADP+ for CO2 fixation"
 		],
 		"answer": 2,
 		"explain": "Proteorhodopsin is a retinal-based proton pump, and the gradient it makes can drive ATP synthesis and transport, which spares organic carbon, but the cell still needs a chemical donor for biosynthesis. Light raised the yield of a marine Bacteroidota isolate in seawater poor in labile carbon and lengthened survival of a starved Vibrio strain, while other proteorhodopsin-carrying isolates show little response to light."
@@ -1314,10 +1314,10 @@
 			{
 				"question": "A relative has a c ring of 8 subunits and makes 3 ATP per turn, so about 2.7 protons per ATP. What follows at the same phosphorylation potential?",
 				"options": [
-					"It needs a higher proton motive force, near 190 mV, to phosphorylate at that potential",
+					"It needs a higher proton motive force, near 190 mV",
 					"It makes ATP at a lower proton motive force than the cell above",
-					"It cannot make ATP at any proton motive force",
-					"Its ATP yield per glucose doubles"
+					"It cannot make ATP, since a fraction of a proton cannot cross the membrane",
+					"Its ATP yield per glucose doubles, since it spends fewer protons per ATP"
 				],
 				"answer": 0,
 				"explain": "49 ÷ (2.67 × 96.5) = 0.190 V, so the smaller ring buys economy of ions at the price of needing a steeper gradient. Rings run from about 8 to 15 subunits, and the larger ones are found where the available force is low."
@@ -1336,9 +1336,9 @@
 				"question": "Why can the cell not bank this energy by substrate-level phosphorylation?",
 				"options": [
 					"Thiamine diphosphate enzymes are unable to take part in energy metabolism",
-					"The route holds no coenzyme A ester that a kinase could work on",
-					"Formate inhibits the kinases of the cell",
-					"The decarboxylation yields far less than the 50 to 70 kJ/mol that a phosphoanhydride bond costs in a growing cell"
+					"The route holds no coenzyme A ester or acyl phosphate that a kinase could work on",
+					"Formate builds up in the cytoplasm and inhibits the kinases that would make ATP",
+					"It releases far less than the 50 to 70 kJ/mol a phosphoanhydride bond costs in a growing cell"
 				],
 				"answer": 3,
 				"explain": "A decarboxylation of this kind is worth about a third of an ATP, so no single phosphoryl transfer can capture it. The route does form oxalyl-CoA and formyl-CoA, but the transferase simply moves the CoA between the two acids rather than releasing the thioester energy."
@@ -1346,10 +1346,10 @@
 			{
 				"question": "How does the cell build a proton motive force from this chemistry?",
 				"options": [
-					"A transporter takes divalent oxalate in and sends monovalent formate out, so net negative charge moves inwards and the interior turns negative, while the decarboxylation consumes a cytoplasmic proton and raises the internal pH",
-					"A membrane-bound decarboxylase pumps Na+ as the carboxyl group leaves",
+					"Swapping divalent oxalate in for monovalent formate out moves net negative charge inwards, and decarboxylation uses up a proton inside",
+					"A membrane-bound decarboxylase pumps Na+ out as the carboxyl group leaves, as methylmalonyl-CoA decarboxylase does",
 					"Formate is oxidised to CO2 by a membrane formate dehydrogenase, which translocates protons as the electrons pass to a quinone",
-					"The CoA transferase works as a proton pump as it swaps the thioester"
+					"The formyl-CoA transferase sits in the membrane and pumps a proton out each time it swaps the CoA thioester"
 				],
 				"answer": 0,
 				"explain": "Reconstitution work on membranes of this organism showed a rapid, electrogenic exchange in which net negative charge moves inwards together with the oxalate, so the interior turns negative, as it would if a positive charge had been pushed out. Decarboxylation inside the cell then takes up a proton, and the cycle of uptake, decarboxylation and efflux is equivalent to exporting about one proton per oxalate."
