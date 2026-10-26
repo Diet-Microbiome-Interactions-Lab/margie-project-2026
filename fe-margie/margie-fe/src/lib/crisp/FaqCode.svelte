@@ -123,14 +123,14 @@
 	}
 	.fc-sym {
 		color: var(--rp-link, var(--mg-accent));
-		font-size: calc(var(--mg-fs) * 1.15);
+		font-size: var(--mg-fs-sm);
 		font-weight: 600;
 		line-height: 1.3;
 		overflow-wrap: anywhere;
 	}
 	.fc-path {
 		color: var(--mg-text-3);
-		font-size: var(--mg-fs-sm);
+		font-size: var(--mg-fs-xs);
 		overflow-wrap: anywhere;
 	}
 	.fc-why {

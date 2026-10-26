@@ -1,178 +1,384 @@
 <script lang="ts">
-	import ReadingPage from '$lib/crisp/ReadingPage.svelte';
+	import { ArrowRight, Compass } from 'lucide-svelte';
+	import { uiBase } from '$lib/workspace/base.svelte';
+	import { ui } from '$lib/workspace/ui.svelte';
 
 	/**
-	 * How to set up MARGIE: a first setup step by step, for one person or a whole lab, with the
-	 * defaults and what to back up. Opened from Home (How to set up MARGIE) and from the working
-	 * folder setup; not in the sidebar.
+	 * How to set up MARGIE, in Guided mode: setting up and running as numbered steps that rise in
+	 * one after another (as Home's Learn more does), then sharing one setup with a lab, the
+	 * defaults, and what to back up. In Simple mode it offers Guided mode instead. Opened from
+	 * Home's button and from the working folder setup; not in the sidebar.
 	 */
 
-	/** The folders the working folder holds. */
-	const INSIDE = [
-		{ name: 'margie-input', holds: 'The genomes you add (FASTA files)' },
-		{ name: 'margie-output', holds: 'The results of each run' },
-		{ name: 'margie-databases', holds: "MARGIE's own databases: the MARGIE database (SQLite), the operon reference, the fingerprint databases and the genome pool" },
-		{ name: 'sif', holds: "The tools' containers, when your account cannot read your group's" },
-		{ name: 'reference-databases/db', holds: "The tools' reference databases, when your account cannot read your group's" }
+	/** Setting up, in order: what each step is, and where it is done. */
+	const SETUP = [
+		{
+			title: 'Connect your cluster account',
+			text: 'Sign up with your cluster’s address and your username. Make a key for MARGIE with ssh-keygen and add its public half to ~/.ssh/authorized_keys; the sign-up page shows the commands.'
+		},
+		{
+			title: 'Set up your working folder',
+			text: 'MARGIE asks for it first: margie in your scratch by default. One click makes margie-input, margie-output and margie-databases in it, and sif and reference-databases/db when your group’s cannot be read.',
+			to: '/analyze',
+			go: 'Open Analyze'
+		},
+		{
+			title: 'Set your SLURM account',
+			text: 'Settings → Cluster: the account your jobs run under and the main partition. GTDB-Tk needs a large-memory partition (about 400 GB), set under Phases.',
+			to: '/settings#cluster',
+			go: 'Open Settings'
+		},
+		{
+			title: 'Containers and reference databases',
+			text: 'Install shows what a run needs. Your group’s are used where they are; otherwise Install copies what it can and builds the rest with margie-build. This is the long part: many hours.',
+			to: '/install',
+			go: 'Open Install'
+		},
+		{
+			title: 'MARGIE’s databases',
+			text: 'The first run sets up margie-databases as a short SLURM job: a copy of your group’s base databases, or new ones where your account reads none. Settings → Databases can start fresh ones.',
+			to: '/settings#databases',
+			go: 'Open Databases'
+		},
+		{
+			title: 'Test it',
+			text: 'Install’s self-test sends a small job to SLURM and shows how it went, so you know the setup works before a real run.',
+			to: '/install',
+			go: 'Run the self-test'
+		}
+	];
+
+	/** Running, once set up. */
+	const RUN = [
+		{ title: 'Add your genomes', text: 'Drop FASTA files (.fna, .fa, .fasta) on Genomes, on Analyze. They go into margie-input.' },
+		{ title: 'Check gene calling and the tools', text: 'Recommended settings are applied; unlock them only to change them. Accept the licence terms once, before the first run.' },
+		{ title: 'Start the run', text: 'Each step goes to SLURM. Jobs follows the run genome by genome, with its log.' },
+		{ title: 'Read the results', text: 'Results shows each genome’s map, every gene with its confidence tier, and the tables to download.' }
+	];
+
+	/** One setup for a whole lab. */
+	const LAB = [
+		'One person sets up the containers, the reference databases and margie-build in the group’s shared folder (a depot folder, for example), with the base databases under it.',
+		'They make the folder readable by the group (chmod -R g+rX on it).',
+		'Each member points Containers and Reference databases (Settings → Folders) there, and sets the Group folder (Settings → Databases).',
+		'Each member keeps their own working folder: genomes, results and MARGIE’s databases stay per person.'
 	];
 
 	/** Each default, and where it is changed. */
 	const DEFAULTS = [
-		{ what: 'Working folder', value: 'margie in your scratch: /scratch/<cluster>/<you>/margie', where: 'Settings → Folders' },
-		{ what: 'Genomes', value: 'margie-input in the working folder', where: 'Settings → Folders' },
-		{ what: 'Results', value: 'margie-output in the working folder', where: 'Settings → Folders' },
-		{ what: "MARGIE's databases", value: 'margie-databases in the working folder', where: 'Settings → Folders' },
-		{ what: 'Containers', value: "Your group's, else sif in the working folder", where: 'Settings → Folders' },
-		{ what: 'Reference databases', value: "Your group's, else reference-databases/db in the working folder", where: 'Settings → Folders' },
-		{ what: 'margie-build', value: "The folder you name, else your group's, else ~/margie-build", where: 'Settings → Folders' },
-		{ what: "Base for MARGIE's databases", value: "Your group's base databases, else new ones", where: 'Settings → Databases' }
+		{ what: 'Working folder', value: '/scratch/<cluster>/<you>/margie', where: 'Settings → Folders' },
+		{ what: 'Genomes | results', value: 'margie-input | margie-output, in the working folder', where: 'Settings → Folders' },
+		{ what: 'MARGIE’s databases', value: 'margie-databases, in the working folder', where: 'Settings → Folders' },
+		{ what: 'Containers', value: 'Your group’s, else sif in the working folder', where: 'Settings → Folders' },
+		{ what: 'Reference databases', value: 'Your group’s, else reference-databases/db in the working folder', where: 'Settings → Folders' },
+		{ what: 'margie-build', value: 'The folder you name, else your group’s, else ~/margie-build', where: 'Settings → Folders' }
+	];
+
+	/** What to back up once it is made. */
+	const KEEP = [
+		{ title: 'Containers and reference databases', text: 'Copy sif and reference-databases/db to your group’s shared space, then point Settings → Folders at the copies.' },
+		{ title: 'MARGIE’s databases', text: 'Back them up from Settings → Databases; they grow with each run.' },
+		{ title: 'Results', text: 'Copy what you need out of scratch: many clusters clear files there that go unused for a while.' }
 	];
 </script>
 
 <svelte:head><title>How to set up MARGIE | MARGIE</title></svelte:head>
 
-<ReadingPage
-	title="How to set up MARGIE"
-	lede="A first setup, step by step, for you alone or for a whole lab: what to prepare, what MARGIE sets up on her own, and what to keep safe once it is done."
-	shade="page-setup"
->
-	<section class="rp-sec" id="before" data-toc="Before you begin">
-		<h2>Before you begin</h2>
-		<p class="rp-lead">
-			MARGIE works in your account on an HPC cluster: she reaches it over SSH and sends each step of a run to SLURM. A first setup needs:
-		</p>
-		<ul>
-			<li>An account on a cluster with SLURM and Apptainer, and a SLURM account (allocation) to run jobs under.</li>
-			<li>Space for a working folder. Scratch suits it: it is fast, and large enough for genomes, results and MARGIE's databases.</li>
-			<li>Room for the tools' containers and reference databases, which are large, unless your group already has them.</li>
-			<li>A partition with large-memory nodes (about 400 GB) if GTDB-Tk works out each genome's domain and genetic code.</li>
-			<li>Optionally, a shared folder for your group (a depot folder, for example), when your lab shares one setup.</li>
-		</ul>
-	</section>
+<div class="cr-page sg" data-shade="page-setup">
+	<div class="cr-head">
+		<h1 class="cr-title">How to set up MARGIE</h1>
+		<p class="cr-lede">For you alone or for a whole lab: what to prepare, what MARGIE sets up on her own, and what to keep once it is done.</p>
+	</div>
 
-	<section class="rp-sec" id="connect" data-toc="1. Connect your account">
-		<h2>1. Connect your cluster account</h2>
-		<p>
-			On the sign-in page, choose Sign up and give your cluster's address and your username. Make a key for MARGIE with
-			<code>ssh-keygen</code> and add its public half to <code>~/.ssh/authorized_keys</code> on the cluster; the sign-up page shows the commands.
-			MARGIE keeps the private key encrypted. To take her access away, delete that key's line from <code>~/.ssh/authorized_keys</code>.
-		</p>
-	</section>
+	{#if !ui.guided}
+		<section class="sg-card sg-simple">
+			<span class="sg-ic" aria-hidden="true"><Compass size={18} /></span>
+			<div>
+				<b>The setup guide is part of Guided mode.</b>
+				<p>Guided mode explains each page as you go, and shows this guide step by step.</p>
+			</div>
+			<button type="button" class="mg-btn primary" onclick={() => ui.update({ mode: 'guided' })}>Switch to Guided</button>
+		</section>
+	{:else}
+		<section class="sg-sec" aria-labelledby="sg-setup">
+			<h2 id="sg-setup">Setting up</h2>
+			<ol class="sg-steps">
+				{#each SETUP as s, i (s.title)}
+					<li style="--i: {i}">
+						<span class="sg-num">{i + 1}</span>
+						<strong>{s.title}</strong>
+						<span class="sg-text">{s.text}</span>
+						{#if s.to}<a class="sg-go" href={uiBase.to(s.to)}>{s.go} <ArrowRight size={14} /></a>{/if}
+					</li>
+				{/each}
+			</ol>
+		</section>
 
-	<section class="rp-sec" id="working" data-toc="2. Working folder">
-		<h2>2. Set up your working folder</h2>
-		<p>
-			The working folder is the first thing MARGIE asks for, on Analyze (under Genomes) and in Settings. By default it is margie in your scratch,
-			<code>/scratch/&lt;cluster&gt;/&lt;you&gt;/margie</code>, and one button makes it with these folders inside:
-		</p>
-		<div class="rp-scroll">
-			<table class="rp-table">
-				<thead><tr><th>Folder</th><th>Holds</th></tr></thead>
-				<tbody>
-					{#each INSIDE as f (f.name)}
-						<tr><td><code>{f.name}</code></td><td>{f.holds}</td></tr>
+		<section class="sg-sec" aria-labelledby="sg-run">
+			<h2 id="sg-run">Running MARGIE</h2>
+			<ol class="sg-steps sg-four">
+				{#each RUN as s, i (s.title)}
+					<li style="--i: {i + 2}">
+						<span class="sg-num">{i + 1}</span>
+						<strong>{s.title}</strong>
+						<span class="sg-text">{s.text}</span>
+					</li>
+				{/each}
+			</ol>
+			<a class="mg-btn primary sg-start" href={uiBase.to('/analyze')}>Start on Analyze <ArrowRight size={15} /></a>
+		</section>
+
+		<section class="sg-sec" aria-labelledby="sg-lab">
+			<h2 id="sg-lab">For a whole lab</h2>
+			<div class="sg-card">
+				<p class="sg-lead">A lab can share one setup, so the long part is done once:</p>
+				<ol class="sg-points">
+					{#each LAB as p, i (p)}<li style="--i: {i}">{p}</li>{/each}
+				</ol>
+				<p class="sg-note">Individual setups are your choice: you can set up your own containers and databases in your working folder instead, at the cost of the hours and the space again.</p>
+			</div>
+		</section>
+
+		<div class="sg-two">
+			<section class="sg-sec" aria-labelledby="sg-defaults">
+				<h2 id="sg-defaults">Defaults</h2>
+				<div class="sg-card sg-table">
+					{#each DEFAULTS as d, i (d.what)}
+						<div class="sg-row" style="--i: {i}">
+							<b>{d.what}</b>
+							<span class="mg-mono">{d.value}</span>
+							<span class="sg-where">{d.where}</span>
+						</div>
 					{/each}
-				</tbody>
-			</table>
-		</div>
-		<p>
-			You can point any of them elsewhere in Settings → Folders. A new working folder takes the folders that sit in it along; a folder you set
-			yourself stays where it is, and so do the containers and reference databases. Files are not moved: the old folder keeps them.
-		</p>
-		<p class="rp-note">
-			Scratch on many clusters deletes files that have not been used for a while. Copy out the results you need, and back up what takes long to
-			make (see Keep what took long, below).
-		</p>
-	</section>
-
-	<section class="rp-sec" id="tools" data-toc="3. Containers and databases">
-		<h2>3. Containers and reference databases</h2>
-		<p>
-			Each annotation tool runs in an Apptainer container and searches its reference databases (Pfam, KEGG, COG, eggNOG, InterPro, GTDB-Tk's and
-			the others). <a href="/install">Install</a> shows what a run needs and whether it is there. When your group keeps them in its shared folder
-			and your account can read it, MARGIE uses them where they are. Otherwise Install sets them up in <code>sif</code> and <code>reference-databases/db</code> in your
-			working folder: it copies what it can and builds the rest with margie-build.
-		</p>
-		<p>
-			margie-build holds the recipes for the containers and databases. MARGIE looks for it in the folder named in Settings → Folders, then in your
-			group's folder, then in <code>~/margie-build</code>, where Install puts a copy when the cluster has none. Building, and setting up
-			margie-build, ask for the build password, which the MARGIE team gives out (see <a href="/contributors">Contributors</a>). InterProScan, MEROPS, TCDB, TMbed and Phobius also
-			need their licences accepted on Install.
-		</p>
-		<p class="rp-note">
-			<b>This is the long part.</b> Building the containers and downloading the reference databases takes many hours. Once they are set up, back
-			them up, ideally in your group's shared space (a depot folder, for example), where the whole group can use them. When no group folder is
-			given, or your account cannot read the default one, MARGIE sets them up in the working folder you gave.
-		</p>
-	</section>
-
-	<section class="rp-sec" id="margie-databases" data-toc="4. MARGIE's databases">
-		<h2>4. MARGIE's databases</h2>
-		<p>
-			Your first run sets up <code>margie-databases</code> as a short SLURM job before it starts. It copies your group's base databases there,
-			so scoring has reference genomes to compare with from the first run. Where your account reads no base databases (in a lab outside the
-			group, for example), it starts new ones instead: MARGIE's starter operon reference, of 29 genomes, and the others empty. These databases
-			grow with each run. Settings → Databases can also start fresh, empty ones, and back yours up.
-		</p>
-	</section>
-
-	<section class="rp-sec" id="slurm" data-toc="5. SLURM">
-		<h2>5. SLURM account and partitions</h2>
-		<p>
-			In Settings → Cluster, set the SLURM account your jobs run under and the main partition. Give GTDB-Tk a large-memory partition under
-			Phases, and any tool its own partition under Per tool.
-		</p>
-	</section>
-
-	<section class="rp-sec" id="first-run" data-toc="6. Test, then run">
-		<h2>6. Test, then run</h2>
-		<p>
-			Install's self-test sends a small job to SLURM and shows how it went. Then open <a href="/analyze">Analyze</a>: add your genomes (drop
-			FASTA files on Genomes), check the gene calling and the tools, and start the run. Jobs follows it, and Results shows what came out.
-		</p>
-	</section>
-
-	<section class="rp-sec" id="lab" data-toc="For a whole lab">
-		<h2>Setting MARGIE up for a whole lab</h2>
-		<p class="rp-lead">A lab can share one setup, so the long part is done once:</p>
-		<ol>
-			<li>
-				One person sets up the containers, the reference databases and margie-build in the group's shared folder (a depot folder, for example),
-				with the base MARGIE databases under it.
-			</li>
-			<li>They make that folder readable by the group, for example with <code>chmod -R g+rX</code> on it.</li>
-			<li>
-				Each member points the Containers folder and the Reference databases folder (Settings → Folders) there, and sets the Group folder
-				(Settings → Databases), so their first run copies the base databases.
-			</li>
-			<li>Each member keeps their own working folder: genomes, results and MARGIE's databases stay per person.</li>
-		</ol>
-		<p>
-			Individual setups are your choice: you can set up your own containers and databases in your working folder instead. That takes the hours
-			and the space again, for each person who does.
-		</p>
-	</section>
-
-	<section class="rp-sec" id="defaults" data-toc="Defaults">
-		<h2>Defaults at a glance</h2>
-		<div class="rp-scroll">
-			<table class="rp-table">
-				<thead><tr><th>What</th><th>Default</th><th>Changed in</th></tr></thead>
-				<tbody>
-					{#each DEFAULTS as d (d.what)}
-						<tr><td>{d.what}</td><td>{d.value}</td><td>{d.where}</td></tr>
+				</div>
+			</section>
+			<section class="sg-sec" aria-labelledby="sg-keep">
+				<h2 id="sg-keep">Keep what took long</h2>
+				<div class="sg-card">
+					{#each KEEP as k, i (k.title)}
+						<div class="sg-keep" style="--i: {i}">
+							<b>{k.title}</b>
+							<span>{k.text}</span>
+						</div>
 					{/each}
-				</tbody>
-			</table>
+				</div>
+			</section>
 		</div>
-	</section>
+	{/if}
+</div>
 
-	<section class="rp-sec" id="keep" data-toc="Keep what took long">
-		<h2>Keep what took long</h2>
-		<ul>
-			<li>Containers and reference databases: copy <code>sif</code> and <code>reference-databases/db</code> to your group's shared space, then point Settings → Folders at the copies.</li>
-			<li>MARGIE's databases: back them up from Settings → Databases, since they grow with each run.</li>
-			<li>Results: copy what you need out of scratch.</li>
-		</ul>
-	</section>
-</ReadingPage>
+<style>
+	.sg {
+		display: flex;
+		flex-direction: column;
+		gap: 26px;
+	}
+	.sg-sec {
+		display: flex;
+		flex-direction: column;
+		gap: 12px;
+		animation: fade calc(220ms * var(--mo-k, 1)) ease-out both;
+	}
+	.sg-sec h2 {
+		margin: 0;
+		font-size: var(--mg-fs-md, 1.05rem);
+		font-weight: 650;
+	}
+	.sg-card {
+		display: flex;
+		flex-direction: column;
+		gap: 10px;
+		padding: 16px 18px;
+		border: 1px solid var(--cr-card-edge, var(--mg-border));
+		border-radius: var(--mg-r);
+		background: var(--cr-card, var(--mg-surface));
+	}
+
+	/* ---- numbered steps that rise in one after another ---- */
+	.sg-steps {
+		display: grid;
+		grid-template-columns: repeat(3, minmax(0, 1fr));
+		gap: 12px;
+		margin: 0;
+		padding: 0;
+		list-style: none;
+	}
+	.sg-steps.sg-four {
+		grid-template-columns: repeat(4, minmax(0, 1fr));
+	}
+	.sg-steps li {
+		display: grid;
+		grid-template-columns: auto minmax(0, 1fr);
+		grid-template-rows: auto 1fr auto;
+		gap: 4px 12px;
+		padding: 14px 16px;
+		border: 1px solid var(--cr-card-edge, var(--mg-border));
+		border-radius: var(--mg-r);
+		background: var(--cr-card, var(--mg-surface));
+		animation: rise calc(320ms * var(--mo-k, 1)) ease-out both;
+		animation-delay: calc(var(--i) * 70ms * var(--mo-k, 1));
+	}
+	.sg-num {
+		grid-row: span 3;
+		display: grid;
+		place-items: center;
+		width: 26px;
+		height: 26px;
+		border-radius: 50%;
+		background: color-mix(in srgb, var(--mg-accent) 14%, transparent);
+		color: var(--mg-accent-ink, var(--mg-accent));
+		font-size: 12px;
+		font-weight: 700;
+	}
+	.sg-steps strong {
+		font-weight: 650;
+	}
+	.sg-text {
+		font-size: var(--mg-fs-sm);
+		color: var(--mg-text-2);
+		line-height: 1.5;
+	}
+	.sg-go {
+		display: inline-flex;
+		align-items: center;
+		gap: 4px;
+		margin-top: 4px;
+		font-size: var(--mg-fs-sm);
+		font-weight: 600;
+		color: var(--mg-accent-ink, var(--mg-accent));
+		text-decoration: none;
+	}
+	.sg-go:hover {
+		text-decoration: underline;
+	}
+	.sg-start {
+		display: inline-flex;
+		align-items: center;
+		gap: 6px;
+		align-self: flex-start;
+		text-decoration: none;
+	}
+
+	/* ---- the lab, the defaults, what to keep ---- */
+	.sg-lead {
+		margin: 0;
+		font-weight: 600;
+	}
+	.sg-points {
+		display: flex;
+		flex-direction: column;
+		gap: 6px;
+		margin: 0;
+		padding-left: 20px;
+		font-size: var(--mg-fs-sm);
+		color: var(--mg-text-2);
+	}
+	.sg-points li {
+		animation: rise calc(280ms * var(--mo-k, 1)) ease-out both;
+		animation-delay: calc(80ms + var(--i) * 60ms * var(--mo-k, 1));
+	}
+	.sg-note {
+		margin: 0;
+		font-size: var(--mg-fs-xs);
+		color: var(--mg-text-3);
+	}
+	.sg-two {
+		display: grid;
+		grid-template-columns: minmax(0, 1.3fr) minmax(0, 1fr);
+		gap: 20px;
+		align-items: start;
+	}
+	.sg-table {
+		gap: 0;
+		padding: 4px 18px;
+	}
+	.sg-row {
+		display: grid;
+		grid-template-columns: 9.5em minmax(0, 1fr);
+		gap: 2px 12px;
+		padding: 9px 0;
+		border-bottom: 1px solid var(--cr-rule, var(--mg-border));
+		font-size: var(--mg-fs-sm);
+		animation: rise calc(260ms * var(--mo-k, 1)) ease-out both;
+		animation-delay: calc(var(--i) * 50ms * var(--mo-k, 1));
+	}
+	.sg-row:last-child {
+		border-bottom: 0;
+	}
+	.sg-row .mg-mono {
+		font-size: var(--mg-fs-xs);
+		overflow-wrap: anywhere;
+	}
+	.sg-where {
+		grid-column: 2;
+		font-size: var(--mg-fs-xs);
+		color: var(--mg-text-3);
+	}
+	.sg-keep {
+		display: flex;
+		flex-direction: column;
+		gap: 2px;
+		font-size: var(--mg-fs-sm);
+		animation: rise calc(260ms * var(--mo-k, 1)) ease-out both;
+		animation-delay: calc(var(--i) * 60ms * var(--mo-k, 1));
+	}
+	.sg-keep span {
+		color: var(--mg-text-2);
+	}
+
+	/* ---- Simple mode ---- */
+	.sg-simple {
+		flex-direction: row;
+		flex-wrap: wrap;
+		align-items: center;
+		gap: 12px 16px;
+	}
+	.sg-simple div {
+		flex: 1 1 280px;
+	}
+	.sg-simple p {
+		margin: 2px 0 0;
+		font-size: var(--mg-fs-sm);
+		color: var(--mg-text-2);
+	}
+	.sg-ic {
+		display: inline-flex;
+		color: var(--mg-accent-ink, var(--mg-accent));
+	}
+
+	@keyframes rise {
+		from {
+			opacity: 0;
+			transform: translateY(8px);
+		}
+	}
+	@keyframes fade {
+		from {
+			opacity: 0;
+		}
+	}
+	:global([data-motion='off']) .sg * {
+		animation: none !important;
+	}
+	@media (max-width: 1100px) {
+		.sg-steps,
+		.sg-steps.sg-four {
+			grid-template-columns: repeat(2, minmax(0, 1fr));
+		}
+		.sg-two {
+			grid-template-columns: minmax(0, 1fr);
+		}
+	}
+	@media (max-width: 640px) {
+		.sg-steps,
+		.sg-steps.sg-four {
+			grid-template-columns: minmax(0, 1fr);
+		}
+		.sg-row {
+			grid-template-columns: minmax(0, 1fr);
+		}
+		.sg-where {
+			grid-column: 1;
+		}
+	}
+</style>

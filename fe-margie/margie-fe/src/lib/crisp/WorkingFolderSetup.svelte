@@ -2,6 +2,7 @@
 	import { uiBase } from '$lib/workspace/base.svelte';
 	import { ws } from '$lib/workspace/data.svelte';
 	import { pathComplete } from '$lib/workspace/path-complete';
+	import { ui } from '$lib/workspace/ui.svelte';
 
 	/**
 	 * First-time setup on a cluster: the working folder before anything else. MARGIE suggests margie
@@ -81,7 +82,7 @@
 		<button type="button" class="mg-btn primary" disabled={busy || !st || (other && !path.trim())} onclick={create}>
 			{busy ? 'Setting it up…' : 'Set up the working folder'}
 		</button>
-		<a class="mg-link" href={uiBase.to('/setup')}>How to set up MARGIE</a>
+		{#if ui.guided}<a class="mg-link" href={uiBase.to('/setup')}>How to set up MARGIE</a>{/if}
 	</div>
 
 	{#if st && (!groupSif || !groupDb)}
