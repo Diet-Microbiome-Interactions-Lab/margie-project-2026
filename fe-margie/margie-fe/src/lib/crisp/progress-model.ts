@@ -12,6 +12,7 @@ import type { Run } from '$lib/api';
 import { COMPARE_TOOLS, RESULT_STAGES, logSteps } from '$lib/crisp/steps';
 import { columnOf, sourceSay, type SourceRow } from '$lib/crisp/cache-report';
 import { uiBase } from '$lib/workspace/base.svelte';
+import { baseOf } from '$lib/crisp/genomes';
 import type { Genome, OrganismResult, ToolClock, ToolJob } from '$lib/workspace/data.svelte';
 
 export type State = 'done' | 'run' | 'wait' | 'failed' | 'partial' | 'none' | 'na';
@@ -225,7 +226,7 @@ export function buildProgress(i: ProgressInput): Progress {
 				const c = fromClock('gtdbtk', genome);
 				if (c) return c;
 				if (i.setting('RUN_GTDBTK') !== '1') return NA('switched off in Settings');
-				const g = i.meta.get(genome);
+				const g = i.meta.get(genome) ?? i.meta.get(baseOf(genome));
 				return g?.domain && g?.genetic_code ? NA('not needed: its domain and genetic code are given') : none(col);
 			}
 			case 'genes': {

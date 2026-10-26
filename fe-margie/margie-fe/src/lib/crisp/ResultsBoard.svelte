@@ -24,7 +24,7 @@
 	import DataGrid from '$lib/workspace/viewers/DataGrid.svelte';
 	import HtmlViewer from '$lib/workspace/viewers/HtmlViewer.svelte';
 	import { backend } from '$lib/workspace/backend.svelte';
-	import { stemOf } from '$lib/crisp/genomes';
+	import { baseOf, stemOf } from '$lib/crisp/genomes';
 	import ImageViewer from '$lib/workspace/viewers/ImageViewer.svelte';
 	import { downloadFigure, downloadFigures } from '$lib/crisp/figure-download';
 
@@ -335,7 +335,7 @@
 	async function rescore() {
 		const g = summary?.genome;
 		if (!g) return;
-		const file = ws.genomes.find((x) => stemOf(x.name) === g)?.name;
+		const file = ws.genomes.find((x) => stemOf(x.name) === g || stemOf(x.name) === baseOf(g))?.name;
 		if (!file) {
 			ui.notify(`${g} is not in your genomes folder: add its FASTA file there to score it again.`, 'error');
 			return;
@@ -451,7 +451,7 @@
 					data-sveltekit-replacestate
 					data-sveltekit-noscroll
 				>
-					<span class="rb-row-name" title={r.name}>{r.name}</span>
+					<span class="rb-row-name" title={r.name}>{baseOf(r.name)}</span>
 					<span class="rb-row-sub">{sub(r.name, r.state)}</span>
 				</a>
 			{/each}
@@ -473,7 +473,7 @@
 		{:else if summary}
 			{#if full}
 				<div class="rb-fullbar">
-					<b class="mg-mono">{summary.genome}</b>
+					<b class="mg-mono" title={summary.genome}>{baseOf(summary.genome)}</b>
 					<span class="rb-fullnote">{show === 'all' ? 'all genes' : `showing ${SHOWS.find((x) => x.id === show)?.label.toLowerCase()}`}</span>
 					<span class="mg-grow"></span>
 					<button type="button" class="rb-btn chat" aria-pressed={chatOpen} onclick={() => ui.toggleFold(CHAT, true)}><Bot size={15} />Chat with the genome</button>
@@ -482,7 +482,7 @@
 			{/if}
 			<header class="rb-head">
 				<div class="rb-title">
-					<h2 id="rb-title" class="mg-mono" title={summary.genome}>{summary.genome}</h2>
+					<h2 id="rb-title" class="mg-mono" title={summary.genome}>{baseOf(summary.genome)}</h2>
 					<ul class="rb-facts">
 						{#if caller}<li><span>gene caller</span>{caller}</li>{/if}
 						{#if summary.geneticCode}<li><span>genetic code</span>{summary.geneticCode}</li>{/if}
@@ -653,7 +653,7 @@
 								{/key}
 							{:else if circular}
 								<p class="rb-fig-note">{figureNote(circular)}</p>
-								<ImageViewer src={fileUrl(circular, true)} alt="Circular map of {summary.genome}" />
+								<ImageViewer src={fileUrl(circular, true)} alt="Circular map of {baseOf(summary.genome)}" />
 							{:else if backend.cluster && summary.final.table}
 								<p class="rb-state">
 									No genome map yet.
@@ -726,13 +726,13 @@
 		{:else if loading}
 			<div class="rb-state rb-wait">
 				<ResultsRing size={120} state="running" />
-				<LoadProgress label="Reading {selected}'s final table" path={pickedResult} size={pickedSize} />
+				<LoadProgress label="Reading {baseOf(selected)}'s final table" path={pickedResult} size={pickedSize} />
 			</div>
 		{:else if selectedRow}
 			<header class="rb-head rb-head-row">
 				<ResultsRing size={64} state={ringState(selectedRow.state)} />
 				<div class="rb-title">
-					<h2 id="rb-title" class="mg-mono" title={selected}>{selected}</h2>
+					<h2 id="rb-title" class="mg-mono" title={selected}>{baseOf(selected)}</h2>
 					<p class="rb-note">
 						{genesOnly
 							? 'This run calls genes and stops there, so no report is written. Choose tools on Analyze and run again to annotate them.'

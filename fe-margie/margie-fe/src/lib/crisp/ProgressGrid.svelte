@@ -1,6 +1,7 @@
 <script lang="ts">
 	import { Check, X } from 'lucide-svelte';
 	import { cachedOn, sourceSay } from '$lib/crisp/cache-report';
+	import { baseOf, hashOf, HASH_NOTE } from '$lib/crisp/genomes';
 	import { formatBytes } from '$lib/api';
 	import { leftText, span, type GridCell, type Progress, type RowProgress } from '$lib/crisp/progress-model';
 	import { uiBase } from '$lib/workspace/base.svelte';
@@ -140,7 +141,7 @@
 			<table class="pgrid" aria-label="Progress, by genome and step">
 				<thead>
 					<tr class="phases">
-						<th class="corner" rowspan="2" scope="col">Genome</th>
+						<th class="corner" rowspan="2" scope="col">Genome <span class="corner-h" title={HASH_NOTE}>| hash</span></th>
 						{#each prog.phases as g (g.label)}<th colspan={g.cols.length} scope="colgroup">{g.label}</th>{/each}
 					</tr>
 					<tr class="tools">
@@ -182,7 +183,8 @@
 									<span class="pie big" class:done={row.pct === 100} class:failed={row.state === 'failed'} style="--p: {row.pct}" aria-hidden="true">
 										{#if row.pct === 100}<Check size={9} strokeWidth={3.5} />{:else if row.state === 'failed'}<X size={9} strokeWidth={3.5} />{/if}
 									</span>
-									<span class="nm">{row.g}</span>
+									<span class="nm">{baseOf(row.g)}</span>
+									<span class="gh mg-mono" title={HASH_NOTE}>{hashOf(row.g)}</span>
 									<span class="gpct">{row.pct}%</span>
 								</button>
 							</th>
@@ -231,7 +233,7 @@
 					<span class="pie {c.state}" style="--p: {c.pct ?? 0}">
 						{#if c.state === 'done'}<Check size={9} strokeWidth={3.5} />{:else if c.state === 'failed'}<X size={9} strokeWidth={3.5} />{/if}
 					</span>
-					<span class="pop-title"><b>{c.t}</b><span class="mg-mono" title={row.g}>{row.g}</span></span>
+					<span class="pop-title"><b>{c.t}</b><span class="mg-mono" title={row.g}>{baseOf(row.g)}</span></span>
 					<button type="button" class="pop-x" aria-label="Close" onclick={() => (pick = null)}><X size={14} /></button>
 				</header>
 				<dl class="pop-rows">
@@ -303,10 +305,14 @@
 					<span class="pie big" class:done={row.pct === 100} style="--p: {row.pct}">
 						{#if row.pct === 100}<Check size={9} strokeWidth={3.5} />{/if}
 					</span>
-					<span class="pop-title"><b>This genome</b><span class="mg-mono" title={row.g}>{row.g}</span></span>
+					<span class="pop-title"><b>This genome</b><span class="mg-mono" title={row.g}>{baseOf(row.g)}</span></span>
 					<button type="button" class="pop-x" aria-label="Close" onclick={() => (pick = null)}><X size={14} /></button>
 				</header>
 				<dl class="pop-rows">
+					{#if hashOf(row.g)}
+						<dt>Genome hash</dt>
+						<dd><span class="mg-mono">{hashOf(row.g)}</span>: assigned by MARGIE from the genome's DNA. Its tables and result files are named <span class="mg-mono">{row.g}</span>.</dd>
+					{/if}
 					<dt>Progress</dt>
 					<dd>{ROW_WORD[row.state]}, {row.pct}% | {row.done} of {row.of} steps</dd>
 					{#if row.running.length}<dt>Running now</dt><dd>{row.running.join(' | ')}</dd>{/if}
@@ -628,6 +634,23 @@
 		overflow: hidden;
 		text-overflow: ellipsis;
 		white-space: nowrap;
+	}
+	/* The genome hash: a column of its own inside the genome's cell, muted. */
+	.gh {
+		flex: none;
+		width: 8.5ch;
+		margin-left: auto;
+		color: var(--mg-text-3);
+		font-size: var(--cr-fs-micro);
+		cursor: help;
+	}
+	.gh + .gpct {
+		margin-left: 0;
+	}
+	.corner-h {
+		color: var(--mg-text-3);
+		font-weight: 400;
+		cursor: help;
 	}
 	.pgrid td {
 		min-width: 24px;

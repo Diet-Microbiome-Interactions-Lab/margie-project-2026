@@ -43,3 +43,23 @@ def test_each_per_genome_load_rule_replaces_the_genomes_rows():
         if tool in RUN_WIDE:
             continue
         assert "--delete-organism" in body, f"{name}_to_db keeps a genome's earlier rows on a reload"
+
+
+def test_rows_carry_their_genome_hash_and_a_reload_removes_only_its_own(tmp_path):
+    db = str(tmp_path / "margie.db")
+    for genome_hash, hit in (("hashA", "COG1"), ("hashB", "COG2")):
+        tsv = tmp_path / f"cog-{genome_hash}.tsv"
+        tsv.write_text(f"organism_name\tfeature_id\tcog\ncoli\tfig|6666666.1.peg.1\t{hit}\n")
+        load_csv_to_db(str(tsv), db, "cog", delimiter="\t", genome_hash=genome_hash)
+    conn = sqlite3.connect(db)
+    assert sorted(conn.execute("SELECT genome_hash, cog FROM cog")) == [("hashA", "COG1"), ("hashB", "COG2")]
+    # Genome A loaded again: its own rows go, genome B's under the same name stay.
+    assert _delete_stale_organism_rows(db, "cog", "coli", fasta_hash=["hashA"]) == 1
+    assert list(sqlite3.connect(db).execute("SELECT genome_hash FROM cog")) == [("hashB",)]
+
+
+def test_each_per_genome_load_rule_passes_the_genome(tmp_path):
+    text = SMK.read_text()
+    for name, body in re.findall(r"^rule (load_\w+)_to_db:(.*?)(?=^rule |^localrules|\Z)", text, re.S | re.M):
+        if name[len("load_"):] not in RUN_WIDE:
+            assert "--fasta {input.fasta}" in body, f"{name}_to_db does not pass the genome's FASTA"

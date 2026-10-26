@@ -8,7 +8,7 @@
 	import ProgressGrid from '$lib/crisp/ProgressGrid.svelte';
 	import { ui } from '$lib/workspace/ui.svelte';
 	import { page } from '$app/state';
-	import { genomeList, stemOf } from '$lib/crisp/genomes';
+	import { baseOf, genomeList, stemOf } from '$lib/crisp/genomes';
 	import { buildProgress, span, toolsOfRun } from '$lib/crisp/progress-model';
 	import type { ToolClock } from '$lib/workspace/data.svelte';
 	import '$lib/workspace/viewers/tools.css';
@@ -373,7 +373,9 @@
 	/** Its genomes: those its jobs name, and while it goes those in the input folder too. */
 	const jobGenomes = $derived.by(() => {
 		const named = new Set((clock?.started ?? []).map((e) => e.genome).filter(Boolean));
-		if (going || !named.size) for (const g of genomeList()) if (g.file) named.add(g.name);
+		// A file's genome already in the run under <name>--<hash> is not listed again under its file's name.
+		const bases = new Set([...named].map(baseOf));
+		if (going || !named.size) for (const g of genomeList()) if (g.file && !named.has(g.name) && !bases.has(baseOf(g.name))) named.add(g.name);
 		return [...named].sort((a, b) => a.localeCompare(b));
 	});
 	const prog = $derived(
