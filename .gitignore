@@ -1,1 +1,4 @@
 .DS_Store
+# Finder copies ("name 2.ext")
+* 2.*
+* 2
