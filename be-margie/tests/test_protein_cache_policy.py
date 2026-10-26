@@ -115,3 +115,19 @@ def test_each_gene_gets_its_fingerprint(tmp_path):
     table.write_text("feature_id\tfingerprint\na1\tpattern hash: de5259bf240c0f63 || label: MioC\n")
     assert protein_cache.record_fingerprints(db, "hashA", str(table), {"a1": "gene1"}) == 1
     assert sqlite3.connect(db).execute("SELECT fingerprint FROM genome_genes WHERE gene_hash = 'gene1'").fetchone() == ("de5259bf240c0f63",)
+
+
+def test_each_protein_has_one_fingerprint_replaced_when_it_differs(tmp_path):
+    db = str(tmp_path / "margie.db")
+    faa_a, _ = _genome(tmp_path, "A", [("a1", "MKVLAAG")])
+    faa_b, _ = _genome(tmp_path, "B", [("b1", "MKVLAAG")])
+    protein_cache.link_genome(db, faa_a, "hashA", "A", {"a1": "geneA"})
+    protein_cache.link_genome(db, faa_b, "hashB", "B", {"b1": "geneB"})
+    h = protein_cache.protein_hash("MKVLAAG")
+    for name, fid, genome, fp, label in (("a", "a1", "hashA", "1111aaaa2222bbbb", "MioC"), ("b", "b1", "hashB", "1111aaaa2222bbbb", "MioC"),
+                                         ("c", "b1", "hashB", "3333cccc4444dddd", "MioC flavodoxin")):
+        table = tmp_path / f"hash-label-{name}.tsv"
+        table.write_text(f"feature_id\tfingerprint\n{fid}\tpattern hash: {fp} || label: {label}\n")
+        protein_cache.record_fingerprints(db, genome, str(table), {fid: "geneA" if genome == "hashA" else "geneB"})
+        row = sqlite3.connect(db).execute("SELECT fingerprint, label FROM protein_fingerprints WHERE aa_hash = ?", (h,)).fetchone()
+        assert row == (fp, label)
