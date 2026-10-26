@@ -9,13 +9,14 @@
 	import { KINDS, LEVELS, TOPICS, type Level, type Question, type Topic } from '$lib/quiz/types';
 
 	/**
-	 * Quizzes on bacterial and archaeal physiology, metabolism, applied bioinformatics and the gut
-	 * microbiome. One unlock question opens them for the account; each answer shows why. Answers and
-	 * filters are kept in this browser.
+	 * Quizzes on bacterial and archaeal physiology, metabolism, energetics, applied bioinformatics and
+	 * the gut microbiome. One unlock question opens them for the account; each answer shows why. Answers and
+	 * filters are kept in this browser. A filter row with nothing picked leaves its questions in.
 	 */
 
 	const ANSWERS = 'margie.quiz.answers';
-	const FILTERS = 'margie.quiz.filters';
+	// v2: rows start with nothing picked; earlier saves had each option picked.
+	const FILTERS = 'margie.quiz.filters.v2';
 	const GATE = 'margie.quiz.gate';
 
 	function load<T>(key: string, fallback: T, store: 'local' | 'session' = 'local'): T {
@@ -55,30 +56,29 @@
 	}
 
 	// ------------------------------------------------ which questions
-	const saved = load<{ topics: Topic[]; levels: Level[]; kinds: Question['kind'][]; known?: Topic[] }>(FILTERS, {
-		topics: TOPICS.map((t) => t.id),
-		levels: [...LEVELS],
-		kinds: KINDS.map((k) => k.id)
-	});
-	// A topic added since the filters were saved starts chosen (saves without `known` had the first four).
-	const known: Topic[] = saved.known ?? ['physiology', 'metabolism', 'bioinformatics', 'gut'];
-	const added = TOPICS.map((t) => t.id).filter((id) => !known.includes(id) && !saved.topics.includes(id));
+	const saved = load<{ topics: Topic[]; levels: Level[]; kinds: Question['kind'][] }>(FILTERS, { topics: [], levels: [], kinds: [] });
+	// The topics that have questions in the banks.
+	const SHOWN = TOPICS.filter((t) => QUESTIONS.some((q) => q.topic === t.id));
 	// ?topic=<id> (the FAQ links to ?topic=margie) starts on that topic alone.
-	const asked = TOPICS.find((t) => t.id === page.url.searchParams.get('topic'))?.id;
-	let topics = $state<Topic[]>(asked ? [asked] : [...saved.topics, ...added]);
+	const asked = SHOWN.find((t) => t.id === page.url.searchParams.get('topic'))?.id;
+	let topics = $state<Topic[]>(asked ? [asked] : saved.topics);
 	let levels = $state<Level[]>(saved.levels);
 	let kinds = $state<Question['kind'][]>(saved.kinds);
-	$effect(() =>
-		save(FILTERS, { topics: $state.snapshot(topics), levels: $state.snapshot(levels), kinds: $state.snapshot(kinds), known: TOPICS.map((t) => t.id) })
-	);
+	$effect(() => save(FILTERS, { topics: $state.snapshot(topics), levels: $state.snapshot(levels), kinds: $state.snapshot(kinds) }));
 
 	function flip<T>(list: T[], v: T): T[] {
-		const next = list.includes(v) ? list.filter((x) => x !== v) : [...list, v];
-		// One of each stays chosen, so there is something to ask.
-		return next.length ? next : list;
+		return list.includes(v) ? list.filter((x) => x !== v) : [...list, v];
+	}
+	/** A row with nothing picked lets each of its options through. */
+	const lets = <T,>(picked: T[], v: T) => !picked.length || picked.includes(v);
+	const picked = $derived(topics.length + levels.length + kinds.length > 0);
+	function clearPicks() {
+		topics = [];
+		levels = [];
+		kinds = [];
 	}
 
-	const pool = $derived(QUESTIONS.filter((q) => topics.includes(q.topic) && levels.includes(q.level) && kinds.includes(q.kind)));
+	const pool = $derived(QUESTIONS.filter((q) => lets(topics, q.topic) && lets(levels, q.level) && lets(kinds, q.kind)));
 	let answers = $state<Record<string, boolean>>(load(ANSWERS, {}));
 	$effect(() => save(ANSWERS, $state.snapshot(answers)));
 	const done = $derived(pool.filter((q) => q.id in answers));
@@ -229,7 +229,7 @@
 		<!-- ------------------------------------------------ choosing -->
 		<div class="qz-filters">
 			<div class="qz-group" role="group" aria-label="Topics">
-				{#each TOPICS as t (t.id)}
+				{#each SHOWN as t (t.id)}
 					<button type="button" class="qz-chip" aria-pressed={topics.includes(t.id)} onclick={() => (topics = flip(topics, t.id))}>{t.label}</button>
 				{/each}
 			</div>
@@ -244,6 +244,14 @@
 				{/each}
 			</div>
 		</div>
+		<p class="qz-hint">
+			{#if picked}
+				Questions from your picks; a row left unpicked keeps each of its options.
+				<button type="button" class="mg-link quiet" onclick={clearPicks}>Clear picks</button>
+			{:else}
+				Questions from the whole bank. Pick topics, levels or kinds to narrow them.
+			{/if}
+		</p>
 
 		{#if !q}
 			<p class="mg-note">No questions match these choices yet.</p>
@@ -483,6 +491,14 @@
 		display: flex;
 		flex-wrap: wrap;
 		gap: 10px 18px;
+	}
+	.qz-hint {
+		margin: -4px 0 0;
+		color: var(--mg-text-3);
+		font-size: var(--mg-fs-sm);
+	}
+	.qz-hint .mg-link {
+		margin-left: 6px;
 	}
 	.qz-group {
 		display: flex;

@@ -141,9 +141,10 @@ def _already_loaded(db_path: str, input_hash: str, tool: str,
                     fasta_hash=None, gene_caller: str | None = None) -> bool:
     """Returns True if this tool's data is already current in the DB.
 
-    With fasta_hash the check is (fasta_hash, PIPELINE_VERSION, tool, gene caller), so
-    RASTtk-based results load over Prodigal-based ones; without it, (input_hash, tool),
-    for non-genome tables such as prodigal GFF.
+    With fasta_hash: the newest load of this genome's table at PIPELINE_VERSION by the same gene
+    caller came from this very file (input_hash), so a step that ran again with other results
+    reloads, RASTtk-based results load over Prodigal-based ones, and a restored file loads once.
+    Without it, (input_hash, tool), for non-genome tables such as prodigal GFF.
     """
     if not Path(db_path).exists():
         return False
@@ -154,13 +155,14 @@ def _already_loaded(db_path: str, input_hash: str, tool: str,
         try:
             _ensure_run_log(conn)
             if hashes:
-                row = conn.execute(
-                    "SELECT id FROM run_log "
+                newest = conn.execute(
+                    "SELECT input_hash FROM run_log "
                     f"WHERE fasta_hash IN ({','.join('?' * len(hashes))}) "
                     "AND pipeline_version = ? AND tool = ? AND status = 'success' "
-                    "AND coalesce(gene_caller, 'rasttk') = ?",
+                    "AND coalesce(gene_caller, 'rasttk') = ? ORDER BY id DESC LIMIT 1",
                     (*hashes, PIPELINE_VERSION, tool, gene_caller or 'rasttk'),
                 ).fetchone()
+                row = newest if newest and newest[0] == input_hash else None
             else:
                 row = conn.execute(
                     "SELECT id FROM run_log WHERE input_hash = ? AND tool = ?",

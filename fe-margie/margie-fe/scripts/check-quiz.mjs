@@ -7,7 +7,7 @@ import { fileURLToPath } from 'node:url';
 
 const dir = path.join(path.dirname(fileURLToPath(import.meta.url)), '..', 'src', 'lib', 'quiz', 'bank');
 const LEVELS = ['easy', 'intermediate', 'hard'];
-const TOPICS = ['physiology', 'metabolism', 'bioinformatics', 'gut', 'margie'];
+const TOPICS = ['physiology', 'metabolism', 'energetics', 'bioinformatics', 'gut', 'margie'];
 const WORDS = /\b(never|always|every|all)\b/i;
 // The names set in italics (src/lib/quiz/names.ts); a word that looks like a genus or an epithet
 // and is missing there is reported.

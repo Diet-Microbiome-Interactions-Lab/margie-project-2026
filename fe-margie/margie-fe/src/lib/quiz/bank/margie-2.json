@@ -54,10 +54,10 @@
 				"options": [
 					"eggNOG's 'conserved protein YbgC'",
 					"COG's 'Function unknown'",
-					"UniProt's 'Glucokinase'",
-					"The three, as each one is a tool's hit"
+					"The three, as each one is a tool's hit",
+					"UniProt's 'Glucokinase'"
 				],
-				"answer": 2,
+				"answer": 3,
 				"explain": "MARGIE asks of each description whether it names a function. 'Glucokinase' does, while 'Function unknown' is one of the boilerplate phrases on the uninformative list."
 			},
 			{
@@ -101,7 +101,7 @@
 					"permissive"
 				],
 				"answer": 2,
-				"explain": "These four are blocked: their licences let only the provider distribute them, so a user obtains them from the provider. MARGIE runs them for a user who holds that licence and disables them for the run otherwise."
+				"explain": "These three are blocked: their licences let only the provider distribute them, so a user obtains them from the provider. MARGIE runs them for a user who holds that licence and disables them for the run otherwise."
 			},
 			{
 				"question": "For commercial use, which of these also needs the user's own licence?",
@@ -211,10 +211,10 @@
 				"options": [
 					"-k GRAM-, its model for diderm genomes",
 					"-k ARCH, its model for archaeal genomes",
-					"-k GRAM+, its model for monoderm genomes",
-					"One model for each genome, as TMbed does"
+					"One model for each genome, as TMbed does",
+					"-k GRAM+, its model for monoderm genomes"
 				],
-				"answer": 2,
+				"answer": 3,
 				"explain": "DeepSig runs with -k GRAM- | GRAM+ | ARCH, and PSORTb (-k n | p | a) follows the envelope type in the same way. Phobius | TMbed | SignalP 6 run with the same model for each genome."
 			},
 			{
@@ -371,7 +371,7 @@
 				"right": "Operons whose members carry the same labels, in any order"
 			}
 		],
-		"explain": "Each operon gets four hashes from its members' gene hashes and labels in genomic order. Evidence hashes match the same tool hits, label hashes match the same labels across species, composition hashes ignore gene order, and only genes in an operon get them."
+		"explain": "Each operon gets four hashes from its members' gene fingerprints and labels in genomic order. Evidence hashes match the same tool hits, label hashes match the same labels across species, composition hashes ignore gene order, and only genes in an operon get them."
 	},
 	{
 		"id": "margie2-012",
@@ -420,7 +420,7 @@
 					"0.17, low: 3/7 times the context 0.8 × 0.49 ≈ 0.39"
 				],
 				"answer": 0,
-				"explain": "The preliminary score is C1 × C4 = 3/7 ≈ 0.43 and the context term is C2 × C3 = 0.8 × 0.49 ≈ 0.39, so the final score is about 0.82, in the high tier (above 0.7, up to 0.9). With agreeing EC numbers, a score above 0.5, C2 above 0.5 and informative neighbours, the gene stays clear of the review flags."
+				"explain": "The preliminary score is C1 × C4 = 3/7 ≈ 0.43 and the context term is C2 × C3 = 0.8 × 0.49 ≈ 0.39, so the final score is about 0.82, in the high tier (above 0.7, up to 0.9). With agreeing EC numbers, a score above 0.5 and informative neighbours, the gene stays clear of the review flags."
 			}
 		],
 		"explain": "Each pair's reliability is the Jeffreys posterior mean times an enrichment weight against a configuration-model null; the adjacency C3 is their geometric mean, and C2 scales it into the context term. The 95% Jeffreys lower bound is written beside each score for reference."
