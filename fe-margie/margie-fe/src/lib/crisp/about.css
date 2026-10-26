@@ -248,6 +248,10 @@
 		column-gap: 48px;
 		align-items: start;
 	}
+	/* With no list of sections beside it, the text takes the sheet's width. */
+	.rp-grid.rp-solo {
+		grid-template-columns: minmax(0, 1fr);
+	}
 	.rp-doc {
 		min-width: 0;
 		font-size: var(--rp-body);
@@ -301,8 +305,8 @@
 		line-height: 1.2;
 		letter-spacing: -0.01em;
 	}
+	/* The line under the title runs the page's full width. */
 	.rp-lede {
-		max-width: 62ch;
 		margin: 10px 0 0;
 		color: var(--mg-text-2);
 		font-size: calc(var(--rp-body) * 1.08);

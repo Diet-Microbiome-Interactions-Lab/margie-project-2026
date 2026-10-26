@@ -144,7 +144,7 @@ export const FAQS: Faq[] = [
 			"<p>MARGIE records each tool and database version in her licence catalog (catalog version 2026-07-01), and the processed tables name the database each tool used in a <code>_database_used</code> column. The annotation databases are:</p>",
 			"<ul><li>COG 2024 (COGclassifier 2.0.0 | BLAST+ 2.16.0)</li><li>KEGG KOfam profiles, recorded as \"current\" (KofamScan 1.3.0)</li><li>eggNOG database 5.0.2 (eggNOG-mapper 2.1.12)</li><li>UniProt Swiss-Prot 2025_05 (DIAMOND 2.1.9)</li><li>Pfam-A 37.0 | TIGRFAMs 15.0 | PGAP HMM library hmm_PGAP 15.0 (HMMER 3.4)</li><li>InterProScan 5.77-108.0 with its member databases</li><li>dbCAN database v13 (dbCAN 5.1.2)</li><li>MEROPS, recorded as \"12.5 / current_release\" | TCDB, recorded as \"2024 / current\"</li><li>Genome Properties, recorded as the repository's git HEAD</li></ul>",
 			"<p>Taxonomy uses GTDB r232 with GTDB-Tk 2.7.0. Genes are called by RASTtk (BV-BRC CLI 1.040, with the SEED files marked \"latest\") or by Prodigal, and operons by UniOP at commit 68c55d2 (2025-05-30), with Prodigal 2.6.3 in its container. Where the catalog says \"current\", \"latest\" or git HEAD, it records the download source in place of a release number. MARGIE's own operon pool starts from <code>operon-db.pkl</code> (schema version 2), built on 2026-09-26 from 29 genomes, and grows as genomes are added.</p>",
-			"<p>A protein's cached result is keyed to the tool's container, database file and settings, so a new database release means those proteins are annotated again. The full table, with the localisation tools, is on <a href=\"/acknowledgements\">Acknowledgements</a>.</p>"
+			"<p>A protein's cached result is keyed to the tool and the settings that change its answer, not to the tool's or the database's version, so a genome annotated once is not run again when a tool or database is updated; a protein whose answer differs when it is next annotated has its result replaced. The full table, with the localisation tools, is on <a href=\"/acknowledgements\">Acknowledgements</a>.</p>"
 		],
 		"refs": [
 			"galperin2025",
@@ -175,7 +175,7 @@ export const FAQS: Faq[] = [
 			{
 				"path": "protein_cache.py",
 				"symbol": "tool_key",
-				"why": "Hashes a tool's container, database and settings, so a new release re-annotates cached proteins."
+				"why": "Hashes the tool and the settings that change its answer; tool and database versions stay out."
 			},
 			{
 				"path": "process_signalp6.py",
@@ -221,12 +221,14 @@ export const FAQS: Faq[] = [
 	{
 		"id": "hashing",
 		"group": "Inside the pipeline",
-		"q": "How does MARGIE hash the genomes and proteins, and at what stage?",
+		"q": "How does MARGIE hash genomes, proteins and genes, and at what stage?",
 		"a": [
-			"<p>MARGIE identifies genomes and proteins by SHA-256 hashes, so she recognises data she has seen before under any file name. Hashing happens at three points of a run.</p>",
-			"<p><b>Genomes, before the steps start.</b> <code>genome_hash</code> reads the FASTA and hashes each record's name and its upper-case bases in file order, so a copy with other line breaks, letter case or file name gets the same hash. The result, marked <code>fa1:</code>, keys the genome's stored step outputs in the MARGIE database (the genome-level cache), its run log rows, and the check for a genome already finished at this pipeline version. An older hash of the file's bytes is still looked up, so earlier entries are found.</p>",
-			"<p><b>Proteins, after gene calling.</b> Each protein's sequence is upper-cased, cleared of spaces and of a final stop <code>*</code>, and hashed. For each per-protein tool, MARGIE pairs this hash with a tool key: a hash of the tool's container, its database location and modification time, and the settings that change its answer. Proteins already stored under that key come back from the protein-level cache; only the rest go to the tool, and its new rows are stored once they load.</p>",
-			"<p><b>MARGIE's own steps.</b> Consolidation and labeling are stored under a hash of their scripts and of the tool tables they merge, so a changed tool set merges again. Each results file is hashed before loading, so the same file loads once, and the operon reference names a genome by a hash of its sorted protein hashes, which lets scoring leave it out of its own reference.</p>"
+			"<p>MARGIE identifies genomes, proteins and genes by SHA-256 hashes, so she recognises data she has seen before under any file name. Two hashes gate a run; the others support them.</p>",
+			"<p><b>Genomes, before the steps start (a gate).</b> <code>genome_hash</code> reads the FASTA and hashes each record's name and its upper-case bases in file order, so a copy with other line breaks, letter case or file name gets the same hash. The result, marked <code>fa1:</code>, restores a genome annotated before, keys its rows and stored step outputs in the MARGIE database and its run log, and names its results <code>&lt;name&gt;--&lt;the first 8 characters&gt;</code>. An older hash of the file's bytes is looked up beside it, so entries made before the genome hash are found.</p>",
+			"<p><b>Proteins, after gene calling (a gate).</b> Each protein's sequence is upper-cased, cleared of spaces and of a final stop <code>*</code>, and hashed. For each per-protein tool, MARGIE pairs this hash with a tool key, a hash of the tool and the settings that change its answer, with the tool's and the database's versions left out. Proteins already stored under that key come back from the protein-level cache; only the rest go to the tool, and its new rows are stored once they load. A hash of the genome's sorted protein hashes records the genome's protein set beside its genome hash.</p>",
+			"<p><b>Genes.</b> A gene's hash is made from its contig, start, end, strand and protein (an RNA gene's feature type). Gene callers number genes anew with each submission, so cached tables are stored and restored with each gene named by its gene hash, which puts the results back on the right gene under any numbering; each gene hash is also kept with the gene's protein hash and fingerprint.</p>",
+			"<p><b>Fingerprints, after scoring.</b> A gene's fingerprint is a 16-character hash of its evidence pattern; each protein's record gets a core fingerprint from the seven C1 tools and an additional one from the others; each operon gets four, from its members' gene hashes or labels, in order or sorted. The operon reference recognises a genome by a hash of its sorted protein hashes, which adds a genome once and leaves it out when it is scored.</p>",
+			"<p><b>Loads and terms.</b> Each results file is hashed before loading, so the same file loads once, and the licence terms a user accepts are hashed, so an acceptance names the exact terms and a change asks again.</p>"
 		],
 		"refs": [
 			"fips180",
@@ -246,7 +248,17 @@ export const FAQS: Faq[] = [
 			{
 				"path": "protein_cache.py",
 				"symbol": "tool_key",
-				"why": "Hashes the container, database and settings a tool's answer depends on."
+				"why": "Hashes the tool and the settings that change its answer; tool and database versions stay out."
+			},
+			{
+				"path": "output_cache.py",
+				"symbol": "gene_hashes",
+				"why": "Hashes each gene's contig, start, end, strand and protein, so a gene keeps its hash under any numbering."
+			},
+			{
+				"path": "scoring/c3_lib.py",
+				"symbol": "genome_fingerprint",
+				"why": "Hashes a genome's sorted protein hashes, so the operon reference recognises it under any name."
 			}
 		],
 		"thesis": false
