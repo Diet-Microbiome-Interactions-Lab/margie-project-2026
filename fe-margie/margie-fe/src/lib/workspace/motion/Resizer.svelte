@@ -19,7 +19,8 @@
 	let dragging = $state(false);
 	const tall = $derived(edge === 'bottom');
 
-	const clamp = (v: number) => Math.round(Math.max(min, Math.min(max, tall ? innerHeight * 1.5 : innerWidth * 0.75, v)));
+	// A side pane stays within the window's width; a pane on the bottom edge grows the page, up to max.
+	const clamp = (v: number) => Math.round(Math.max(min, Math.min(max, v, tall ? Infinity : innerWidth * 0.75)));
 
 	function down(e: PointerEvent) {
 		if (e.button !== 0) return;
@@ -27,7 +28,9 @@
 		const handle = e.currentTarget as HTMLElement;
 		handle.setPointerCapture(e.pointerId);
 		const x0 = tall ? e.clientY : e.clientX;
-		const w0 = width;
+		// A pane shorter than its size (its content ends first) is dragged from the height it shows.
+		const shown = tall ? handle.parentElement?.getBoundingClientRect().height : undefined;
+		const w0 = shown && shown < width ? Math.round(shown) : width;
 		let next = w0;
 		let frame = 0;
 		dragging = true;
