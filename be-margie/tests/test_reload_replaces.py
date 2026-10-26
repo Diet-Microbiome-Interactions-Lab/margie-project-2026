@@ -40,7 +40,7 @@ def test_each_per_genome_load_rule_replaces_the_genomes_rows():
     text = SMK.read_text()
     for name, body in re.findall(r"^rule (load_\w+)_to_db:(.*?)(?=^rule |^localrules|\Z)", text, re.S | re.M):
         tool = name[len("load_"):]
-        if tool in RUN_WIDE:
+        if tool in RUN_WIDE or "LOADER_PYTHON" not in body:
             continue
         assert "--delete-organism" in body, f"{name}_to_db keeps a genome's earlier rows on a reload"
 
@@ -61,5 +61,5 @@ def test_rows_carry_their_genome_hash_and_a_reload_removes_only_its_own(tmp_path
 def test_each_per_genome_load_rule_passes_the_genome(tmp_path):
     text = SMK.read_text()
     for name, body in re.findall(r"^rule (load_\w+)_to_db:(.*?)(?=^rule |^localrules|\Z)", text, re.S | re.M):
-        if name[len("load_"):] not in RUN_WIDE:
+        if name[len("load_"):] not in RUN_WIDE and "LOADER_PYTHON" in body:
             assert "--fasta {input.fasta}" in body, f"{name}_to_db does not pass the genome's FASTA"

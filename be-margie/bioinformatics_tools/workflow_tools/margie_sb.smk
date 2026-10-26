@@ -930,29 +930,22 @@ rule update_operon_fingerprint_database:
         """
 
 
+localrules: load_consolidation_to_db
+
+
 rule load_consolidation_to_db:
-    """Loads the consolidation tables into main_database."""
+    """Marks consolidation done for the genome. Its tables stay in the results folder and are not
+    loaded: nothing reads them from main_database, and labeling's tables hold each gene's label
+    with each tool's ids."""
     input:
         merged=CONSOLIDATION_MERGED,
         no_stat=CONSOLIDATION_NO_STAT,
-        compute_tkn=CONSOLIDATION_COMPUTE_TOKEN,
-        fasta=lambda wildcards: GENOMES[wildcards.genome]
+        compute_tkn=CONSOLIDATION_COMPUTE_TOKEN
     output:
         tkn=CONSOLIDATION_TOKEN
-    retries: LOAD_RETRIES
-    resources:
-        runtime=load_minutes,
-        margie_sb_db_writer=1
-    params:
-        db=MAIN_DATABASE,
-        script=LOAD_SCRIPT
     shell:
         """
-        {LOADER_PYTHON} {params.script} tsv {input.merged} {params.db} consolidation_merged \
-            --fasta {input.fasta} --delete-organism {wildcards.genome}
-        {LOADER_PYTHON} {params.script} tsv {input.no_stat} {params.db} consolidation_no_stat \
-            --fasta {input.fasta} --delete-organism {wildcards.genome}
-        echo "consolidation loaded for {wildcards.genome}" > {output.tkn}
+        echo "consolidation done for {wildcards.genome}; its tables are in the results folder" > {output.tkn}
         """
 
 
