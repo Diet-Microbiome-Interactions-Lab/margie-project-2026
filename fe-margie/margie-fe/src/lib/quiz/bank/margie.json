@@ -357,18 +357,18 @@
 					"COG's earlier rows are copied over without matching them to gene ids"
 				],
 				"answer": 2,
-				"explain": "X has the same genome hash, so COG's stored output files come back before the step would start, and the step is skipped. Restored tables are rewritten onto this run's RASTtk gene ids."
+				"explain": "X has the same genome hash, so COG's stored output files come back before the step would start, and the step is skipped. Each gene in the restored tables comes back by its gene hash, under this run's gene ids."
 			},
 			{
 				"question": "What happens to X's consolidation?",
 				"options": [
-					"It runs again, as the set of tool tables it merges has changed",
+					"It runs again, as consolidation runs in each run over the tables now there",
 					"It comes back from the cache, since X's genome hash is the same",
 					"It is skipped, and the earlier merged table is used without TCDB",
 					"It comes back first, and TCDB's columns are appended to it later"
 				],
 				"answer": 0,
-				"explain": "Consolidation and labelling are cached under the genome hash together with a hash of the tool tables they merge. Adding TCDB changes those tables, so both merge again over the new set of tables."
+				"explain": "Consolidation and labelling are not cached: they take about a minute, and their tables are large. Both run in each run over the tables in the genome's folder, here with TCDB's."
 			},
 			{
 				"question": "What happens to COG for the new genome Y?",
@@ -379,7 +379,7 @@
 					"It searches only Y's unseen proteins and merges cached rows for the rest"
 				],
 				"answer": 3,
-				"explain": "COG's answer depends on the protein alone, so it uses the protein-level cache: each protein is matched by the SHA-256 of its sequence with a key for COG's container, database and settings. Only the proteins new to the cache are searched, which is what speeds up a genome that shares many proteins with genomes already run."
+				"explain": "COG's answer depends on the protein alone, so it uses the protein-level cache: each protein is matched by the SHA-256 of its sequence with a key for COG and its settings. Only the proteins new to the cache are searched, which is what speeds up a genome that shares many proteins with genomes already run."
 			}
 		],
 		"explain": "The genome level is tried first and the protein level covers the rest. Scoring runs fresh for both genomes, since the operon reference grows with each genome added."
