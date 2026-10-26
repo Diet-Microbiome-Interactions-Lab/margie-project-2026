@@ -79,7 +79,6 @@
 }
 .cr-lede {
 	grid-area: lede;
-	max-width: 110ch;
 	padding-left: 18px;
 	border-left: 1px solid var(--mg-border);
 	font-size: var(--cr-fs-meta);

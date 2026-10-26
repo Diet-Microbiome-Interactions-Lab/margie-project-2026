@@ -43,49 +43,6 @@
 		"explain": "MARGIE picks the gene caller genome by genome: RASTtk when the domain and genetic code are both known, and Prodigal for a genome missing either while GTDB-Tk is off. Analyze shows how many genomes go to each caller before the run starts."
 	},
 	{
-		"id": "margie2-002",
-		"topic": "margie",
-		"level": "easy",
-		"kind": "case",
-		"scenario": "A run has finished for two genomes: GTDB-Tk classified genome A and RASTtk called its genes, while genome B went to Prodigal. A student opens each genome's folder and then its per-tool-phased-output/ folder, where the step folders now sit.",
-		"parts": [
-			{
-				"question": "Where does the student find genome A's domain and genetic code from GTDB-Tk?",
-				"options": [
-					"rasttk/rast.tsv",
-					"FINAL_GENOME_VIEWER.html",
-					"genome_info/genome_info.tsv",
-					"cache-report.tsv in the run folder"
-				],
-				"answer": 2,
-				"explain": "The GTDB-Tk step holds the classification, with the domain and genetic code, in genome_info/genome_info.tsv. Consolidation takes the genome's domain from this file."
-			},
-			{
-				"question": "Genome B has a prodigal/ folder where genome A has rasttk/. What does it hold?",
-				"options": [
-					"An empty folder, kept for a later RASTtk run of genome B",
-					"Prodigal's gene calls, in prodigal.faa | prodigal.gff | prodigal.tsv",
-					"RASTtk's own calls, made as a check on Prodigal's",
-					"A copy of genome A's RASTtk files, kept for reuse"
-				],
-				"answer": 1,
-				"explain": "Prodigal writes its own folder: the proteins, the GFF and the gene table, in RASTtk's columns. Phases 4 to 13 read each genome's own gene calls, so they run the same way for both genomes."
-			},
-			{
-				"question": "Which file holds each gene's EC consensus across tools, its operon information and its TIGRFAM family-cluster agreement?",
-				"options": [
-					"consolidated-no-stat.tsv",
-					"envelope_summary.tsv",
-					"fingerprint-database.tsv",
-					"labeled-genes.tsv"
-				],
-				"answer": 3,
-				"explain": "Labelling writes labeled-genes.tsv with the label, the EC consensus across tools, the gene's operon context and the agreement within the TIGRFAM family cluster, which scoring reads."
-			}
-		],
-		"explain": "When a run ends, each genome folder keeps FINAL_ANNOTATION_WITH_CONFIDENCE.tsv, its Excel copy, FINAL_GENOME_VIEWER.html and diagrams/ at the top, and the step folders, gene calls included, move into per-tool-phased-output/."
-	},
-	{
 		"id": "margie2-003",
 		"topic": "margie",
 		"level": "easy",
@@ -340,11 +297,11 @@
 				"options": [
 					"Those in which Pfam found zero domains back in the spring run",
 					"Each of them, as the tool key covers Pfam's database file",
-					"None of them, as their protein hashes are already stored",
+					"None of them: the tool key leaves out the Pfam release, so their results come back",
 					"Those whose genome hash differs from G's genome hash"
 				],
-				"answer": 1,
-				"explain": "A protein's cached result is keyed to the tool's container, its database location and modification time, and its settings. The new Pfam release gives a new key, so the shared proteins are annotated again."
+				"answer": 2,
+				"explain": "A protein's cached result is keyed to the tool and the settings that change its answer, not to the tool's or the database's release. The proteins H shares with G come back from the protein cache, and only H's new proteins go to Pfam."
 			},
 			{
 				"question": "What does scoring record about the operon pool for H?",
@@ -358,7 +315,7 @@
 				"explain": "Scoring runs fresh against the pool as it stands, with H's own counts subtracted, and notes how many pool genomes H was scored against and whether H was left out. The reference's size at scoring is recorded for Results."
 			}
 		],
-		"explain": "MARGIE reuses a protein's cached result while the tool's container, database and settings stay the same. Scoring reads the pools as they stand, so it runs fresh, and each load adds a run_log row with the file's SHA-256 hash, the genome's sequence hash and the pipeline version."
+		"explain": "MARGIE reuses a protein's cached result while the tool and its settings stay the same, through new tool and database releases. Scoring reads the pools as they stand, so it runs fresh, and each load adds a run_log row with the file's SHA-256 hash, the genome's sequence hash and the pipeline version."
 	},
 	{
 		"id": "margie2-010",

@@ -106,48 +106,37 @@
 		}
 	];
 	/** The hashes MARGIE recognises genomes, proteins and genes by, so each is annotated once. */
+	/** Each hash MARGIE makes: the two that gate a run, then those that support them. */
 	const HASHES = [
 		{
+			role: 'main',
 			hash: 'Genome hash',
 			level: 'Genome',
-			from: "The genome's DNA, contig by contig (its file name and line lengths aside)",
+			from: "Each record's name and its bases in upper case, in file order (file name, line breaks and letter case aside); marked fa1:",
 			when: 'Before the run starts',
 			why: 'A genome is the same genome under any file name',
 			helps: 'Restores a genome annotated before, whole; names its results <name>--<the first 8 characters> (coli--a1b2c3d4); keys its rows in the database'
 		},
 		{
+			role: 'main',
 			hash: 'Protein hash',
 			level: 'Protein',
-			from: "The protein's amino-acid sequence",
+			from: "The protein's amino-acid sequence, in upper case, without spaces or a final stop (*)",
 			when: 'After gene calling, before the tools',
 			why: 'A protein gives the same answer from a tool in any genome',
 			helps: 'Each tool runs on new proteins only; each protein is linked to the genomes it occurs in'
 		},
 		{
-			hash: 'Gene hash',
-			level: 'Gene',
-			from: "Its contig, start, end, strand and protein (an RNA's feature type)",
-			when: "Storing and restoring a genome's cached tables",
-			why: 'Gene callers number genes anew with each submission, and copies of one protein sit in different places',
-			helps: 'Puts cached results back on the right gene under any numbering'
-		},
-		{
-			hash: 'Fingerprint hash',
-			level: 'Protein and gene',
-			from: "The protein's descriptors from the tools: a core part from the seven C1 tools, an additional part from the others",
-			when: 'After scoring',
-			why: 'Proteins with the same descriptors share a fingerprint',
-			helps: "One record per protein; a tool added later changes only the additional part"
-		},
-		{
-			hash: 'Protein-set hash',
+			role: 'supporting',
+			hash: 'Older genome hash',
 			level: 'Genome',
-			from: "The genome's protein hashes, together",
-			when: "Scoring (C3's operon reference)",
-			why: 'Recognises a genome by its content, under any name',
-			helps: 'Adds a genome to the operon reference once, and leaves it out when it is scored'
+			from: "The FASTA file's bytes",
+			when: 'Beside the genome hash, in each lookup',
+			why: 'Entries made before the genome hash carry it',
+			helps: 'Finds those older entries in the caches, the run log and the loads'
 		},
 		{
+			role: 'supporting',
 			hash: 'Tool key',
 			level: "A protein's results",
 			from: 'The tool and the settings that change its answer (its thresholds, InterPro analyses)',
@@ -156,13 +145,77 @@
 			helps: 'Genomes annotated once are not run again when a tool or database is updated'
 		},
 		{
+			role: 'supporting',
+			hash: 'Gene hash',
+			level: 'Gene',
+			from: "Its contig, start, end, strand and protein (an RNA's feature type)",
+			when: "Storing and restoring a genome's cached tables",
+			why: 'Gene callers number genes anew with each submission, and copies of one protein sit in different places',
+			helps: 'Puts cached results back on the right gene under any numbering; ties each gene to its fingerprint'
+		},
+		{
+			role: 'supporting',
+			hash: 'Protein-set hash',
+			level: 'Genome',
+			from: "The genome's protein hashes, sorted",
+			when: 'Linking a genome to its proteins',
+			why: "Recognises a genome's proteins as a whole",
+			helps: 'Records each genome hash with its protein set and the names it came under'
+		},
+		{
+			role: 'supporting',
+			hash: 'Genome content fingerprint',
+			level: 'Genome',
+			from: "The genome's per-gene protein hashes, sorted",
+			when: "Scoring (C3's operon reference)",
+			why: 'The operon reference recognises a genome by its content, under any name',
+			helps: 'Adds a genome to the operon reference once, and leaves it out when it is scored'
+		},
+		{
+			role: 'supporting',
+			hash: 'Gene fingerprint',
+			level: 'Gene',
+			from: "The gene's evidence pattern: RASTtk's description and each tool's ids and descriptions, in fixed slots",
+			when: 'After scoring',
+			why: 'Genes with the same evidence share a fingerprint, in one genome or many',
+			helps: 'Counts each pattern, and the label it led to, across genomes (the gene fingerprint database)'
+		},
+		{
+			role: 'supporting',
+			hash: 'Protein fingerprints',
+			level: 'Protein',
+			from: "The protein's descriptors: a core part from the seven C1 tools, an additional part from the others",
+			when: 'After scoring',
+			why: "A protein's record shows at a glance what its tools said",
+			helps: 'One record per protein; a tool added later changes only the additional part'
+		},
+		{
+			role: 'supporting',
+			hash: 'Operon fingerprints',
+			level: 'Operon',
+			from: "The members' gene hashes or labels, in genomic order or sorted: four hashes",
+			when: 'After scoring',
+			why: 'Operons with the same evidence or the same labels, in order or not, share a fingerprint',
+			helps: 'The four operon fingerprint databases'
+		},
+		{
+			role: 'supporting',
 			hash: 'Results-file hash',
 			level: 'Load',
 			from: "A tool's results file",
 			when: 'Loading into the database',
 			why: 'A file loaded before holds the same rows',
-			helps: 'Skips loading it again; a reload replaces the genome\'s rows by genome hash'
+			helps: "Skips loading it again; a reload replaces the genome's rows by genome hash"
 		},
+		{
+			role: 'supporting',
+			hash: 'Terms hash',
+			level: 'Licence terms',
+			from: 'The text of the terms a user accepts',
+			when: 'Accepting the terms',
+			why: 'An acceptance names the exact terms it was for',
+			helps: 'Asks again when the terms change'
+		}
 	];
 	/** What the database keeps by hash, read by eye when checking hashes and restoring results. */
 	const RECORDS = [
@@ -173,12 +226,14 @@
 		{ table: 'genome_protein_descriptors', what: 'Answers that depend on the genome as well as the protein (PSORTb, DeepSig), by genome hash and protein hash' }
 	];
 	const HASH_CODE = [
-		{ path: 'genome_identity.py', what: 'The genome and protein hashes' },
+		{ path: 'genome_identity.py', what: 'The genome hash, the older genome hash and the protein hash' },
 		{ path: 'output_cache.py', what: 'The genome cache: whole tool outputs by genome hash, genes by gene hash' },
-		{ path: 'protein_cache.py', what: "The protein cache, the links between proteins and genomes, and each protein's record" },
-		{ path: 'load_to_db.py', what: "Loading into the database, a genome's rows replaced by genome hash" },
+		{ path: 'protein_cache.py', what: "The tool key, the protein cache, the protein-set hash and each protein's record with its fingerprints" },
+		{ path: 'load_to_db.py', what: "The results-file hash, and a genome's rows replaced by genome hash" },
+		{ path: 'scoring/c3_lib.py', what: "The genome content fingerprint" },
 		{ path: 'scoring/update-occ-reference-depot.py', what: 'The operon reference, a genome added once by its content' },
-		{ path: 'fingerprint/add-gene-fingerprint.py', what: "Each gene's fingerprint" }
+		{ path: 'fingerprint/add-gene-fingerprint.py', what: "Each gene's fingerprint" },
+		{ path: 'fingerprint/add-operon-fingerprint.py', what: "Each operon's four fingerprints" }
 	];
 	const DOES = [
 		{ title: 'Calls genes', text: 'RASTtk or Prodigal, genome by genome' },
@@ -272,8 +327,11 @@
 			<table class="rp-table mt-hashes">
 				<thead><tr><th>Hash</th><th>Level</th><th>Made from</th><th>When</th><th>Why</th><th>What it helps with</th></tr></thead>
 				<tbody>
-					{#each HASHES as h (h.hash)}
-						<tr><td><b>{h.hash}</b></td><td>{h.level}</td><td>{h.from}</td><td>{h.when}</td><td>{h.why}</td><td>{h.helps}</td></tr>
+					{#each [['main', 'The two gates'], ['supporting', 'Supporting hashes']] as [role, title] (role)}
+						<tr class="mt-group"><th colspan="6">{title}</th></tr>
+						{#each HASHES.filter((h) => h.role === role) as h (h.hash)}
+							<tr><td><b>{h.hash}</b></td><td>{h.level}</td><td>{h.from}</td><td>{h.when}</td><td>{h.why}</td><td>{h.helps}</td></tr>
+						{/each}
 					{/each}
 				</tbody>
 			</table>
@@ -339,6 +397,10 @@
 	}
 	.mt-hashes td:first-child {
 		white-space: nowrap;
+	}
+	.mt-hashes .mt-group th {
+		background: var(--rp-stripe);
+		text-align: left;
 	}
 	.mt-phases td {
 		min-width: 0;

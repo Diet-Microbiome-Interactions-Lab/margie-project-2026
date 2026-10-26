@@ -1,7 +1,6 @@
 #TEMPLATE PROVIDED AT THE END FOR A NEW SNAKEMAKE AS DANE DESIGNED IT.
 """
-All MARGIE rules. No games.
-MARGIE(SB): QC, taxonomy, gene calling, annotation, localization and scoring, per genome.
+MARGIE's rules: quality, taxonomy, gene calling, annotation, localisation and scoring, genome by genome.
 """
 
 import math

@@ -1,7 +1,7 @@
 """
 DB-based output cache for MARGIE workflow.
 
-Stores compute rule output files (prodigal, pfam, cog) as BLOBs in an
+Stores compute rule output files (RASTtk's gene calls, pfam, cog) as BLOBs in an
 ``output_cache`` table inside the same SQLite database used for annotations.
 This lets Snakemake skip expensive re-computation when the same input FASTA
 has already been processed, even across fresh timestamped working directories.
