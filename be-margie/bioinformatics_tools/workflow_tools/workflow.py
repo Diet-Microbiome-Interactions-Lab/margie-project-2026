@@ -1302,6 +1302,9 @@ class WorkflowBase(ProgramBase):
                 # Each gene's fingerprint, beside its gene hash.
                 _safely(f'Recording the fingerprints of {genome}', protein_cache.record_fingerprints, db_path, slot['genome_hash'],
                         f"{slot['pc_prefix']}fingerprint/labeled-genes-fingerprint-hash-label.tsv", slot['genes'])
+                # Each protein's record: its descriptors tool by tool, and its core and additional fingerprints.
+                _safely(f'Recording the proteins of {genome}', protein_cache.record_proteins, db_path,
+                        f"{slot['pc_prefix']}labeling/labeled-genes.tsv", slot['pc_prefix'], slot['genome_hash'])
             LOGGER.info(provenance.summary(genome))
 
         while pending or queue or active:

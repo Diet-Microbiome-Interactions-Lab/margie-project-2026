@@ -88,8 +88,48 @@ CREATE TABLE IF NOT EXISTS protein_fingerprints (
     aa_hash TEXT PRIMARY KEY,
     fingerprint TEXT NOT NULL,
     label TEXT NOT NULL DEFAULT '',
-    recorded_at TEXT NOT NULL
+    recorded_at TEXT NOT NULL,
+    core_fingerprint TEXT NOT NULL DEFAULT '',
+    extra_fingerprint TEXT NOT NULL DEFAULT ''
 );
+CREATE TABLE IF NOT EXISTS protein_descriptors (
+    aa_hash TEXT NOT NULL,
+    tool TEXT NOT NULL,
+    position INTEGER NOT NULL,
+    value TEXT NOT NULL,
+    recorded_at TEXT NOT NULL,
+    PRIMARY KEY (aa_hash, tool)
+) WITHOUT ROWID;
+CREATE TABLE IF NOT EXISTS genome_protein_descriptors (
+    genome_hash TEXT NOT NULL,
+    aa_hash TEXT NOT NULL,
+    tool TEXT NOT NULL,
+    value TEXT NOT NULL,
+    recorded_at TEXT NOT NULL,
+    PRIMARY KEY (genome_hash, aa_hash, tool)
+) WITHOUT ROWID;
+"""
+
+# The protein record (protein_records): one row a protein, read by eye when checking hashes or
+# restoring results. The seven tools every run has (C1's sources) come first and make the core
+# fingerprint; the other tools follow in this order, tools added later after them, and make the
+# additional fingerprint, so a new tool changes only that. Tools whose answer depends on the genome
+# as well (PSORTb on its Gram class, DeepSig on its organism class) are kept by genome hash and
+# protein hash (genome_protein_descriptors), as they are restored.
+CORE_TOOLS = ['COG', 'KEGG', 'EGGNOG', 'UNIPROT', 'PFAM', 'TIGRFAM', 'PGAP']
+EXTRA_TOOLS = ['HAMAP', 'NCBIFAM', 'PIRSF', 'CDD', 'DBCAN', 'MEROPS', 'TCDB', 'SIGNALP6', 'PHOBIUS', 'TMBED']
+GENOME_TOOLS = ['PSORTB', 'DEEPSIG']
+RECORDS_VIEW = """
+CREATE VIEW IF NOT EXISTS protein_records AS
+SELECT f.aa_hash AS protein_hash,
+       (SELECT count(*) FROM protein_genomes g WHERE g.aa_hash = f.aa_hash) AS genomes,
+       (SELECT group_concat(genome_hash, ', ') FROM protein_genomes g WHERE g.aa_hash = f.aa_hash) AS genome_hashes,
+       f.fingerprint, f.core_fingerprint, f.extra_fingerprint, f.label,
+""" + ",\n".join(f"       (SELECT value FROM protein_descriptors d WHERE d.aa_hash = f.aa_hash AND d.tool = '{t}') AS {t.lower()}"
+                  for t in CORE_TOOLS) + """,
+       (SELECT group_concat(tool || ': ' || value, ' | ') FROM (SELECT tool, value FROM protein_descriptors d
+        WHERE d.aa_hash = f.aa_hash AND d.position >= 100 ORDER BY d.position, d.tool)) AS additional
+FROM protein_fingerprints AS f;
 """
 
 # InterPro's member databases, as margie_sb.smk names them.
@@ -210,6 +250,11 @@ def _connect(db: str) -> sqlite3.Connection:
     conn = sqlite3.connect(db, timeout=120)
     conn.execute('PRAGMA busy_timeout=120000')
     conn.executescript(CREATE_SQL)
+    have = {r[1] for r in conn.execute('PRAGMA table_info(protein_fingerprints)')}
+    for col in ('core_fingerprint', 'extra_fingerprint'):
+        if col not in have:
+            conn.execute(f"ALTER TABLE protein_fingerprints ADD COLUMN {col} TEXT NOT NULL DEFAULT ''")
+    conn.executescript(RECORDS_VIEW)
     # Caches made before the genome column: it is added, empty for the rows already there.
     if 'genome' not in {r[1] for r in conn.execute('PRAGMA table_info(protein_cache)')}:
         try:
@@ -584,3 +629,114 @@ def record_fingerprints(db: str, genome_hash: str, hash_label_tsv: str, genes: d
     finally:
         conn.close()
     return len(found)
+
+
+def _hash16(text: str) -> str:
+    return hashlib.sha256(text.encode('utf-8')).hexdigest()[:16]
+
+
+def _rows_by_feature(path: Path) -> dict[str, list[dict]]:
+    out: dict[str, list[dict]] = {}
+    if path.is_file():
+        with open(path, newline='', encoding='utf-8', errors='replace') as fh:
+            for row in csv.DictReader(fh, delimiter='\t'):
+                out.setdefault(row.get('feature_id') or '', []).append(row)
+    return out
+
+
+def _localization(prefix: str) -> dict[str, dict[str, str]]:
+    """{feature id: {tool: value}} from the localization tools' results in the genome's folder;
+    PSORTb's and DeepSig's say the Gram or organism class they were run for."""
+    out: dict[str, dict[str, str]] = {}
+    put = lambda fid, slot, value: value and out.setdefault(fid, {}).__setitem__(slot, value)  # noqa: E731
+    for fid, rows in _rows_by_feature(Path(f'{prefix}signalp6/signalp6_results.tsv')).items():
+        r = rows[0]
+        site = (r.get('SIGNALP6_cleavage_site') or '').strip()
+        put(fid, 'SIGNALP6', (r.get('SIGNALP6_prediction') or '').strip() + (f'; cleavage {site}' if site else ''))
+    for fid, rows in _rows_by_feature(Path(f'{prefix}phobius/phobius_results.tsv')).items():
+        tm = sum(1 for r in rows if 'TRANSMEM' in (r.get('phobius_segment_type') or '').upper())
+        sp = (rows[0].get('phobius_has_signal_peptide') or '').strip().lower() in ('true', 'yes', '1', 'y')
+        put(fid, 'PHOBIUS', f'{tm} TM segment{"" if tm == 1 else "s"}; signal peptide: {"yes" if sp else "no"}')
+    for fid, rows in _rows_by_feature(Path(f'{prefix}tmbed/tmbed_results.tsv')).items():
+        put(fid, 'TMBED', (rows[0].get('TMBED_topology') or '').strip())
+    for fid, rows in _rows_by_feature(Path(f'{prefix}psortb/psortb_results.tsv')).items():
+        r = rows[0]
+        envelope = (r.get('PSORTB_gram_class') or r.get('ENVELOPE_envelope_type') or '').strip()
+        where = (r.get('PSORTB_localization') or '').strip()
+        put(fid, 'PSORTB', f'{where} ({envelope})' if where and envelope else where)
+    for fid, rows in _rows_by_feature(Path(f'{prefix}deepsig/deepsig_results.tsv')).items():
+        kind = (rows[0].get('DEEPSIG_organism_class') or '').strip()
+        found = ', '.join(dict.fromkeys(t for r in rows if (t := (r.get('DEEPSIG_feature_type') or '').strip())))
+        put(fid, 'DEEPSIG', f'{found} ({kind})' if found and kind else found)
+    return out
+
+
+def _position(tool: str) -> int:
+    """Where a tool sits in the record: core tools first, then the additional tools in their order,
+    then any other tool."""
+    base = tool.split(' (')[0]
+    if base in CORE_TOOLS:
+        return CORE_TOOLS.index(base)
+    return 100 + (EXTRA_TOOLS.index(base) if base in EXTRA_TOOLS else len(EXTRA_TOOLS))
+
+
+def record_proteins(db: str, labeled_tsv: str, prefix: str, genome_hash: str = '') -> int:
+    """Adds each protein's descriptors to its record (protein_descriptors, read through
+    protein_records): each tool's ids and descriptions from the labeled genes, and the localization
+    tools' answers. A tool the record lacks is added, the same answer stays, a different one replaces
+    it; the core and additional fingerprints follow. PSORTb's and DeepSig's answers go under the
+    genome hash and protein hash (genome_protein_descriptors). Returns the number of proteins."""
+    path = Path(labeled_tsv)
+    if not path.is_file():
+        return 0
+    local = _localization(prefix)
+    found: dict[tuple[str, str], str] = {}
+    per_genome: dict[tuple[str, str], str] = {}
+    with open(path, newline='', encoding='utf-8', errors='replace') as fh:
+        for row in csv.DictReader(fh, delimiter='\t'):
+            seq = (row.get('aa_seq') or '').strip()
+            if not seq:
+                continue
+            h = protein_hash(seq)
+            for tool in CORE_TOOLS + EXTRA_TOOLS:
+                ids = (row.get(f'{tool}_all_ids') or '').strip()
+                desc = (row.get(f'{tool}_all_descriptions') or '').strip()
+                if ids:
+                    found[(h, tool)] = f'{ids} — {desc}' if desc else ids
+            for tool, value in local.get(row.get('feature_id') or '', {}).items():
+                (per_genome if tool in GENOME_TOOLS else found)[(h, tool)] = value
+    if not found and not per_genome:
+        return 0
+    proteins = sorted({h for h, _ in found})
+    stamp = datetime.now(timezone.utc).isoformat()
+    conn = _connect(db)
+    try:
+        with conn:
+            if genome_hash:
+                conn.executemany('INSERT INTO genome_protein_descriptors (genome_hash, aa_hash, tool, value, recorded_at) '
+                                 'VALUES (?, ?, ?, ?, ?) ON CONFLICT (genome_hash, aa_hash, tool) DO UPDATE SET '
+                                 'value = excluded.value, recorded_at = excluded.recorded_at '
+                                 'WHERE genome_protein_descriptors.value != excluded.value',
+                                 [(genome_hash, h, tool, value, stamp) for (h, tool), value in per_genome.items()])
+            conn.executemany('INSERT INTO protein_descriptors (aa_hash, tool, position, value, recorded_at) VALUES (?, ?, ?, ?, ?) '
+                             'ON CONFLICT (aa_hash, tool) DO UPDATE SET value = excluded.value, recorded_at = excluded.recorded_at '
+                             'WHERE protein_descriptors.value != excluded.value',
+                             [(h, tool, _position(tool), value, stamp) for (h, tool), value in found.items()])
+            prints = []
+            for chunk in _chunks(proteins):
+                held: dict[str, dict[str, str]] = {}
+                for h, tool, value in conn.execute(
+                        f'SELECT aa_hash, tool, value FROM protein_descriptors WHERE aa_hash IN ({",".join("?" * len(chunk))})', chunk):
+                    held.setdefault(h, {})[tool] = value
+                for h in chunk:
+                    have = held.get(h, {})
+                    core = _hash16(' | '.join(f'{t}: {have.get(t, "")}' for t in CORE_TOOLS))
+                    extra_tools = sorted((t for t in have if _position(t) >= 100), key=lambda t: (_position(t), t))
+                    extra = _hash16(' | '.join(f'{t}: {have[t]}' for t in extra_tools)) if extra_tools else ''
+                    prints.append((h, stamp, core, extra))
+            conn.executemany("INSERT INTO protein_fingerprints (aa_hash, fingerprint, label, recorded_at, core_fingerprint, extra_fingerprint) "
+                             "VALUES (?, '', '', ?, ?, ?) ON CONFLICT (aa_hash) DO UPDATE SET "
+                             "core_fingerprint = excluded.core_fingerprint, extra_fingerprint = excluded.extra_fingerprint", prints)
+    finally:
+        conn.close()
+    return len(proteins)
