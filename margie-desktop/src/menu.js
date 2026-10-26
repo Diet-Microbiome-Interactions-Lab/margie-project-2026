@@ -9,6 +9,7 @@ import { DATA_DIR, LOG_DIR, PIPELINE_HOME } from './paths.js';
 import { prefs, setPref } from './app-prefs.js';
 import { localApi, quiet } from './local-api.js';
 import { addGenomeFiles } from './open-files.js';
+import { checkForUpdates, thisBuild } from './update.js';
 import { log } from './log.js';
 
 const isMac = process.platform === 'darwin';
@@ -113,6 +114,7 @@ export function buildMenu(ctx) {
 						label: app.name,
 						submenu: [
 							{ role: 'about' },
+							{ label: 'Check for Updates…', click: () => void checkForUpdates({ manual: true, getWindow }) },
 							{ type: 'separator' },
 							{ label: 'Where MARGIE Runs…', accelerator: 'CmdOrCtrl+,', click: () => goTo('/start') },
 							{ type: 'separator' },
@@ -228,6 +230,12 @@ export function buildMenu(ctx) {
 					click: () => toggle('keepAwake', !prefs().keepAwake)
 				},
 				{
+					label: 'Check for Updates Automatically',
+					type: 'checkbox',
+					checked: look.updates,
+					click: () => toggle('updates', !prefs().updates)
+				},
+				{
 					label: 'Show in the Menu Bar',
 					type: 'checkbox',
 					checked: look.tray,
@@ -251,6 +259,7 @@ export function buildMenu(ctx) {
 		{
 			role: 'help',
 			submenu: [
+				...(isMac ? [] : [{ label: 'Check for Updates…', click: () => void checkForUpdates({ manual: true, getWindow }) }, { type: 'separator' }]),
 				{ label: 'Open Log Folder', click: () => void shell.openPath(LOG_DIR) },
 				{ label: 'MARGIE on GitHub', click: () => void shell.openExternal('https://github.com/Diet-Microbiome-Interactions-Lab/margie-project-2026') },
 				{ type: 'separator' },
@@ -261,6 +270,7 @@ export function buildMenu(ctx) {
 							type: 'info',
 							message: `MARGIE ${app.getVersion()}`,
 							detail: [
+								`Build     ${thisBuild().builtAt || 'development'}${thisBuild().commit ? ` (${thisBuild().commit})` : ''}`,
 								`Electron ${process.versions.electron}`,
 								`Node ${process.versions.node}`,
 								'',

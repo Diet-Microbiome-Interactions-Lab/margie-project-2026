@@ -197,7 +197,19 @@ run('npm', ['ci', '--omit=dev', '--ignore-scripts', '--no-audit', '--no-fund'], 
 fs.rmSync(path.join(GUI, 'package-lock.json'), { force: true });
 
 // ---------------------------------------------------------------------------
-// 5. Report
+// 5. The build's identity, for the app's update check (src/update.js): in the app's resources, and
+//    in dist/ to upload with the installers to the release. A release's installers built in one
+//    stage share it, so build them together (dist:all).
+// ---------------------------------------------------------------------------
+const builtAt = new Date().toISOString();
+const head = execFileSync('git', ['-C', DESKTOP, 'rev-parse', '--short', 'HEAD'], { encoding: 'utf8' }).trim();
+const buildInfo = JSON.stringify({ id: `${builtAt}-${head}`, builtAt, commit: head }, null, '\t') + '\n';
+fs.writeFileSync(path.join(STAGE, 'build-info.json'), buildInfo);
+fs.mkdirSync(path.join(DESKTOP, 'dist'), { recursive: true });
+fs.writeFileSync(path.join(DESKTOP, 'dist', 'build-info.json'), buildInfo);
+
+// ---------------------------------------------------------------------------
+// 6. Report
 // ---------------------------------------------------------------------------
 const bytes = (dir) => {
 	let total = 0;
@@ -216,4 +228,5 @@ console.log(`  node_modules/ ${mb(bytes(path.join(GUI, 'node_modules')))}`);
 console.log(`  scripts/      ${mb(bytes(path.join(GUI, 'scripts')))}`);
 console.log(`  total         ${mb(bytes(GUI))}   →  ${GUI}`);
 console.log(`  pipeline      ${mb(bytes(PIPELINE))}   →  ${PIPELINE}`);
+console.log(`  build         ${builtAt} (${head})   →  build-info.json, also in dist/ for the release`);
 console.log(`  build files   ${fs.existsSync(VAULT) ? `${mb(fs.statSync(VAULT).size)}, locked   →  ${VAULT}` : 'none'}`);

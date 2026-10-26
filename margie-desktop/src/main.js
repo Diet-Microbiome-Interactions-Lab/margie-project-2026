@@ -22,6 +22,7 @@ import { loadWindowState, trackWindowState } from './window-state.js';
 import { prefs } from './app-prefs.js';
 import { createRunWatch } from './run-watch.js';
 import { createTray } from './tray.js';
+import { scheduleUpdateChecks } from './update.js';
 import { addGenomeFiles, pendingOpenFiles, rememberOpenFile } from './open-files.js';
 
 /** Allows a single instance, which owns the state folder and the tunnel's port. */
@@ -439,6 +440,9 @@ async function start() {
 	createWindow();
 
 	if (prefs().tray) tray = createTray({ watch, showWindow, goTo });
+
+	// A newer build on GitHub is offered, whatever its version number (update.js).
+	if (app.isPackaged) scheduleUpdateChecks(() => win);
 
 	// Files opened before the server was up.
 	const opened = pendingOpenFiles();

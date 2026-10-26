@@ -36,6 +36,9 @@ extraResources:
   # copies it out to Application Support, where it can write (src/pipeline.js).
   - from: .stage/pipeline
     to: pipeline
+  # The build's identity, which the update check compares with the release's (src/update.js).
+  - from: .stage/build-info.json
+    to: build-info.json
   # margie-build, locked with the build password (scripts/stage.mjs); the app
   # unpacks it for a session once the password is given (lib/server/build-vault.ts).
   - from: .stage/build.margie

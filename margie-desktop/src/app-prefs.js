@@ -23,7 +23,11 @@ const DEFAULTS = {
 	/** Keeps the Mac awake while a run is going. */
 	keepAwake: true,
 	/** Remembered zoom, as Electron's zoom level (0 = 100%). */
-	zoom: 0
+	zoom: 0,
+	/** Looks for a newer build on GitHub after start and once a day (update.js). */
+	updates: true,
+	/** A newer build the user chose to skip; the automatic check does not offer it again. */
+	skipBuild: ''
 };
 
 const ALLOWED = {
@@ -32,7 +36,9 @@ const ALLOWED = {
 	tray: (v) => (typeof v === 'boolean' ? v : null),
 	notifications: (v) => (typeof v === 'boolean' ? v : null),
 	keepAwake: (v) => (typeof v === 'boolean' ? v : null),
-	zoom: (v) => (typeof v === 'number' && v >= -5 && v <= 5 ? v : null)
+	zoom: (v) => (typeof v === 'number' && v >= -5 && v <= 5 ? v : null),
+	updates: (v) => (typeof v === 'boolean' ? v : null),
+	skipBuild: (v) => (typeof v === 'string' && v.length <= 200 ? v : null)
 };
 
 let cache = null;

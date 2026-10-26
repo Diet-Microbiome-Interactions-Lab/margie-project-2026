@@ -143,6 +143,28 @@ Apptainer, or on the HPC through ssh. Writable files go where Electron puts them
 launcher as everywhere else. The Linux builds have so far been produced on macOS and not yet
 tried on a Linux desktop.
 
+## Updates
+
+Each build carries `build-info.json` (its build time and commit), written by `npm run stage` into
+the app and into `dist/`. The app reads the latest GitHub release a little after it starts and
+once a day (**Check for Updates Automatically**, on by default), and from **Check for Updates…**
+in the MARGIE menu (Help on Windows and Linux). A release whose `build-info.json` names a newer
+build counts as an update whatever its version number, so installers re-uploaded under the same
+version reach users; without that file, an installer uploaded more than 12 hours after the
+user's build counts as newer. The app downloads the installer for its system to Downloads, opens
+it and offers to quit, so it can be installed over the old copy; settings, genomes and runs stay.
+
+So upload `dist/build-info.json` with the installers, and build a release's installers in one
+stage so they share it:
+
+```bash
+npm run dist:all
+gh release upload v1.0.0 dist/MARGIE-* dist/build-info.json --clobber
+```
+
+Copies built before this check was added have no check: they update once by hand, from the
+release page.
+
 ## Signing and notarization
 
 `electron-builder.yml` ships with `notarize: false`, so a local build works with no Apple
