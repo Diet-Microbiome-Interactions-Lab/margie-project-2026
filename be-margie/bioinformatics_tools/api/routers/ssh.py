@@ -1853,11 +1853,9 @@ def setup_stores(body: dict | None = None, current_user: dict = Depends(get_curr
     """Copies the databases missing on scratch, from the user's newest depot
     backup where there is one, else from the base copies.
 
-    body {"fresh": true, "build_password": ...}: every database starts empty instead, as its
-    next version in the working folder (a new lab's own); this needs the build password."""
+    body {"fresh": true}: every database starts empty instead, as its next version in the
+    working folder (a new lab's own); the copies there stay."""
     fresh = bool((body or {}).get("fresh"))
-    if fresh:
-        build_gate.check((body or {}).get("build_password"))
     conn = _build_connection(current_user)
     user_config = _stores_user_config(current_user, conn)
     _stores_settle(current_user, conn, user_config)
