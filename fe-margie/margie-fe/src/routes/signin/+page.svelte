@@ -224,7 +224,7 @@
 							<div class="form">
 								<div class="hint request">
 									<p>
-										MARGIE runs on Purdue's HPC cluster, so she needs an account there. If you are not affiliated with Purdue, or are a
+										MARGIE runs on Purdue's HPC cluster, so she has to know you as a Purdue affiliate, with an active account there. If you are not affiliated with Purdue, or are a
 										collaborator or a reviewer, please email the address below to get a username and password to sign in.
 									</p>
 									<p>
