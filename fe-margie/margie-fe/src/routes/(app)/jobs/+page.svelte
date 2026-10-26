@@ -46,7 +46,7 @@
 					<Eraser size={14} />{clearing ? 'Clearing…' : 'Clear history'}
 				</button>
 			{/if}
-			<a class="mg-btn small" href="/quiz" title="Questions on microbes, metabolism, bioinformatics, the gut and MARGIE"><Lightbulb size={14} />Bored while waiting? Try Quizzes!</a>
+			<a class="mg-btn small" href="/quiz" title="Questions on microbes, metabolism, energetics, bioinformatics, the gut and MARGIE"><Lightbulb size={14} />Bored while waiting? Try Quizzes!</a>
 			<RefreshButton title="Read the jobs again" run={() => ws.loadRuns()} />
 		</div>
 	</div>

@@ -29,6 +29,7 @@ How a run annotates and scores is set out under **Methods**.
 
 - `FINAL_ANNOTATION_WITH_CONFIDENCE.tsv`: each gene's label, its source, location and topology, the four scoring measures with their reasoning, its 0 to 1 confidence and tier.
 - A GFF of the annotation, each tool's own results, gene and operon fingerprints, and a genome map.
+- In the working folder's `resource-utilization-statistics/`: the run's resource use, a PDF of up to three landscape pages (SLURM hours by partition and phase, memory, disk read and written, files, space and rates), and a row of `runs.tsv` in seconds and bytes for adding up runs.
 
 ## How does MARGIE work
 
