@@ -162,9 +162,13 @@ export function buildProgress(i: ProgressInput): Progress {
 	const planned = new Set(i.tools);
 	const phases = phasesOf(i.tools, i.offered);
 	const cols = phases.flatMap((g) => g.cols);
-	const results = new Map(i.results.map((r) => [r.organism, r]));
+	// The run's own genome folders: Results lists each genome's latest finished result, which may be
+	// another run's (an earlier run of the same genome, under the same name).
+	const runDir = (i.run?.outputDir ?? '').replace(/\/$/, '');
+	const own = runDir ? i.results.filter((r) => r.folder?.startsWith(`${runDir}/`)) : i.results;
+	const results = new Map(own.map((r) => [r.organism, r]));
 	const cells = new Map<string, 'done' | 'partial'>();
-	for (const r of i.results) for (const t of r.tools) cells.set(`${t.tool}\t${r.organism}`, t.processed ? 'done' : 'partial');
+	for (const r of own) for (const t of r.tools) cells.set(`${t.tool}\t${r.organism}`, t.processed ? 'done' : 'partial');
 	const logged = i.log && i.run ? logSteps(i.log, i.run.status) : null;
 	const started = new Map((i.clock?.started ?? []).map((e) => [`${e.tool}\t${e.genome}`, e]));
 	const typical = i.clock?.typical ?? {};
@@ -291,10 +295,8 @@ export function buildProgress(i: ProgressInput): Progress {
 	function hrefOf(col: string, genome: string, c: Cell): string | undefined {
 		if (c.state === 'na' || c.state === 'none') return undefined;
 		const out = i.outputRoot;
-		// This job's own folder first: Results may list the genome from another run, or not yet at all.
-		const runDir = (i.run?.outputDir ?? '').replace(/\/$/, '');
-		const listed = results.get(genome);
-		const r = listed && (!runDir || listed.folder?.startsWith(`${runDir}/`)) ? listed : undefined;
+		// This job's own folder (results holds only those), or where it will be.
+		const r = results.get(genome);
 		const gdir = r?.folder ?? (runDir ? `${runDir}/${genome}` : undefined);
 		const toolPath = (t: string) => r?.tools.find((x) => x.tool === t)?.path ?? (gdir ? `${gdir}/${t}` : undefined);
 		let dir: string | undefined;
