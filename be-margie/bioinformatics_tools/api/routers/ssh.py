@@ -1009,7 +1009,7 @@ def _defaults_for(current_user: dict, conn, params: list[dict]) -> list[dict]:
         except Exception:
             pass
     # The databases folder's settings, as the first setup makes them (for any account).
-    shown = user_stores.default_paths(root, current_user.get("cluster_username") or "you") if root else {}
+    shown = user_stores.default_paths(root, current_user.get("cluster_username") or "you", short=not member) if root else {}
     if working:
         shown.update({"margie_sb.input_path": f"{working}/{user_stores.INPUT_NAME}",
                       "margie_sb.output_path": f"{working}/{user_stores.OUTPUT_NAME}",

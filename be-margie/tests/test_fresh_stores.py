@@ -30,7 +30,9 @@ def test_every_store_starts_empty_as_its_next_version():
     assert len(occ) == 1 and occ[0][3].endswith(".venv/bin/python") and occ[0][4].endswith("workflow_tools/scoring")
     job_db = next(s for s in user_stores.STORES if s["id"] == "job_db")
     new = [p for p in plan if p[0] == "new"]
-    assert len(new) == 1 and job_db["name"] in new[0][2] and "-v" in new[0][2]
+    # Fresh databases take the short names (<user>-margie-v1.db), not the group's base's.
+    assert len(new) == 1 and new[0][2].endswith(f"/u-{user_stores.short_stem(job_db)}-v1.db")
+    assert after["names"]["job_db"] == "margie" and after["names"]["occ"] == "operon-reference"
 
 
 def test_the_copy_script_knows_the_empty_reference_step():
