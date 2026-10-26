@@ -384,7 +384,8 @@ def database_facts(path: str) -> dict:
     facts["size"], facts["changed"] = st.st_size, st.st_mtime
     for attempt in range(6):
         try:
-            db = sqlite3.connect(f"file:{path}?mode=ro", uri=True, timeout=120)
+            # immutable=1: read without taking a lock, so a run writing to the database is never held up.
+            db = sqlite3.connect(f"file:{path}?mode=ro&immutable=1", uri=True)
             try:
                 log(f"Counting the genomes and genes in {path}")
                 # A genome loaded more than once has its rows more than once; each gene counts once.
@@ -398,9 +399,10 @@ def database_facts(path: str) -> dict:
             finally:
                 db.close()
             break
-        except sqlite3.OperationalError as exc:
-            if "locked" in str(exc) and attempt < 5:
-                log(f"{path} is busy (a run is writing to it); trying again")
+        except sqlite3.DatabaseError as exc:
+            # A page changed under the read (a run writing as it counts): read again.
+            if attempt < 5:
+                log(f"{path} changed while it was read ({exc}); reading again")
                 time.sleep(15)
                 continue
             facts["error"] = str(exc)

@@ -263,6 +263,59 @@ def current_rast_genome_id(rasttk_file: str) -> str | None:
     return ids.pop().decode()
 
 
+def rast_genome_ids(paths: list[str]) -> set[str]:
+    """The RASTtk genome ids (6666666.<job>) the files name."""
+    ids: set[str] = set()
+    for path in paths:
+        try:
+            ids |= {m.group(1).decode() for m in _RAST_GENOME_ID_RE.finditer(Path(path).read_bytes())}
+        except OSError:
+            continue
+    return ids
+
+
+def _proteins_by_number(faa: bytes) -> dict[str, str]:
+    """{feature number ('peg.12'): protein} from a RASTtk .faa."""
+    out: dict[str, str] = {}
+    name, seq = None, []
+    for line in faa.decode(errors="replace").splitlines():
+        if line.startswith(">"):
+            if name:
+                out[name] = "".join(seq)
+            m = re.match(r">\S*?6666666\.\d+\.(\S+)", line)
+            name, seq = (m.group(1) if m else None), []
+        elif name:
+            seq.append(line.strip())
+    if name:
+        out[name] = "".join(seq)
+    return out
+
+
+def gene_calls_match(db_path: str, input_file: str, current_faa: str, made_with: str) -> bool | None:
+    """Whether the genome's cached gene calls under RASTtk job `made_with` (6666666.<job>) are this run's: the same
+    protein under each feature number. Cached tables name genes by number, so they move onto this
+    run's id only then. None when the cache holds no gene calls under that id to compare with."""
+    try:
+        current = _proteins_by_number(Path(current_faa).read_bytes())
+    except OSError:
+        return None
+    pattern = _extract_pattern_suffix("rast.faa")
+    conn = _get_connection(db_path)
+    try:
+        _ensure_table(conn)
+        for input_hash in _input_hashes(input_file):
+            for fname, blob in conn.execute(
+                    "SELECT filename, content FROM output_cache WHERE input_hash = ? AND tool = 'rasttk'", (input_hash,)):
+                if _extract_pattern_suffix(fname) != pattern:
+                    continue
+                if {m.group(1).decode() for m in _RAST_GENOME_ID_RE.finditer(blob)} != {made_with}:
+                    return None
+                return bool(current) and _proteins_by_number(blob) == current
+    finally:
+        conn.close()
+    return None
+
+
 def realign_rast_genome_id(paths: list[str], current_id: str) -> dict[str, str]:
     """Rewrites cache-restored files onto this run's RASTtk genome id.
 

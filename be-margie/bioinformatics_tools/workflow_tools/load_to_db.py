@@ -124,15 +124,15 @@ def _ensure_run_log(conn: sqlite3.Connection) -> None:
     conn.execute("CREATE INDEX IF NOT EXISTS run_log__fasta_hash ON run_log(fasta_hash, tool)")
 
 
-def _ensure_organism_index(conn: sqlite3.Connection, table_name: str) -> None:
-    """Indexes table_name by organism_name, so a genome's delete reads that genome's rows
-    rather than the whole table. Built the first time a load meets the table without one:
+def _ensure_organism_index(conn: sqlite3.Connection, table_name: str, col: str = "organism_name") -> None:
+    """Indexes table_name by the column naming the genome, so a genome's delete reads that genome's
+    rows rather than the whole table. Built the first time a load meets the table without one:
     that once costs one read of the table, as an unindexed delete did each time."""
-    name = f"{table_name}__organism_name"
+    name = f"{table_name}__{col}"
     if conn.execute("SELECT 1 FROM sqlite_master WHERE type='index' AND name=?", (name,)).fetchone():
         return
-    print(f"Indexing {table_name} by organism_name (once per table)")
-    conn.execute(f'CREATE INDEX IF NOT EXISTS "{name}" ON "{table_name}"(organism_name)')
+    print(f"Indexing {table_name} by {col} (once per table)")
+    conn.execute(f'CREATE INDEX IF NOT EXISTS "{name}" ON "{table_name}"("{col}")')
 
 
 def _already_loaded(db_path: str, input_hash: str, tool: str,
@@ -251,12 +251,14 @@ def _delete_stale_organism_rows(db_path: str, table_name: str,
             if not exists:
                 return 0
             cols = {row[1] for row in conn.execute(f'PRAGMA table_info("{table_name}")')}
-            if "organism_name" not in cols:
+            # The gene calls' table (rasttk) names the genome in its organism column.
+            col = "organism_name" if "organism_name" in cols else "organism" if "organism" in cols else None
+            if not col:
                 return 0
-            _ensure_organism_index(conn, table_name)
+            _ensure_organism_index(conn, table_name, col)
             placeholders = ",".join("?" * len(targets))
             cursor = conn.execute(
-                f'DELETE FROM "{table_name}" WHERE organism_name IN ({placeholders})',
+                f'DELETE FROM "{table_name}" WHERE "{col}" IN ({placeholders})',
                 tuple(sorted(targets)),
             )
             deleted = cursor.rowcount
