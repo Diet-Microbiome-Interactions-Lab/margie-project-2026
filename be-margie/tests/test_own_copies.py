@@ -27,7 +27,8 @@ def test_margies_own_names_win_and_the_newest_is_taken():
     inside = ["u-margie-thesis-22-prokaryotes-base-v1.db", "u-margie-thesis-22-prokaryotes-base-v3.db",
               "u-margie-thesis-22-prokaryotes-base-v4.db.partial", "margie-thesis-22-prokaryotes-base.db"]
     f = us.own_copy(JOB_DB, "u", ROOT, [], inside)
-    assert f == {"path": f"{ROOT}/sqlite/u-margie-thesis-22-prokaryotes-base-v3.db", "how": "named", "version": 3}
+    assert f == {"path": f"{ROOT}/sqlite/u-margie-thesis-22-prokaryotes-base-v3.db", "how": "named", "version": 3,
+                 "stem": "margie-thesis-22-prokaryotes-base"}
 
 
 def test_someone_elses_copy_is_not_taken():
@@ -210,7 +211,8 @@ def test_a_copy_found_by_extension_needs_no_size_match_with_the_groups():
 def test_a_copy_found_by_extension_is_renamed_into_place(tmp_path):
     (tmp_path / "lab.db").write_text("db")
     v = _adopt(tmp_path, JOB_DB, {"path": str(tmp_path / "lab.db"), "how": "ext", "version": 1})
-    assert v == 1 and (tmp_path / "sqlite" / "u-margie-thesis-22-prokaryotes-base-v1.db").read_text() == "db"
+    # A copy of the user's own, not the group's base: the short name.
+    assert v == 1 and (tmp_path / "sqlite" / "u-margie-v1.db").read_text() == "db"
     assert not (tmp_path / "lab.db").exists()
 
 
@@ -265,3 +267,40 @@ def test_builds_outside_the_group_keep_their_records_and_group_their_own():
                    ["env", "MARGIE_SHARED_GROUP", "@group"]]
     with patch.object(us, "DEPOT", "/shared/lab/margie"), patch.object(us, "_run", return_value=(0, "0")):
         assert tool_assets.build_env(None, {}) == []
+
+
+
+# ---- names: a copy of the group's base keeps the base's; anything else a short one ----
+
+def test_short_names_and_both_are_recognised():
+    assert us.versioned(JOB_DB, "u", 1, us.short_stem(JOB_DB)) == "u-margie-v1.db"
+    assert us.versioned(OCC, "u", 2, us.short_stem(OCC)) == "u-operon-reference-v2.pkl"
+    assert us.versioned(JOB_DB, "u", 1) == "u-margie-thesis-22-prokaryotes-base-v1.db"
+    assert us.parse_versioned(JOB_DB, "u", "u-margie-v4.db") == (4, "margie")
+    assert us.parse_versioned(JOB_DB, "u", "u-margie-thesis-22-prokaryotes-base-v2.db") == (2, "margie-thesis-22-prokaryotes-base")
+    # A manifest entry without a name (made before short names) is the base's.
+    assert us.stem_of({"version": 3}, JOB_DB) == "margie-thesis-22-prokaryotes-base"
+    assert us.stem_of({"version": 3, "name": "margie"}, JOB_DB) == "margie"
+
+
+def _setup_plan(src_for_base: str):
+    """start_setup's plan and record for a first setup, with the base resolving to src_for_base."""
+    got = {}
+    status = {"op": None, "root": ROOT, "stores": [{"version": None, "found": None} for _ in us.STORES]}
+    with patch.object(us, "status", return_value=status), patch.object(us, "_backups", return_value=[]), \
+         patch.object(us, "resolve_base", return_value=src_for_base), patch.object(us, "_size", return_value=1), \
+         patch.object(us, "_run", return_value=(0, "/home/u")), \
+         patch.object(us, "_start", side_effect=lambda conn, root, kind, plan, after, cfg=None, **kw: got.update(plan=plan, after=after)):
+        us.start_setup(None, {}, "u")
+    return got
+
+
+def test_a_new_setup_takes_short_names_and_a_copy_of_the_groups_base_keeps_its_own():
+    with patch.object(us, "DEPOT", "/shared/lab/margie"):
+        fresh = _setup_plan("")
+        lab = _setup_plan("/shared/lab/margie/databases/margie-generated-databases/sqlite/margie-thesis-22-prokaryotes-base.db")
+        mine = _setup_plan("/home/u/my-own.db")
+    assert fresh["after"]["names"]["job_db"] == "margie" and fresh["after"]["names"]["occ"] == "operon-reference"
+    assert any(step[-1] == f"{ROOT}/sqlite/u-margie-v1.db" or f"{ROOT}/sqlite/u-margie-v1.db" in step for step in fresh["plan"])
+    assert lab["after"]["names"]["job_db"] == "margie-thesis-22-prokaryotes-base"
+    assert mine["after"]["names"]["job_db"] == "margie"

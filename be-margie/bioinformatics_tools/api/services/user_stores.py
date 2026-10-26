@@ -98,6 +98,8 @@ STORES: list[dict] = [
         'depot_sub': 'sqlite',
         'sub': 'sqlite',
         'name': 'margie-thesis-22-prokaryotes-base',
+        # A copy set up any other way than from the base (new, the starter, the user's own): <user>-margie-vN.db.
+        'short': 'margie',
         'ext': '.db',
         'companions': [],
         'config': {'main_database': None},
@@ -111,6 +113,7 @@ STORES: list[dict] = [
         'depot_sub': 'operon-database',
         'sub': 'operon-database',
         'name': 'occ_reference',
+        'short': 'operon-reference',
         'ext': '.pkl',
         # Written beside the reference by update-occ-reference-depot.py.
         'companions': ['.members.tsv', '.genome_stats.tsv'],
@@ -327,20 +330,48 @@ def fill_default_partition(conn, cfg: dict) -> bool:
 
 # ---- Names ----
 
-def versioned(store: dict, user: str, version: int) -> str:
-    """Returns <user>-<name>-v<N><ext>, the name used on scratch and depot."""
-    return f"{user}-{store['name']}-v{version}{store.get('ext', '') if store['kind'] == 'file' else ''}"
+def short_stem(store: dict) -> str:
+    """The name of a copy set up any other way than from the group's base (new, the starter, the
+    user's own): margie, operon-reference, fingerprint-database, genome-pool."""
+    return store.get('short') or store['name']
+
+
+def _stems(store: dict) -> list[str]:
+    """The names a copy of the store goes by: the base's (a copy of the group's base, and its
+    backups) and the short one."""
+    return list(dict.fromkeys([store['name'], short_stem(store)]))
+
+
+def versioned(store: dict, user: str, version: int, stem: str | None = None) -> str:
+    """Returns <user>-<name>-v<N><ext>, the name used on scratch and depot: the base's name, or
+    stem (short_stem for a copy not made from the base)."""
+    return f"{user}-{stem or store['name']}-v{version}{store.get('ext', '') if store['kind'] == 'file' else ''}"
+
+
+def parse_versioned(store: dict, user: str, name: str) -> tuple[int, str] | None:
+    """The version and name stem of a versioned name (either stem), or None."""
+    ext = re.escape(store.get('ext', '')) if store['kind'] == 'file' else ''
+    for stem in _stems(store):
+        m = re.fullmatch(rf"{re.escape(user)}-{re.escape(stem)}-v(\d+){ext}", name)
+        if m:
+            return int(m.group(1)), stem
+    return None
 
 
 def _version_of(store: dict, user: str, name: str) -> int | None:
     """Parses the version from a versioned name, or None."""
-    ext = re.escape(store.get('ext', '')) if store['kind'] == 'file' else ''
-    m = re.fullmatch(rf"{re.escape(user)}-{re.escape(store['name'])}-v(\d+){ext}", name)
-    return int(m.group(1)) if m else None
+    found = parse_versioned(store, user, name)
+    return found[0] if found else None
 
 
-def _backups(conn, store: dict, user: str, cfg: dict | None = None) -> list[int]:
-    """Returns the versions of this user's backups of the store, oldest first."""
+def stem_of(entry: dict | None, store: dict) -> str:
+    """The name stem a manifest entry records ({version, name}); an entry without one is the base's."""
+    name = (entry or {}).get('name')
+    return name if name in _stems(store) else store['name']
+
+
+def _backups(conn, store: dict, user: str, cfg: dict | None = None) -> list[tuple[int, str]]:
+    """Returns this user's backups of the store as (version, name stem), oldest first."""
     try:
         entries = ssh_sftp.list_remote_dir(backup_dir(store, cfg), connection=conn)
     except Exception:
@@ -350,9 +381,9 @@ def _backups(conn, store: dict, user: str, cfg: dict | None = None) -> list[int]
     for e in entries:
         if e.get('type') != want:
             continue
-        v = _version_of(store, user, e.get('name') or '')
-        if v is not None:
-            found.append(v)
+        p = parse_versioned(store, user, e.get('name') or '')
+        if p is not None:
+            found.append(p)
     return sorted(found)
 
 
@@ -379,8 +410,8 @@ def _write_manifest(conn, root: str, manifest: dict) -> None:
     ssh_sftp.write_remote_text_file(_state_path(root, 'stores.json'), json.dumps(manifest, indent=2) + '\n', connection=conn)
 
 
-def working_path(store: dict, root: str, user: str, version: int) -> str:
-    return f"{root}/{store['sub']}/{versioned(store, user, version)}"
+def working_path(store: dict, root: str, user: str, version: int, stem: str | None = None) -> str:
+    return f"{root}/{store['sub']}/{versioned(store, user, version, stem)}"
 
 
 def _probe(conn, root: str, user: str, cfg: dict | None = None) -> dict:
@@ -398,7 +429,8 @@ def _probe(conn, root: str, user: str, cfg: dict | None = None) -> dict:
              f'echo "@@slurmout"; tail -n 20 {shlex.quote(_state_path(root, "op.slurm.out"))} 2>/dev/null',
              f'echo "@@logage"; echo $(( $(date +%s) - $(stat -c %Y {shlex.quote(log_path)} 2>/dev/null || echo 0) ))']
     for st in STORES:
-        parts.append(f'echo "@@depot {st["id"]}"; ls -1p {shlex.quote(backup_dir(st, cfg))} 2>/dev/null | grep "^{user}-{st["name"]}-v"')
+        names = '|'.join(re.escape(n) for n in _stems(st))
+        parts.append(f'echo "@@depot {st["id"]}"; ls -1p {shlex.quote(backup_dir(st, cfg))} 2>/dev/null | grep -E "^{user}-({names})-v"')
     # What is in the working folder, for copies put there by hand (own_copy).
     # Newest first, so a copy found by its extension is the newest one (own_copy).
     parts.append(f'echo "@@here"; ls -1pAt {shlex.quote(root)} 2>/dev/null')
@@ -420,9 +452,10 @@ def _probe(conn, root: str, user: str, cfg: dict | None = None) -> dict:
     # Checks the working copies named by the manifest.
     wanted = {}
     for st in STORES:
-        v = (manifest.get(st['id']) or {}).get('version') if isinstance(manifest, dict) else None
+        entry = (manifest.get(st['id']) or {}) if isinstance(manifest, dict) else {}
+        v = entry.get('version')
         if v:
-            wanted[st['id']] = (int(v), working_path(st, root, user, int(v)))
+            wanted[st['id']] = (int(v), working_path(st, root, user, int(v), stem_of(entry, st)))
     present = set()
     if wanted:
         cmd = '; '.join(f'test -e {shlex.quote(p)} && echo {sid}' for sid, (_, p) in wanted.items())
@@ -432,8 +465,8 @@ def _probe(conn, root: str, user: str, cfg: dict | None = None) -> dict:
     for st in STORES:
         names = [n.rstrip('/') for n in sections.get(f'depot {st["id"]}', [])]
         is_dir = st['kind'] == 'dir'
-        vs = sorted(v for n in names
-                    if (v := _version_of(st, user, n)) is not None
+        vs = sorted(p for n in names
+                    if (p := parse_versioned(st, user, n)) is not None
                     and any(x == n + '/' for x in sections.get(f'depot {st["id"]}', [])) == is_dir)
         backups[st['id']] = vs
     return {
@@ -461,17 +494,17 @@ def own_copy(store: dict, user: str, root: str, top: list[str], inside: list[str
     # In the listing's order (newest first), each name once.
     listed = lambda names: list(dict.fromkeys((n.rstrip('/'), n.endswith('/')) for n in names if n.strip()))
     top, inside = listed(top), listed(inside)
-    named = [(v, n) for n, d in inside if d == is_dir and (v := _version_of(store, user, n)) is not None]
+    named = [(p[0], n, p[1]) for n, d in inside if d == is_dir and (p := parse_versioned(store, user, n)) is not None]
     if named:
-        v, n = max(named)
-        return {'path': f'{sub}/{n}', 'how': 'named', 'version': v}
+        v, n, stem = max(named)
+        return {'path': f'{sub}/{n}', 'how': 'named', 'version': v, 'stem': stem}
     base = posixpath.basename(store['base_rel'])
     if not is_dir:
         for where, names in ((sub, inside), (root, top)):
             if (base, False) in names:
                 return {'path': f'{where}/{base}', 'how': 'base', 'version': 1}
         ext = store.get('ext', '')
-        someone_elses = re.compile(rf".+-{re.escape(store['name'])}-v\d+{re.escape(ext)}")
+        someone_elses = re.compile(rf".+-({'|'.join(re.escape(n) for n in _stems(store))})-v\d+{re.escape(ext)}")
         for where, names in ((sub, inside), (root, top)):
             for n, d in names:
                 if not d and ext and n.endswith(ext) and n != ext and not n.startswith('.') and not someone_elses.fullmatch(n):
@@ -526,13 +559,21 @@ def _gb(n: int) -> str:
     return f'{n} bytes'
 
 
+def adopted_stem(store: dict, found: dict) -> str:
+    """The name a found copy goes by once taken: its own (MARGIE's name), the base's (a file named
+    as the group's base is a copy of it), else the short one."""
+    if found['how'] == 'named':
+        return found.get('stem') or store['name']
+    return store['name'] if found['how'] == 'base' else short_stem(store)
+
+
 def adopt(conn, store: dict, found: dict, root: str, user: str) -> int:
     """Takes a found copy as the store's working copy, where it is: renamed to MARGIE's name in the
     store's subfolder (companions too), or a base folder's files moved into one. Nothing is copied
     or overwritten. Returns its version."""
     if found['how'] == 'named':
         return found['version']
-    dst = working_path(store, root, user, 1)
+    dst = working_path(store, root, user, 1, adopted_stem(store, found))
     q = shlex.quote
     if found['how'] in ('base', 'ext'):
         src = found['path']
@@ -831,12 +872,13 @@ def _config_paths(store: dict, target: str) -> dict:
             for key, inner in store['config'].items()}
 
 
-def default_paths(root: str, user: str) -> dict:
+def default_paths(root: str, user: str, short: bool = False) -> dict:
     """The settings of the databases folder as a first setup in root makes them: each store's first
-    working copy, and the run archives (OUTPUT_DIRS), for Settings to show while unset."""
+    working copy (under the base's names, or the short ones for a setup not made from the base),
+    and the run archives (OUTPUT_DIRS), for Settings to show while unset."""
     out: dict = {}
     for st in STORES:
-        out.update(_config_paths(st, working_path(st, root, user, 1)))
+        out.update(_config_paths(st, working_path(st, root, user, 1, short_stem(st) if short else None)))
     out.update({key: f'{root}/{sub}' for key, sub in OUTPUT_DIRS.items()})
     return out
 
@@ -862,6 +904,7 @@ def status(conn, cfg: dict, user: str) -> dict:
         present = s['id'] in probe['present']
         ready = ready and present
         backups = probe['backups'].get(s['id'], [])
+        entry = probe['manifest'].get(s['id']) or {}
         stores.append({
             'id': s['id'],
             'label': s['label'],
@@ -873,9 +916,11 @@ def status(conn, cfg: dict, user: str) -> dict:
             # A copy of it in the working folder that the next setup uses instead of copying.
             'found': found.get(s['id']),
             'base': bases[s['id']],
-            'backup': ({'version': backups[-1],
-                        'path': posixpath.join(backup_dir(s, cfg), versioned(s, user, backups[-1]))}
+            'backup': ({'version': backups[-1][0],
+                        'path': posixpath.join(backup_dir(s, cfg), versioned(s, user, *backups[-1]))}
                        if backups else None),
+            # The name its working copy goes by: the base's, or the short one.
+            'stem': stem_of(entry, s),
             'backups': len(backups),
         })
     return {'root': root, 'user': user, 'ready': ready, 'stores': stores, 'op': op or None}
@@ -958,7 +1003,7 @@ def start_setup(conn, cfg: dict, user: str, fresh: bool = False) -> dict:
         raise StoreError('A copy is already under way.', 409)
     root = st['root']
     plan: list[list] = [['mkdir', f'{root}/{sub}'] for sub in OUTPUT_DIRS.values()]
-    after: dict = {'kind': 'setup', 'versions': {}}
+    after: dict = {'kind': 'setup', 'versions': {}, 'names': {}}
     state = f'{root}/{STATE_DIR}'
     # Copies already in the working folder are used where they are.
     own = {s['id']: info['found'] for s, info in zip(STORES, st['stores'])
@@ -967,31 +1012,38 @@ def start_setup(conn, cfg: dict, user: str, fresh: bool = False) -> dict:
         _run(conn, f'mkdir -p {shlex.quote(state)} && chmod 700 {shlex.quote(state)}')
         manifest = read_manifest(conn, root)
         for sid, found in own.items():
-            manifest[sid] = {'version': adopt(conn, STORE_BY_ID[sid], found, root, user)}
+            manifest[sid] = {'version': adopt(conn, STORE_BY_ID[sid], found, root, user),
+                             'name': adopted_stem(STORE_BY_ID[sid], found)}
         _write_manifest(conn, root, manifest)
     for s, info in zip(STORES, st['stores']):
         if s['id'] in own:
             continue
         if fresh:
             version = (info['version'] or 0) + 1
-            dst = working_path(s, root, user, version)
+            dst = working_path(s, root, user, version, short_stem(s))
             _plan_fresh(plan, s, dst)
             after['versions'][s['id']] = version
+            after['names'][s['id']] = short_stem(s)
             continue
         if info['version']:
             continue
         backups = _backups(conn, s, user, cfg)
         if backups:
-            src = posixpath.join(backup_dir(s, cfg), versioned(s, user, backups[-1]))
-            version = backups[-1] + 1
-            label = f"{s['label']} (from your backup v{backups[-1]})"
+            last, stem = backups[-1]
+            src = posixpath.join(backup_dir(s, cfg), versioned(s, user, last, stem))
+            version = last + 1
+            label = f"{s['label']} (from your backup v{last})"
         else:
             # A source chosen in Settings (margie_sb.stores.base.<id>) wins over the group folder;
             # with neither, the store starts from MARGIE's own defaults (below).
             src = resolve_base(conn, s, cfg)
             version = 1
             label = s['label']
-        dst = working_path(s, root, user, version)
+            # A copy of the group's base keeps the base's name; any other (new, or from a source of
+            # the user's own) gets the short one.
+            stem = s['name'] if src and in_group(src) else short_stem(s)
+        dst = working_path(s, root, user, version, stem)
+        after['names'][s['id']] = stem
         if not src:
             # No group folder and no chosen source: a fresh start.
             if s['id'] == 'occ':
@@ -1107,7 +1159,7 @@ def backup_check(conn, cfg: dict, user: str, store_id: str) -> dict:
         'size': size,
         'free': free,
         'fits': fits,
-        'target': posixpath.join(backup_dir(s, cfg), versioned(s, user, info['version'])),
+        'target': posixpath.join(backup_dir(s, cfg), versioned(s, user, info['version'], info['stem'])),
     }
 
 
@@ -1131,12 +1183,13 @@ def start_backup(conn, cfg: dict, user: str, store_id: str) -> dict:
     if not v:
         raise StoreError(f"{s['label']} is not set up on scratch yet.", 409)
     root = st['root']
-    src = working_path(s, root, user, v)
-    dst = posixpath.join(backup_dir(s, cfg), versioned(s, user, v))
+    stem = info['stem']
+    src = working_path(s, root, user, v, stem)
+    dst = posixpath.join(backup_dir(s, cfg), versioned(s, user, v, stem))
     code, _ = _run(conn, f'test -e {shlex.quote(dst)}')
     if code == 0:
         raise StoreError(f'{dst} already exists; nothing is overwritten.', 409)
-    nxt = working_path(s, root, user, v + 1)
+    nxt = working_path(s, root, user, v + 1, stem)
     plan: list[list] = [['copy', f"{s['label']} v{v} to depot", src, dst, _size(conn, [src])]]
     companions = s.get('companions', []) if s['kind'] == 'file' else []
     for c in companions:
@@ -1149,7 +1202,7 @@ def start_backup(conn, cfg: dict, user: str, store_id: str) -> dict:
         code, _ = _run(conn, f'test -e {shlex.quote(src + c)}')
         if code == 0:
             plan.append(['move', src + c, nxt + c])
-    _start(conn, root, f'backup:{store_id}', plan, {'kind': 'backup', 'versions': {store_id: v + 1}}, cfg)
+    _start(conn, root, f'backup:{store_id}', plan, {'kind': 'backup', 'versions': {store_id: v + 1}, 'names': {store_id: stem}}, cfg)
     return status(conn, cfg, user)
 
 
@@ -1169,8 +1222,13 @@ def apply_finished(conn, cfg: dict, user: str) -> bool:
         except json.JSONDecodeError:
             after = {}
         manifest = read_manifest(conn, root)
+        names = after.get('names') or {}
         for sid, version in (after.get('versions') or {}).items():
-            manifest[sid] = {'version': int(version)}
+            entry = {'version': int(version)}
+            name = names.get(sid) or (manifest.get(sid) or {}).get('name')
+            if name:
+                entry['name'] = name
+            manifest[sid] = entry
         _write_manifest(conn, root, manifest)
         # Config keys set by a tool-assets copy.
         for key, value in (after.get('config') or {}).items():
@@ -1195,9 +1253,10 @@ def point_config(conn, cfg: dict, user: str, root: str | None = None) -> bool:
     changed = False
     wanted: dict = {}
     for s in STORES:
-        v = (manifest.get(s['id']) or {}).get('version')
+        entry = manifest.get(s['id']) or {}
+        v = entry.get('version')
         if v:
-            wanted.update(_config_paths(s, working_path(s, root, user, v)))
+            wanted.update(_config_paths(s, working_path(s, root, user, v, stem_of(entry, s))))
     for key, sub in OUTPUT_DIRS.items():
         wanted[key] = f'{root}/{sub}'
     # Cached so later requests skip the cluster lookup.

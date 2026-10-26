@@ -39,7 +39,7 @@ export function crispVars(p: UiPrefs, dark: boolean): Record<string, string> {
 		['--mg-bg', 'bg', '#F5F6F8'],
 		['--mg-surface', 'surface', '#FFFFFF'],
 		['--mg-surface-2', 'surface2', '#F5F6F7'],
-		['--mg-border', 'border', '#F5F8FF'],
+		['--mg-border', 'border', '#FFFFFF'],
 		['--mg-border-strong', 'borderStrong', '#C9CDD2'],
 		['--mg-seg-sel', '', '#FFFFFF']
 	];
@@ -87,7 +87,7 @@ export function crispVars(p: UiPrefs, dark: boolean): Record<string, string> {
 		'--cr-box-pad': p.density === 'compact' ? '12px 14px' : '16px 18px',
 		'--cr-note-pad': p.density === 'compact' ? '8px 14px' : '10px 18px',
 		'--cr-width': WIDTH[p.pageWidth] ?? WIDTH.wide,
-		// The hairline between rows: the Lines colour (Customize → Colours), #F5F8FF unless changed.
+		// The hairline between rows: the Lines colour (Customize → Colours), #FFFFFF unless changed.
 		'--cr-rule': dark ? `color-mix(in srgb, ${base['--mg-border']} 80%, ${base['--mg-surface']})` : (white['--mg-border'] ?? base['--mg-border']),
 		'--cr-zebra': `color-mix(in srgb, ${ink} ${dark ? 3 : 2.4}%, transparent)`,
 		// A section is a grey panel on the page, as in the classic pages; what
