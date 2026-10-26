@@ -12,7 +12,7 @@ from unittest.mock import MagicMock, patch
 import pytest
 
 from bioinformatics_tools.workflow_tools import workflow as workflow_module
-from bioinformatics_tools.workflow_tools.workflow import WorkflowBase, WORKFLOWS, _scripts_versioned
+from bioinformatics_tools.workflow_tools.workflow import WorkflowBase, WORKFLOWS
 from bioinformatics_tools.workflow_tools.workflow_registry import WORKFLOWS
 
 
@@ -669,8 +669,8 @@ class TestDoMargieSb:
 
     def test_genome_cache_map_covers_every_phase4_8_tool(self, wf):
         """Checks that do_margie_sb passes a per-genome cache_map_fn covering every
-        phase4-8 tool, with the full file set for multi-file tools, plus the
-        script-versioned consolidation/labeling steps."""
+        phase4-8 tool, with the full file set for multi-file tools. Consolidation and
+        labeling are not cached: they take about a minute and their tables are large."""
         wf.conf.get = MagicMock(side_effect=lambda key, default=None: {
             'input': '/genomes/genome1.fa',
             'main_database': '/tmp/test-margie.db',
@@ -696,16 +696,12 @@ class TestDoMargieSb:
         assert captured['resources']['margie_sb_bvbrc'] == 1
         assert captured['resources']['margie_sb_db_writer'] == 1
 
-        consolidation = _scripts_versioned('consolidation')
-        labeling = _scripts_versioned('labeling')
-        assert consolidation.startswith('consolidation@')
-        assert labeling.startswith('labeling@')
         expected_tools = {
             'cog', 'pfam', 'merops', 'tcdb', 'uniprot', 'kegg', 'eggnog', 'dbcan',
             'pgap', 'geneprop', 'operon', 'tmbed', 'signalp6', 'deepsig', 'psortb',
             'signalp4', 'tigrfam', 'phobius', 'envelope', 'interpro',
-            consolidation, labeling,
         }
+        assert not any(k.startswith(('consolidation', 'labeling')) for k in cache_map)
         assert set(cache_map.keys()) == expected_tools
         # quast/gtdbtk/rasttk are excluded (see _genome_cache_map).
         assert 'quast' not in cache_map
@@ -717,8 +713,6 @@ class TestDoMargieSb:
         assert len(cache_map['phobius']) == 3  # results.tsv + top1.tsv + token
         assert len(cache_map['envelope']) == 3  # results.tsv + summary.tsv + token
         assert len(cache_map['interpro']) == 38  # (results.tsv + token) + 18 dbs * 2 files each
-        assert len(cache_map[consolidation]) == 6  # tables + manifest + compute/db tokens
-        assert len(cache_map[labeling]) == 6
 
         for paths in cache_map.values():
             for path in paths:

@@ -44,22 +44,6 @@ from bioinformatics_tools.workflow_tools.workflow_registry import (
 LOGGER = logging.getLogger(__name__)
 
 
-_SCRIPT_VERSIONS: dict[str, str] = {}
-
-
-def _scripts_versioned(step: str) -> str:
-    """Returns '<step>@<fingerprint of its scripts>', the cache name for steps
-    that run MARGIE's own code (consolidation, labeling), so changed code is a
-    cache miss while the tools' cached outputs stay valid."""
-    if step not in _SCRIPT_VERSIONS:
-        folder = Path(__file__).parent / step
-        digest = hashlib.sha256()
-        for f in sorted(folder.glob('*')):
-            if f.is_file() and f.suffix in ('.py', '.sh', '.json', '.tsv'):
-                digest.update(f.name.encode() + b'\0' + f.read_bytes())
-        _SCRIPT_VERSIONS[step] = f'{step}@{digest.hexdigest()[:12]}'
-    return _SCRIPT_VERSIONS[step]
-
 # Consolidation merges every tool table in a genome's folder, and labeling reads only what it
 # merged: their cache entries are keyed by those tables too, so a different tool set, or a
 # tool's changed output, reruns them instead of bringing back a merge of other tables.
@@ -1924,7 +1908,7 @@ class WorkflowBase(ProgramBase):
                                   ('prodigal.sif', 'latest')]
 
         def _genome_cache_map(genome: str) -> dict[str, list[str]]:
-            '''Returns each phase4-11 tool's output files for one genome, keyed by
+            '''Returns each phase 4-8 tool's output files for one genome, keyed by
             tool name, for restore_all()/store_all().
 
             Excludes gtdbtk/rasttk, which run as batches the DAG replans anyway, and
@@ -1952,25 +1936,8 @@ class WorkflowBase(ProgramBase):
                 interpro_paths += [f'{prefix}interpro/interpro_{db}_results.tsv',
                                     f'{prefix}interpro/interpro_{db}_db.tkn']
             cache_map['interpro'] = interpro_paths
-            # Phase 9: includes the wide merged TSV so labeling can rerun from cache.
-            cache_map[_scripts_versioned('consolidation')] = [
-                f'{prefix}consolidation/detected-columns.json',
-                f'{prefix}consolidation/consolidated-merged-all-columns.tsv',
-                f'{prefix}consolidation/consolidated-no-stat.tsv',
-                f'{prefix}consolidation/manifest.tsv',
-                f'{prefix}consolidation/consolidation_compute.tkn',
-                f'{prefix}consolidation/consolidation_db.tkn',
-            ]
-            # Phase 10 (labeling)
-            cache_map[_scripts_versioned('labeling')] = [
-                f'{prefix}labeling/labeled-genes.tsv',
-                f'{prefix}labeling/labeled-genes-ec-consensus.tsv',
-                f'{prefix}labeling/labeled-genes-operon-info.tsv',
-                f'{prefix}labeling/labeled-genes-cluster-agreement.tsv',
-                f'{prefix}labeling/labeling_compute.tkn',
-                f'{prefix}labeling/labeling_db.tkn',
-            ]
-            # Phases 11-12 are not cached: scoring's OCC reference grows every run.
+            # From consolidation on, nothing is cached: consolidation and labeling take about a minute and
+            # their tables take hundreds of MB a genome; scoring's operon reference grows with each run.
             return cache_map
 
         # RASTtk concurrency: a mkdir mutex in margie_sb.smk's run_rasttk rule.

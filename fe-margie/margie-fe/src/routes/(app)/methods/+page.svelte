@@ -163,14 +163,6 @@
 			why: 'A file loaded before holds the same rows',
 			helps: 'Skips loading it again; a reload replaces the genome\'s rows by genome hash'
 		},
-		{
-			hash: 'Merged-tables key',
-			level: 'Genome',
-			from: 'The tool tables consolidation reads',
-			when: 'Consolidation and labeling',
-			why: 'Their results follow from exactly those tables',
-			helps: 'Restores consolidation and labeling when the tables are the same'
-		}
 	];
 	/** What the database keeps by hash, read by eye when checking hashes and restoring results. */
 	const RECORDS = [
@@ -266,7 +258,7 @@
 			its results when the sequence comes back, under any file name.
 		</p>
 		<ol class="mt-gates">
-			<li><b>Before the run: the genome hash.</b> A genome annotated before comes back from the genome cache: its gene calls, GTDB-Tk and each tool's results. Scoring runs again, as the operon reference grows with each genome.</li>
+			<li><b>Before the run: the genome hash.</b> A genome annotated before comes back from the genome cache: its gene calls, GTDB-Tk and each tool's results. Consolidation, labeling and scoring run again: the first two take about a minute, and scoring reads an operon reference that grows with each genome.</li>
 			<li><b>After gene calling: the protein hash.</b> A protein annotated before with a tool comes back from the protein cache; the tool runs on the new proteins. A tool new to a protein runs and is added; the protein's other tools stay.</li>
 		</ol>
 		<p>
