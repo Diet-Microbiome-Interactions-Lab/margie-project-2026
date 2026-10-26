@@ -187,3 +187,21 @@ def test_a_genome_the_table_describes_calls_its_genes_without_the_batch(tmp_path
 def test_a_genome_without_them_waits_for_the_batch(tmp_path):
     rules = _dry(tmp_path, ['gB/rasttk/rasttk_db.tkn'])
     assert rules[0] == 'run_gtdbtk_batch' and 'split_gtdbtk_batch_per_genome' in rules
+
+
+@patch(f'{W}.cache_sif_files')
+@patch(f'{W}.locate_local_sif_files')
+@patch(f'{W}.time.sleep')
+def test_a_run_without_the_cache_restores_nothing(mock_sleep, mock_locate, mock_cache, wf, tmp_path):  # noqa: F811
+    """margie_sb.use_cache false (Analyze, unlocked): no gene calls, GTDB-Tk, tool tables or proteins
+    come back from the MARGIE database, so each tool runs and keeps its raw output."""
+    values = {'main_database': str(tmp_path / 'm.db'), 'margie_sb': {'use_cache': False}}
+    wf.conf.get = lambda *a: values[a[0]] if len(a) == 1 else values.get(a[0], a[1])
+    out = tmp_path / 'run'
+    smk_config = {'output_dir': str(out), 'main_database': str(tmp_path / 'm.db')}
+    with _fake_launchers(wf), \
+         patch.object(workflow_module.WorkflowBase, '_restore_gene_calls', side_effect=AssertionError('gene calls restored')), \
+         patch(f'{W}.restore_all', side_effect=AssertionError('tool tables restored')), \
+         patch(f'{W}.protein_cache.split', side_effect=AssertionError('proteins restored')):
+        wf._run_pipeline_batch_sequential('margie_sb', smk_config, {'g1': '/g1.fa'},
+                                          cache_map_fn=lambda s: {'cog': [str(out / 'g1' / 'cog' / 'cog_results.tsv')]}, mode='dev')

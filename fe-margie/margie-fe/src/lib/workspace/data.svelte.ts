@@ -967,6 +967,9 @@ class Workspace {
 		return found.length;
 	}
 
+	/** The next run skips MARGIE's caches (unlocked on Analyze, after a yes); back to the cache once it starts. */
+	noCache = $state(false);
+
 	async annotate() {
 		if (this.#saveTimer) {
 			clearTimeout(this.#saveTimer);
@@ -983,11 +986,14 @@ class Workspace {
 		}
 		if (!this.chosenTools.length) ui.notify('No tools are chosen: this run calls genes and stops there.', 'ok');
 		// Omitted when every genome is chosen, so the server runs the folder without staging.
-		return this.start({
+		const run = await this.start({
 			kind: 'annotate',
 			tools: this.chosenTools,
-			...(this.everyGenomeChosen ? {} : { genomes: this.selectedGenomes })
+			...(this.everyGenomeChosen ? {} : { genomes: this.selectedGenomes }),
+			...(this.noCache ? { noCache: true } : {})
 		});
+		if (run) this.noCache = false;
+		return run;
 	}
 
 	/** Builds or downloads; the first one for a place asks for the install statement (installLock.confirm). */

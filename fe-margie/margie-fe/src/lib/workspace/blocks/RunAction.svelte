@@ -4,7 +4,7 @@
 	import { ws } from '../data.svelte';
 	import { ui } from '../ui.svelte';
 	import ProgressBar from '../ProgressBar.svelte';
-	import { ArrowRight, CircleAlert } from 'lucide-svelte';
+	import { ArrowRight, CircleAlert, Database, Lock } from 'lucide-svelte';
 	import { onMount } from 'svelte';
 	import Switch from '../Switch.svelte';
 	import { runEmails } from '../run-emails.svelte';
@@ -47,7 +47,8 @@
 
 	/** What the button will do. */
 	const sentence = $derived(
-		tools ? `Annotate ${plural(n, 'genome')} with ${plural(tools, 'tool')}` : `Call genes on ${plural(n, 'genome')}`
+		(tools ? `Annotate ${plural(n, 'genome')} with ${plural(tools, 'tool')}` : `Call genes on ${plural(n, 'genome')}`) +
+			(ws.noCache ? ', without the cache' : '')
 	);
 	const outputDir = $derived(ws.resultRoots.outputRoot.split('/').filter(Boolean).at(-1) ?? 'output');
 	const onCluster = $derived(backend.cluster ? ' on the cluster' : '');
@@ -60,6 +61,8 @@
 	);
 
 	let starting = $state(false);
+	/** Asking before the next run skips the cache. */
+	let askingCache = $state(false);
 	/** True while the user's databases are still being copied. */
 	const copying = $derived(ws.storesBusy && !ws.storesOp?.op?.startsWith('backup:'));
 
@@ -114,6 +117,39 @@
 	<p class="under mg-note">{under}</p>
 {/if}
 {#if backend.cluster}
+	<!-- MARGIE's cache, on by default; skipping it for the next run is unlocked after a yes. -->
+	<div class="cache" class:off={ws.noCache}>
+		<span class="c-ic" aria-hidden="true"><Database size={15} /></span>
+		<span class="c-text">
+			{#if ws.noCache}
+				<b>The next run does not use the cache</b>
+				<small>Each tool runs on each genome and keeps its raw output in original_container_outputs. Its results still go into the cache.</small>
+			{:else}
+				<b>MARGIE's cache: on (recommended)</b>
+				<small>Genomes and proteins annotated before come back from MARGIE's database, with their processed tables; those tools do not run again.</small>
+			{/if}
+		</span>
+		{#if ws.noCache}
+			<button type="button" class="mg-link quiet" onclick={() => (ws.noCache = false)}>Use the cache again</button>
+		{:else if !askingCache}
+			<button type="button" class="mg-btn small" onclick={() => (askingCache = true)}><Lock size={13} /> Run without the cache</button>
+		{/if}
+	</div>
+	{#if askingCache && !ws.noCache}
+		<div class="cache-ask" role="alertdialog" aria-labelledby="cache-ask-t">
+			<b id="cache-ask-t">Run the next run without the cache?</b>
+			<ul>
+				<li>Each tool runs on each genome, including genomes and proteins annotated before, and keeps the container's raw output.</li>
+				<li>The run takes longer and uses more of your SLURM time.</li>
+				<li>Its results still go into MARGIE's database and the cache, as in other runs.</li>
+				<li>This is for the next run only; the runs after it use the cache again.</li>
+			</ul>
+			<div class="cache-go">
+				<button type="button" class="mg-btn small primary" onclick={() => ((ws.noCache = true), (askingCache = false))}>Yes, without the cache</button>
+				<button type="button" class="mg-link quiet" onclick={() => (askingCache = false)}>Keep the cache</button>
+			</div>
+		</div>
+	{/if}
 	<div class="mail">
 		<Switch label="Email me about my runs" checked={runEmails.on && !!runEmails.to} disabled={!runEmails.loaded || !runEmails.to} onchange={(on) => runEmails.set(on)} />
 		<span>
@@ -174,6 +210,62 @@
 	.under {
 		margin-top: 8px;
 		text-align: center;
+	}
+	.cache {
+		display: flex;
+		flex-wrap: wrap;
+		align-items: center;
+		gap: 8px 12px;
+		margin-top: 12px;
+		padding: 10px 12px;
+		border: 1px solid var(--mg-border);
+		border-radius: var(--mg-r-sm);
+		background: var(--mg-surface);
+		font-size: var(--mg-fs-sm);
+		text-align: left;
+	}
+	.cache.off {
+		border-color: color-mix(in srgb, var(--mg-warn) 55%, var(--mg-border));
+	}
+	.c-ic {
+		display: inline-flex;
+		color: var(--mg-accent-ink, var(--mg-accent));
+	}
+	.cache.off .c-ic {
+		color: var(--mg-warn);
+	}
+	.c-text {
+		display: flex;
+		flex: 1 1 260px;
+		flex-direction: column;
+		gap: 2px;
+		min-width: 0;
+	}
+	.c-text small {
+		color: var(--mg-text-3);
+	}
+	.cache-ask {
+		display: flex;
+		flex-direction: column;
+		gap: 8px;
+		margin-top: 8px;
+		padding: 12px 14px;
+		border: 1px solid color-mix(in srgb, var(--mg-warn) 55%, var(--mg-border));
+		border-radius: var(--mg-r-sm);
+		background: var(--mg-surface);
+		font-size: var(--mg-fs-sm);
+		text-align: left;
+	}
+	.cache-ask ul {
+		margin: 0;
+		padding-left: 18px;
+		color: var(--mg-text-2);
+	}
+	.cache-go {
+		display: flex;
+		flex-wrap: wrap;
+		align-items: center;
+		gap: 8px 14px;
 	}
 	.mail {
 		display: flex;

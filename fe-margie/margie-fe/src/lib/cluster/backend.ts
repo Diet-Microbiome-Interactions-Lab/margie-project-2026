@@ -411,7 +411,7 @@ async function runDetail(id: string, params: URLSearchParams) {
 }
 
 /** Builds the tool selection from the request and config, then submits the workflow. */
-async function startRun(body: { kind?: string; tools?: string[]; all?: boolean; genomes?: string[] }) {
+async function startRun(body: { kind?: string; tools?: string[]; all?: boolean; genomes?: string[]; noCache?: boolean }) {
 	if (body.kind !== 'annotate') return notHere('Tools and databases on the cluster are installed by its administrators, not from here.');
 	const w = await workflow();
 	const cfg = await config.get();
@@ -439,7 +439,9 @@ async function startRun(body: { kind?: string; tools?: string[]; all?: boolean; 
 		genome_path: input,
 		output_dir: output || null,
 		selected_tools: selected,
-		...(genomes ? { genomes } : {})
+		...(genomes ? { genomes } : {}),
+		// Without the cache: each tool runs and keeps its raw output (unlocked on Analyze).
+		...(body.noCache ? { use_cache: false } : {})
 	});
 	jobs.drop();
 	return {
