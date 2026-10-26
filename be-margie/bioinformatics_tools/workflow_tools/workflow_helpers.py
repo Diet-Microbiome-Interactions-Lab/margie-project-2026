@@ -159,13 +159,17 @@ def genome_calls(genomes: dict[str, str], config) -> dict[str, dict[str, str]]:
 
     `margie_sb.genome_info` in config.yaml maps a genome file name or stem to
     {domain, genetic_code}. RASTtk needs both; a genome missing either is called
-    by Prodigal unless GTDB-Tk runs, which determines both. Computed at parse
-    time so the Snakefile can split genomes between run_rasttk and run_prodigal.
+    by Prodigal unless GTDB-Tk runs, which determines both. Where the genome table
+    leaves one out, the value GTDB-Tk's first step gave (the file `gtdbtk_early`
+    names, written by workflow.py while the rest of GTDB-Tk goes on) fills it in.
+    Computed at parse time so the Snakefile can split genomes between run_rasttk
+    and run_prodigal.
     """
     run_gtdbtk = rc_bool('run_gtdbtk', True, config=config)
     meta = rc('margie_sb.genome_info', None, config=config) or rc('genome_info', None, config=config) or {}
     if not isinstance(meta, dict):
         meta = {}
+    early = read_early_calls(rc(GTDBTK_EARLY, '', config=config)) if run_gtdbtk else {}
     by_key = {}
     for key, row in meta.items():
         if isinstance(row, dict):
@@ -181,10 +185,76 @@ def genome_calls(genomes: dict[str, str], config) -> dict[str, dict[str, str]]:
         domain = 'Bacteria' if raw.startswith('b') else 'Archaea' if raw.startswith('a') else ''
         code = str(row.get('genetic_code') or '').strip()
         code = code if code.isdigit() else ''
+        source = 'metadata' if domain or code else ('gtdbtk' if run_gtdbtk else 'none')
+        found = early.get(genome, {})
+        domain, code = domain or found.get('domain', ''), code or found.get('genetic_code', '')
         caller = 'rasttk' if run_gtdbtk or (domain and code) else 'prodigal'
-        out[genome] = {'domain': domain, 'genetic_code': code, 'gene_caller': caller,
-                       'source': 'metadata' if domain or code else ('gtdbtk' if run_gtdbtk else 'none')}
+        out[genome] = {'domain': domain, 'genetic_code': code, 'gene_caller': caller, 'source': source}
     return out
+
+
+# ---- GTDB-Tk's first step ----
+# The config key naming the file of domains and genetic codes GTDB-Tk's first step gave.
+GTDBTK_EARLY = 'gtdbtk_early'
+# GTDB-Tk's single-copy marker sets (CONFIG.BAC_MARKER_COUNT, CONFIG.AR_MARKER_COUNT).
+_MARKERS = {'bac120': 120, 'ar53': 53}
+
+
+def identify_calls(folder: str | Path, newer_than: float = 0.0) -> dict[str, dict[str, str]]:
+    """Each genome's domain and genetic code from GTDB-Tk's identify step under `folder`, as soon
+    as it has written them, while classify_wf goes on: the translation table it chose
+    (gtdbtk.translation_table_summary.tsv, written last) and the domain whose single-copy markers
+    it found the larger share of, ties to Bacteria, as GTDB-Tk's genome_domain decides it.
+    Empty until the three files are there (and newer than `newer_than`)."""
+    found = sorted(Path(folder).glob('**/identify/gtdbtk.translation_table_summary.tsv'),
+                   key=lambda f: f.stat().st_mtime)
+    if not found or found[-1].stat().st_mtime < newer_than:
+        return {}
+    here = found[-1].parent
+    tables = {}
+    for line in found[-1].read_text().splitlines():
+        parts = line.split('\t')
+        if len(parts) >= 2 and parts[1].strip().isdigit():
+            tables[parts[0]] = parts[1].strip()
+    shares: dict[str, dict[str, float]] = {}
+    for name, total in _MARKERS.items():
+        summary = here / f'gtdbtk.{name}.markers_summary.tsv'
+        if not summary.exists():
+            return {}
+        for line in summary.read_text().splitlines()[1:]:
+            parts = line.split('\t')
+            if len(parts) != 9 or not parts[1].isdigit() or not parts[3].isdigit():
+                continue
+            # Unique hits and multiple identical hits count as single copy (get_single_copy_hits).
+            shares.setdefault(parts[0], {})[name] = 100.0 * (int(parts[1]) + int(parts[3])) / total
+    calls = {}
+    for genome, table in tables.items():
+        share = shares.get(genome, {})
+        if 'bac120' in share and 'ar53' in share:
+            calls[genome] = {'domain': 'Bacteria' if share['bac120'] >= share['ar53'] else 'Archaea',
+                             'genetic_code': table}
+    return calls
+
+
+def write_early_calls(path: str | Path, calls: dict[str, dict[str, str]]) -> None:
+    """Writes the domains and genetic codes GTDB-Tk's first step gave, one genome a line."""
+    lines = ['genome\tdomain\tgenetic_code'] + [f"{g}\t{c['domain']}\t{c['genetic_code']}" for g, c in sorted(calls.items())]
+    Path(path).parent.mkdir(parents=True, exist_ok=True)
+    Path(path).write_text('\n'.join(lines) + '\n')
+
+
+def read_early_calls(path: str | Path | None) -> dict[str, dict[str, str]]:
+    """Reads write_early_calls' file; empty when there is none."""
+    try:
+        lines = Path(path).read_text().splitlines()[1:] if path else []
+    except OSError:
+        return {}
+    calls = {}
+    for line in lines:
+        parts = line.split('\t')
+        if len(parts) == 3 and parts[1] in ('Bacteria', 'Archaea') and parts[2].isdigit():
+            calls[parts[0]] = {'domain': parts[1], 'genetic_code': parts[2]}
+    return calls
 
 
 def gene_call_files(prefix: str, caller: str) -> dict[str, str]:

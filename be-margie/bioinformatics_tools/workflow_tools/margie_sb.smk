@@ -1841,12 +1841,19 @@ rule load_gtdbtk_to_db:
 localrules: resolve_genome_info
 
 
+def _needs_gtdbtk_results(genome):
+    """Whether a genome's domain or genetic code waits for GTDB-Tk's results: not when the genome
+    table gives both, or GTDB-Tk's first step has (workflow.py, while the rest of GTDB-Tk goes on)."""
+    call = GENOME_CALLS[genome]
+    return RUN_GTDBTK and not (call['domain'] and call['genetic_code'])
+
+
 rule resolve_genome_info:
     """Writes GENOME_INFO: the genome's domain, genetic code and gene caller (the config wins)."""
     input:
         unpack(lambda wildcards: {'gtdbtk_results': GTDBTK_RESULTS.format(genome=wildcards.genome),
                                   'translation_table': GTDBTK_TRANSLATION_TABLE.format(genome=wildcards.genome)}
-               if RUN_GTDBTK else {})
+               if _needs_gtdbtk_results(wildcards.genome) else {})
     output:
         info=GENOME_INFO
     run:
@@ -1864,7 +1871,7 @@ rule resolve_genome_info:
                         return value
             return ''
 
-        if RUN_GTDBTK:
+        if _needs_gtdbtk_results(wildcards.genome):
             # The config overrides only what it names.
             domain = domain or first_value(input.gtdbtk_results, 'GTDBTK_domain')
             code = code or first_value(input.translation_table, 'translation_table')

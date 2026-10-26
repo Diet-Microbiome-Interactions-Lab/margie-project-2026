@@ -19,7 +19,7 @@
 					n: '2',
 					step: 'Taxonomy',
 					tools: ['GTDB-Tk (optional)'],
-					does: "Places each genome in the GTDB taxonomy, which gives its domain and genetic code. The genome table on Analyze can give both instead."
+					does: "Places each genome in the GTDB taxonomy. Its first step gives each genome's domain and genetic code within minutes, and gene calling starts from there while the placement goes on. The genome table on Analyze can give both instead."
 				},
 				{
 					n: '3',
