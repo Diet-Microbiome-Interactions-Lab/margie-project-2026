@@ -105,6 +105,81 @@
 			phases: [{ n: '15', step: 'Gene report', tools: ["MARGIE's own (optional)"], does: 'A per-gene report of the evidence behind each annotation.' }]
 		}
 	];
+	/** The hashes MARGIE recognises genomes, proteins and genes by, so each is annotated once. */
+	const HASHES = [
+		{
+			hash: 'Genome hash',
+			level: 'Genome',
+			from: "The genome's DNA, contig by contig (its file name and line lengths aside)",
+			when: 'Before the run starts',
+			why: 'A genome is the same genome under any file name',
+			helps: 'Restores a genome annotated before, whole; names its results <name>--<the first 8 characters> (coli--a1b2c3d4); keys its rows in the database'
+		},
+		{
+			hash: 'Protein hash',
+			level: 'Protein',
+			from: "The protein's amino-acid sequence",
+			when: 'After gene calling, before the tools',
+			why: 'A protein gives the same answer from a tool in any genome',
+			helps: 'Each tool runs on new proteins only; each protein is linked to the genomes it occurs in'
+		},
+		{
+			hash: 'Gene hash',
+			level: 'Gene',
+			from: "Its contig, start, end, strand and protein (an RNA's feature type)",
+			when: "Storing and restoring a genome's cached tables",
+			why: 'Gene callers number genes anew with each submission, and copies of one protein sit in different places',
+			helps: 'Puts cached results back on the right gene under any numbering'
+		},
+		{
+			hash: 'Fingerprint hash',
+			level: 'Protein and gene',
+			from: "The protein's descriptors from the tools: a core part from the seven C1 tools, an additional part from the others",
+			when: 'After scoring',
+			why: 'Proteins with the same descriptors share a fingerprint',
+			helps: "One record per protein; a tool added later changes only the additional part"
+		},
+		{
+			hash: 'Protein-set hash',
+			level: 'Genome',
+			from: "The genome's protein hashes, together",
+			when: "Scoring (C3's operon reference)",
+			why: 'Recognises a genome by its content, under any name',
+			helps: 'Adds a genome to the operon reference once, and leaves it out when it is scored'
+		},
+		{
+			hash: 'Tool key',
+			level: "A protein's results",
+			from: 'The tool and the settings that change its answer (its thresholds, InterPro analyses)',
+			when: 'With the protein hash',
+			why: "Keeps a protein's results apart by tool and settings; new tool and database versions keep them",
+			helps: 'Genomes annotated once are not run again when a tool or database is updated'
+		},
+		{
+			hash: 'Results-file hash',
+			level: 'Load',
+			from: "A tool's results file",
+			when: 'Loading into the database',
+			why: 'A file loaded before holds the same rows',
+			helps: 'Skips loading it again; a reload replaces the genome\'s rows by genome hash'
+		},
+	];
+	/** What the database keeps by hash, read by eye when checking hashes and restoring results. */
+	const RECORDS = [
+		{ table: 'protein_records', what: 'One row per protein: its hash, the genomes it occurs in, its fingerprints and label, the descriptor of each core tool, then the additional tools' },
+		{ table: 'protein_genomes', what: 'Each protein hash with each genome hash it occurs in' },
+		{ table: 'genome_proteomes', what: "Each genome hash with its protein set and the names it came under" },
+		{ table: 'genome_genes', what: "Each genome's genes by gene hash, with each gene's protein hash and fingerprint" },
+		{ table: 'genome_protein_descriptors', what: 'Answers that depend on the genome as well as the protein (PSORTb, DeepSig), by genome hash and protein hash' }
+	];
+	const HASH_CODE = [
+		{ path: 'genome_identity.py', what: 'The genome and protein hashes' },
+		{ path: 'output_cache.py', what: 'The genome cache: whole tool outputs by genome hash, genes by gene hash' },
+		{ path: 'protein_cache.py', what: "The protein cache, the links between proteins and genomes, and each protein's record" },
+		{ path: 'load_to_db.py', what: "Loading into the database, a genome's rows replaced by genome hash" },
+		{ path: 'scoring/update-occ-reference-depot.py', what: 'The operon reference, a genome added once by its content' },
+		{ path: 'fingerprint/add-gene-fingerprint.py', what: "Each gene's fingerprint" }
+	];
 	const DOES = [
 		{ title: 'Calls genes', text: 'RASTtk or Prodigal, genome by genome' },
 		{ title: 'Annotates proteins', text: 'with many tools at once, each on its own' },
@@ -176,6 +251,53 @@
 		{/each}
 	</section>
 
+	<section class="rp-sec" id="hashes" data-toc="Annotating each genome and protein once">
+		<h2>Annotating each genome and protein once</h2>
+		<p class="rp-lead">
+			MARGIE recognises genomes, proteins and genes by hashes of their sequences. She runs a tool on a sequence once and restores
+			its results when the sequence comes back, under any file name.
+		</p>
+		<ol class="mt-gates">
+			<li><b>Before the run: the genome hash.</b> A genome annotated before comes back from the genome cache: its gene calls, GTDB-Tk and each tool's results. Consolidation, labeling and scoring run again: the first two take about a minute, and scoring reads an operon reference that grows with each genome.</li>
+			<li><b>After gene calling: the protein hash.</b> A protein annotated before with a tool comes back from the protein cache; the tool runs on the new proteins. A tool new to a protein runs and is added; the protein's other tools stay.</li>
+		</ol>
+		<p>
+			Each genome runs as its file name and the first 8 characters of its genome hash (<span class="mg-mono">coli--a1b2c3d4</span>), so genomes that share a file name stay apart in the database and the results. The website shows the name you gave it, with the hash beside it on the Jobs page.
+		</p>
+		<h3>The hashes</h3>
+		<div class="rp-scroll">
+			<table class="rp-table mt-hashes">
+				<thead><tr><th>Hash</th><th>Level</th><th>Made from</th><th>When</th><th>Why</th><th>What it helps with</th></tr></thead>
+				<tbody>
+					{#each HASHES as h (h.hash)}
+						<tr><td><b>{h.hash}</b></td><td>{h.level}</td><td>{h.from}</td><td>{h.when}</td><td>{h.why}</td><td>{h.helps}</td></tr>
+					{/each}
+				</tbody>
+			</table>
+		</div>
+		<h3>What the database keeps by hash</h3>
+		<div class="rp-scroll">
+			<table class="rp-table">
+				<thead><tr><th>Table</th><th>What it holds</th></tr></thead>
+				<tbody>
+					{#each RECORDS as r (r.table)}
+						<tr><td class="mg-mono">{r.table}</td><td>{r.what}</td></tr>
+					{/each}
+				</tbody>
+			</table>
+		</div>
+		<h3>The scripts</h3>
+		<ul class="rp-plain">
+			{#each HASH_CODE as c (c.path)}
+				<li>
+					<a class="mt-file" href="/code?file={encodeURIComponent(c.path)}">
+						<span class="mg-mono">{c.path.split('/').pop()}</span><span class="mt-lines">{c.what}</span><ArrowRight size={16} />
+					</a>
+				</li>
+			{/each}
+		</ul>
+	</section>
+
 	<section class="rp-sec" id="code" data-toc="The code behind each step">
 		<h2>The code behind each step</h2>
 		<p>MARGIE's own steps are Python scripts. Each one opens on the Code page as the server runs it, highlighted, with line numbers.</p>
@@ -206,6 +328,15 @@
 </ReadingPage>
 
 <style>
+	.mt-gates {
+		display: flex;
+		flex-direction: column;
+		gap: 8px;
+		padding-left: 1.3em;
+	}
+	.mt-hashes td:first-child {
+		white-space: nowrap;
+	}
 	.mt-phases td {
 		min-width: 0;
 	}

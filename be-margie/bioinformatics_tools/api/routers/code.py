@@ -21,6 +21,13 @@ WORKFLOW_TOOLS = Path(__file__).resolve().parents[2] / "workflow_tools"
 # The steps in run order (margie_sb.smk), each with its scripts in the order they run.
 STEPS = [
     {
+        "key": "hashes",
+        "title": "Genome, protein and gene hashes",
+        "what": "Recognises each genome, protein and gene by a hash of its sequence, restores what was annotated "
+                "before and records each protein's results once, linked to the genomes it occurs in.",
+        "files": ["genome_identity.py", "output_cache.py", "protein_cache.py", "load_to_db.py"],
+    },
+    {
         "key": "consolidation",
         "title": "Consolidation",
         "what": "Merges each tool's table into one row per gene.",
