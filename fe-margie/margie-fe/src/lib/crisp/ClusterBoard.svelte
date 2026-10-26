@@ -309,7 +309,7 @@
 	.cb {
 		display: flex;
 		flex-direction: column;
-		gap: 14px;
+		gap: var(--cr-stack, 16px);
 	}
 	.cb-bad {
 		color: var(--mg-danger);
@@ -327,7 +327,7 @@
 		display: flex;
 		gap: 10px;
 		align-items: flex-start;
-		padding: 12px 16px;
+		padding: 12px var(--cr-box-x, 18px);
 		border-right: 1px solid var(--cr-card-edge, var(--mg-border));
 		color: var(--mg-accent-ink, var(--mg-accent));
 	}
@@ -342,7 +342,7 @@
 		display: flex;
 		align-items: center;
 		gap: 16px;
-		padding: 12px 16px;
+		padding: 12px var(--cr-box-x, 18px);
 		color: var(--mg-text-2);
 		white-space: nowrap;
 	}
@@ -396,7 +396,7 @@
 		flex-wrap: wrap;
 		align-items: center;
 		gap: 8px;
-		padding: 10px 16px;
+		padding: 10px var(--cr-box-x, 18px);
 		border-bottom: 1px solid var(--cr-card-edge, var(--mg-border));
 		color: var(--mg-accent-ink, var(--mg-accent));
 	}
@@ -426,7 +426,7 @@
 		display: grid;
 		grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
 		gap: 14px 24px;
-		padding: 14px 16px;
+		padding: 14px var(--cr-box-x, 18px);
 	}
 	.cb-bar {
 		display: flex;
@@ -485,7 +485,7 @@
 		font-size: var(--cr-fs-meta, 13px);
 	}
 	.cb-table th {
-		padding: 8px 16px;
+		padding: 8px var(--cr-box-x, 18px);
 		background: var(--mg-surface-2);
 		color: var(--mg-text-3);
 		font-weight: 600;
@@ -493,7 +493,7 @@
 		white-space: nowrap;
 	}
 	.cb-table td {
-		padding: 8px 16px;
+		padding: 8px var(--cr-box-x, 18px);
 		border-top: 1px solid var(--mg-border);
 		vertical-align: middle;
 		white-space: nowrap;

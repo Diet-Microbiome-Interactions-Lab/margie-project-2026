@@ -372,7 +372,7 @@
 		flex-direction: column;
 		gap: 12px;
 		max-width: 760px;
-		padding: var(--mg-pad, 18px);
+		padding: var(--cr-box-pad, 16px 18px);
 		border: 1px solid var(--mg-border);
 		border-radius: var(--mg-r);
 		background: var(--cr-card, var(--mg-surface));
@@ -483,7 +483,6 @@
 		display: flex;
 		flex-wrap: wrap;
 		gap: 10px 18px;
-		margin-bottom: var(--mg-gap, 14px);
 	}
 	.qz-group {
 		display: flex;
@@ -560,7 +559,6 @@
 	}
 	.qz-foot {
 		max-width: 760px;
-		margin-top: 10px;
 	}
 	.qz-foot .mg-link {
 		display: inline-flex;

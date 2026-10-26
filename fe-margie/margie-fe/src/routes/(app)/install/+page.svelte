@@ -55,8 +55,7 @@
 		display: flex;
 		flex-direction: column;
 		gap: 8px;
-		margin-bottom: var(--cr-gutter, 16px);
-		padding: 12px var(--mg-pad);
+		padding: var(--cr-note-pad, 10px 18px);
 	}
 	.in-line {
 		display: flex;
