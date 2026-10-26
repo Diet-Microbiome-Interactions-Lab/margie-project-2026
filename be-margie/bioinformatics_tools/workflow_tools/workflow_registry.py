@@ -185,8 +185,8 @@ MARGIE_SB_PHASED_TOOLS = [
     {'key': 'consolidation', 'label': 'Consolidation', 'phase': 9, 'sif': 'consolidation.sif', 'purpose': 'Consolidate upstream outputs', 'uses_container': False},
     {'key': 'labeling', 'label': 'Labeling', 'phase': 10, 'sif': 'labeling.sif', 'purpose': 'Label assignment', 'uses_container': False},
     # Host-side Python with no container: in margie_sb.smk, so no .sif is checked.
-    {'key': 'fingerprint', 'label': 'Fingerprint', 'phase': 11, 'sif': 'fingerprint.sif', 'purpose': 'Feature fingerprinting', 'uses_container': False},
-    {'key': 'scoring_heuristic', 'label': 'Scoring', 'phase': 12, 'sif': 'scoring-heuristic.sif', 'purpose': 'Confidence scoring (statistical model)', 'uses_container': False},
+    {'key': 'scoring_heuristic', 'label': 'Scoring', 'phase': 11, 'sif': 'scoring-heuristic.sif', 'purpose': 'Confidence scoring (statistical model)', 'uses_container': False},
+    {'key': 'fingerprint', 'label': 'Fingerprint', 'phase': 12, 'sif': 'fingerprint.sif', 'purpose': 'Feature fingerprinting', 'uses_container': False},
     {'key': 'fingerprint_database', 'label': 'Fingerprint Database', 'phase': 13, 'sif': 'fingerprint-database.sif', 'purpose': 'Fingerprint DB stage', 'uses_container': False},
     {'key': 'ani', 'label': 'ANI', 'phase': 14, 'sif': 'ani.sif', 'purpose': 'Average nucleotide identity'},
     {'key': 'aai', 'label': 'AAI', 'phase': 14, 'sif': 'aai.sif', 'purpose': 'Average amino acid identity'},

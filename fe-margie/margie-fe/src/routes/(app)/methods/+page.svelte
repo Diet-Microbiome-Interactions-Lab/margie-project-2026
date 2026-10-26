@@ -78,17 +78,17 @@
 				},
 				{
 					n: '11',
-					step: 'Fingerprints',
-					tools: ["MARGIE's own"],
-					does: "Hashes each gene's pattern of hits across the tools, and each operon's, into a fingerprint, so the same evidence is recognised in other genomes.",
-					more: { href: '/faq#fingerprints', label: 'What a fingerprint is' }
-				},
-				{
-					n: '12',
 					step: 'Scoring',
 					tools: ["MARGIE's own"],
 					does: 'A 0 to 1 confidence for each gene from four measures (C1 to C4), with a tier and a review flag.',
 					more: { href: '/faq#scoring', label: 'How scoring works' }
+				},
+				{
+					n: '12',
+					step: 'Fingerprints',
+					tools: ["MARGIE's own"],
+					does: "Hashes each gene's pattern of hits across the tools, and each operon's, into a fingerprint, so the same evidence is recognised in other genomes.",
+					more: { href: '/faq#fingerprints', label: 'What a fingerprint is' }
 				},
 				{
 					n: '13',
