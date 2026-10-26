@@ -1,41 +1,84 @@
 <script lang="ts">
-	import { Check, CircleHelp, KeyRound, Lock } from 'lucide-svelte';
+	import { Check, CircleHelp, KeyRound, Lock, LockOpen } from 'lucide-svelte';
 	import { sharedColumns } from '$lib/workspace/even';
 	import Switch from '$lib/workspace/Switch.svelte';
+	import Fold from '$lib/workspace/motion/Fold.svelte';
+	import FoldTitle from '$lib/workspace/motion/FoldTitle.svelte';
+	import FoldToggle from '$lib/workspace/motion/FoldToggle.svelte';
 	import { uiBase } from '$lib/workspace/base.svelte';
 	import { backend } from '$lib/workspace/backend.svelte';
 	import { ws, type Depth } from '$lib/workspace/data.svelte';
 	import { ui } from '$lib/workspace/ui.svelte';
 
 	/**
-	 * Analyze's steps after the genomes: 2, gene calling (QUAST, GTDB-Tk, then RASTtk or
-	 * Prodigal: phases 1 to 3), and 3, the annotation tools by phase (phase 4 recommended).
-	 * Short titles; what each does shows in Guided mode or under a step's ?.
+	 * Analyze's boxes after the genomes, as Install's: gene calling (QUAST, GTDB-Tk, then RASTtk or
+	 * Prodigal: phases 1 to 3) and the annotation tools by phase. Each box is locked with its saved
+	 * choice, the recommended one until changed: Unlock opens a draft, Save keeps it for the next runs
+	 * (with the account on the website) and locks the box again, Cancel drops it. A run uses the saved
+	 * choice. Short titles; what each does shows in Guided mode or under a box's ?.
 	 */
 
-	const save = async (key: string, value: string) => {
-		if (value === ws.setting(key)) return;
-		if (await ws.saveSettings({ [key]: value })) ui.notify('Saved', 'ok');
-	};
 	let help = $state<Record<string, boolean>>({});
-	// Both steps fold away until opened; their heads say what is chosen.
+	// Both boxes fold away until opened; their heads say what is chosen.
 	const CALLING = 'analyze:calling';
 	const TOOLS = 'analyze:tools';
+	const open = (id: string) => {
+		if (ui.isFolded(id, true)) ui.toggleFold(id, true);
+	};
 
 	// ------------------------------------------------ gene calling
-	const gtdbtk = $derived(ws.setting('RUN_GTDBTK') === '1');
-	const caller = $derived(ws.setting('GENE_CALLER') || 'prodigal');
+	type Calling = { quast: boolean; gtdbtk: boolean; caller: string };
+	const savedGtdbtk = $derived(ws.setting('RUN_GTDBTK') === '1');
+	const savedCaller = $derived(ws.setting('GENE_CALLER') || 'prodigal');
+	let callingDraft = $state<Calling | null>(null);
+	const calling = $derived<Calling>(callingDraft ?? { quast: ws.quast, gtdbtk: savedGtdbtk, caller: savedCaller });
+	/** Recommended: GTDB-Tk works out each genome's domain and genetic code, so RASTtk calls each genome; QUAST off. */
+	const callingRecommended = $derived(calling.gtdbtk && !calling.quast);
 	/** RASTtk needs a known domain and genetic code: from the genome table, or from GTDB-Tk. */
 	const known = $derived(ws.genomes.filter((g) => g.domain && g.domain !== 'Unknown' && g.genetic_code).length);
 	const all = $derived(ws.genomes.length);
 	/** On the cluster each genome gets RASTtk when both are known (or GTDB-Tk runs), Prodigal otherwise. */
-	const byRast = $derived(gtdbtk ? all : known);
+	const byRast = $derived(calling.gtdbtk ? all : known);
 	const quast = $derived(ws.tools.find((t) => t.name === 'quast'));
-	const quastOn = $derived(ws.chosenTools.includes('quast'));
 	// GTDB-Tk needs its own image and reference tree.
 	const gtdbtkMissing = $derived(
 		[ws.images.find((r) => r.name === 'gtdbtk'), ws.databases.find((r) => r.name === 'gtdbtk')].some((r) => r && r.status !== 'ok')
 	);
+	const callers = $derived(
+		backend.cluster
+			? all
+				? byRast === all
+					? `RASTtk for all ${all}`
+					: byRast
+						? `RASTtk ${byRast}, Prodigal ${all - byRast}`
+						: `Prodigal for all ${all}`
+				: ''
+			: calling.caller === 'rasttk'
+				? 'RASTtk'
+				: calling.caller === 'prodigal'
+					? 'Prodigal'
+					: 'RASTtk or Prodigal'
+	);
+	function unlockCalling() {
+		callingDraft = { ...calling };
+		open(CALLING);
+	}
+	let savingCalling = $state(false);
+	async function saveCalling() {
+		const d = callingDraft;
+		if (!d || savingCalling) return;
+		const changes: Record<string, string> = {};
+		if (d.gtdbtk !== savedGtdbtk) changes.RUN_GTDBTK = d.gtdbtk ? '1' : '0';
+		if (!backend.cluster && d.caller !== savedCaller) changes.GENE_CALLER = d.caller;
+		savingCalling = true;
+		const saved = !Object.keys(changes).length || (await ws.saveSettings(changes));
+		savingCalling = false;
+		// A failed save keeps the draft, so nothing typed is lost.
+		if (!saved) return;
+		ws.quast = d.quast;
+		callingDraft = null;
+		ui.notify('Saved: the next runs use this gene calling.', 'ok');
+	}
 
 	// ------------------------------------------------ the tools, by phase
 	const PHASE_NAME: Record<number, string> = {
@@ -82,7 +125,11 @@
 	});
 	let groupsWidth = $state(0);
 	const toolCols = $derived(sharedColumns(groups.map((g) => g.tools.length), Math.max(1, Math.floor((groupsWidth + 6) / 196))));
-	const inRun = $derived(new Set(ws.chosenTools));
+	type Tools = { depth: Depth; custom: string[] };
+	let toolsDraft = $state<Tools | null>(null);
+	const toolsView = $derived<Tools>(toolsDraft ?? { depth: ws.depth, custom: ws.custom });
+	/** The tools shown ticked: the draft's while unlocked, else the saved choice's. */
+	const inRun = $derived(new Set(ws.toolsFor(toolsView.depth, toolsView.custom, false)));
 	const picked = $derived(groups.reduce((a, g) => a + g.tools.filter((t) => inRun.has(t.name)).length, 0));
 	const offered = $derived(groups.reduce((a, g) => a + g.tools.length, 0));
 	const locked = $derived(ws.tools.filter((t) => !t.licensed));
@@ -111,226 +158,289 @@
 	$effect(() => {
 		if (anyRequired && ws.depth === 'quick') ws.depth = 'standard';
 	});
-	/** A tool ticked by hand makes the choice Custom, from what was chosen; a required one stays on. */
+	const depthLabel = $derived(DEPTHS.find((d) => d.value === toolsView.depth)?.label ?? 'Custom');
+	function unlockTools() {
+		toolsDraft = { depth: ws.depth, custom: [...ws.custom] };
+		open(TOOLS);
+	}
+	/** A tool ticked by hand makes the draft Custom, from what was ticked; a required one stays on. */
 	function toggle(name: string) {
-		if (ws.tools.find((t) => t.name === name)?.required) return;
-		const now = ws.chosenTools;
-		ws.custom = now.includes(name) ? now.filter((x) => x !== name) : [...now, name];
-		ws.depth = 'custom';
+		if (!toolsDraft || ws.tools.find((t) => t.name === name)?.required) return;
+		const now = [...inRun];
+		toolsDraft = { depth: 'custom', custom: now.includes(name) ? now.filter((x) => x !== name) : [...now, name] };
+	}
+	function saveTools() {
+		const d = toolsDraft;
+		if (!d) return;
+		ws.custom = d.custom;
+		ws.depth = d.depth;
+		toolsDraft = null;
+		ui.notify('Saved: the next runs use these tools.', 'ok');
 	}
 </script>
 
-{#snippet helpButton(id: string, what: string)}
-	{#if !ui.explain}
+{#snippet helpButton(id: string, what: string, foldId: string)}
+	{#if !ui.explain && !ui.isFolded(foldId, true)}
 		<button type="button" class="rs-help" aria-pressed={!!help[id]} aria-label={what} title={what} onclick={() => (help[id] = !help[id])}>
 			<CircleHelp size={15} />
 		</button>
 	{/if}
 {/snippet}
 
-<!-- ------------------------------------------------ 2. gene calling -->
-<section class="rs-box" class:folded={ui.isFolded(CALLING, true)} aria-labelledby="rs-calling" data-help={help.calling ? 'on' : undefined}>
-	<header class="rs-head">
-		<span class="rs-n">2</span>
-		<h2 id="rs-calling">Gene calling</h2>
-		<span class="rs-sum">
-			{#if backend.cluster}
-				{all ? (byRast === all ? `RASTtk for all ${all}` : byRast ? `RASTtk ${byRast}, Prodigal ${all - byRast}` : `Prodigal for all ${all}`) : ''}
-			{:else}
-				{caller === 'rasttk' ? 'RASTtk' : caller === 'prodigal' ? 'Prodigal' : 'RASTtk or Prodigal'}
-			{/if}
-		</span>
-		<span class="mg-grow"></span>
-		{#if !ui.isFolded(CALLING, true)}{@render helpButton('calling', 'How gene calling works')}{/if}
-		<button type="button" class="mg-link quiet" aria-expanded={!ui.isFolded(CALLING, true)} onclick={() => ui.toggleFold(CALLING, true)}>{ui.isFolded(CALLING, true) ? 'Show' : 'Hide'}</button>
-	</header>
-
-	{#if !ui.isFolded(CALLING, true)}
-	<ol class="rs-phases">
-		<li>
-			<span class="rs-ph">Phase 1 | Quality</span>
-			<div class="rs-row">
-				<b>QUAST</b>
-				<span class="mg-grow"></span>
-				{#if quast}<Switch label="Check assembly quality with QUAST" checked={quastOn} onchange={() => (ws.quast = !ws.quast)} />{:else}<span class="mg-note">not offered</span>{/if}
-			</div>
-			<p class="mg-note mg-explain">Assembly statistics (contigs, N50, length) for each genome. Optional; nothing later depends on it.</p>
-		</li>
-		<li>
-			<span class="rs-ph">Phase 2 | Taxonomy</span>
-			<div class="rs-row">
-				<b>GTDB-Tk</b>
-				<span class="mg-grow"></span>
-				<Switch label="Work out domain and genetic code with GTDB-Tk" checked={gtdbtk} onchange={(on) => save('RUN_GTDBTK', on ? '1' : '0')} />
-			</div>
-			{#if gtdbtk && gtdbtkMissing}
-				<p class="mg-note warn">Needs its image and reference tree. <a class="mg-link" href={uiBase.to('/install#installed')}>Install</a></p>
-			{/if}
-			<p class="mg-note mg-explain">
-				Places each genome in the GTDB taxonomy, which gives RASTtk its domain and genetic code. Use it when you do not know them. It needs
-				a highmem node (about 400 GB) and adds hours; off, the genome table supplies both.
-			</p>
-		</li>
-		<li>
-			<span class="rs-ph">Phase 3 | Gene caller</span>
-			{#if backend.cluster}
-				<div class="rs-split" aria-label="Gene caller by genome">
-					<span class="rs-cell" class:on={byRast > 0}><b>RASTtk</b><span>{byRast} genome{byRast === 1 ? '' : 's'}</span></span>
-					<span class="rs-cell" class:on={all - byRast > 0}><b>Prodigal</b><span>{all - byRast} genome{all - byRast === 1 ? '' : 's'}</span></span>
-				</div>
-				{#if !gtdbtk && known < all}
-					<p class="mg-note">
-						{all - known} with an unknown domain or genetic code go to Prodigal.
-						<a class="mg-link" href="#genomes">Fill them in</a> or turn on GTDB-Tk for RASTtk.
-					</p>
-				{/if}
-			{:else}
-				<div class="rs-seg" role="radiogroup" aria-label="Gene caller" style="--k: 3">
-					{#each [{ v: 'auto', l: 'Per genome' }, { v: 'rasttk', l: 'RASTtk' }, { v: 'prodigal', l: 'Prodigal' }] as o (o.v)}
-						<button type="button" role="radio" aria-checked={caller === o.v} onclick={() => save('GENE_CALLER', o.v)}>{o.l}</button>
-					{/each}
-				</div>
-			{/if}
-			<p class="mg-note mg-explain">
-				RASTtk is recommended when a genome's domain and genetic code are known (from the table or GTDB-Tk): it calls the genes and
-				annotates them too. Prodigal is unsupervised and fast, needs neither, but calls genes only.
-			</p>
-		</li>
-	</ol>
+<!-- Locked: the saved choice and Unlock. Unlocked: Cancel and Save. -->
+{#snippet lockControls(unlocked: boolean, unlock: () => void, cancel: () => void, save: () => void, busy = false)}
+	{#if unlocked}
+		<button type="button" class="mg-link quiet" disabled={busy} onclick={cancel}>Cancel</button>
+		<button type="button" class="mg-btn small primary rs-save" disabled={busy} onclick={save}>{busy ? 'Saving' : 'Save'}</button>
+	{:else}
+		<button type="button" class="rs-unlock" title="Unlock to change these settings" onclick={unlock}><Lock size={13} /> Unlock</button>
 	{/if}
-</section>
+{/snippet}
 
-<!-- ------------------------------------------------ 3. annotation tools -->
-<section class="rs-box" id="tools" class:folded={ui.isFolded(TOOLS, true)} aria-labelledby="rs-tools" data-help={help.tools ? 'on' : undefined}>
-	<header class="rs-head">
-		<span class="rs-n">3</span>
-		<h2 id="rs-tools">Annotation tools</h2>
-		<span class="rs-sum">{picked} of {offered}{ui.isFolded(TOOLS, true) ? `, ${DEPTHS.find((d) => d.value === ws.depth)?.label.toLowerCase()}` : ''}</span>
-		<span class="mg-grow"></span>
-		{#if !ui.isFolded(TOOLS, true)}
-			<div class="rs-seg" role="radiogroup" aria-label="Which tools" style="--k: {DEPTHS.length}">
-				{#each DEPTHS as d (d.value)}
-					<button type="button" role="radio" aria-checked={ws.depth === d.value} onclick={() => (ws.depth = d.value)}>{d.label}</button>
-				{/each}
-			</div>
-		{/if}
-		{#if !ui.isFolded(TOOLS, true)}{@render helpButton('tools', 'What the tools do')}{/if}
-		<button type="button" class="mg-link quiet" aria-expanded={!ui.isFolded(TOOLS, true)} onclick={() => ui.toggleFold(TOOLS, true)}>{ui.isFolded(TOOLS, true) ? 'Show' : 'Hide'}</button>
-	</header>
-	{#if !ui.isFolded(TOOLS, true)}
-	<p class="mg-note mg-explain">
-		{#if anyRequired}
-			COG, KEGG, eggNOG, UniProt, Pfam, TIGRFAM, PGAP, InterPro and dbCAN are part of every run: labeling and the confidence score read them,
-			so every run's scores mean the same. MEROPS, TCDB and GenProp are yours to add: MEROPS and TCDB add peptidase and transporter
-			calls, and need their licence terms accepted. KEGG uses only the public KOfam data. Gene calling, operons, consolidation,
-			labeling, fingerprints and scoring are part of every run.
+{#snippet notice(unlocked: boolean, recommended: boolean, saved: string)}
+	<p class="rs-notice" class:open={unlocked}>
+		{#if unlocked}
+			<LockOpen size={14} />
+			<span>Unlocked: change what you need, then <b>Save</b>. Runs use the saved choice until you save.</span>
+		{:else if recommended}
+			<Lock size={14} />
+			<span><b>Recommended settings are applied.</b> Change them only if you know what you are doing.</span>
 		{:else}
-			Recommended runs the phase 4 tools, which the envelope stage and scoring read. MEROPS and TCDB are not used in scoring but add
-			peptidase and transporter calls. Tools with licence terms (MEROPS, Phobius, SignalP and others) stay off until you accept their
-			terms; add them yourself. KEGG uses only the public KOfam data. Gene calling, operons, consolidation, labeling, fingerprints and
-			scoring are part of every run.
+			<Lock size={14} />
+			<span><b>Your saved choice is applied</b>{saved ? `: ${saved}` : ''}. Unlock to change it.</span>
 		{/if}
 	</p>
+{/snippet}
 
-	<div class="rs-groups" bind:clientWidth={groupsWidth} style="--cols: {toolCols}">
-		{#each groups as g (g.phase)}
-			<section class="rs-group" aria-label="Phase {g.phase}">
-				<h3>
-					Phase {g.phase}{PHASE_NAME[g.phase] ? ` | ${PHASE_NAME[g.phase]}` : ''}
-					{#if g.phase === 4 && !anyRequired}<span class="rs-rec">recommended</span>{/if}
-					<span class="rs-gcount">{g.tools.filter((t) => inRun.has(t.name)).length} of {g.tools.length}</span>
-				</h3>
-				<ul class="rs-even mg-even">
-					{#each g.tools as t (t.name)}
-						{@const on = inRun.has(t.name)}
-						<li title={hint(t)}>
-							<button
-								type="button"
-								class="rs-tool"
-								class:on
-								class:locked={!t.licensed}
-								class:required={t.required}
-								aria-pressed={on}
-								disabled={!t.licensed || t.required}
-								title={hint(t)}
-								onclick={() => toggle(t.name)}
+<!-- ------------------------------------------------ gene calling -->
+<section class="mg-card rs-card" data-shade="calling" aria-labelledby="rs-calling">
+	<header class="mg-card-head">
+		<FoldTitle id={CALLING} closed headingId="rs-calling">Gene calling</FoldTitle>
+		<span class="mg-note">{callingDraft ? 'Unlocked' : callingRecommended ? 'Recommended' : 'Saved choice'}{callers ? ` | ${callers}` : ''}</span>
+		<span class="mg-grow"></span>
+		{@render helpButton('calling', 'How gene calling works', CALLING)}
+		{@render lockControls(!!callingDraft, unlockCalling, () => (callingDraft = null), saveCalling, savingCalling)}
+		<FoldToggle id={CALLING} closed />
+	</header>
+	<Fold id={CALLING} closed>
+		<div class="rs-body" data-help={help.calling ? 'on' : undefined}>
+			{@render notice(!!callingDraft, callingRecommended, [calling.gtdbtk ? 'GTDB-Tk on' : 'GTDB-Tk off', calling.quast ? 'QUAST on' : ''].filter(Boolean).join(', '))}
+			<ol class="rs-phases" class:locked={!callingDraft} inert={!callingDraft}>
+				<li>
+					<span class="rs-ph">Phase 1 | Quality</span>
+					<div class="rs-row">
+						<b>QUAST</b>
+						<span class="mg-grow"></span>
+						{#if quast}
+							<Switch label="Check assembly quality with QUAST" checked={calling.quast} onchange={(on) => callingDraft && (callingDraft = { ...callingDraft, quast: on })} />
+						{:else}<span class="mg-note">not offered</span>{/if}
+					</div>
+					<p class="mg-note mg-explain">Assembly statistics (contigs, N50, length) for each genome. Optional; nothing later depends on it.</p>
+				</li>
+				<li>
+					<span class="rs-ph">Phase 2 | Taxonomy</span>
+					<div class="rs-row">
+						<b>GTDB-Tk</b>
+						<span class="mg-grow"></span>
+						<Switch label="Work out domain and genetic code with GTDB-Tk" checked={calling.gtdbtk} onchange={(on) => callingDraft && (callingDraft = { ...callingDraft, gtdbtk: on })} />
+					</div>
+					{#if calling.gtdbtk && gtdbtkMissing}
+						<p class="mg-note warn">Needs its image and reference tree. <a class="mg-link" href={uiBase.to('/install#installed')}>Install</a></p>
+					{/if}
+					<p class="mg-note mg-explain">
+						Places each genome in the GTDB taxonomy, which gives RASTtk its domain and genetic code. Use it when you do not know them. It
+						needs a highmem node (about 400 GB) and adds hours; off, the genome table supplies both.
+					</p>
+				</li>
+				<li>
+					<span class="rs-ph">Phase 3 | Gene caller</span>
+					{#if backend.cluster}
+						<div class="rs-split" aria-label="Gene caller by genome">
+							<span class="rs-cell" class:on={byRast > 0}><b>RASTtk</b><span>{byRast} genome{byRast === 1 ? '' : 's'}</span></span>
+							<span class="rs-cell" class:on={all - byRast > 0}><b>Prodigal</b><span>{all - byRast} genome{all - byRast === 1 ? '' : 's'}</span></span>
+						</div>
+						{#if !calling.gtdbtk && known < all}
+							<p class="mg-note">
+								{all - known} with an unknown domain or genetic code go to Prodigal. Fill them in on the genome table or turn on GTDB-Tk
+								for RASTtk.
+							</p>
+						{/if}
+					{:else}
+						<div class="rs-seg" role="radiogroup" aria-label="Gene caller" style="--k: 3">
+							{#each [{ v: 'auto', l: 'Per genome' }, { v: 'rasttk', l: 'RASTtk' }, { v: 'prodigal', l: 'Prodigal' }] as o (o.v)}
+								<button type="button" role="radio" aria-checked={calling.caller === o.v} onclick={() => callingDraft && (callingDraft = { ...callingDraft, caller: o.v })}
+									>{o.l}</button
+								>
+							{/each}
+						</div>
+					{/if}
+					<p class="mg-note mg-explain">
+						RASTtk is recommended when a genome's domain and genetic code are known (from the table or GTDB-Tk): it calls the genes and
+						annotates them too. Prodigal is unsupervised and fast, needs neither, but calls genes only.
+					</p>
+				</li>
+			</ol>
+		</div>
+	</Fold>
+</section>
+
+<!-- ------------------------------------------------ annotation tools -->
+<section class="mg-card rs-card" id="tools" data-shade="tools" aria-labelledby="rs-tools">
+	<header class="mg-card-head">
+		<FoldTitle id={TOOLS} closed headingId="rs-tools">Annotation tools</FoldTitle>
+		<span class="mg-note">{toolsDraft ? 'Unlocked' : depthLabel} | {picked} of {offered}</span>
+		<span class="mg-grow"></span>
+		{@render helpButton('tools', 'What the tools do', TOOLS)}
+		{@render lockControls(!!toolsDraft, unlockTools, () => (toolsDraft = null), saveTools)}
+		<FoldToggle id={TOOLS} closed />
+	</header>
+	<Fold id={TOOLS} closed>
+		<div class="rs-body" data-help={help.tools ? 'on' : undefined}>
+			<div class="rs-notice-row">
+				{@render notice(!!toolsDraft, toolsView.depth === 'standard', depthLabel.toLowerCase())}
+				{#if toolsDraft}
+					<div class="rs-seg" role="radiogroup" aria-label="Which tools" style="--k: {DEPTHS.length}">
+						{#each DEPTHS as d (d.value)}
+							<button type="button" role="radio" aria-checked={toolsDraft.depth === d.value} onclick={() => toolsDraft && (toolsDraft = { ...toolsDraft, depth: d.value })}
+								>{d.label}</button
 							>
-								<span class="rs-box-mark" aria-hidden="true">{#if on}<Check size={12} strokeWidth={3.2} />{/if}</span>
-								<span class="rs-tname">
-									<span>{t.label ?? t.name}</span>
-									{#if BLURB[t.name]}<small>{BLURB[t.name]}</small>{/if}
-								</span>
-								{#if t.required && t.licensed}
-									<span class="rs-required">required</span>
-								{:else if !t.licensed}
-									<span class="rs-lic need" aria-label="Locked until its licence terms are accepted"><Lock size={11} /></span>
-								{:else if t.gated}
-									<span class="rs-lic" aria-label="Licence accepted"><KeyRound size={11} /></span>
-								{/if}
-							</button>
-						</li>
-					{/each}
-				</ul>
-			</section>
-		{/each}
-	</div>
-	{#if locked.length}
-		<p class="mg-note rs-locked">
-			<Lock size={11} /> {locked.length} need their licence terms accepted first:
-			{locked.map((t) => t.label ?? t.name).join(', ')}.
-			{#if backend.cluster}<a class="mg-link" href="#licence">Licence terms</a>{:else}<a class="mg-link" href={uiBase.to('/settings#licences')}>Licences</a>{/if}
-		</p>
-	{/if}
-	{/if}
+						{/each}
+					</div>
+				{/if}
+			</div>
+			<p class="mg-note mg-explain">
+				{#if anyRequired}
+					COG, KEGG, eggNOG, UniProt, Pfam, TIGRFAM, PGAP, InterPro and dbCAN are part of every run: labeling and the confidence score
+					read them, so every run's scores mean the same. MEROPS, TCDB and GenProp are yours to add: MEROPS and TCDB add peptidase and
+					transporter calls, and need their licence terms accepted. KEGG uses only the public KOfam data. Gene calling, operons,
+					consolidation, labeling, fingerprints and scoring are part of every run.
+				{:else}
+					Recommended runs the phase 4 tools, which the envelope stage and scoring read. MEROPS and TCDB are not used in scoring but add
+					peptidase and transporter calls. Tools with licence terms (MEROPS, Phobius, SignalP and others) stay off until you accept their
+					terms; add them yourself. KEGG uses only the public KOfam data. Gene calling, operons, consolidation, labeling, fingerprints and
+					scoring are part of every run.
+				{/if}
+			</p>
+
+			<div class="rs-groups" class:locked={!toolsDraft} inert={!toolsDraft} bind:clientWidth={groupsWidth} style="--cols: {toolCols}">
+				{#each groups as g (g.phase)}
+					<section class="rs-group" aria-label="Phase {g.phase}">
+						<h3>
+							Phase {g.phase}{PHASE_NAME[g.phase] ? ` | ${PHASE_NAME[g.phase]}` : ''}
+							{#if g.phase === 4 && !anyRequired}<span class="rs-rec">recommended</span>{/if}
+							<span class="rs-gcount">{g.tools.filter((t) => inRun.has(t.name)).length} of {g.tools.length}</span>
+						</h3>
+						<ul class="rs-even mg-even">
+							{#each g.tools as t (t.name)}
+								{@const on = inRun.has(t.name)}
+								<li title={hint(t)}>
+									<button
+										type="button"
+										class="rs-tool"
+										class:on
+										class:locked={!t.licensed}
+										class:required={t.required}
+										aria-pressed={on}
+										disabled={!t.licensed || t.required}
+										title={hint(t)}
+										onclick={() => toggle(t.name)}
+									>
+										<span class="rs-box-mark" aria-hidden="true">{#if on}<Check size={12} strokeWidth={3.2} />{/if}</span>
+										<span class="rs-tname">
+											<span>{t.label ?? t.name}</span>
+											{#if BLURB[t.name]}<small>{BLURB[t.name]}</small>{/if}
+										</span>
+										{#if t.required && t.licensed}
+											<span class="rs-required">required</span>
+										{:else if !t.licensed}
+											<span class="rs-lic need" aria-label="Locked until its licence terms are accepted"><Lock size={11} /></span>
+										{:else if t.gated}
+											<span class="rs-lic" aria-label="Licence accepted"><KeyRound size={11} /></span>
+										{/if}
+									</button>
+								</li>
+							{/each}
+						</ul>
+					</section>
+				{/each}
+			</div>
+			{#if locked.length}
+				<p class="mg-note rs-locked">
+					<Lock size={11} /> {locked.length} need their licence terms accepted first:
+					{locked.map((t) => t.label ?? t.name).join(', ')}.
+					{#if backend.cluster}<a class="mg-link" href="#licence">Licence terms</a>{:else}<a class="mg-link" href={uiBase.to('/settings#licences')}>Licences</a>{/if}
+				</p>
+			{/if}
+		</div>
+	</Fold>
 </section>
 
 <style>
-	.rs-box {
+	/* Each box as Install's: a card with a named head; its body pads like the head. */
+	.rs-card {
+		color: var(--mg-text);
+	}
+	.rs-card :global(.mg-card-head) {
+		flex-wrap: wrap;
+		row-gap: 6px;
+	}
+	.rs-body {
 		display: flex;
 		flex-direction: column;
 		gap: 12px;
-		padding: 16px 18px;
-		border: 1px solid var(--cr-card-edge, var(--mg-border));
-		border-radius: var(--mg-r);
-		background: var(--cr-card, var(--mg-surface));
-		color: var(--mg-text);
+		padding: var(--cr-pad, 16px 18px);
 	}
-	.rs-box > .mg-note {
+	.rs-body > .mg-note {
 		margin: 0;
 	}
-	/* Folded: one slim line. */
-	.rs-box.folded {
-		padding-top: 10px;
-		padding-bottom: 10px;
-	}
-	.rs-head {
+	/* The lock: a quiet line over the settings, and the settings shown but not changeable. */
+	.rs-notice-row {
 		display: flex;
 		flex-wrap: wrap;
 		align-items: center;
-		gap: 8px 10px;
+		justify-content: space-between;
+		gap: 8px 16px;
 	}
-	.rs-n {
-		display: grid;
-		place-items: center;
-		width: 22px;
-		height: 22px;
-		border-radius: 50%;
-		background: color-mix(in srgb, var(--mg-accent) 14%, transparent);
-		color: var(--mg-accent-ink, var(--mg-accent));
-		font-size: var(--mg-fs-xs);
-		font-weight: 700;
-	}
-	.rs-head h2 {
+	.rs-notice {
+		display: flex;
+		align-items: center;
+		gap: 8px;
 		margin: 0;
-		font-size: var(--mg-fs-xs);
-		font-weight: 650;
-		letter-spacing: 0.06em;
-		text-transform: uppercase;
+		font-size: var(--mg-fs-sm);
 		color: var(--mg-text-2);
 	}
-	.rs-sum {
-		font-size: var(--mg-fs-xs);
+	.rs-notice :global(svg) {
+		flex: none;
 		color: var(--mg-text-3);
+	}
+	.rs-notice b {
+		font-weight: 600;
+		color: var(--mg-text);
+	}
+	.rs-notice.open :global(svg) {
+		color: var(--mg-accent-ink, var(--mg-accent));
+	}
+	.locked {
+		opacity: 0.8;
+	}
+	.rs-unlock {
+		display: inline-flex;
+		align-items: center;
+		gap: 6px;
+		height: 28px;
+		padding: 0 12px;
+		border: 1px solid var(--mg-border-strong);
+		border-radius: var(--mg-r-sm);
+		background: var(--mg-surface);
+		color: var(--mg-text);
+		font: inherit;
+		font-size: var(--mg-fs-xs);
+		font-weight: 600;
+		cursor: pointer;
+	}
+	.rs-unlock:hover {
+		border-color: var(--mg-accent);
+		color: var(--mg-accent-ink, var(--mg-accent));
 	}
 	.rs-help {
 		display: grid;

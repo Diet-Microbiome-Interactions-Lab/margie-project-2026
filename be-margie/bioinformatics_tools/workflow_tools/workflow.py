@@ -31,7 +31,8 @@ from bioinformatics_tools.workflow_tools.load_to_db import is_already_processed,
 from bioinformatics_tools.workflow_tools import cache_report, protein_cache
 from bioinformatics_tools.workflow_tools.programs import ProgramBase
 from bioinformatics_tools.workflow_tools.workflow_helpers import (
-    discover_genomes, genome_stem, get_workflow_prefix_for, WORKFLOW_PATH_DEFAULTS, genome_calls, gene_call_files)
+    discover_genomes, genome_stem, get_workflow_prefix_for, WORKFLOW_PATH_DEFAULTS, genome_calls, gene_call_files,
+    GTDBTK_EARLY, identify_calls, read_early_calls, write_early_calls)
 from bioinformatics_tools.workflow_tools.workflow_registry import (
     HIDDEN_TOOLS,
     MARGIE_SB_PHASED_TOOLS,
@@ -213,34 +214,41 @@ class _BackgroundProcess:
         return self.proc.wait()
 
 
+# How often Stage 1 looks for GTDB-Tk's first-step files while the batch goes on, in seconds.
+EARLY_POLL = 30
+
+
 class _Stage1Waves:
-    '''Stage 1 as up to three Snakemake invocations behind one
+    '''Stage 1 as up to four Snakemake invocations behind one
     _BackgroundProcess-shaped handle.
 
     GTDB-Tk runs as one batch while output_cache restores it per genome, so:
 
-      batch    GTDB-Tk, only when some genome still needs it
-      ready    RASTtk for genomes whose GTDB-Tk outputs are already on disk
-      pending  RASTtk for the rest, started once the batch has landed
+      batch  GTDB-Tk, only when some genome still needs it, its results split and loaded
+      ready  RASTtk for genomes that need nothing from it: their GTDB-Tk outputs are on disk,
+             or the genome table gives their domain and genetic code
+      early  RASTtk for the rest, once GTDB-Tk's first step (identify) has written their
+             domain and genetic code, while the batch goes on
+      late   RASTtk for genomes the first step did not give, once the batch has ended
 
-    "ready" runs alongside "batch"; the RASTtk waves never overlap, since
+    "ready" and "early" run alongside "batch"; the RASTtk waves never overlap, since
     BV-BRC must see one submission at a time.
     '''
 
-    def __init__(self, launch, batch_targets, ready_targets, pending_targets):
-        self._launch = launch          # (targets, label) -> _BackgroundProcess | None
+    def __init__(self, launch, batch_targets, ready_targets, waiting=(), targets_for=None, early=None):
+        self._launch = launch          # (targets, label, first-step calls or None) -> _BackgroundProcess | None
         self._lock = threading.Lock()
         self._procs: list = []
         self._launch_failed = False
         self._done = threading.Event()
         self._thread = threading.Thread(
-            target=self._drive, args=(batch_targets, ready_targets, pending_targets), daemon=True)
+            target=self._drive, args=(batch_targets, ready_targets, list(waiting), targets_for, early), daemon=True)
         self._thread.start()
 
-    def _start(self, targets, label):
+    def _start(self, targets, label, calls=None):
         if not targets:
             return None
-        proc = self._launch(targets, label)
+        proc = self._launch(targets, label, calls)
         if proc is None:
             self._launch_failed = True
             return None
@@ -248,17 +256,39 @@ class _Stage1Waves:
             self._procs.append(proc)
         return proc
 
-    def _drive(self, batch_targets, ready_targets, pending_targets):
+    @staticmethod
+    def _first_step(early, batch) -> dict:
+        '''GTDB-Tk's first-step calls once two looks EARLY_POLL apart agree (its files are whole),
+        or what there is once the batch has ended.'''
+        last = None
+        while True:
+            now = early()
+            if now and now == last:
+                return now
+            if batch is None or batch.poll() is not None:
+                return early()
+            last = now
+            time.sleep(EARLY_POLL)
+
+    def _drive(self, batch_targets, ready_targets, waiting, targets_for, early):
         try:
             batch = self._start(batch_targets, 'GTDB-Tk batch')
-            ready = self._start(ready_targets, 'RASTtk, GTDB-Tk already available')
-            for proc in (batch, ready):
+            ready = self._start(ready_targets, 'RASTtk, GTDB-Tk not needed or already available')
+            if ready is not None:
+                ready.wait()
+            calls = self._first_step(early, batch) if waiting and early is not None else {}
+            first = [g for g in waiting if g in calls]
+            if first:
+                proc = self._start(targets_for(first), "RASTtk, from GTDB-Tk's first step", {g: calls[g] for g in first})
                 if proc is not None:
                     proc.wait()
-            # Starts only after the batch lands and the first RASTtk wave exits.
-            rest = self._start(pending_targets, 'RASTtk, after GTDB-Tk batch')
-            if rest is not None:
-                rest.wait()
+            if batch is not None:
+                batch.wait()
+            rest = [g for g in waiting if g not in calls]
+            if rest:
+                proc = self._start(targets_for(rest), 'RASTtk, after GTDB-Tk batch')
+                if proc is not None:
+                    proc.wait()
         finally:
             self._done.set()
 
@@ -979,32 +1009,60 @@ class WorkflowBase(ProgramBase):
         provenance.write()
 
         # Stage 1: phases 1-3 in waves with --jobs=1, one BV-BRC submission at a time.
-        def _stage1_targets(genome: str) -> list[str]:
+        def _stage1_targets(genome: str, gtdbtk: bool = True) -> list[str]:
             '''Returns Stage 1's files for one genome: its genome_info.tsv and its gene calls' DB
-            token, plus GTDB-Tk's when it is selected. QUAST is not here: it runs on its own.'''
+            token, plus GTDB-Tk's when it is selected and asked for. QUAST is not here: it runs on its own.'''
             prefix = get_workflow_prefix_for(genome, smk_config)
             # genome_info.tsv too: for a genome whose gene calls came from the database it is
             # not made on the way to RASTtk, and Stage 2's restored tool outputs must be newer.
             targets = [f"{prefix}genome_info/genome_info.tsv", _gene_calls(genome)['loaded']]
-            if run_gtdbtk_enabled:
+            if run_gtdbtk_enabled and gtdbtk:
                 targets.append(f"{prefix}gtdbtk/gtdbtk_db.tkn")
             return targets
+
+        output_dir_for_batch = (smk_config.get('output_dir') or '').rstrip('/')
+        # The domains and genetic codes GTDB-Tk's first step gave, kept beside the batch: each later
+        # Snakemake of this run (and of a resumed copy of it) reads them, so its genome_info.tsv stays as made.
+        early_file = (Path(output_dir_for_batch) / 'original_container_outputs' / 'gtdbtk' / 'domain-and-genetic-code.tsv'
+                      if output_dir_for_batch else None)
+        if run_gtdbtk_enabled and early_file is not None and early_file.exists():
+            smk_config[GTDBTK_EARLY] = str(early_file)
 
         # "Ready": per-genome GTDB-Tk outputs on disk, or always when GTDB-Tk is off.
         gtdbtk_ready = [g for g in genome_files
                         if not run_gtdbtk_enabled
                         or all(Path(p).exists() for p in self._gtdbtk_split_paths(g, smk_config))]
         gtdbtk_pending = [g for g in genome_files if g not in set(gtdbtk_ready)]
-        LOGGER.info('Stage 1 waves: %d genome(s) have GTDB-Tk outputs already, %d still need the batch',
-                    len(gtdbtk_ready), len(gtdbtk_pending))
+        # Their gene calling needs nothing from GTDB-Tk when the genome table (or an earlier first
+        # step) gives the domain and genetic code; GTDB-Tk still classifies them in the batch.
+        calls_now = genome_calls(genome_files, {'run_gtdbtk': True, 'margie_sb': self._margie_sb_dict(),
+                                                GTDBTK_EARLY: smk_config.get(GTDBTK_EARLY, '')})
+        known = [g for g in gtdbtk_pending if calls_now[g]['domain'] and calls_now[g]['genetic_code']]
+        waiting = [g for g in gtdbtk_pending if g not in set(known)]
+        LOGGER.info('Stage 1 waves: %d genome(s) have GTDB-Tk outputs already, %d need the batch '
+                    '(%d of them only for their taxonomy; the others start from its first step)',
+                    len(gtdbtk_ready), len(gtdbtk_pending), len(known))
 
-        output_dir_for_batch = (smk_config.get('output_dir') or '').rstrip('/')
+        # The batch, its results split and loaded genome by genome; the gene calling goes on beside it.
         batch_targets = ([f"{output_dir_for_batch}/original_container_outputs/gtdbtk/gtdbtk_batch.done"]
+                         + [f"{get_workflow_prefix_for(g, smk_config)}gtdbtk/gtdbtk_db.tkn" for g in gtdbtk_pending]
                          if gtdbtk_pending and output_dir_for_batch else [])
+        batch_started = time.time()
+
+        def _early() -> dict:
+            '''The waiting genomes' domain and genetic code, once GTDB-Tk's first step has written them
+            in this run (a minute's leeway for the compute nodes' clocks).'''
+            calls = identify_calls(early_file.parent, newer_than=batch_started - 60)
+            return {g: c for g, c in calls.items() if g in waiting}
 
         # Stage 1 runs at the account's job limit; RASTtk alone goes one at a time (the
         # margie_sb_bvbrc slot, and the rule's own lock across runs), so BV-BRC sees one submission.
-        def _launch_wave(targets: list[str], label: str):
+        def _launch_wave(targets: list[str], label: str, calls: dict | None = None):
+            if calls:
+                write_early_calls(early_file, {**read_early_calls(early_file), **calls})
+                smk_config[GTDBTK_EARLY] = str(early_file)
+                LOGGER.info("GTDB-Tk's first step gave the domain and genetic code of %d genome(s): "
+                            'their gene calling starts while GTDB-Tk goes on', len(calls))
             command = self.build_executable(selected_wf, config_overrides=smk_config, mode=mode,
                                             compute_config=compute_config, extra_resources=extra_resources,
                                             rerun_triggers=rerun_triggers, target=targets)
@@ -1018,8 +1076,10 @@ class WorkflowBase(ProgramBase):
         stage1 = _Stage1Waves(
             _launch_wave,
             batch_targets,
-            [t for g in gtdbtk_ready for t in _stage1_targets(g)],
-            [t for g in gtdbtk_pending for t in _stage1_targets(g)],
+            [t for g in gtdbtk_ready for t in _stage1_targets(g)] + [t for g in known for t in _stage1_targets(g, gtdbtk=False)],
+            waiting,
+            lambda genomes: [t for g in genomes for t in _stage1_targets(g, gtdbtk=False)],
+            _early if batch_targets and early_file is not None else None,
         )
 
         # QUAST reads only the genomes and no step reads its results: its own Snakemake, beside
@@ -1384,31 +1444,31 @@ class WorkflowBase(ProgramBase):
                             f"{slot['pc_prefix']}labeling/labeled-genes.tsv", slot['pc_prefix'], slot['genome_hash'])
             LOGGER.info(provenance.summary(genome))
 
+        def _cache_gtdbtk() -> None:
+            """Caches GTDB-Tk outputs once the split has written them (its compute token comes last),
+            so a run that stops before they load keeps them, and again once they are loaded, with the
+            database token. The batch can end after the gene calling it no longer holds up."""
+            if not (db_path and run_gtdbtk_enabled):
+                return
+            for genome in genome_files:
+                if genome in gtdbtk_loaded:
+                    continue
+                paths = self._gtdbtk_split_paths(genome, smk_config)
+                split = [*paths[:2], f"{get_workflow_prefix_for(genome, smk_config)}gtdbtk/gtdbtk_compute.tkn"]
+                if Path(paths[2]).exists() or (genome not in gtdbtk_stored and all(Path(p).exists() for p in split)):
+                    _safely(f'Caching GTDB-Tk for {genome}', store, db_path, genome_files[genome], 'gtdbtk', paths)
+                    gtdbtk_stored.add(genome)
+                    if Path(paths[2]).exists():
+                        gtdbtk_loaded.add(genome)
+
         while pending or queue or active:
-            # Caches GTDB-Tk outputs once the split has written them (its compute token comes
-            # last), so a run that stops before a genome's Stage 1 wave keeps them, and again
-            # once they are loaded, with the database token.
-            if db_path and run_gtdbtk_enabled:
-                for genome in genome_files:
-                    if genome in gtdbtk_loaded:
-                        continue
-                    paths = self._gtdbtk_split_paths(genome, smk_config)
-                    split = [*paths[:2], f"{get_workflow_prefix_for(genome, smk_config)}gtdbtk/gtdbtk_compute.tkn"]
-                    if Path(paths[2]).exists() or (genome not in gtdbtk_stored and all(Path(p).exists() for p in split)):
-                        _safely(f'Caching GTDB-Tk for {genome}', store, db_path, genome_files[genome], 'gtdbtk', paths)
-                        gtdbtk_stored.add(genome)
-                        if Path(paths[2]).exists():
-                            gtdbtk_loaded.add(genome)
+            _cache_gtdbtk()
 
             for genome in list(pending):
                 if Path(_gene_calls(genome)['loaded']).exists():
                     pending.discard(genome)
                     queue.append(genome)
                     if db_path:
-                        if run_gtdbtk_enabled and genome not in gtdbtk_stored:
-                            _safely(f'Caching GTDB-Tk for {genome}', store, db_path, genome_files[genome], 'gtdbtk',
-                                    self._gtdbtk_split_paths(genome, smk_config))
-                            gtdbtk_stored.add(genome)
                         if genome not in prodigal_genomes and not rasttk_restored.get(genome, False):
                             _safely(f'Caching RASTtk for {genome}', store, db_path, genome_files[genome], 'rasttk',
                                     self._rasttk_paths(genome, smk_config))
@@ -1490,6 +1550,8 @@ class WorkflowBase(ProgramBase):
                 return rc_val or 1
 
         stage1.wait()
+        # GTDB-Tk's batch may end after Stage 2: its results are cached now.
+        _cache_gtdbtk()
         if stage1.poll() != 0:
             LOGGER.warning('Stage 1 (rasttk_all) exited with rc=%s after Stage 2/3 finished draining', stage1.poll())
         if quast_proc is not None and quast_proc.wait() != 0:

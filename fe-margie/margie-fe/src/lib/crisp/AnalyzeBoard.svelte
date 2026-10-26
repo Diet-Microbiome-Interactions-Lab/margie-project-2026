@@ -9,13 +9,16 @@
 	import GenomesBoard from '$lib/crisp/GenomesBoard.svelte';
 	import RunAction from '$lib/workspace/blocks/RunAction.svelte';
 	import Licence from '$lib/cluster/Licence.svelte';
+	import Fold from '$lib/workspace/motion/Fold.svelte';
+	import FoldTitle from '$lib/workspace/motion/FoldTitle.svelte';
+	import FoldToggle from '$lib/workspace/motion/FoldToggle.svelte';
 	import RunSteps from './RunSteps.svelte';
 
 	/**
-	 * The Analyze page, in the order a run is set up: 1 the genomes (folder, files, table),
-	 * 2 gene calling and 3 the annotation tools (RunSteps), the licence terms once before a
-	 * first run, then the start button (or the run's bar with Stop and Go to Jobs, or Resume
-	 * and Restart after a failed run). A run's progress by genome and step is on Jobs.
+	 * The Analyze page, in the order a run is set up, one box each as on Install: the genomes
+	 * (folders, files, table), gene calling and the annotation tools (RunSteps), the licence terms
+	 * once before a first run, then the start button (or the run's bar with Stop and Go to Jobs, or
+	 * Resume and Restart after a failed run). A run's progress by genome and step is on Jobs.
 	 */
 	const GENOME_TABLE = 'analyze:genome-table';
 
@@ -65,30 +68,24 @@
 </script>
 
 <div class="analyze">
-<!-- The steps in one card, one row each (an-steps), the run under them. -->
-<div class="an-steps">
-<!-- ------------------------------------------------ 1. the genomes: their folder, files added here, the table -->
-<section id="genomes" class="genomes" aria-label="Genomes">
-	<GenomesBoard foldId={GENOME_TABLE} step={1} />
-</section>
+<!-- ------------------------------------------------ the genomes: their folders, files added here, the table -->
+<GenomesBoard foldId={GENOME_TABLE} />
 
-<!-- ------------------------------------------------ 2. gene calling, 3. annotation tools -->
+<!-- ------------------------------------------------ gene calling, annotation tools -->
 <RunSteps />
 
 <!-- ------------------------------------------------ once, before a first run: the licence terms (recorded on the cluster) -->
 {#if needsTerms}
-	<section class="card licbox" class:folded={ui.isFolded(LICENCE, true)} id="licence" aria-labelledby="lic-h">
-		<header class="lichead">
-			<span class="stepn">4</span>
-			<h2 id="lic-h">Licence terms</h2>
+	<section class="mg-card" data-shade="licence" id="licence" aria-labelledby="lic-h">
+		<header class="mg-card-head">
+			<FoldTitle id={LICENCE} closed headingId="lic-h">Licence terms</FoldTitle>
 			<span class="lic-need">Not accepted yet: needed once, before your first run</span>
 			<span class="mg-grow"></span>
-			<button type="button" class="mg-link quiet" aria-expanded={!ui.isFolded(LICENCE, true)} onclick={() => ui.toggleFold(LICENCE, true)}>{ui.isFolded(LICENCE, true) ? 'Show' : 'Hide'}</button>
+			<FoldToggle id={LICENCE} closed />
 		</header>
-		{#if !ui.isFolded(LICENCE, true)}<Licence />{/if}
+		<Fold id={LICENCE} closed><div class="lic-body"><Licence /></div></Fold>
 	</section>
 {/if}
-</div>
 
 <!-- ------------------------------------------------ the run -->
 <section class="card runcard" id="run">
@@ -146,120 +143,15 @@
 		box-shadow: var(--cr-card-shadow, none);
 	}
 
-	/* The steps: one card, a hairline between them, instead of a box each. */
-	.an-steps {
-		display: flex;
-		flex-direction: column;
-		overflow: hidden;
-		border: 1px solid var(--cr-card-edge, var(--mg-border));
-		border-radius: var(--mg-r);
-		background: var(--cr-card, var(--mg-surface));
-		box-shadow: var(--cr-card-shadow, none);
-	}
-	.genomes {
-		display: flex;
-		flex-direction: column;
-	}
-	.an-steps :global(:is(.gb-board, .rs-box)),
-	.an-steps .licbox {
-		border: none;
-		border-radius: 0;
-		background: transparent;
-		box-shadow: none;
-	}
-	.an-steps :global(.gb-board + .gb-board),
-	.an-steps > :global(.rs-box),
-	.an-steps > .licbox {
-		border-top: 1px solid var(--mg-border);
-	}
-	/* The steps line up as columns: number | title | what it is set to, then its controls at the
-	   right. Each title takes the same width (the longest, Annotation tools), and the gaps match. */
-	.an-steps {
-		--an-title: 9.5rem;
-	}
-	.an-steps :global(:is(.gb-board, .rs-box)),
-	.an-steps .licbox {
-		padding-left: 18px;
-		padding-right: 18px;
-	}
-	.an-steps :global(:is(.gb-top, .rs-head)),
-	.lichead {
-		column-gap: 10px;
-	}
-	.an-steps :global(:is(.gb-colhead, .rs-head > h2)),
-	.lichead h2 {
-		flex: 0 0 var(--an-title);
-		white-space: nowrap;
-	}
-	/* On a phone, a step's summary goes under its title, so its Show stays on the title's line. */
-	@media (max-width: 640px) {
-		.an-steps :global(:is(.gb-top, .rs-head)),
-		.lichead {
-			flex-wrap: wrap;
-			row-gap: 2px;
-		}
-		.an-steps :global(:is(.gb-colhead, .rs-head > h2)),
-		.lichead h2 {
-			flex-basis: auto;
-		}
-		.an-steps :global(:is(.gb-count, .gb-sum, .rs-sum)),
-		.lic-need {
-			order: 10;
-			flex-basis: 100%;
-			padding-left: 32px;
-		}
-	}
-	/* Files dragged over the genomes: their row lights, not a box. */
-	.an-steps :global(.gb-board.over) {
-		background: color-mix(in srgb, var(--mg-accent) 6%, transparent);
-		box-shadow: inset 3px 0 0 var(--mg-accent);
-	}
-
-	/* ---------------------------------------- the licence terms, once */
-	.licbox {
-		padding: 16px 18px;
-	}
-	.licbox.folded {
-		padding-top: 10px;
-		padding-bottom: 10px;
-	}
-	.lichead {
-		display: flex;
-		align-items: center;
-		gap: 10px;
-		margin-bottom: 8px;
-	}
-	.lichead h2 {
-		margin: 0;
-		font-size: var(--mg-fs-xs);
-		font-weight: 650;
-		letter-spacing: 0.06em;
-		text-transform: uppercase;
-		color: var(--mg-text-2);
-	}
-	.lichead {
-		margin-bottom: 0;
-	}
-	.licbox:has(.lic-need) .lichead + :global(*) {
-		margin-top: 8px;
+	/* The licence terms, once: their body pads like the head. */
+	.lic-body {
+		padding: var(--cr-pad, 16px 18px);
 	}
 	.lic-need {
 		font-size: var(--mg-fs-xs);
 		font-weight: 600;
 		color: var(--mg-warn);
 	}
-	.stepn {
-		display: grid;
-		place-items: center;
-		width: 22px;
-		height: 22px;
-		border-radius: 50%;
-		background: color-mix(in srgb, var(--mg-accent) 14%, transparent);
-		color: var(--mg-accent-ink, var(--mg-accent));
-		font-size: var(--mg-fs-xs);
-		font-weight: 700;
-	}
-
 
 	/* ---------------------------------------- the run */
 	.runcard {

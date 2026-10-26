@@ -392,23 +392,26 @@ class Workspace {
 		total: this.setup.filter((r) => r.required).length
 	});
 
-	/** Tools the chosen depth runs (before annotate.sh adds operon and the envelope inputs). */
-	chosenTools = $derived.by(() => {
+	/** The tools a choice runs: a depth, the hand-picked list for Custom, and QUAST's switch. */
+	toolsFor(depth: Depth, custom: string[], quast: boolean): string[] {
 		const usable = new Set(this.tools.filter((t) => t.licensed).map((t) => t.name));
 		// The tools every run needs come with any choice.
 		const required = this.tools.filter((t) => t.required && t.licensed).map((t) => t.name);
 		const pick =
-			this.depth === 'quick'
+			depth === 'quick'
 				? ['operon']
-				: this.depth === 'standard'
+				: depth === 'standard'
 					? STANDARD_TOOLS.filter((t) => usable.has(t))
-					: this.depth === 'licensed'
+					: depth === 'licensed'
 						? [...usable]
-						: this.custom.filter((t) => usable.has(t));
+						: custom.filter((t) => usable.has(t));
 		// QUAST comes from its own switch, whatever the depth.
-		const quast = this.quast && usable.has('quast') ? ['quast'] : [];
-		return [...new Set([...required, ...pick.filter((t) => t !== 'quast'), ...quast])];
-	});
+		const withQuast = quast && usable.has('quast') ? ['quast'] : [];
+		return [...new Set([...required, ...pick.filter((t) => t !== 'quast'), ...withQuast])];
+	}
+
+	/** Tools the saved choice runs (before annotate.sh adds operon and the envelope inputs). */
+	chosenTools = $derived.by(() => this.toolsFor(this.depth, this.custom, this.quast));
 
 	/** Images and databases the chosen depth needs that are not there yet. */
 	needs = $derived.by(() => {

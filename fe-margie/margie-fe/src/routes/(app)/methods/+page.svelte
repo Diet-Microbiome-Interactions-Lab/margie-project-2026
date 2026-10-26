@@ -19,7 +19,7 @@
 					n: '2',
 					step: 'Taxonomy',
 					tools: ['GTDB-Tk (optional)'],
-					does: "Places each genome in the GTDB taxonomy, which gives its domain and genetic code. The genome table on Analyze can give both instead."
+					does: "Places each genome in the GTDB taxonomy. Its first step gives each genome's domain and genetic code within minutes, and gene calling starts from there while the placement goes on. The genome table on Analyze can give both instead."
 				},
 				{
 					n: '3',
@@ -59,8 +59,8 @@
 			]
 		},
 		{
-			title: 'Label, score and remember',
-			blurb: "MARGIE's own steps: one row per gene, one label, a confidence, and fingerprints that later genomes are compared with.",
+			title: 'Describe, score and remember',
+			blurb: "MARGIE's own steps: one row per gene, its best product descriptor, a confidence, and fingerprints that later genomes are compared with.",
 			phases: [
 				{
 					n: '9',
@@ -73,8 +73,8 @@
 					n: '10',
 					step: 'Labeling',
 					tools: ["MARGIE's own"],
-					does: 'Gives each gene one product label by a fixed trust hierarchy, from curated family models down to domain models.',
-					more: { href: '/faq#label-derivation', label: 'How a label is derived' }
+					does: 'Gives each gene its best product descriptor by a fixed trust hierarchy, from curated family models down to domain models.',
+					more: { href: '/faq#label-derivation', label: 'How the best product descriptor is derived' }
 				},
 				{
 					n: '11',
@@ -178,7 +178,7 @@
 			from: "The gene's evidence pattern: RASTtk's description and each tool's ids and descriptions, in fixed slots",
 			when: 'After scoring',
 			why: 'Genes with the same evidence share a fingerprint, in one genome or many',
-			helps: 'Counts each pattern, and the label it led to, across genomes (the gene fingerprint database)'
+			helps: 'Counts each pattern, and the best product descriptor it led to, across genomes (the gene fingerprint database)'
 		},
 		{
 			role: 'supporting',
@@ -193,9 +193,9 @@
 			role: 'supporting',
 			hash: 'Operon fingerprints',
 			level: 'Operon',
-			from: "The members' gene hashes or labels, in genomic order or sorted: four hashes",
+			from: "The members' gene hashes or product descriptors, in genomic order or sorted: four hashes",
 			when: 'After scoring',
-			why: 'Operons with the same evidence or the same labels, in order or not, share a fingerprint',
+			why: 'Operons with the same evidence or the same product descriptors, in order or not, share a fingerprint',
 			helps: 'The four operon fingerprint databases'
 		},
 		{
@@ -219,7 +219,7 @@
 	];
 	/** What the database keeps by hash, read by eye when checking hashes and restoring results. */
 	const RECORDS = [
-		{ table: 'protein_records', what: 'One row per protein: its hash, the genomes it occurs in, its fingerprints and label, the descriptor of each core tool, then the additional tools' },
+		{ table: 'protein_records', what: 'One row per protein: its hash, the genomes it occurs in, its fingerprints and best product descriptor, the descriptor of each core tool, then the additional tools' },
 		{ table: 'protein_genomes', what: 'Each protein hash with each genome hash it occurs in' },
 		{ table: 'genome_proteomes', what: "Each genome hash with its protein set and the names it came under" },
 		{ table: 'genome_genes', what: "Each genome's genes by gene hash, with each gene's protein hash and fingerprint" },
@@ -240,8 +240,8 @@
 		{ title: 'Annotates proteins', text: 'with many tools at once, each on its own' },
 		{ title: 'Finds operons', text: 'from the spacing between neighbouring genes' },
 		{ title: 'Places proteins', text: 'in the cell, with the inferred envelope' },
-		{ title: 'Labels each gene', text: 'with one product name, by a trust hierarchy' },
-		{ title: 'Scores the label', text: 'from 0 to 1, by how well the evidence agrees' }
+		{ title: 'Describes each gene', text: 'with its best product descriptor, by a trust hierarchy' },
+		{ title: 'Scores the descriptor', text: 'from 0 to 1, by how well the evidence agrees' }
 	];
 
 	/** MARGIE's own steps and their scripts, as the Code page lists them (routers/code.py). */
@@ -262,7 +262,7 @@
 
 <svelte:head><title>Methods | MARGIE</title></svelte:head>
 
-<ReadingPage title="Methods" lede="How MARGIE annotates a genome, phase by phase, and scores each gene's label." shade="page-methods">
+<ReadingPage title="Methods" lede="How MARGIE annotates a genome, phase by phase, and scores each gene's best product descriptor." shade="page-methods">
 	<section class="rp-sec" id="overview" data-toc="Overview">
 		<h2>Overview</h2>
 		<p class="rp-lead">
@@ -274,7 +274,7 @@
 				<div class="rp-tile"><b>{d.title}</b><span>{d.text}</span></div>
 			{/each}
 		</div>
-		<p>She keeps each step's output, so each label traces back to the hits behind it.</p>
+		<p>She keeps each step's output, so each gene's best product descriptor traces back to the hits behind it.</p>
 	</section>
 
 	<a class="rp-link" href="/faq">

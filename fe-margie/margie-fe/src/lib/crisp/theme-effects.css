@@ -9,7 +9,7 @@
  * for reduced motion. Text keeps its contrast: the backdrops stay faint behind the cards.
  *
  * Cards: the shared card classes and each page's own boxes (AnalyzeBoard .card, GenomesBoard
- * .gb-board, RunSteps .rs-box, ResultsBoard .rb, SettingsBoard .sb-card, InstallBoard .ib-box,
+ * .gb-board, ResultsBoard .rb, SettingsBoard .sb-card, InstallBoard .ib-box,
  * the about pages' .ab-box, AboutYou .about, JourneyPath .jp, ClusterBoard .cb-card and .cb-strip).
  */
 
@@ -89,7 +89,7 @@
 	--cr-card: color-mix(in srgb, var(--mg-surface) 82%, transparent);
 	--cr-card-edge: color-mix(in srgb, var(--fx-a) 22%, var(--mg-border));
 }
-.crisp[data-palette='glow'] :is(.mg-card, .cr-block, .card, .gb-board, .rs-box, .rb, .sb-card, .ib-box, .ab-box, .about, .jp, .cb-card, .cb-strip) {
+.crisp[data-palette='glow'] :is(.mg-card, .cr-block, .card, .gb-board, .rb, .sb-card, .ib-box, .ab-box, .about, .jp, .cb-card, .cb-strip) {
 	backdrop-filter: blur(12px) saturate(140%);
 	box-shadow: 0 10px 34px -18px color-mix(in srgb, var(--fx-a) 55%, transparent);
 }
@@ -150,7 +150,7 @@
 .crisp[data-palette='gram']::after {
 	background: radial-gradient(130vmax 95vmax at 52% 36%, transparent 52%, color-mix(in srgb, var(--fx-1) 12%, transparent) 100%);
 }
-.crisp[data-palette='gram'] :is(.mg-card, .cr-block, .card, .gb-board, .rs-box, .rb, .sb-card, .ib-box, .ab-box, .about, .jp, .cb-card, .cb-strip) {
+.crisp[data-palette='gram'] :is(.mg-card, .cr-block, .card, .gb-board, .rb, .sb-card, .ib-box, .ab-box, .about, .jp, .cb-card, .cb-strip) {
 	/* Stained along the top, violet to safranin; the card keeps its own colour. */
 	background-image: linear-gradient(90deg, var(--fx-1), var(--fx-2));
 	background-size: 100% 3px;
@@ -212,7 +212,7 @@
 .crisp[data-palette='agar'] :is(.mg-btn, .btn) {
 	border-radius: 999px;
 }
-.crisp[data-palette='agar'] :is(.mg-card, .cr-block, .card, .gb-board, .rs-box, .rb, .sb-card, .ib-box, .ab-box, .about, .jp, .cb-card, .cb-strip) {
+.crisp[data-palette='agar'] :is(.mg-card, .cr-block, .card, .gb-board, .rb, .sb-card, .ib-box, .ab-box, .about, .jp, .cb-card, .cb-strip) {
 	box-shadow:
 		inset 0 1px 0 color-mix(in srgb, #ffffff 55%, transparent),
 		0 12px 30px -20px rgb(90 60 10 / 0.45);
