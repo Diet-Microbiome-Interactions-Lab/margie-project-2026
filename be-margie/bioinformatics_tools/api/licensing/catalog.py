@@ -92,13 +92,19 @@ def disabled_tool_ids(usage_type: str | None, licensed_ids: Iterable[str] | None
     return disabled
 
 
+# An acceptance is the account's own when made since the account was: the account of that name
+# (when there is one) and its creation time, compared to the second (both are UTC, ISO 8601).
+_OWN = "LEFT JOIN users u ON u.username = a.username "
+_NOT_OLDER = "AND (u.created_at IS NULL OR substr(a.accepted_at, 1, 19) >= substr(u.created_at, 1, 19)) "
+
+
 def get_entitlement(username: str) -> dict:
     """Returns {usage_type, licensed_tools} from the user's current-terms acceptance, or empty values."""
     current = load_terms()["version"]
     with get_db() as db:
         row = db.execute(
-            "SELECT usage_type, licensed_tools FROM license_acceptances "
-            "WHERE username = ? AND terms_version = ? ORDER BY id DESC LIMIT 1",
+            "SELECT a.usage_type, a.licensed_tools FROM license_acceptances a " + _OWN
+            + "WHERE a.username = ? AND a.terms_version = ? " + _NOT_OLDER + "ORDER BY a.id DESC LIMIT 1",
             (username, current),
         ).fetchone()
     if not row:
@@ -185,11 +191,13 @@ def build_terms_payload() -> dict:
 
 
 def has_accepted_current_terms(username: str) -> bool:
-    """Returns True if the user has an acceptance row for the current terms version."""
+    """Returns True if the user has an acceptance row for the current terms version, made since
+    the account was (a row left by an earlier account of the same name does not count)."""
     current = load_terms()["version"]
     with get_db() as db:
         row = db.execute(
-            "SELECT 1 FROM license_acceptances WHERE username = ? AND terms_version = ? LIMIT 1",
+            "SELECT 1 FROM license_acceptances a " + _OWN
+            + "WHERE a.username = ? AND a.terms_version = ? " + _NOT_OLDER + "LIMIT 1",
             (username, current),
         ).fetchone()
     return row is not None

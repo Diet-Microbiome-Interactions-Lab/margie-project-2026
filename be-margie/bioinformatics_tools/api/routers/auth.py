@@ -149,13 +149,28 @@ def register(body: UserRegister, request: Request):
             detail=f'Connected, but could not set up the workflow environment on the cluster: {exc}'
         )
 
-    return _store_user(
-        body,
+    account = dict(
         cluster_host=body.cluster_host,
         cluster_username=body.cluster_username,
         home_dir=home_dir,
         private_key_encrypted=encrypt_private_key(body.private_key),
     )
+    made = _store_user(body, **account)
+    _drop_leftover_acceptances({**account, 'user_id': made['user_id'], 'username': body.username}, request)
+    return made
+
+
+def _drop_leftover_acceptances(user: dict, request: Request) -> None:
+    """A new account starts without licence acceptances: any held under its name by an earlier
+    account of that name are revoked and the revocation recorded (revoke_on_record). Nothing is
+    done when there are none, and a failure leaves the account made (an acceptance older than the
+    account does not count for it anyway: licensing.has_accepted_current_terms)."""
+    try:
+        result = revoke_on_record(user, request, 'a new account took this name')
+        if result['rows_removed']:
+            LOGGER.info('Revoked %d acceptance(s) left under the name %s', result['rows_removed'], user['username'])
+    except Exception as exc:  # noqa: BLE001
+        LOGGER.warning('Could not revoke the acceptances left under the name %s: %s', user['username'], exc)
 
 
 def _store_user(body: UserRegister, *, cluster_host: str, cluster_username: str,

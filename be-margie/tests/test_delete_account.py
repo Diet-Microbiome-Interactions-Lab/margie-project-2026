@@ -106,3 +106,38 @@ def test_deleting_the_account_revokes_its_licence_on_record(client, test_rsa_key
     # The same name signed up again starts without an acceptance.
     h2 = _signed_in(client, test_rsa_key, name='licgone', cluster_user='licgone')
     assert client.get('/v1/license/status', headers=h2).json()['accepted'] is False
+
+
+# ---- a new account with an old name starts without its acceptances ----
+
+def _leftover_acceptance(username: str, when: str = '2026-01-01T00:00:00Z'):
+    """An acceptance held under a name, as an earlier account of that name left it."""
+    from bioinformatics_tools.api import licensing
+    from bioinformatics_tools.api.database import get_db
+    with get_db() as db:
+        db.execute('INSERT INTO license_acceptances (username, terms_version, terms_sha256, accepted_items, usage_type, '
+                   'licensed_tools, ip_address, user_agent, accepted_at, depot_record_path) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
+                   (username, licensing.load_terms()['version'], 'x', '[]', 'academic', '[]', None, None, when, None))
+
+
+def test_an_acceptance_older_than_the_account_does_not_count(client, test_rsa_key):  # noqa: F811
+    from bioinformatics_tools.api import licensing
+    with patch('bioinformatics_tools.api.routers.auth._drop_leftover_acceptances'):
+        h = _signed_in(client, test_rsa_key, name='reused')
+    _leftover_acceptance('reused')
+    assert not licensing.has_accepted_current_terms('reused')
+    assert licensing.get_entitlement('reused')['usage_type'] is None
+    assert client.get('/v1/license/status', headers=h).json()['accepted'] is False
+    # One made since the account was counts.
+    _leftover_acceptance('reused', when='2999-01-01T00:00:00Z')
+    assert licensing.has_accepted_current_terms('reused')
+
+
+def test_signing_up_with_an_old_name_revokes_what_it_left(client, test_rsa_key):  # noqa: F811
+    from bioinformatics_tools.api.database import get_db
+    _leftover_acceptance('again')
+    with patch('bioinformatics_tools.api.routers.license._save_on_cluster', return_value=lambda **kw: '/records/x/revocation.json'):
+        _signed_in(client, test_rsa_key, name='again')
+    with get_db() as db:
+        left = db.execute('SELECT count(*) FROM license_acceptances WHERE username = ?', ('again',)).fetchone()[0]
+    assert left == 0
