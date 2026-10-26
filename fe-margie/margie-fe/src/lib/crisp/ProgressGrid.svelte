@@ -2,7 +2,7 @@
 	import { Check, X } from 'lucide-svelte';
 	import { cachedOn, sourceSay } from '$lib/crisp/cache-report';
 	import { formatBytes } from '$lib/api';
-	import { leftText, span, type Progress, type RowProgress } from '$lib/crisp/progress-model';
+	import { leftText, span, type GridCell, type Progress, type RowProgress } from '$lib/crisp/progress-model';
 	import { uiBase } from '$lib/workspace/base.svelte';
 	import Resizer from '$lib/workspace/motion/Resizer.svelte';
 	import { ui } from '$lib/workspace/ui.svelte';
@@ -22,7 +22,8 @@
 		fromLog = false,
 		reported = true,
 		elapsedOf = () => '',
-		onLog
+		onLog,
+		onRerun
 	}: {
 		prog: Progress;
 		/** Whether the run is still going (times left, steps under way). */
@@ -35,9 +36,19 @@
 		reported?: boolean;
 		/** How long a genome has been going ('' when not going). */
 		elapsedOf?: (g: string) => string;
-		/** Shows the run's log, for a step that failed. */
-		onLog?: () => void;
+		/** Shows where a failed step failed in the logs: its genome, step and the rules it ran. */
+		onLog?: (g: string, t: string, rules: string[]) => void;
+		/** Runs a failed step's genome again from that step. */
+		onRerun?: (g: string, t: string) => void;
 	} = $props();
+
+	/** The rules a failed step ran: its failed SLURM jobs', else its own rule names. */
+	function rulesOf(c: GridCell): string[] {
+		const jobs = c.jobs ?? [];
+		const failed = jobs.filter((j) => !/complet|running|pending/i.test(j.status)).map((j) => j.rule);
+		const named = failed.length ? failed : jobs.map((j) => j.rule);
+		return [...new Set(named.length ? named : [`run_${c.t}`, `load_${c.t}_to_db`])];
+	}
 
 	const STATE_WORD: Record<string, string> = { done: 'Done', run: 'Running', wait: 'Running', failed: 'Failed', partial: 'Stopped before it finished', none: 'Not started', na: 'Not chosen' };
 	const ROW_WORD: Record<RowProgress['state'], string> = { done: 'Done', running: 'Running', failed: 'Failed', stopped: 'Stopped before it finished', queued: 'Not started' };
@@ -272,7 +283,15 @@
 				</dl>
 				<div class="pop-acts">
 					{#if c.state === 'failed' && onLog}
-						<button type="button" class="mg-btn small" onclick={() => { pick = null; onLog?.(); }}>Show the log</button>
+						<button type="button" class="mg-btn small" onclick={() => { const at = [row.g, c.t, rulesOf(c)] as const; pick = null; onLog?.(...at); }}>Show where it failed</button>
+					{/if}
+					{#if c.state === 'failed' && onRerun}
+						<button
+							type="button"
+							class="mg-btn small primary"
+							title="Runs this step again, then the genome's steps after it; its finished steps are kept"
+							onclick={() => { const at = [row.g, c.t] as const; pick = null; onRerun?.(...at); }}>Run again</button
+						>
 					{/if}
 					{#if c.href}
 						<a class="mg-btn small" href={c.href} onclick={() => (pick = null)}>Open its folder</a>

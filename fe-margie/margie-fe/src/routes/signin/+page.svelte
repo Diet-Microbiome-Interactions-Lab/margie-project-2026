@@ -17,7 +17,8 @@
 	import '$lib/crisp/crisp.css';
 	import { onMount } from 'svelte';
 	import { fade, slide } from 'svelte/transition';
-	import { Check, ChevronRight, CircleAlert, Copy, KeyRound, LoaderCircle, Mail, Server } from 'lucide-svelte';
+	import { Check, ChevronRight, CircleAlert, Copy, Database, KeyRound, LoaderCircle, Mail, Server, X } from 'lucide-svelte';
+	import DatabasesInfo from '$lib/crisp/DatabasesInfo.svelte';
 	import CrispMark from '$lib/crisp/CrispMark.svelte';
 	import Corner from '$lib/workspace/Corner.svelte';
 	import GenomePuzzle from '$lib/workspace/GenomePuzzle.svelte';
@@ -30,7 +31,9 @@
 	import { DEFAULT_PREFS, sanitizePrefs, styleString } from '$lib/workspace/prefs';
 	import { ui } from '$lib/workspace/ui.svelte';
 
-	let mode = $state<'signin' | 'create' | 'request' | 'databases'>('signin');
+	let mode = $state<'signin' | 'create' | 'request'>('signin');
+	/** The MARGIE databases, opened from the top bar in a popup. */
+	let dbOpen = $state(false);
 	let username = $state('');
 	let password = $state('');
 	let clusterHost = $state('');
@@ -160,6 +163,7 @@
 </script>
 
 <svelte:head><title>Sign in | MARGIE</title></svelte:head>
+<svelte:window onkeydown={(e) => e.key === 'Escape' && dbOpen && (dbOpen = false)} />
 
 {#snippet copyButton(text: string, label: string)}
 	<button type="button" class="mg-icon-btn" aria-label={label} onclick={() => copy(text)}>
@@ -171,6 +175,7 @@
 <div class="crisp signin" data-mg-root data-theme={ui.dark ? 'dark' : 'light'} data-motion={ui.motion} style={vars}>
 	<header class="bar">
 		<span class="brand"><CrispMark size={22} /><span class="word">MARGIE</span><span class="platform">Bioinformatics Supercomputing Platform</span></span>
+		<button type="button" class="db-open" aria-haspopup="dialog" onclick={() => (dbOpen = true)}><Database size={14} />MARGIE databases</button>
 		<span class="grow"></span>
 		<Corner base="crisp" colours={false} account={false}>
 			{#snippet customize()}
@@ -195,13 +200,9 @@
 
 			<div class="side">
 				<header class="st-head">
-					<h1 class="cr-title">{mode === 'signin' ? 'Sign in' : mode === 'create' ? 'New account' : mode === 'databases' ? 'MARGIE databases' : 'Access from outside Purdue'}</h1>
+					<h1 class="cr-title">{mode === 'signin' ? 'Sign in' : mode === 'create' ? 'New account' : 'Access from outside Purdue'}</h1>
 					<p class="cr-lede">
-						{mode === 'request'
-							? 'Reviewers and collaborators get a username and password to sign in with.'
-							: mode === 'databases'
-								? 'The databases MARGIE builds from the genomes she annotates.'
-								: 'Sign in to run MARGIE on your cluster.'}
+						{mode === 'request' ? 'Reviewers and collaborators get a username and password to sign in with.' : 'Sign in to run MARGIE on your cluster.'}
 					</p>
 				</header>
 
@@ -212,7 +213,6 @@
 							<button type="button" role="tab" aria-selected={mode === 'signin'} onclick={() => (mode = 'signin')}>Sign in</button>
 							<button type="button" role="tab" aria-selected={mode === 'create'} onclick={() => (mode = 'create')}>Create account</button>
 							<button type="button" role="tab" aria-selected={mode === 'request'} onclick={() => (mode = 'request')}>Outside Purdue</button>
-							<button type="button" role="tab" aria-selected={mode === 'databases'} onclick={() => (mode = 'databases')}>MARGIE databases</button>
 						</div>
 
 						{#if problem}
@@ -265,17 +265,6 @@
 								<div class="acts">
 									<span class="hint">Opens your mail app, addressed to {CONTACT}.</span>
 									<a class="mg-btn primary" class:off={!canRequest} href={canRequest ? mailto : undefined} aria-disabled={!canRequest}><Mail size={15} /> Send request</a>
-								</div>
-							</div>
-						{:else if mode === 'databases'}
-							<!-- The MARGIE-generated databases, released here as one download once enough genomes are annotated. -->
-							<div class="form">
-								<div class="hint request">
-									<p class="db-soon"><b>{DATABASES.soon}</b></p>
-									<p>{DATABASES.about}</p>
-									<ul class="db-list">
-										{#each DATABASES.holds as h (h)}<li>{h}</li>{/each}
-									</ul>
 								</div>
 							</div>
 						{:else}
@@ -349,6 +338,21 @@
 			</div>
 		</div>
 	</main>
+
+	{#if dbOpen}
+		<button type="button" class="db-scrim" aria-label="Close" onclick={() => (dbOpen = false)} transition:fade={{ duration: ui.ms(120) }}></button>
+		<div class="db-pop" role="dialog" aria-modal="true" aria-labelledby="db-pop-h" transition:fade={{ duration: ui.ms(140) }}>
+			<header class="db-pop-head">
+				<div>
+					<h2 id="db-pop-h">MARGIE databases</h2>
+					<p>{DATABASES.lede}</p>
+				</div>
+				<span class="grow"></span>
+				<button type="button" class="mg-icon-btn" aria-label="Close" onclick={() => (dbOpen = false)}><X size={16} /></button>
+			</header>
+			<DatabasesInfo />
+		</div>
+	{/if}
 </div>
 
 <style>
@@ -477,7 +481,7 @@
 	}
 	.tabs {
 		display: grid;
-		grid-template-columns: repeat(4, minmax(0, 1fr));
+		grid-template-columns: repeat(3, minmax(0, 1fr));
 		gap: 2px;
 		padding: 3px;
 		border: 1px solid var(--mg-border);
@@ -504,16 +508,88 @@
 		color: var(--mg-accent-ink, var(--mg-text));
 		font-weight: 600;
 	}
-	.db-soon {
+	/* MARGIE databases: a button after the platform's name, and its popup. */
+	.db-open {
+		display: inline-flex;
+		align-items: center;
+		gap: 6px;
+		height: 30px;
+		padding: 0 11px;
+		border: 1px solid var(--mg-border);
+		border-radius: var(--mg-r-sm);
+		background: var(--mg-surface);
+		color: var(--mg-text);
+		font: inherit;
+		font-size: var(--cr-fs-meta);
+		white-space: nowrap;
+		cursor: pointer;
+	}
+	.db-open:hover {
+		border-color: var(--mg-border-strong, var(--mg-text-3));
+	}
+	.db-scrim {
+		position: fixed;
+		inset: 0;
+		z-index: 70;
+		border: none;
+		background: rgb(0 0 0 / 0.32);
+		cursor: default;
+	}
+	.db-pop {
+		position: fixed;
+		z-index: 71;
+		top: 50%;
+		left: 50%;
+		width: min(560px, calc(100vw - 32px));
+		max-height: calc(100vh - 48px);
+		overflow: auto;
+		padding: 22px 24px 20px;
+		border: 1px solid var(--mg-border);
+		border-radius: var(--mg-r);
+		background: var(--mg-surface);
+		box-shadow: 0 18px 48px rgb(0 0 0 / 0.22);
+		color: var(--mg-text);
+		font-size: var(--cr-fs-body);
+		line-height: 1.6;
+		transform: translate(-50%, -50%);
+	}
+	.db-pop-head {
+		display: flex;
+		align-items: flex-start;
+		gap: 12px;
+		margin-bottom: 10px;
+	}
+	.db-pop-head h2 {
+		margin: 0;
+		font-size: calc(var(--cr-fs-body) * 1.35);
+		font-weight: 650;
+	}
+	.db-pop-head p {
+		margin: 2px 0 0;
+		color: var(--mg-text-2);
+	}
+	.db-pop :global(p) {
+		margin: 0 0 10px;
+	}
+	.db-pop :global(.dbi-lead) {
 		font-size: var(--cr-fs-section);
 	}
-	.db-list {
+	.db-pop :global(.dbi-list) {
 		display: flex;
 		flex-direction: column;
 		gap: 4px;
-		margin: 0;
+		margin: 0 0 12px;
 		padding-left: 1.3em;
 		list-style: disc;
+	}
+	.db-pop :global(.rp-note) {
+		color: var(--mg-text-2);
+		font-size: var(--cr-fs-meta);
+	}
+	@media (max-width: 520px) {
+		.db-open {
+			padding: 0 8px;
+		}
 	}
 	.form {
 		display: flex;

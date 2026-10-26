@@ -127,12 +127,16 @@ def count_jobs(connection: SSHConnection, db_path: str, workflow: str | None = N
 
 def clear_jobs(connection: SSHConnection, db_path: str, backup_path: str,
                owner_username: str | None = None,
-               owner_cluster_username: str | None = None) -> dict | None:
-    """Backs up the owner's finished jobs to backup_path and removes them from the history
-    (job_history.clear_jobs); None when that failed, and then nothing was removed."""
-    return _run(connection, "clear", {
+               owner_cluster_username: str | None = None,
+               job_ids: list[str] | None = None) -> dict | None:
+    """Backs up the owner's finished jobs (or only job_ids among them) to backup_path and removes
+    them from the history (job_history.clear_jobs); None when that failed, and then nothing was removed."""
+    payload = {
         "db_path": db_path,
         "backup_path": backup_path,
         "owner_username": owner_username,
         "owner_cluster_username": owner_cluster_username,
-    })
+    }
+    if job_ids:
+        payload["job_ids"] = job_ids
+    return _run(connection, "clear", payload)

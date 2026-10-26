@@ -190,6 +190,7 @@ export const AI_USAGE = {
 
 /** The MARGIE-generated databases: released as one download once thousands of genomes are annotated. */
 export const DATABASES = {
+	lede: 'The databases MARGIE builds from the genomes she annotates.',
 	soon: 'MARGIE-specific databases will be released soon. Stay tuned!',
 	about:
 		'Once MARGIE has annotated thousands of genomes, the first release will be here as one zip file: a folder named margie-databases holding the databases MARGIE generates.',
