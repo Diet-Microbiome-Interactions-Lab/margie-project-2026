@@ -4,6 +4,10 @@
 	import { ws } from '$lib/workspace/data.svelte';
 	import RefreshButton from '$lib/workspace/blocks/RefreshButton.svelte';
 	import { uiBase } from '$lib/workspace/base.svelte';
+	import { page } from '$app/state';
+
+	/** The genomes listed: one run's (?run=) or each genome's latest result. */
+	const listed = $derived(ws.resultRuns.find((r) => r.name === page.url.searchParams.get('run'))?.organisms ?? ws.results);
 
 	/** The genomes' results folder, opened in Files from the beta note. */
 	const folder = $derived(ws.resultRoots.genomesDir || ws.resultRoots.outputRoot);
@@ -24,7 +28,7 @@
 	<div class="cr-page fill" data-shade="page-results">
 		<div class="cr-head">
 			<h1 class="cr-title">Results</h1>
-			<span class="cr-meta">{ws.results.length ? `${ws.finished.length} of ${ws.results.length} finished` : ''}</span>
+			<span class="cr-meta">{listed.length ? `${listed.filter((r) => r.final?.table).length} of ${listed.length} finished` : ''}</span>
 			<div class="cr-head-acts">
 				<button type="button" class="mg-btn small" title={pageFull ? 'Leave full screen (Esc)' : 'The whole page on the whole screen'} onclick={togglePage}>
 					{#if pageFull}<Minimize size={14} /> Exit full screen{:else}<Maximize size={14} /> Full screen{/if}

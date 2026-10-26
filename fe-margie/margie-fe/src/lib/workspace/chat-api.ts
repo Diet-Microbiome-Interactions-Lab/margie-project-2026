@@ -70,10 +70,10 @@ export function chatSettings<T>(body: unknown): Promise<T> {
 	return onCluster() ? local<T>('PUT', '', body) : api<T>('/genome-chat', { method: 'PUT', body: JSON.stringify(body) });
 }
 
-export async function chatAsk<T>(genome: string, question: string, context: string): Promise<T> {
+export async function chatAsk<T>(genome: string, question: string, context: string, folder = ''): Promise<T> {
 	if (onServer()) {
 		// The server reads the genome's folders over your own connection, and nothing outside them.
-		const r = await chatRemote(genome);
+		const r = await chatRemote(genome, folder || undefined);
 		if (!r) throw new ApiError(`No results for ${genome} on the cluster yet.`, 404);
 		return call<T>('POST', '/v1/chat', { genome, question, context, remote: { roots: r.roots, table: r.table ?? null } });
 	}
