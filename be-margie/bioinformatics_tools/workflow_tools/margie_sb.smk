@@ -1907,9 +1907,10 @@ rule run_rasttk:
         cp $(find {params.output_dir} -name "genome.faa") {output.faa}
         cp $(find {params.output_dir} -name "genome.gff") {output.gff}
         cp $(find {params.output_dir} -type d -name gene_calls -print -quit)/* $(dirname {output.results})/ || true
-        # The gene table, the proteins and the GFF come from one BV-BRC submission.
-        TSV_ID=$(grep -m1 -o 'fig|6666666[.][0-9]*' {output.results} || true)
-        GFF_ID=$(grep -m1 -o 'fig|6666666[.][0-9]*' {output.gff} || true)
+        # The gene table, the proteins and the GFF come from one BV-BRC submission: each file's first
+        # submission id (a line can carry it many times).
+        TSV_ID=$(awk 'match($0, /fig[|]6666666[.][0-9]+/) {{ print substr($0, RSTART, RLENGTH); exit }}' {output.results} || true)
+        GFF_ID=$(awk 'match($0, /fig[|]6666666[.][0-9]+/) {{ print substr($0, RSTART, RLENGTH); exit }}' {output.gff} || true)
         if [[ -n "$TSV_ID" && -n "$GFF_ID" && "$TSV_ID" != "$GFF_ID" ]]; then
             echo "ERROR: RASTtk's gene table ($TSV_ID) and GFF ($GFF_ID) come from different BV-BRC submissions for {wildcards.genome}; run the step again" >&2
             exit 1
