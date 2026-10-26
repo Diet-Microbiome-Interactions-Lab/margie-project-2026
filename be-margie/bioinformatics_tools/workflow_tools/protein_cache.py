@@ -15,7 +15,8 @@ Only tools whose rows depend on the protein alone are listed in TOOLS.
 
 link_genome() records each genome's proteins and genes by hash (protein_genomes,
 genome_proteomes, genome_genes), so a set of proteins names its genome; record_fingerprints()
-adds each gene's fingerprint.
+adds each gene's fingerprint, and each protein's (protein_fingerprints: built from the protein's
+own annotations, so one per protein hash, replaced when a later genome's differs).
 """
 from __future__ import annotations
 
@@ -83,6 +84,12 @@ CREATE TABLE IF NOT EXISTS genome_genes (
     fingerprint TEXT NOT NULL DEFAULT '',
     PRIMARY KEY (genome_hash, gene_hash)
 ) WITHOUT ROWID;
+CREATE TABLE IF NOT EXISTS protein_fingerprints (
+    aa_hash TEXT PRIMARY KEY,
+    fingerprint TEXT NOT NULL,
+    label TEXT NOT NULL DEFAULT '',
+    recorded_at TEXT NOT NULL
+);
 """
 
 # InterPro's member databases, as margie_sb.smk names them.
@@ -544,23 +551,36 @@ def link_genome(db: str, faa: str, genome_hash: str, name: str = '', genes: dict
 
 def record_fingerprints(db: str, genome_hash: str, hash_label_tsv: str, genes: dict[str, str]) -> int:
     """Adds each gene's fingerprint (its pattern hash, from the fingerprint step's hash-label table)
-    to genome_genes; returns how many genes got one."""
+    to genome_genes, and each protein's, with its label, to protein_fingerprints; returns how many
+    genes got one."""
     path = Path(hash_label_tsv)
     if not genome_hash or not genes or not path.is_file():
         return 0
     found: list[tuple[str, str, str]] = []
+    labels: dict[str, str] = {}
     with open(path, newline='', encoding='utf-8', errors='replace') as fh:
         for row in csv.DictReader(fh, delimiter='\t'):
-            m = re.search(r'pattern hash:\s*([0-9a-f]+)', row.get('fingerprint') or '')
+            text = row.get('fingerprint') or ''
+            m = re.search(r'pattern hash:\s*([0-9a-f]+)', text)
             gene = genes.get(row.get('feature_id') or '')
             if m and gene:
                 found.append((m.group(1), genome_hash, gene))
+                label = re.search(r'label:\s*(.*?)\s*(?:\|\||$)', text)
+                labels[m.group(1)] = label.group(1) if label else ''
     if not found:
         return 0
+    stamp = datetime.now(timezone.utc).isoformat()
     conn = _connect(db)
     try:
         with conn:
             conn.executemany('UPDATE genome_genes SET fingerprint = ? WHERE genome_hash = ? AND gene_hash = ?', found)
+            # A protein's fingerprint: kept while a later genome gives the same, replaced when it differs.
+            rows = conn.execute("SELECT DISTINCT aa_hash, fingerprint FROM genome_genes "
+                                "WHERE genome_hash = ? AND aa_hash != '' AND fingerprint != ''", (genome_hash,)).fetchall()
+            conn.executemany('INSERT INTO protein_fingerprints (aa_hash, fingerprint, label, recorded_at) VALUES (?, ?, ?, ?) '
+                             'ON CONFLICT (aa_hash) DO UPDATE SET fingerprint = excluded.fingerprint, label = excluded.label, '
+                             'recorded_at = excluded.recorded_at WHERE protein_fingerprints.fingerprint != excluded.fingerprint',
+                             [(h, fp, labels.get(fp, ''), stamp) for h, fp in rows])
     finally:
         conn.close()
     return len(found)
