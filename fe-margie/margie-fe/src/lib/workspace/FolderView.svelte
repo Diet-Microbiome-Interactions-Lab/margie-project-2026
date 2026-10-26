@@ -12,7 +12,7 @@
 	import './viewers/tools.css';
 	import { uiBase } from './base.svelte';
 	import { untrack } from 'svelte';
-	import { ArrowUp, Check, ChevronLeft, ChevronRight, ClipboardCopy, ClipboardPaste, Copy, CornerDownLeft, Download, Ellipsis, File, FileArchive, FileCode, FileImage, FilePlus, FileSpreadsheet, FileText, Folder, FolderOpen, FolderPlus, RefreshCw, Scissors, Trash2, X } from 'lucide-svelte';
+	import { ArrowUp, Check, ChevronLeft, ChevronRight, ClipboardCopy, ClipboardPaste, Copy, CornerDownLeft, Download, Ellipsis, File, FileArchive, FileCode, FileImage, FilePlus, FileSpreadsheet, FileText, Folder, FolderOpen, FolderPlus, Pencil, RefreshCw, Scissors, Trash2, X } from 'lucide-svelte';
 	import { ApiError, api, fileUrl, formatBytes, post } from '$lib/api';
 	import { ui } from './ui.svelte';
 	import { pathComplete } from './path-complete';
@@ -403,6 +403,49 @@
 		lastTicked = -1;
 	}
 
+	// ------------------------------------------------ renaming (cluster)
+	/** The file or folder being renamed in place, and the name typed for it. */
+	let renaming = $state<string | null>(null);
+	let renameTo = $state('');
+	let renameBusy = $state(false);
+	function startRename(path: string) {
+		renaming = path;
+		renameTo = nameOf(path);
+		menu = null;
+	}
+	/** Selects the name without its extension, as a file manager does, so typing replaces just that. */
+	function selectStem(node: HTMLInputElement) {
+		node.focus();
+		const dot = node.value.lastIndexOf('.');
+		node.setSelectionRange(0, dot > 0 ? dot : node.value.length);
+	}
+	/** Renames it where it is; nothing is replaced, and the cluster refuses what the account may not rename. */
+	async function rename() {
+		const from = renaming;
+		const name = renameTo.trim();
+		if (!from || !name || renameBusy) return;
+		if (name === nameOf(from)) return (renaming = null);
+		renameBusy = true;
+		try {
+			const d = await post<{ path: string; old: string; renamed: boolean }>('/files/rename', { path: from, name });
+			renaming = null;
+			const swap = (x: string) => (x === d.old ? d.path : x.startsWith(`${d.old}/`) ? d.path + x.slice(d.old.length) : x);
+			selected = selected.map(swap);
+			clip.paths = clip.paths.map(swap);
+			if (picked && swap(picked) !== picked) onpick?.(swap(picked));
+			ui.notify(`Renamed to ${nameOf(d.path)}`, 'ok');
+			await load();
+		} catch (e) {
+			ui.notify(e instanceof Error ? e.message : String(e), 'error');
+		} finally {
+			renameBusy = false;
+		}
+	}
+	$effect(() => {
+		void current?.path;
+		renaming = null;
+	});
+
 	// ------------------------------------------------ deleting (cluster)
 	/** What waits on a yes before it is deleted. */
 	let asking = $state<string[] | null>(null);
@@ -452,6 +495,7 @@
 	onkeydown={(e) => {
 		if (e.key !== 'Escape') return;
 		if (menu) menu = null;
+		else if (renaming) renaming = null;
 		else if (asking) asking = null;
 	}}
 	onresize={() => (menu = null)}
@@ -516,6 +560,7 @@
 			{#if ops}
 				<button type="button" role="menuitem" onclick={() => fromMenu(() => take('copy', m.path))}><Copy size={14} />Copy</button>
 				<button type="button" role="menuitem" onclick={() => fromMenu(() => take('move', m.path))}><Scissors size={14} />Cut, to move it</button>
+				<button type="button" role="menuitem" onclick={() => fromMenu(() => startRename(m.path))}><Pencil size={14} />Rename</button>
 				<button type="button" role="menuitem" class="danger" disabled={!!deleting} onclick={() => fromMenu(() => askDelete([m.path]))}><Trash2 size={14} />Delete</button>
 			{/if}
 		</div>
@@ -556,6 +601,9 @@
 			<span class="mg-grow"></span>
 			<button type="button" class="vw-pill" title="Copy the selected" onclick={() => takeSelected('copy')}><Copy size={14} /><span class="fv-lbl">Copy</span></button>
 			<button type="button" class="vw-pill" title="Cut the selected, to move them" onclick={() => takeSelected('move')}><Scissors size={14} /><span class="fv-lbl">Cut</span></button>
+			{#if selected.length === 1}
+				<button type="button" class="vw-pill" title="Rename the selected" onclick={() => startRename(selected[0])}><Pencil size={14} /><span class="fv-lbl">Rename</span></button>
+			{/if}
 			<button type="button" class="vw-pill fv-danger" title="Delete the selected" onclick={() => askDelete([...selected])}><Trash2 size={14} /><span class="fv-lbl">Delete</span></button>
 			<button type="button" class="vw-btn icon" title="Clear the selection" aria-label="Clear the selection" onclick={() => (selected = [])}><X size={14} /></button>
 		</div>
@@ -663,12 +711,34 @@
 				</li>
 				{#each entries as e, k (e.name)}
 					{@const p = child(e.name)}
-					<li class="fv-row" class:picked={picked === p} class:clipped={clip.paths.includes(p)} class:cut={clip.op === 'move'} class:ticked={selected.includes(p)} style="--d: {inner}">
+					<li class="fv-row" class:picked={picked === p} class:clipped={clip.paths.includes(p)} class:cut={clip.op === 'move'} class:ticked={selected.includes(p)} class:renaming={renaming === p} style="--d: {inner}">
 						<span class="fv-namecell">
 							{#if ops}
 								<input type="checkbox" class="fv-tick" class:shown={selected.length > 0} checked={selected.includes(p)} aria-label="Select {e.name}" title="Select (Shift-click for a run)" onclick={(ev) => tick(ev, k, p)} />
 							{/if}
-							{#if e.type === 'directory'}
+							{#if renaming === p}
+								<!-- Renamed in place: Enter keeps the new name, Escape leaves it as it was. -->
+								<form
+									class="fv-make fv-rename"
+									onsubmit={(ev) => {
+										ev.preventDefault();
+										rename();
+									}}
+								>
+									{#if e.type === 'directory'}<Folder size={16} />{:else}{@const Icon = iconOf(e.name)}<Icon size={16} />{/if}
+									<input
+										class="mg-input"
+										bind:value={renameTo}
+										aria-label="New name for {e.name}"
+										spellcheck="false"
+										autocomplete="off"
+										use:selectStem
+										onkeydown={(ev) => ev.key === 'Escape' && ((renaming = null), ev.stopPropagation())}
+									/>
+									<button type="submit" class="vw-pill" disabled={!renameTo.trim() || renameTo.includes('/') || renameBusy}>{renameBusy ? 'Renaming…' : 'Rename'}</button>
+									<button type="button" class="vw-btn icon" aria-label="Cancel" onclick={() => (renaming = null)}><X size={14} /></button>
+								</form>
+							{:else if e.type === 'directory'}
 								<button type="button" class="fv-name dir" title={e.name} onclick={() => open(p)}><Folder size={16} /><span>{e.name}</span></button>
 							{:else}
 								{@const Icon = iconOf(e.name)}
@@ -684,7 +754,7 @@
 								type="button"
 								class="fv-dl fv-more"
 								class:on={menu?.path === p || clip.paths.includes(p) || copiedPath === p}
-								title="Download, copy path, copy, cut or delete {e.name}"
+								title="Download, copy path, copy, cut, rename or delete {e.name}"
 								aria-label="More for {e.name}"
 								aria-haspopup="menu"
 								aria-expanded={menu?.path === p}
@@ -1090,6 +1160,16 @@
 		flex: 1;
 		min-width: 0;
 		height: 30px;
+	}
+	/* A row being renamed gives its name field the whole row. */
+	.fv-row.renaming .fv-namecell {
+		grid-column: 1 / -1;
+	}
+	.fv-row.renaming > :not(.fv-namecell) {
+		display: none;
+	}
+	.fv-rename input {
+		min-width: 12em;
 	}
 	.fv-missing {
 		display: inline-flex;

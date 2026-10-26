@@ -4096,6 +4096,60 @@ def make_path(payload: dict, current_user: dict = Depends(get_current_user)):
     raise HTTPException(status_code=500, detail=f"Could not create {path}: {out.strip() or 'no answer from the cluster'}")
 
 
+@router.post("/rename_path")
+def rename_path(payload: dict, current_user: dict = Depends(get_current_user)):
+    """Renames a file or folder where it is, as the user: where their account may not, the cluster
+    refuses, and so does this. The new name is one name (no slash), nothing that exists is
+    replaced, and what is not deleted from here (_delete_plan) is not renamed either.
+
+    Body: {"path", "name"}."""
+    path = payload.get("path")
+    name = payload.get("name")
+    if not isinstance(path, str) or not path.strip() or any(c in path for c in "\n\r\t"):
+        raise HTTPException(status_code=400, detail="Which file or folder?")
+    name = name.strip() if isinstance(name, str) else ""
+    if not name or name in (".", "..") or "/" in name or any(ord(c) < 32 for c in name) or len(name.encode()) > 255:
+        raise HTTPException(status_code=400, detail="Give a new name: one name, without a slash.")
+    conn = _build_connection(current_user)
+    home = posixpath.normpath(current_user["home_dir"])
+    source = _resolve_browse_path(path.strip(), current_user).rstrip("/") or "/"
+    target = posixpath.join(posixpath.dirname(source), name)
+    if target == source:
+        return {"path": source, "old": source, "renamed": False}
+    q = shlex.quote
+    try:
+        cfg = _read_config(current_user, conn) or {}
+    except Exception:
+        cfg = {}
+    # Where MARGIE's code and the path really are, symlinked folders followed (as delete_paths).
+    _, out = _run_remote_check(
+        conn,
+        f'printf "@%s\\n" "$(readlink -f -- {q(home + "/bioinformatics-tools")} 2>/dev/null)"; '
+        f'd=$(readlink -f -- "$(dirname -- {q(source)})" 2>/dev/null) && printf "@%s/%s\\n" "$d" "$(basename -- {q(source)})" || echo @',
+    )
+    lines = [line[1:].strip() for line in out.splitlines() if line.startswith("@")]
+    seen = {source: posixpath.normpath(lines[1])} if len(lines) > 1 and lines[1] else {}
+    _, refused = _delete_plan([source], seen, home, lines[0] if lines else "", user_stores.depot(cfg))
+    if refused:
+        raise HTTPException(status_code=403, detail=refused[0]["message"].replace("not deleted", "not renamed").replace("to delete", "to rename"))
+    _, out = _run_remote_check(
+        conn,
+        f"if [ ! -e {q(source)} ] && [ ! -L {q(source)} ]; then echo GONE; "
+        f"elif [ -e {q(target)} ] || [ -L {q(target)} ]; then echo EXISTS; "
+        f"else mv -n -T -- {q(source)} {q(target)} 2>&1 && {{ [ -e {q(target)} ] || [ -L {q(target)} ]; }} && echo RENAMED; fi",
+    )
+    last = out.strip().splitlines()[-1] if out.strip() else ""
+    if last == "RENAMED":
+        return {"path": target, "old": source, "renamed": True}
+    if last == "GONE":
+        raise HTTPException(status_code=404, detail=f"{posixpath.basename(source)} is not there any more.")
+    if last == "EXISTS":
+        raise HTTPException(status_code=409, detail=f"{name} is already there; nothing was replaced.")
+    if "ermission denied" in out:
+        raise HTTPException(status_code=403, detail=f"Your account may not rename {posixpath.basename(source)}: permission denied there.")
+    raise HTTPException(status_code=500, detail=f"Could not rename {posixpath.basename(source)}: {out.strip() or 'no answer from the cluster'}")
+
+
 @router.post("/browse_save")
 def browse_save(payload: dict, current_user: dict = Depends(get_current_user)):
     """Writes edited text back to a file on the cluster from the explorer's editor.

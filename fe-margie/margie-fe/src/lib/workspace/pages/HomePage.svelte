@@ -76,7 +76,7 @@
 		<div class="cta">
 			<a class="pill primary" href="/analyze"><Play size={15} /> Start annotating</a>
 			<a class="pill" href={uiBase.to('/results')}>See results</a>
-			<a class="pill" href={uiBase.to('/setup')}>How to set up MARGIE</a>
+			{#if ui.guided}<a class="pill" href={uiBase.to('/setup')}>How to set up MARGIE</a>{/if}
 			{#if !ui.guided}
 				<button type="button" class="pill quiet" aria-pressed={more} aria-controls="home-more" onclick={() => (more = !more)}>
 					{more ? 'Show less' : 'Learn more'}

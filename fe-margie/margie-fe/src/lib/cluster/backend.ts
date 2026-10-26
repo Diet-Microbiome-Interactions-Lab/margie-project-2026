@@ -1509,6 +1509,9 @@ export async function clusterApi<T = any>(path: string, init: RequestInit = {}):
 			// Deletes files and folders as a job on the login node, followed like a transfer; some paths are refused.
 			case 'POST /files/delete':
 				return call('POST', '/v1/ssh/delete_paths', body ?? {});
+			// A file or folder renamed where it is; nothing is replaced, and what is not deleted from here is not renamed.
+			case 'POST /files/rename':
+				return call('POST', '/v1/ssh/rename_path', body ?? {});
 			case 'GET /results':
 				return results();
 			case 'GET /files':

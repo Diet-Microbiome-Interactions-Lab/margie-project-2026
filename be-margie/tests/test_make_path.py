@@ -44,3 +44,50 @@ def test_a_file_needs_its_folder(authed_client):  # noqa: F811
 def test_bad_requests_are_refused(authed_client):  # noqa: F811
     assert authed_client.post(ROUTE, json={"path": "/a", "kind": "link"}).status_code == 400
     assert authed_client.post(ROUTE, json={"path": "", "kind": "folder"}).status_code == 400
+
+
+# ---- renaming a file or folder where it is ----
+
+RENAME = "/v1/ssh/rename_path"
+
+
+def _rename(authed_client, answer, **body):
+    """Posts a rename; the cluster says where things really are, then `answer` for the move."""
+    def run(conn, command):
+        if command.startswith("printf"):
+            src = body.get("path", "")
+            return 0, f"@/home/testuser/margie-project-2026/be-margie\n@{src}\n"
+        return 0, answer
+    with patch(f"{SSH}._build_connection"), patch(f"{SSH}._read_config", return_value={}), \
+         patch(f"{SSH}._run_remote_check", side_effect=run) as remote:
+        r = authed_client.post(RENAME, json=body)
+    return r, remote
+
+
+def test_a_file_or_folder_is_renamed_where_it_is(authed_client):  # noqa: F811
+    r, remote = _rename(authed_client, "RENAMED", path="/scratch/u/runs/old name", name="new name")
+    assert r.status_code == 200 and r.json() == {"path": "/scratch/u/runs/new name", "old": "/scratch/u/runs/old name", "renamed": True}
+    assert "mv -n -T -- '/scratch/u/runs/old name' '/scratch/u/runs/new name'" in remote.call_args[0][1]
+
+
+def test_a_rename_replaces_nothing(authed_client):  # noqa: F811
+    r, _ = _rename(authed_client, "EXISTS", path="/scratch/u/a.txt", name="b.txt")
+    assert r.status_code == 409 and "nothing was replaced" in r.json()["detail"]
+
+
+def test_a_new_name_is_one_name(authed_client):  # noqa: F811
+    for bad in ("", "..", "x/y", "a\nb"):
+        r, _ = _rename(authed_client, "RENAMED", path="/scratch/u/a.txt", name=bad)
+        assert r.status_code == 400
+
+
+def test_what_is_not_deleted_from_here_is_not_renamed(authed_client):  # noqa: F811
+    for path in ("/home/testuser", "/home/testuser/.ssh", "/home/testuser/.config/bioinformatics-tools"):
+        r, _ = _rename(authed_client, "RENAMED", path=path, name="moved")
+        assert r.status_code == 403 and "not renamed" in r.json()["detail"], path
+
+
+def test_the_same_name_changes_nothing(authed_client):  # noqa: F811
+    r, remote = _rename(authed_client, "RENAMED", path="/scratch/u/a.txt", name="a.txt")
+    assert r.json() == {"path": "/scratch/u/a.txt", "old": "/scratch/u/a.txt", "renamed": False}
+    remote.assert_not_called()
