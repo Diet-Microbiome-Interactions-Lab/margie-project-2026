@@ -8,8 +8,9 @@ writes every component with its reasoning, both stages, the tier and the review 
   final       = clip(preliminary + context, 0, 1)
 A parallel "hybrid" final uses the hybrid C3. Context only raises the score.
 Tiers: > 0.9 highest | > 0.7 high | > 0.5 medium | > 0.3 fair | else low.
-needs_review is set by EC conflict, final < 0.5, C2 < 0.5 in an operon, or an
-ambiguous operon that gave no boost.
+needs_review is set by EC conflict, final < 0.5, or an ambiguous operon that
+gave no boost. C2 sets no flag: UniOP joins two genes from a pair probability of
+0.5, so an operon gene's C2 is 0.5 to 1.
 """
 import argparse
 import csv
@@ -350,22 +351,14 @@ def main() -> None:
 
             tier = confidence_score_tier(final)
 
-            # ── needs_review triggers; a context increase is not a trigger. ──
+            # ── needs_review triggers; context only adds, so it sets none by raising the score. ──
             ec_conflict = ec_status == "conflicting"
-            context_drop = context_effect == "decreases"
             low_conf = final < _NEUTRAL
             reasons = []
             if ec_conflict:
                 reasons.append("EC conflict — independent EC sources disagree")
-            if context_drop:
-                reasons.append(f"operon context lowers confidence by ≥{_CONTEXT_MATERIAL_THRESHOLD} "
-                               f"({preliminary:.4f}→{final:.4f})")
             if low_conf:
                 reasons.append(f"low confidence (final={final:.4f} < {_NEUTRAL})")
-            # C2 < 0.5: the operon assignment itself is doubtful.
-            if in_operon and c2 < 0.5:
-                reasons.append(f"weak operon probability (C2={c2:.2f} < 0.5) -- this gene's "
-                               f"operon assignment with its neighbour is doubtful")
             # Mostly uncharacterized operon that gave no boost: review note only.
             operon_ambiguous = (in_operon and context_effect != "increases"
                                 and ambiguity >= _OPERON_AMBIGUITY_MIN)
