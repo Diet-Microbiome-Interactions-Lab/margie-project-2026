@@ -115,7 +115,7 @@
 			from: "Each record's name and its bases in upper case, in file order (file name, line breaks and letter case aside); marked fa1:",
 			when: 'Before the run starts',
 			why: 'A genome is the same genome under any file name',
-			helps: 'Restores a genome annotated before, whole; names its results <name>--<the first 8 characters> (coli--a1b2c3d4); keys its rows in the database'
+			helps: 'Restores a genome annotated before, whole; names its results <name>--<the first 8 characters> (coli--fa1:a1b2); keys its rows in the database'
 		},
 		{
 			role: 'main',
@@ -327,7 +327,7 @@
 			The caches keep RASTtk-based results. A genome bound for Prodigal takes RASTtk's gene calls and results when its genome hash has them, so Prodigal annotates novel genomes. A Prodigal genome reads the protein cache, and its results are loaded into the database without entering the caches. A later RASTtk run of the genome replaces them; a Prodigal run leaves RASTtk-based results in place.
 		</p>
 		<p>
-			Each genome runs as its file name and the first 8 characters of its genome hash (<span class="mg-mono">coli--a1b2c3d4</span>), so genomes that share a file name stay apart in the database and the results. The website shows the name you gave it, with the hash beside it on the Jobs page.
+			Each genome runs as its file name and the first 8 characters of its genome hash (<span class="mg-mono">coli--fa1:a1b2</span>), so genomes that share a file name stay apart in the database and the results. The website shows the name you gave it, with the hash beside it on the Jobs page.
 		</p>
 		<h3>The hashes</h3>
 		<div class="rp-scroll">
