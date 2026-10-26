@@ -866,7 +866,7 @@ class WorkflowBase(ProgramBase):
         background with --jobs=1, since BV-BRC takes one submission at a time.
         Stage 2 (rule phase4_12_one_genome) runs phases 4-11 for one genome at a
         time, in RASTtk-ready order, choosing the most complete ready genome
-        first (see _genome_stage2_progress). A Stage 2 failure halts the queue.
+        first (see _genome_stage2_progress). A Stage 2 failure is recorded and the other genomes go on.
         '''
         run_id = str(uuid.uuid4())
         LOGGER.info('Starting sequential batch workflow "%s" run_id=%s genomes=%d', key_name, run_id, len(genome_files))

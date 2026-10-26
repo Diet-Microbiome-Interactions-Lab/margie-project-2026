@@ -6,22 +6,24 @@
  */
 
 export const GENERA = [
-	'Acetobacterium', 'Akkermansia', 'Aliivibrio', 'Anaerobutyricum', 'Anaerostipes', 'Azotobacter',
-	'Bacillus', 'Bacteroides', 'Bifidobacterium', 'Bilophila', 'Cellulomonas', 'Chlorobium',
-	'Clostridium', 'Deinococcus', 'Desulfovibrio', 'Enterobacter', 'Escherichia', 'Eubacterium',
-	'Faecalibacterium', 'Halobacterium', 'Klebsiella', 'Lactobacillus', 'Lactococcus', 'Leuconostoc',
-	'Methanobrevibacter', 'Methanocaldococcus', 'Methanosaeta', 'Methanosarcina', 'Methanosphaera',
-	'Methanothermobacter', 'Methanothrix', 'Methylococcus', 'Methylosinus', 'Mycobacterium',
-	'Mycoplasma', 'Nitrobacter', 'Nitrosomonas', 'Nitrospira', 'Paracoccus', 'Prevotella',
-	'Propionibacterium', 'Pseudomonas', 'Roseburia', 'Ruminococcus', 'Spiroplasma', 'Staphylococcus',
-	'Vibrio'
+	'Acetobacterium', 'Akkermansia', 'Aliivibrio', 'Anabaena', 'Anaerobutyricum', 'Anaerostipes',
+	'Azotobacter', 'Bacillus', 'Bacteroides', 'Bifidobacterium', 'Bilophila', 'Cellulomonas',
+	'Chlorobium', 'Clostridium', 'Deinococcus', 'Desulfovibrio', 'Enterobacter', 'Escherichia',
+	'Eubacterium', 'Faecalibacterium', 'Geobacter', 'Halobacterium', 'Klebsiella', 'Lactobacillus',
+	'Lactococcus', 'Leuconostoc', 'Methanobrevibacter', 'Methanocaldococcus', 'Methanosaeta',
+	'Methanosarcina', 'Methanosphaera', 'Methanothermobacter', 'Methanothrix', 'Methylococcus',
+	'Methylosinus', 'Mycobacterium', 'Mycoplasma', 'Myxococcus', 'Nitrobacter', 'Nitrosomonas',
+	'Nitrospira', 'Paracoccus', 'Prevotella', 'Propionibacterium', 'Pseudomonas', 'Roseburia',
+	'Ruminococcus', 'Shewanella', 'Spiroplasma', 'Staphylococcus', 'Streptomyces', 'Sulfolobus',
+	'Vibrio', 'Zymomonas'
 ];
 
 export const EPITHETS = [
-	'aerogenes', 'aureus', 'bromii', 'cholerae', 'coli', 'fimi', 'fischeri', 'freudenreichii', 'hallii',
-	'jannaschii', 'lactis', 'megaterium', 'mesenteroides', 'muciniphila', 'piger', 'prausnitzii',
-	'radiodurans', 'rectale', 'salinarum', 'smithii', 'subtilis', 'thetaiotaomicron', 'tuberculosis',
-	'vinelandii', 'woodii'
+	'acidocaldarius', 'aerogenes', 'aeruginosa', 'aureus', 'bromii', 'cholerae', 'coli', 'fimi',
+	'fischeri', 'freudenreichii', 'hallii', 'jannaschii', 'lactis', 'megaterium', 'mesenteroides',
+	'mobilis', 'muciniphila', 'piger', 'prausnitzii', 'radiodurans', 'rectale', 'salinarum',
+	'smithii', 'subtilis', 'thetaiotaomicron', 'tuberculosis', 'vinelandii', 'wadsworthia', 'woodii',
+	'xanthus'
 ];
 
 const EP = EPITHETS.join('|');

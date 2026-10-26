@@ -4,9 +4,10 @@ run fresh, partly each, kept from an earlier attempt in the same run folder, or 
 
 The database has two caches. Genome level (output_cache.py): a step's whole output for a
 genome, keyed by the genome's sequence hash: GTDB-Tk before gene calling, RASTtk's gene
-calls, and each step after gene calling. Protein level (protein_cache.py): one tool's rows
-per protein, keyed by the protein's hash and the tool's container, database and settings,
-used after gene calling so a tool annotates only proteins it has not seen.
+calls, and each tool's step after gene calling (consolidation, labeling and scoring run again).
+Protein level (protein_cache.py): one tool's rows per protein, keyed by the protein's hash and
+the tool and its settings, used after gene calling so a tool annotates only proteins it has not
+seen; tool and database versions stay out of the key.
 
 Written to <output_dir>/cache-report.tsv as the run goes (the website shows it with the run),
 and summed up in the run's log one line per genome. Never raises: a report that cannot be

@@ -3,8 +3,8 @@
 
 Each tool's EC numbers form one set; among the m tools reporting an EC, R is
 the fraction of tool pairs where both sets keep an EC incompatible with the
-other ("-" levels are wildcards). c4_score = 1 - (m/5)*R over the 5 EC-capable
-databases, and the final scorer uses base = C1 * c4_score. The review flag comes
+other ("-" levels are wildcards). c4_score = 1 - (min(m, 5)/5)*R, the weight
+reaching 1 at five tools, and the final scorer uses base = C1 * c4_score. The review flag comes
 from add-ec-consensus.py's categorical "conflicting" status. Hierarchy-tier
 columns are joined in for provenance.
 """
@@ -16,7 +16,7 @@ from pathlib import Path
 
 csv.field_size_limit(10_000_000)
 
-# EC-capable DBs (EGGNOG, RAST, KEGG, dbCAN, TCDB); penalty weight is m/5.
+# The penalty weight is m/5, up to 1 at five tools reporting an EC (add-ec-consensus.py reads 13).
 N_EC_CAPABLE_TOOLS = 5
 
 _EC_BLANK = {"", "-", "--", "n/a", "na", "none", "null", "*"}

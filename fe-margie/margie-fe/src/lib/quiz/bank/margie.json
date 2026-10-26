@@ -71,7 +71,7 @@
 		"kind": "truefalse",
 		"statement": "When no higher-tier tool has an informative hit, a MEROPS, TCDB or dbCAN hit can set a gene's product label.",
 		"answer": false,
-		"explain": "The label comes from the trust hierarchy, and MEROPS, TCDB and dbCAN hits are reported beside it as a cross-check. Otherwise, after tiers 1 to 8, the label falls back to the first of those tools with any description, or to 'No DB hits'."
+		"explain": "The label comes from the trust hierarchy, and MEROPS, TCDB and dbCAN hits are reported beside it as a cross-check. When no tool of tiers 1 to 8 qualifies, the label falls back to the first tool of those tiers with any description, or to 'No DB hits'."
 	},
 	{
 		"id": "margie-006",
@@ -119,7 +119,7 @@
 		"kind": "truefalse",
 		"statement": "In MARGIE's confidence score, a gene's operon context can raise its score but does not lower it.",
 		"answer": true,
-		"explain": "The context term is C2 × C3 for a gene in an operon and 0 otherwise; both factors lie between 0 and 1, so the term is zero or positive and is added. A weak or novel operon adds 0, and the score stays at the gene's own evidence, C1 × C4."
+		"explain": "The context term is C2 × C3 for a gene in an operon and 0 otherwise; both factors lie between 0 and 1, so the term is zero or positive and is added. An operon with no supported pairs adds 0, and the score stays at the gene's own evidence, C1 × C4."
 	},
 	{
 		"id": "margie-010",
@@ -224,7 +224,7 @@
 			"0.93"
 		],
 		"answer": 2,
-		"explain": "R is the share of tool pairs that conflict, here 1 of 3, and the penalty is weighted by m/5, the number of tools reporting an EC out of five. C4 = 1 − (3/5)·(1/3) = 1 − 0.2 = 0.8."
+		"explain": "R is the share of tool pairs that conflict, here 1 of 3, and the penalty is weighted by m/5, where m is the number of tools that give the gene an EC number, counted up to five. C4 = 1 − (3/5)·(1/3) = 1 − 0.2 = 0.8."
 	},
 	{
 		"id": "margie-015",
@@ -303,7 +303,7 @@
 		"topic": "margie",
 		"level": "intermediate",
 		"kind": "case",
-		"scenario": "A researcher installs MARGIE and starts her from the command line inside a batch job, with no terminal attached, before accepting MARGIE's licensing terms. Several of the tools MARGIE runs, SignalP among them, are licensed by their authors for particular uses only.",
+		"scenario": "A researcher installs MARGIE and starts a run from the command line inside a batch job, with no terminal attached, before accepting MARGIE's licensing terms. Several of the tools MARGIE runs, SignalP 6 among them, are licensed by their authors for particular uses only.",
 		"parts": [
 			{
 				"question": "What does MARGIE do with this first run?",
@@ -317,12 +317,12 @@
 				"explain": "With the terms yet to be accepted and the batch job detached from a terminal, MARGIE stops with a message to accept the terms once in an interactive terminal, or through the web app, which records the acceptance."
 			},
 			{
-				"question": "In an interactive terminal they accept the terms, choose academic use and answer that they do not hold a SignalP licence. What happens on their runs?",
+				"question": "In an interactive terminal they accept the terms, choose academic use and answer that they do not hold a SignalP 6 licence. What happens on their runs?",
 				"options": [
-					"SignalP runs anyway, since academic use covers each gated tool",
-					"The run stops until a SignalP licence file is placed in its folder",
-					"SignalP runs, and its results are hidden from the final tables",
-					"SignalP is turned off, and the tools they may use run as usual"
+					"SignalP 6 runs anyway, since academic use covers each gated tool",
+					"The run stops until a SignalP 6 licence file is placed in its folder",
+					"SignalP 6 runs, and its results are hidden from the final tables",
+					"SignalP 6 is turned off, and the tools they may use run as usual"
 				],
 				"answer": 3,
 				"explain": "Tools whose licence the user has to obtain are asked about one by one, and MARGIE runs only those the user holds a licence for, disabling the rest. For commercial use, MARGIE also asks about the tools whose licences restrict commercial use."
@@ -516,10 +516,10 @@
 					"No, since its final confidence is above 0.9",
 					"No, since operon context lifted its score past 0.5",
 					"Yes, since its tools' EC numbers conflict",
-					"Yes, since its C2 is above the 0.5 threshold"
+					"Yes, since a C2 of 0.9 marks a doubtful operon call"
 				],
 				"answer": 2,
-				"explain": "An EC conflict sets the review flag whatever the score; the other triggers are a confidence below 0.5, C2 below 0.5 in an operon, and an ambiguous operon whose context added 0. Strong operon context can lift the score, but the conflict stays visible to a curator."
+				"explain": "An EC conflict sets the review flag whatever the score; the other triggers are a final score below 0.5 and an operon where half or more of the adjacent pairs involve an uncharacterised protein and context did not raise the score by 0.1 or more. Strong operon context can lift the score, but the conflict stays visible to a curator."
 			}
 		],
 		"explain": "The confidence is built in two stages: the gene's own evidence (C1 discounted by C4), then an operon boost (C2 × C3). The boost can make up for weak or conflicting evidence, which is why the review flag records the conflict on its own."
@@ -552,7 +552,7 @@
 			},
 			{
 				"left": "A protein, for the protein-level cache",
-				"right": "Its sequence, with a key for the tool's container, database and settings"
+				"right": "Its sequence, with a key for the tool and its settings"
 			},
 			{
 				"left": "A gene fingerprint",
@@ -563,11 +563,11 @@
 				"right": "The sorted hashes of the genome's proteins"
 			},
 			{
-				"left": "Consolidation, in the genome-level cache",
-				"right": "The genome hash and a hash of the tool tables it merges"
+				"left": "A gene, in the cached tables",
+				"right": "Its contig, start, end, strand and protein"
 			}
 		],
-		"explain": "Each hash fits its use: the genome hash ignores line breaks and file names, the protein key changes with a new database release, the fingerprint captures the evidence pattern, and the reference matches a genome by content even under a new name. Consolidation reruns when the tables it merges change."
+		"explain": "Each hash fits its use: the genome hash ignores line breaks and file names, the protein key leaves out tool and database versions so a new release keeps the cached results, the gene hash puts cached rows back on the right gene under any numbering, the fingerprint captures the evidence pattern, and the reference matches a genome by content even under a new name."
 	},
 	{
 		"id": "margie-031",
@@ -613,15 +613,15 @@
 		"topic": "margie",
 		"level": "easy",
 		"kind": "choice",
-		"question": "Which file in a genome's folder gives each gene's label together with its confidence and tier?",
+		"question": "How does MARGIE make a genome's final table, FINAL_ANNOTATION_WITH_CONFIDENCE.tsv?",
 		"options": [
-			"labeled-genes.tsv",
-			"consolidated-no-stat.tsv",
-			"envelope_summary.tsv",
-			"FINAL_ANNOTATION_WITH_CONFIDENCE.tsv"
+			"Consolidation writes it straight from the tools' tables, before labelling",
+			"The website builds it in the browser from the MARGIE database",
+			"The genome viewer writes it when the map is drawn",
+			"At the end of scoring, joining each gene's label and its sources with C1 to C4, their reasoning, the confidence and the tier"
 		],
 		"answer": 3,
-		"explain": "labeled-genes.tsv holds the label and how it was chosen; scoring adds C1 to C4, the confidence and the tier in FINAL_ANNOTATION_WITH_CONFIDENCE.tsv. It stays at the top of the genome folder with its Excel copy, FINAL_GENOME_VIEWER.html and the diagrams/ folder."
+		"explain": "make-final-annotation-with-confidence.py runs as the last step of scoring: it joins labelling's table (the label, its source and audit trail) with C1 to C4, their formulas and reasoning, the final confidence and the tier. The genome viewer and the Excel copy are made from it."
 	},
 	{
 		"id": "margie-035",
@@ -807,22 +807,22 @@
 			"It sends only the proteins not yet stored under that tool's key"
 		],
 		"answer": 3,
-		"explain": "Each protein is stored under its sequence hash and a tool key: a hash of the tool's container, database and the settings that change its answer. Stored proteins come back from the cache, and only the rest go to the tool."
+		"explain": "Each protein is stored under its sequence hash and a tool key: a hash of the tool and the settings that change its answer, with the tool's and the database's versions left out. Stored proteins come back from the cache, and only the rest go to the tool."
 	},
 	{
 		"id": "margie-047",
 		"topic": "margie",
 		"level": "intermediate",
 		"kind": "choice",
-		"question": "Which file says, for each genome and step, whether the step ran fresh or came back from the cache?",
+		"question": "A run's cache report says that a per-protein tool's step for one genome was partly restored. What does that mean?",
 		"options": [
-			"envelope_summary.tsv in the genome folder",
-			"consolidated-no-stat.tsv in the genome folder",
-			"cache-report.tsv in the run folder",
-			"fingerprint-database.tsv in the store folder"
+			"The tool's container stopped part way and was started again",
+			"The genome-level cache held only some of the tool's files",
+			"Some of the genome's proteins came from the protein cache, and the tool annotated the rest",
+			"The tool's database was updated since the genome was first run"
 		],
 		"answer": 2,
-		"explain": "cache-report.tsv names, for each genome and step, whether it ran or was restored, and from which cache level: the genome-level cache or the protein-level cache."
+		"explain": "The protein-level cache works protein by protein under the tool's key, so a tool can take some proteins' rows from the cache and annotate only the rest; cache-report.tsv gives both counts. The genome-level cache returns a step's whole output or nothing."
 	},
 	{
 		"id": "margie-048",
@@ -864,19 +864,19 @@
 			"Final score 0.82, in a three-gene operon of named genes with C2 = 0.9",
 			"Final score 0.78, whose EC numbers from two tools conflict",
 			"Final score 0.55, a single gene with no EC number from any tool",
-			"Final score 0.95, in a two-gene operon with C2 = 0.7"
+			"Final score 0.95, in a two-gene operon of named genes with C2 = 0.7"
 		],
 		"answer": 1,
-		"explain": "A gene is flagged when its EC numbers conflict, its final score is below 0.5, it sits in an operon with C2 below 0.5, or half or more of its operon's adjacent pairs involve an uncharacterised protein and context added 0. An EC conflict flags the gene at any score."
+		"explain": "A gene is flagged when its EC numbers conflict, its final score is below 0.5, or half or more of its operon's adjacent pairs involve an uncharacterised protein and context did not raise its score by 0.1 or more. An EC conflict flags the gene at any score."
 	},
 	{
 		"id": "margie-050",
 		"topic": "margie",
 		"level": "intermediate",
 		"kind": "truefalse",
-		"statement": "In labelling, a UniProt Swiss-Prot hit can set the label only at 40% identity or more, while the other tools' hits are used under the cutoffs they applied when they searched.",
+		"statement": "UniProt Swiss-Prot is the one tool whose hits labelling gates, at 40% identity, while the other tools' hits are used under the cutoffs they applied when they searched.",
 		"answer": true,
-		"explain": "UniProt is the one tool gated at labelling. The other tools applied their own cutoffs when they searched, such as the trusted cutoffs of PGAP and TIGRFAM and KofamScan's adaptive thresholds for KEGG."
+		"explain": "Only UniProt is gated at labelling: its hit sets the label in the first pass only at 40% identity or more. The other tools applied their own cutoffs when they searched, such as the trusted cutoffs of PGAP and TIGRFAM and KofamScan's adaptive thresholds for KEGG."
 	},
 	{
 		"id": "margie-051",
@@ -902,54 +902,43 @@
 		"options": [
 			"The final tables only, one per genome, as the other outputs stay in folders",
 			"The containers and reference databases that the tools run with",
-			"Each step's result tables, the genome and protein caches, and the run log",
+			"The tools' tables, the labelling, scoring and fingerprint tables, the caches and the run log",
 			"The operon reference and the fingerprint pools that C3 and fingerprinting read"
 		],
 		"answer": 2,
-		"explain": "Results, caches and provenance share the file, so copying it carries them along; it also keeps the site's job history. The operon reference and fingerprint databases are separate files in the store folder."
+		"explain": "Results, caches and provenance share the file, so copying it carries them along; it also keeps the site's job history. Consolidation's tables stay in the results folder, and the operon reference and fingerprint databases are separate files in the store folder."
 	},
 	{
 		"id": "margie-053",
 		"topic": "margie",
 		"level": "intermediate",
 		"kind": "case",
-		"scenario": "After a run, a student opens one genome's folder. At the top are FINAL_ANNOTATION_WITH_CONFIDENCE.tsv, its Excel copy, FINAL_GENOME_VIEWER.html and a diagrams/ folder; the step folders have moved into per-tool-phased-output/.",
+		"scenario": "A student reads one gene's row in a genome's final table. Its label came from KEGG, although PGAP ranks higher in the trust hierarchy and reported a hit for the gene.",
 		"parts": [
 			{
-				"question": "They want Pfam's own output, as the tool wrote it. Where is it?",
+				"question": "How does MARGIE record why PGAP did not set the label?",
 				"options": [
-					"In per-tool-phased-output/, as the cleaned Pfam results table",
-					"Under original_container_outputs/, in the genome's Pfam folder, raw/",
-					"In the PFAM_ columns of FINAL_ANNOTATION_WITH_CONFIDENCE.tsv",
-					"In the MARGIE database only, as the raw files are deleted after loading"
-				],
-				"answer": 1,
-				"explain": "Each container's own output is kept under original_container_outputs/<genome>/<tool>/: raw/ holds what the tool wrote, and processed/ the cleaned table MARGIE takes from it."
-			},
-			{
-				"question": "A gene's label came from KEGG, though PGAP ranks higher in the trust hierarchy. Where do they see why PGAP did not set it?",
-				"options": [
-					"In cache-report.tsv, which lists the tools skipped for each gene",
-					"In the C4 formula column, which names the tools that conflicted",
-					"In the labelling audit trail, which tags each tool, such as no_hit",
-					"In envelope_summary.tsv, which lists the tools each gene passed"
+					"cache-report.tsv lists the tools skipped for each gene",
+					"The C4 formula names the tools that conflicted",
+					"Labelling's audit trail tags each decision tool, such as no_hit, uninformative or gate_failed",
+					"The envelope summary lists the tools each gene passed"
 				],
 				"answer": 2,
-				"explain": "labeled-genes.tsv tags each decision tool as winner, no_hit, uninformative, gate_failed or available_but_lower_priority, so PGAP's tag says why PGAP was passed over."
+				"explain": "Labelling writes an audit trail beside the label, in labeled-genes.tsv and in the final table: each decision tool is tagged WINNER, no_hit, uninformative, gate_failed or available_but_lower_priority, with its gate note."
 			},
 			{
-				"question": "Where else does MARGIE keep a copy of the genome's final table?",
+				"question": "The audit trail tags PGAP uninformative. What does that say about PGAP's hit?",
 				"options": [
-					"In the user's final-tables store, which keeps the latest table per genome",
-					"In the BV-BRC workspace that RASTtk sent the genome to",
-					"In the operon reference, beside the genome's operon counts",
-					"In the browser's storage, for the Results page to open"
+					"It fell below a 40% identity gate that PGAP shares with UniProt",
+					"Its best hit names no function, such as hypothetical protein, so the label passed down the hierarchy",
+					"It came from the protein cache, which labelling passes over",
+					"KEGG's hit had a lower e-value, which outranks the hierarchy"
 				],
-				"answer": 0,
-				"explain": "A copy of each final table goes to the final-tables store in the user's storage, and the scoring archive keeps each run's scores."
+				"answer": 1,
+				"explain": "PGAP reported a hit, so it is not no_hit, but the hit names no function. UniProt is the one tool gated at labelling, so PGAP cannot fail a gate, and labelling went on down the hierarchy to KEGG's informative hit."
 			}
 		],
-		"explain": "A genome folder puts the final table, its Excel copy, the genome viewer and the diagrams first. The raw tool outputs, the step tables and the reasons behind each label stay alongside for checking."
+		"explain": "The final table carries the reasons behind each label: the audit trail tags each tool, so a curator can see why a higher-ranked tool was passed over."
 	},
 	{
 		"id": "margie-054",

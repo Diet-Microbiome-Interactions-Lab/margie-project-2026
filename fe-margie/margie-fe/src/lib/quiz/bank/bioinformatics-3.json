@@ -1,0 +1,879 @@
+[
+	{
+		"id": "bioi3-001",
+		"topic": "bioinformatics",
+		"level": "easy",
+		"kind": "choice",
+		"question": "Gene callers such as Prodigal score a candidate start codon partly by a Shine–Dalgarno motif, such as AGGAGG, a few bases upstream of it. What does this motif pair with when translation begins?",
+		"options": [
+			"The anticodon of the initiator tRNA carrying formyl-methionine",
+			"The 3′ end of the 16S rRNA in the small ribosomal subunit",
+			"The 5′ end of the 23S rRNA in the large ribosomal subunit",
+			"The 5S rRNA bound to the large ribosomal subunit"
+		],
+		"answer": 1,
+		"explain": "The Shine–Dalgarno sequence of the mRNA base-pairs with the anti-Shine–Dalgarno sequence at the 3′ end of 16S rRNA, which places the start codon in the ribosome's P site. Gene callers use the motif and its spacing from the start codon to choose among candidate starts in one reading frame."
+	},
+	{
+		"id": "bioi3-002",
+		"topic": "bioinformatics",
+		"level": "easy",
+		"kind": "choice",
+		"question": "A protein is annotated with the Gene Ontology term 'cell outer membrane'. Which part of the Gene Ontology does this term belong to?",
+		"options": [
+			"Molecular function",
+			"Biological process",
+			"Cellular component",
+			"Protein family"
+		],
+		"answer": 2,
+		"explain": "GO describes gene products in three aspects: molecular function, what the product does, such as ATP binding; biological process, the wider process it serves, such as DNA repair; and cellular component, where it acts, such as the outer membrane."
+	},
+	{
+		"id": "bioi3-003",
+		"topic": "bioinformatics",
+		"level": "easy",
+		"kind": "choice",
+		"question": "How many hypervariable regions, used to tell taxa apart in amplicon surveys, does the bacterial 16S rRNA gene contain?",
+		"options": [
+			"Three, named V1 to V3",
+			"Four, named V1 to V4",
+			"Six, named V1 to V6",
+			"Nine, named V1 to V9"
+		],
+		"answer": 3,
+		"explain": "The 16S rRNA gene, about 1,500 bp long, has nine hypervariable regions separated by conserved stretches. Amplicon primers sit in the conserved stretches and usually span one or two hypervariable regions, such as V4 or V3–V4."
+	},
+	{
+		"id": "bioi3-004",
+		"topic": "bioinformatics",
+		"level": "easy",
+		"kind": "choice",
+		"question": "Binning tools such as MetaBAT 2 group the contigs of a metagenome assembly into genomes. Which two signals do they mainly rely on?",
+		"options": [
+			"Tetranucleotide frequency and read coverage across samples",
+			"Contig length and the number of genes on each contig",
+			"Matches to 16S rRNA genes and to plasmid databases",
+			"The order of genes along each contig and their strands"
+		],
+		"answer": 0,
+		"explain": "Contigs from one genome share a sequence composition, captured by tetranucleotide frequencies, and their coverage rises and falls together across samples. Combining the two separates genomes better than either signal alone."
+	},
+	{
+		"id": "bioi3-005",
+		"topic": "bioinformatics",
+		"level": "easy",
+		"kind": "choice",
+		"question": "An Illumina assembly of a Bacillus subtilis isolate includes a 5.4 kb contig that matches bacteriophage phiX174 along its whole length. What is the most likely source of this contig?",
+		"options": [
+			"A prophage carried in the isolate's chromosome",
+			"PhiX DNA added to the sequencing run as a control library",
+			"A plasmid that the isolate took up from its habitat",
+			"A misassembled copy of one of the rRNA operons"
+		],
+		"answer": 1,
+		"explain": "Illumina runs commonly include a spiked-in phiX174 library for quality control, and a small share of its reads can be assigned to samples. phiX174 is a lytic phage of Escherichia coli, so a match to it in a Bacillus subtilis assembly points to the run, and such contigs are removed before annotation."
+	},
+	{
+		"id": "bioi3-006",
+		"topic": "bioinformatics",
+		"level": "easy",
+		"kind": "choice",
+		"question": "A gene caller searches an assembled contig for open reading frames. In how many reading frames can a double-stranded DNA sequence be translated?",
+		"options": [
+			"Two, one on each strand",
+			"Four, one for each kind of base",
+			"Six, three on each strand",
+			"Three, one from each of the first three bases"
+		],
+		"answer": 2,
+		"explain": "Each strand can be read starting at its first, second or third base, giving three frames per strand and six in total. Bacterial genes lie on both strands, so gene callers scan the six frames."
+	},
+	{
+		"id": "bioi3-007",
+		"topic": "bioinformatics",
+		"level": "intermediate",
+		"kind": "choice",
+		"question": "Gene callers face far more long open reading frames that are not real genes in genomes of about 70% GC than in genomes of about 30% GC. Why?",
+		"options": [
+			"The stop codons TAA, TAG and TGA are AT-rich, so they turn up rarely by chance in GC-rich DNA",
+			"GC-rich genomes use more alternative start codons, which lengthen each open reading frame",
+			"GC-rich DNA is hard to sequence, so its assemblies hold more errors that merge genes",
+			"GC-rich genomes carry more prophages, whose genes overlap those of the host"
+		],
+		"answer": 0,
+		"explain": "Each stop codon holds two or three A or T bases, so GC-rich sequence can run for hundreds of codons without a stop in a given frame, including frames opposite real genes. Gene callers therefore weigh codon usage and start signals rather than ORF length alone."
+	},
+	{
+		"id": "bioi3-008",
+		"topic": "bioinformatics",
+		"level": "intermediate",
+		"kind": "choice",
+		"question": "A protein is annotated with EC 3.2.1.-. What does this partial EC number tell you?",
+		"options": [
+			"The enzyme's activity has been measured, but its gene has not been sequenced",
+			"The enzyme is the first hydrolase found in the genome being annotated",
+			"The protein has lost its activity and is a pseudogene product",
+			"The enzyme is a glycosidase, but its specific bond or substrate is not assigned"
+		],
+		"answer": 3,
+		"explain": "EC numbers have four levels: class 3 holds the hydrolases, 3.2 the glycosylases and 3.2.1 the glycosidases, which hydrolyse O- and S-glycosyl compounds. The dash leaves the fourth level, the specific enzyme, open, which suits a protein placed in a glycosidase family without a known substrate."
+	},
+	{
+		"id": "bioi3-009",
+		"topic": "bioinformatics",
+		"level": "intermediate",
+		"kind": "choice",
+		"question": "Why do researchers compare genomes from different genera by average amino acid identity (AAI) rather than by average nucleotide identity (ANI)?",
+		"options": [
+			"AAI needs no gene calling, so it runs faster on draft genomes",
+			"ANI can only be computed between complete, closed genomes",
+			"Between distant genomes little DNA aligns reliably, while shared proteins still align well",
+			"AAI counts only the genes unique to each genome, which differ most between genera"
+		],
+		"answer": 2,
+		"explain": "DNA diverges faster than protein, since many substitutions are synonymous, so below about 80% ANI few regions align and the value loses meaning; FastANI, for example, is designed for the 80 to 100% range. AAI over shared proteins still resolves relationships at genus level and above."
+	},
+	{
+		"id": "bioi3-010",
+		"topic": "bioinformatics",
+		"level": "intermediate",
+		"kind": "choice",
+		"question": "A BLASTP search with a protein carrying a long run of glutamine and proline residues returns thousands of unrelated hits, each aligned only across that run. Which setting best removes these spurious hits?",
+		"options": [
+			"Masking low-complexity regions of the query with the SEG filter",
+			"Raising the E-value cutoff from 0.001 to 10",
+			"Turning off composition-based score adjustment",
+			"Lowering the word size so that more seeds are found"
+		],
+		"answer": 0,
+		"explain": "Low-complexity stretches, such as runs of one or two amino acids, align with many unrelated proteins and give misleading scores. SEG masks them in protein searches, as DUST does in nucleotide searches, so the hits that remain rest mainly on the rest of the sequence."
+	},
+	{
+		"id": "bioi3-011",
+		"topic": "bioinformatics",
+		"level": "intermediate",
+		"kind": "choice",
+		"question": "Why does Prodigal offer an anonymous, or metagenome, mode (-p meta) beside its normal mode?",
+		"options": [
+			"Normal mode cannot read FASTA files that hold more than one sequence",
+			"Metagenome mode predicts RNA genes as well as protein-coding genes",
+			"Metagenome mode assigns each gene to a taxon as it calls it",
+			"Normal mode learns its model from the input, which short contigs from mixed genomes cannot supply"
+		],
+		"answer": 3,
+		"explain": "In normal mode Prodigal learns codon usage, start codon and ribosome binding site preferences from the sequence it is given, which needs a single genome of reasonable size. For short contigs or mixed communities, anonymous mode applies preset training files built from many genomes and picks the best fit for each sequence."
+	},
+	{
+		"id": "bioi3-012",
+		"topic": "bioinformatics",
+		"level": "hard",
+		"kind": "choice",
+		"question": "In a GFF3 file, the eighth column of a CDS line holds its phase: 0, 1 or 2. What does a phase of 2 mean?",
+		"options": [
+			"The CDS lies in the third reading frame counted from the start of the contig",
+			"Two bases must be removed from the start of the feature to reach the first base of a codon",
+			"The CDS is the second piece of a coding sequence split into several features",
+			"Two codons within the CDS are stop codons that the ribosome reads through"
+		],
+		"answer": 1,
+		"explain": "The GFF3 specification defines phase as the number of bases to remove from the 5′ end of a CDS feature, on its own strand, to reach the first base of the next codon. It matters for coding sequences in pieces or cut off at a contig edge, while a complete bacterial gene has phase 0."
+	},
+	{
+		"id": "bioi3-013",
+		"topic": "bioinformatics",
+		"level": "hard",
+		"kind": "choice",
+		"question": "In one BLASTP search, hit A has a bit score of 50 and an E-value of 4e-3. Hit B, to the same query in the same database, has a bit score of 60. Taking the search space as the same for both hits, what is hit B's E-value, to one significant figure?",
+		"options": [
+			"4e-4",
+			"2e-3",
+			"4e-6",
+			"4e-13"
+		],
+		"answer": 2,
+		"explain": "BLAST turns a bit score S into an E-value as E = m × n × 2^−S, where m × n is the search space. Ten more bits divide the E-value by 2^10 = 1,024, so 4e-3 becomes 3.9e-6, or 4e-6 to one significant figure."
+	},
+	{
+		"id": "bioi3-014",
+		"topic": "bioinformatics",
+		"level": "hard",
+		"kind": "choice",
+		"question": "Along a circular bacterial chromosome, the cumulative GC skew is the running sum of (G − C)/(G + C) over successive windows. Where do its lowest and highest points usually fall?",
+		"options": [
+			"Lowest at the terminus of replication, highest at the origin",
+			"Lowest at the origin of replication, highest at the terminus",
+			"Lowest at the largest prophage, highest at the rRNA operons",
+			"Lowest and highest at the two ends of the longest operon"
+		],
+		"answer": 1,
+		"explain": "The leading strand of replication carries more G than C, so the skew is positive from the origin to the terminus and negative from the terminus back to the origin. The running sum therefore bottoms out at the origin and peaks at the terminus, which helps locate oriC in a new genome."
+	},
+	{
+		"id": "bioi3-015",
+		"topic": "bioinformatics",
+		"level": "hard",
+		"kind": "choice",
+		"question": "GTDB aims to make ranks such as genus and family span comparable depths across the tree of life. Which measure does it use to normalise these ranks?",
+		"options": [
+			"16S rRNA identity cutoffs fixed for each rank",
+			"GC content ranges set for each phylum",
+			"The dates on which the type strains were first described",
+			"Relative evolutionary divergence (RED) in its tree of concatenated marker proteins"
+		],
+		"answer": 3,
+		"explain": "GTDB builds its reference trees from concatenated single-copy marker proteins, 120 for Bacteria and 53 for Archaea, and uses relative evolutionary divergence to bring each rank closer to a consistent depth, splitting, merging or moving taxa that fall far from it. Species are delimited separately, mainly by ANI of about 95% to a representative genome."
+	},
+	{
+		"id": "bioi3-016",
+		"topic": "bioinformatics",
+		"level": "hard",
+		"kind": "choice",
+		"question": "PSI-BLAST builds a position-specific scoring matrix from the hits of each round and searches again with it. What is the main risk if an unrelated sequence passes the inclusion threshold in an early round?",
+		"options": [
+			"The profile shifts towards the wrong family and draws more unrelated sequences into later rounds",
+			"The search halts, since PSI-BLAST stops as soon as a false positive appears",
+			"The query sequence is rewritten to match the false positive before the next round",
+			"Nothing changes, since each round scores hits against the original query alone"
+		],
+		"answer": 0,
+		"explain": "Each round adds the included hits to the profile, so a false positive moves the profile's scores towards its own family, and later rounds then pick up that family's members too. A strict inclusion E-value and a check of the hits added each round limit this profile corruption."
+	},
+	{
+		"id": "bioi3-017",
+		"topic": "bioinformatics",
+		"level": "easy",
+		"kind": "truefalse",
+		"statement": "A genome sequenced to 30× mean coverage has each of its bases covered by exactly 30 reads.",
+		"answer": false,
+		"explain": "Coverage is an average: reads start at random positions, so depth varies from base to base, roughly following a Poisson distribution, with further dips in regions of extreme GC content. Some bases fall well below 30 reads and others lie above it."
+	},
+	{
+		"id": "bioi3-018",
+		"topic": "bioinformatics",
+		"level": "easy",
+		"kind": "truefalse",
+		"statement": "Two proteins that share less than 25% sequence identity cannot be homologous.",
+		"answer": false,
+		"explain": "Many homologous proteins, recognised by shared structure or by profile methods, share less than 25% identity, and some less than 15%. In this range, the 'twilight zone' and below, identity alone cannot separate homologs from chance matches, which is why profile HMMs and structure comparison are used for distant relationships."
+	},
+	{
+		"id": "bioi3-019",
+		"topic": "bioinformatics",
+		"level": "easy",
+		"kind": "truefalse",
+		"statement": "Bacterial genomes carry from one to more than a dozen copies of the 16S rRNA gene, so read counts in a 16S amplicon survey are not direct counts of cells.",
+		"answer": true,
+		"explain": "The rrnDB database records 16S copy numbers from one, as in Mycobacterium tuberculosis, through seven in Escherichia coli and ten in Bacillus subtilis, to more in some other bacteria. A taxon with many copies yields more reads per cell than one with few, and primer and PCR biases add further differences, so read shares are relative estimates even after copy-number correction."
+	},
+	{
+		"id": "bioi3-020",
+		"topic": "bioinformatics",
+		"level": "intermediate",
+		"kind": "truefalse",
+		"statement": "In bacterial inner-membrane proteins, the loops between transmembrane helices that carry more lysine and arginine residues usually face the cytoplasm.",
+		"answer": true,
+		"explain": "This is von Heijne's positive-inside rule: lysine and arginine are markedly enriched in cytoplasmic loops. Topology predictors such as TMHMM learn this bias from proteins of known topology and use it to decide which way each helix crosses the membrane."
+	},
+	{
+		"id": "bioi3-021",
+		"topic": "bioinformatics",
+		"level": "intermediate",
+		"kind": "truefalse",
+		"statement": "EC numbers classify enzymes by sequence family, so two enzymes with the same EC number share a common ancestor.",
+		"answer": false,
+		"explain": "EC numbers classify the reaction catalysed, not the protein's ancestry, and unrelated proteins can catalyse one reaction. Cu/Zn superoxide dismutases and Fe/Mn superoxide dismutases both carry EC 1.15.1.1, yet they differ in fold and in their metals."
+	},
+	{
+		"id": "bioi3-022",
+		"topic": "bioinformatics",
+		"level": "intermediate",
+		"kind": "truefalse",
+		"statement": "Building a pangenome from genomes annotated with different gene callers can inflate the accessory genome, since one gene may be called with different start codons or split differently in each genome.",
+		"answer": true,
+		"explain": "Pangenome tools cluster predicted proteins, so inconsistent calls can make one gene look like several families or like a gene missing from some genomes. Annotating each genome with the same pipeline, and tools such as Panaroo that correct likely annotation errors, limit this inflation of the accessory genome."
+	},
+	{
+		"id": "bioi3-023",
+		"topic": "bioinformatics",
+		"level": "hard",
+		"kind": "truefalse",
+		"statement": "NCBI translation tables 1 and 11 assign the same amino acid or stop signal to each of the 64 codons and differ only in which codons they accept as starts.",
+		"answer": true,
+		"explain": "Table 11, the code for Bacteria, Archaea and plastids, reads codons as the standard code does but lists more alternative start codons, among them GTG and ATT. Gene callers use table 11 for most prokaryotes, whose genes start mostly with ATG, GTG or TTG."
+	},
+	{
+		"id": "bioi3-024",
+		"topic": "bioinformatics",
+		"level": "hard",
+		"kind": "truefalse",
+		"statement": "In a GFF3 file, a gene on the minus strand is written with a start coordinate greater than its end coordinate, since it reads from high to low positions.",
+		"answer": false,
+		"explain": "The GFF3 specification requires start to be less than or equal to end on either strand, and the seventh column gives the strand. For a minus-strand gene, the start codon lies at the end coordinate, and the gene reads down from there to the start coordinate."
+	},
+	{
+		"id": "bioi3-025",
+		"topic": "bioinformatics",
+		"level": "easy",
+		"kind": "match",
+		"question": "Match each enzyme class, with its EC number, to the reactions its enzymes catalyse.",
+		"pairs": [
+			{
+				"left": "Oxidoreductases (EC 1)",
+				"right": "Oxidation–reduction, moving electrons between molecules"
+			},
+			{
+				"left": "Transferases (EC 2)",
+				"right": "Transfer of a group, such as a phosphate or methyl, between molecules"
+			},
+			{
+				"left": "Hydrolases (EC 3)",
+				"right": "Cleavage of bonds by water"
+			},
+			{
+				"left": "Ligases (EC 6)",
+				"right": "Joining of two molecules, driven by breaking down ATP or a similar triphosphate"
+			},
+			{
+				"left": "Translocases (EC 7)",
+				"right": "Movement of ions or molecules across a membrane"
+			}
+		],
+		"explain": "The first digit of an EC number names one of seven classes; the other two are lyases (EC 4) and isomerases (EC 5). Translocases became class 7 in 2018, taking in enzymes such as ATP-driven transporters that were listed as hydrolases before."
+	},
+	{
+		"id": "bioi3-026",
+		"topic": "bioinformatics",
+		"level": "easy",
+		"kind": "match",
+		"question": "Match each COG functional category letter to the functions it covers.",
+		"pairs": [
+			{
+				"left": "J",
+				"right": "Translation, ribosomal structure and biogenesis"
+			},
+			{
+				"left": "K",
+				"right": "Transcription"
+			},
+			{
+				"left": "L",
+				"right": "Replication, recombination and repair"
+			},
+			{
+				"left": "G",
+				"right": "Carbohydrate transport and metabolism"
+			},
+			{
+				"left": "M",
+				"right": "Cell wall, membrane and envelope biogenesis"
+			}
+		],
+		"explain": "COG letters sort orthologous groups into broad categories, grouped under information storage and processing (J, K, L), cellular processes (such as M) and metabolism (such as G). Counting genes per letter gives a quick functional profile of a genome."
+	},
+	{
+		"id": "bioi3-027",
+		"topic": "bioinformatics",
+		"level": "intermediate",
+		"kind": "match",
+		"question": "Match each HMMER program to what it does.",
+		"pairs": [
+			{
+				"left": "hmmbuild",
+				"right": "Builds a profile HMM from a multiple sequence alignment"
+			},
+			{
+				"left": "hmmsearch",
+				"right": "Searches one or more profiles against a sequence database"
+			},
+			{
+				"left": "hmmscan",
+				"right": "Searches each query sequence against a database of profiles, such as Pfam"
+			},
+			{
+				"left": "phmmer",
+				"right": "Searches a protein sequence against a protein database, as BLASTP does"
+			},
+			{
+				"left": "jackhmmer",
+				"right": "Searches a protein sequence iteratively, rebuilding a profile from the hits each round, as PSI-BLAST does"
+			}
+		],
+		"explain": "HMMER's programs differ in what serves as query and what as database. hmmscan suits annotating a genome's proteins against Pfam, while hmmsearch suits finding the members of one family across many genomes."
+	},
+	{
+		"id": "bioi3-028",
+		"topic": "bioinformatics",
+		"level": "intermediate",
+		"kind": "match",
+		"question": "Protein gene callers skip several kinds of genome feature. Match each tool to the features it finds.",
+		"pairs": [
+			{
+				"left": "tRNAscan-SE",
+				"right": "tRNA genes, with their anticodons"
+			},
+			{
+				"left": "barrnap",
+				"right": "5S, 16S and 23S rRNA genes"
+			},
+			{
+				"left": "Infernal with Rfam",
+				"right": "Riboswitches and other structured non-coding RNAs, by covariance models"
+			},
+			{
+				"left": "MinCED",
+				"right": "CRISPR arrays of repeats and spacers"
+			},
+			{
+				"left": "TransTermHP",
+				"right": "Rho-independent transcription terminators"
+			}
+		],
+		"explain": "Annotation pipelines run dedicated tools such as these for the features that protein gene callers leave out. Infernal's covariance models score base pairing as well as sequence, which suits RNAs whose structure is better conserved than their sequence."
+	},
+	{
+		"id": "bioi3-029",
+		"topic": "bioinformatics",
+		"level": "intermediate",
+		"kind": "match",
+		"question": "STRING combines several kinds of evidence that two proteins work together. Match each kind to what it records.",
+		"pairs": [
+			{
+				"left": "Gene fusion",
+				"right": "The two proteins appear joined in a single chain in another organism"
+			},
+			{
+				"left": "Phylogenetic profile",
+				"right": "The two genes are present together or absent together across many genomes"
+			},
+			{
+				"left": "Conserved neighbourhood",
+				"right": "The two genes sit close together on the chromosome in many distantly related genomes"
+			},
+			{
+				"left": "Co-expression",
+				"right": "The two genes' mRNA levels rise and fall together across conditions"
+			},
+			{
+				"left": "Text mining",
+				"right": "The two genes are mentioned together in the text of research papers"
+			}
+		],
+		"explain": "The first four kinds infer a functional link from genomes or expression data without testing it: genes that are fused, inherited together, kept side by side or expressed together tend to work in one pathway or complex. Text mining draws on what papers report, and STRING scores each kind and combines them into one confidence score."
+	},
+	{
+		"id": "bioi3-030",
+		"topic": "bioinformatics",
+		"level": "hard",
+		"kind": "match",
+		"question": "InterPro merges protein signatures from several member databases. Match each member database to the kind of signature it provides.",
+		"pairs": [
+			{
+				"left": "PROSITE",
+				"right": "Short sequence patterns, often marking active or binding sites"
+			},
+			{
+				"left": "PRINTS",
+				"right": "Fingerprints, sets of several conserved motifs that define a family"
+			},
+			{
+				"left": "Pfam",
+				"right": "Profile HMMs of families and domains, built from curated seed alignments"
+			},
+			{
+				"left": "CATH-Gene3D",
+				"right": "Profile HMMs of domains defined from solved 3D structures"
+			},
+			{
+				"left": "HAMAP",
+				"right": "Curated family profiles tied to rules that UniProt uses to annotate proteins"
+			}
+		],
+		"explain": "The member databases model families in different ways, from single motifs and motif sets to HMMs built from sequence or from structure, and family rules for annotation; PROSITE also holds profiles beside its patterns. InterPro groups signatures that describe the same family or domain into one entry, so a protein's hits can be read together."
+	},
+	{
+		"id": "bioi3-031",
+		"topic": "bioinformatics",
+		"level": "hard",
+		"kind": "match",
+		"question": "These GenBank feature locations come from the record of a circular chromosome of 5,000,000 bp and from the record of a draft contig. Match each location to what it describes.",
+		"pairs": [
+			{
+				"left": "complement(3300..4200)",
+				"right": "A feature on the minus strand, read from 4200 down to 3300"
+			},
+			{
+				"left": "join(4999501..5000000,1..400)",
+				"right": "A feature that runs across the end and the start of the circular sequence"
+			},
+			{
+				"left": "<1..450",
+				"right": "A feature that begins before the first base of the sequence, so only part of it is present"
+			},
+			{
+				"left": "2100^2101",
+				"right": "A site between two adjacent bases, such as a cleavage point"
+			}
+		],
+		"explain": "GenBank locations count from 1 and include both ends: complement() places a feature on the opposite strand, join() links its pieces, < marks a lower end lying beyond the given position and ^ marks a point between two bases. A join across the origin keeps a gene that spans the end and start of a circular chromosome in one feature."
+	},
+	{
+		"id": "bioi3-032",
+		"topic": "bioinformatics",
+		"level": "hard",
+		"kind": "match",
+		"question": "Roary sorts a pangenome's gene clusters by the share of strains that carry them. Match each category to its range under Roary's default settings.",
+		"pairs": [
+			{
+				"left": "Core genes",
+				"right": "99% to 100% of strains"
+			},
+			{
+				"left": "Soft core genes",
+				"right": "95% to under 99% of strains"
+			},
+			{
+				"left": "Shell genes",
+				"right": "15% to under 95% of strains"
+			},
+			{
+				"left": "Cloud genes",
+				"right": "Under 15% of strains"
+			}
+		],
+		"explain": "The soft core allows for genes missed in a few draft assemblies, the shell holds genes common in parts of the population and the cloud holds rare genes, often on mobile elements. With 100 strains, a gene found in 97 of them counts as soft core."
+	},
+	{
+		"id": "bioi3-033",
+		"topic": "bioinformatics",
+		"level": "easy",
+		"kind": "case",
+		"scenario": "A student opens a FASTQ file of Illumina reads whose quality scores use the usual Phred+33 encoding, in which a character's ASCII code minus 33 gives its quality score. The first record, shown with its four lines separated by bars, reads: @read1 | GATCCGATTA | + | IIIII????#",
+		"parts": [
+			{
+				"question": "What does the line holding only + do?",
+				"options": [
+					"It marks the read as coming from the forward strand",
+					"It separates the sequence from its quality line and may repeat the header",
+					"It shows that the read passed the sequencer's quality filter",
+					"It links this read to its mate in the paired file"
+				],
+				"answer": 1,
+				"explain": "A FASTQ record has four lines: a header starting with @, the sequence, a + line that may repeat the header, and a quality line with one character for each base."
+			},
+			{
+				"question": "The character I has ASCII code 73. What quality score and error probability does it stand for?",
+				"options": [
+					"Q40, an error probability of 1 in 10,000",
+					"Q40, an error probability of 1 in 40",
+					"Q30, an error probability of 1 in 1,000",
+					"Q73, an error probability of 1 in 73"
+				],
+				"answer": 0,
+				"explain": "73 − 33 = 40, and a Phred score Q stands for an error probability of 10^(−Q/10), so Q40 means one wrong call in 10,000. The ? characters, ASCII 63, stand for Q30, or one in 1,000."
+			},
+			{
+				"question": "The last base has the quality character #, ASCII 35. What should a read trimmer such as fastp or Trimmomatic do with it?",
+				"options": [
+					"Keep it, since 35 counts as a high quality score",
+					"Keep it, since trimmers act only on the first bases of a read",
+					"Trim it, since at Q2 the call is more likely wrong than right",
+					"Replace the whole read with its mate from the paired file"
+				],
+				"answer": 2,
+				"explain": "35 − 33 = 2, and Q2 stands for an error probability of 10^−0.2, about 0.63. Quality tends to fall towards the 3′ end of Illumina reads, so quality trimming, such as Trimmomatic's TRAILING step or fastp's tail cutting when turned on, removes low-quality bases there before assembly."
+			}
+		],
+		"explain": "FASTQ keeps a quality score for each base, and decoding the Phred scores shows which bases to trust before assembly."
+	},
+	{
+		"id": "bioi3-034",
+		"topic": "bioinformatics",
+		"level": "intermediate",
+		"kind": "case",
+		"scenario": "A student bins a soil metagenome and checks three bins with CheckM. Bin A is 96% complete with 1.5% contamination and carries its 23S and 5S rRNA genes and 19 tRNA genes, but no 16S rRNA gene. Bin B is 72% complete with 3% contamination. Bin C is 41% complete with 0.8% contamination.",
+		"parts": [
+			{
+				"question": "Under the MIMAG standard, which tier does bin B reach?",
+				"options": [
+					"High-quality draft",
+					"Medium-quality draft",
+					"Low-quality draft",
+					"Finished genome"
+				],
+				"answer": 1,
+				"explain": "MIMAG's medium-quality tier needs at least 50% completeness and under 10% contamination, and its high-quality tier needs over 90% completeness and under 5% contamination. Bin B, at 72% and 3%, is a medium-quality draft."
+			},
+			{
+				"question": "Bin A passes the completeness and contamination limits of a high-quality draft. Which MIMAG tier does it reach?",
+				"options": [
+					"High-quality draft, since only completeness and contamination count",
+					"Low-quality draft, since lacking a 16S gene drops a bin to the lowest tier",
+					"No tier, since MIMAG sets aside bins without a 16S gene",
+					"Medium-quality draft, since high quality also requires the three rRNA genes and at least 18 tRNAs"
+				],
+				"answer": 3,
+				"explain": "MIMAG adds an assembly condition to the high-quality tier: the 23S, 16S and 5S rRNA genes and at least 18 tRNAs must be present. Lacking a 16S gene, bin A stays a medium-quality draft."
+			},
+			{
+				"question": "Why are 16S rRNA genes so often missing from metagenome bins?",
+				"options": [
+					"Their near-identical copies, within and across genomes, break the assembly, and the pieces bin poorly",
+					"Binning tools remove rRNA genes to keep the bins small",
+					"Most soil bacteria carry no 16S rRNA gene",
+					"CheckM removes 16S genes when it counts its marker genes"
+				],
+				"answer": 0,
+				"explain": "rRNA genes are multicopy and highly conserved, so assemblers often collapse or fragment them, and their coverage and composition differ from the rest of the genome, which keeps them out of bins. Long reads or targeted reassembly can recover them."
+			}
+		],
+		"explain": "Completeness and contamination set most of a bin's MIMAG tier, but the high-quality tier also requires rRNA and tRNA genes, and short-read metagenome assemblies often miss the rRNA genes."
+	},
+	{
+		"id": "bioi3-035",
+		"topic": "bioinformatics",
+		"level": "intermediate",
+		"kind": "case",
+		"scenario": "A student sequences a bacterial isolate whose genome is about 5.0 Mb on an Illumina run that yields 2,000,000 read pairs of 2 × 150 bp. After assembly, the chromosomal contigs have a mean depth of about 120×, while one 4 kb contig has a depth of about 360×.",
+		"parts": [
+			{
+				"question": "What mean coverage do these reads give?",
+				"options": [
+					"30×",
+					"60×",
+					"120×",
+					"240×"
+				],
+				"answer": 2,
+				"explain": "Coverage is the total of sequenced bases divided by the genome size: 2,000,000 pairs × 2 reads × 150 bp = 600 Mb, and 600 Mb ÷ 5.0 Mb = 120×."
+			},
+			{
+				"question": "What does the 4 kb contig at 360× most likely represent?",
+				"options": [
+					"DNA from a contaminating organism present at low abundance",
+					"A sequence present at about three copies per chromosome, such as a small multicopy plasmid or a collapsed repeat",
+					"A region where the sequencer made three times as many errors",
+					"A region that the assembler wrongly placed at three sites"
+				],
+				"answer": 1,
+				"explain": "Depth scales with copy number, so a contig at three times the chromosomal depth is present in about three copies per chromosome. A small plasmid kept at several copies per cell, or a repeat whose copies the assembler merged into one contig, both fit."
+			},
+			{
+				"question": "A k-mer counter run on the same reads with k = 31 counts 480 million k-mers, with its main depth peak at 96×. Taking the few k-mers from sequencing errors as negligible, what genome size does this suggest?",
+				"options": [
+					"4.0 Mb",
+					"4.8 Mb",
+					"9.6 Mb",
+					"5.0 Mb"
+				],
+				"answer": 3,
+				"explain": "Genome size is about the number of k-mers divided by the k-mer depth: 480,000,000 ÷ 96 = 5,000,000 bp, or 5.0 Mb. The k-mer peak sits below the base coverage because each 150 bp read holds 150 − 31 + 1 = 120 k-mers, so k-mer depth is 120× × 120/150 = 96×."
+			}
+		],
+		"explain": "Depth figures answer several questions about an isolate: whether the data suffice, which contigs are present in more than one copy, and how large the genome is."
+	},
+	{
+		"id": "bioi3-036",
+		"topic": "bioinformatics",
+		"level": "intermediate",
+		"kind": "case",
+		"scenario": "A student runs BLASTP with tabular output (-outfmt 6) for a 400-residue protein. The top line, its 12 columns separated by bars, reads: q1 | s1 | 80.000 | 200 | 38 | 2 | 1 | 200 | 51 | 248 | 1e-90 | 330. The columns are query, subject, percent identity, alignment length, mismatches, gap openings, query start, query end, subject start, subject end, E-value and bit score.",
+		"parts": [
+			{
+				"question": "What share of the query does the alignment cover?",
+				"options": [
+					"80%",
+					"40%",
+					"100%",
+					"50%"
+				],
+				"answer": 3,
+				"explain": "The alignment runs from residue 1 to residue 200 of the 400-residue query, so it covers 200 ÷ 400 = 50%. The 80% identity describes only that aligned half."
+			},
+			{
+				"question": "How many identical residue pairs does the alignment contain?",
+				"options": [
+					"160",
+					"200",
+					"162",
+					"320"
+				],
+				"answer": 0,
+				"explain": "BLAST computes percent identity over the alignment length, gap columns included, so 80% of 200 columns is 160 identical pairs. With 38 mismatches, 198 columns pair two residues and the other 2 are gaps."
+			},
+			{
+				"question": "Which sequence carries the two gap characters in the alignment?",
+				"options": [
+					"The query, since its span is the longer one",
+					"One each, since gaps come in pairs",
+					"The subject, since its span of 51 to 248 holds 198 residues against the query's 200",
+					"Neither, since the mismatches account for the difference"
+				],
+				"answer": 2,
+				"explain": "The subject span holds 248 − 51 + 1 = 198 residues, two fewer than the query's 200, so two query residues face gaps in the subject. The two gap openings in column six fit two gaps of one residue each."
+			}
+		],
+		"explain": "BLAST's tabular columns let you work out coverage, identity and gaps for each hit, which matter as much as the E-value when deciding whether to transfer a name."
+	},
+	{
+		"id": "bioi3-037",
+		"topic": "bioinformatics",
+		"level": "hard",
+		"kind": "case",
+		"scenario": "A KEGG module is defined as KA (KB,KC) KD+KE, where KA to KE stand for KEGG Orthology (KO) entries and the module has three steps. A genome's KO annotation includes KA, KC and KD, but neither KB nor KE.",
+		"parts": [
+			{
+				"question": "In KEGG module notation, what does the comma in (KB,KC) mean?",
+				"options": [
+					"KB and KC are alternatives, and either one fills the step",
+					"KB and KC are subunits of one complex, and both are needed",
+					"KB and KC catalyse two steps, one after the other",
+					"KB is needed for the step, and KC is optional"
+				],
+				"answer": 0,
+				"explain": "In a KEGG module definition, a space separates consecutive steps, a comma separates alternatives for one step and a plus sign joins the subunits of a complex, while a minus sign marks an optional subunit."
+			},
+			{
+				"question": "How many of the module's three steps does the genome fill?",
+				"options": [
+					"None, since KB is missing",
+					"One of three",
+					"Two of three",
+					"Three of three"
+				],
+				"answer": 2,
+				"explain": "KA fills the first step and KC alone fills the second, but the third needs both KD and KE as subunits of one complex, and KE is missing. The module is therefore one block short of complete."
+			},
+			{
+				"question": "What is the most careful reading of the missing KE?",
+				"options": [
+					"The pathway cannot run in this organism, so the module should be dropped from the report",
+					"KE may be lost from the draft, too divergent to pass its threshold or replaced by an unrelated enzyme, so the gap needs checking",
+					"KD must be misannotated, since a complex cannot work with one of its subunits missing",
+					"The genome must be contaminated, since modules turn up either complete or missing entirely"
+				],
+				"answer": 1,
+				"explain": "A missing KO can reflect a gene lost in a draft assembly, a divergent homolog below the KO's score threshold or a non-homologous enzyme doing the same job. A one-block gap is a lead for targeted searches, not proof that the pathway is absent."
+			}
+		],
+		"explain": "KEGG modules turn KO lists into pathway completeness, and reading their notation correctly separates real gaps from alternatives."
+	},
+	{
+		"id": "bioi3-038",
+		"topic": "bioinformatics",
+		"level": "hard",
+		"kind": "case",
+		"scenario": "A student assembles a Bacillus subtilis isolate from Oxford Nanopore reads alone and annotates it. The pipeline reports many more protein-coding genes than reference strains of the species carry, many proteins are much shorter than their best database hits, and neighbouring genes often match consecutive parts of one reference protein, with the breaks falling at homopolymers, runs of one repeated base such as AAAAAAA.",
+		"parts": [
+			{
+				"question": "What most likely causes the split genes?",
+				"options": [
+					"Self-splicing introns that the gene caller fails to remove",
+					"A switch to translation table 4 in this lineage",
+					"Foreign DNA inserted into each gene by horizontal transfer",
+					"Insertion and deletion errors in homopolymers, which shift the reading frame"
+				],
+				"answer": 3,
+				"explain": "Nanopore basecalling has had most trouble counting bases in homopolymers, so assemblies gain or lose a base there, and each such indel shifts the frame and ends the gene at an early stop codon. Newer basecallers and chemistries have reduced, though not removed, these errors."
+			},
+			{
+				"question": "Which step best fixes the assembly?",
+				"options": [
+					"Lowering the gene caller's minimum gene length",
+					"Polishing it with Medaka and, ideally, with accurate short reads in a tool such as Polypolish or Pilon",
+					"Running the gene caller in its metagenome mode",
+					"Rotating the chromosome to start at dnaA"
+				],
+				"answer": 1,
+				"explain": "Polishing realigns reads to the draft and corrects its consensus: Medaka works from the long reads, and short-read polishers fix most remaining indels in homopolymers. After polishing, gene counts and protein lengths should come close to those of reference strains."
+			},
+			{
+				"question": "How can the student check the polished assembly for remaining frameshifts?",
+				"options": [
+					"Compare each protein's length with that of its best database hit, expecting ratios near 1",
+					"Check that the N50 has risen above that of the unpolished draft",
+					"Confirm that the GC content matches the species average",
+					"Count the tRNA genes and check that there are at least 18"
+				],
+				"answer": 0,
+				"explain": "Frameshifts truncate proteins, so many query-to-hit length ratios well below 1 flag them, while a sharp peak near 1 suggests few remain. N50, GC content and tRNA counts barely change with small indel errors."
+			}
+		],
+		"explain": "Indel errors do little to assembly statistics but break genes, so protein lengths against known homologs test a long-read assembly's base accuracy better than contiguity does."
+	},
+	{
+		"id": "bioi3-039",
+		"topic": "bioinformatics",
+		"level": "hard",
+		"kind": "case",
+		"scenario": "In a new Pseudomonas genome, a gene caller predicts a 512-residue protein whose N-terminus runs 32 residues beyond the start of its close homologs, which begin with a Sec signal peptide. SignalP finds no signal peptide in the predicted protein. An in-frame ATG lies 32 codons downstream of the predicted start, with the motif AGGAGG 8 bases upstream of it.",
+		"parts": [
+			{
+				"question": "Why does SignalP find no signal peptide?",
+				"options": [
+					"Pseudomonas proteins are exported without signal peptides",
+					"SignalP recognises only Tat signal peptides",
+					"The signal peptide begins 32 residues in, and SignalP expects one at the N-terminus",
+					"The extension makes the protein too long for SignalP to analyse"
+				],
+				"answer": 2,
+				"explain": "SignalP looks for a signal peptide starting at the first residue, with its n-, h- and c-regions in order. With 32 extra residues in front, the real signal peptide sits too far in to be recognised."
+			},
+			{
+				"question": "Which start codon is more likely the true one?",
+				"options": [
+					"The predicted start, since the longest ORF gives the true protein",
+					"A start further upstream, beyond the predicted one",
+					"Neither, since the gene must be a pseudogene",
+					"The downstream ATG, given its Shine–Dalgarno motif and its match to the homologs' N-termini"
+				],
+				"answer": 3,
+				"explain": "A well-spaced Shine–Dalgarno motif, an ATG codon and agreement with the N-termini of close homologs point to the downstream start. Choosing the most upstream start in an ORF, as a longest-ORF rule does, adds such N-terminal extensions."
+			},
+			{
+				"question": "With the start corrected, how long is the protein before its signal peptide is cut off?",
+				"options": [
+					"512 residues",
+					"480 residues",
+					"544 residues",
+					"448 residues"
+				],
+				"answer": 1,
+				"explain": "Starting 32 codons downstream removes 32 residues, so the precursor has 512 − 32 = 480 residues. Signal peptidase then removes the signal peptide, leaving a shorter mature protein."
+			}
+		],
+		"explain": "Start codon errors change a protein's N-terminus, where signal peptides sit, so localisation predictions are only as good as the start codon calls."
+	},
+	{
+		"id": "bioi3-040",
+		"topic": "bioinformatics",
+		"level": "easy",
+		"kind": "case",
+		"scenario": "A student annotates the proteins of a new isolate from a little-studied bacterial genus with BLASTP against UniProtKB. For one protein, the top hit is an unreviewed TrEMBL entry from a sister species at 98% identity, with no function assigned. The best hit in Swiss-Prot, the reviewed section, is a dihydroorotase from a related genus at 62% identity along the full length of both proteins.",
+		"parts": [
+			{
+				"question": "What sets Swiss-Prot entries apart from TrEMBL entries?",
+				"options": [
+					"Swiss-Prot entries are reviewed by curators, while TrEMBL entries are annotated automatically",
+					"Swiss-Prot holds only proteins with solved 3D structures",
+					"TrEMBL holds only proteins from metagenomes",
+					"Swiss-Prot holds only proteins from model organisms such as Escherichia coli"
+				],
+				"answer": 0,
+				"explain": "UniProtKB has a reviewed section, Swiss-Prot, curated from the literature, and a far larger unreviewed section, TrEMBL, annotated by automatic methods. Swiss-Prot names rest on firmer evidence."
+			},
+			{
+				"question": "Which name best suits the protein?",
+				"options": [
+					"Hypothetical protein, as for the closest hit",
+					"Dihydroorotase, but only once the 98% hit is renamed to match",
+					"Hypothetical protein, since no hit reaches 100% identity",
+					"Dihydroorotase, from the reviewed full-length hit at 62% identity"
+				],
+				"answer": 3,
+				"explain": "A closer hit helps only if it carries information, and one with no function assigned carries none. A full-length match at over 60% identity to a reviewed enzyme is good evidence of the same function, since enzymes this similar mostly share their full EC number. Pipelines such as Prokka search curated proteins first for this reason."
+			}
+		],
+		"explain": "Annotation transfer works best from reviewed entries with full-length matches; the closest hit is not the best source when it carries no function."
+	}
+]

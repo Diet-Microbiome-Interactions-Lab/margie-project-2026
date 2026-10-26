@@ -22,8 +22,9 @@ from concurrent.futures import ThreadPoolExecutor
 
 from bioinformatics_tools.utilities import ssh_slurm
 from bioinformatics_tools.utilities.ssh_connection import SSHConnection
-from bioinformatics_tools.api.services import run_mail
+from bioinformatics_tools.api.services import hosting_usage, run_mail
 from bioinformatics_tools.api.services.job_store import job_store
+from bioinformatics_tools.workflow_tools.usage_report import MARKER as USAGE_REPORT
 
 LOGGER = logging.getLogger(__name__)
 
@@ -140,6 +141,7 @@ def run_ssh_task(job_id: str, command: str, connection: SSHConnection,
 
     exit_code = 0  # Track command exit code
     last_genome = ""  # Most recently seen "wildcards: genome=..." value
+    log_bytes = 0  # What the run's log brought in, for its resource report
     saw_snakemake_syntax_error = False
 
     try:
@@ -155,6 +157,7 @@ def run_ssh_task(job_id: str, command: str, connection: SSHConnection,
                                              driver_time=driver_time,
                                              # A cancelled run stops being watched, freeing its thread.
                                              stop=lambda: job_store.get_status(job_id) == "cancelled"):
+            log_bytes += len(line) + 1
             # Run is live on the cluster; later errors only affect watching it.
             if line == "__LAUNCHED__":
                 launched = True
@@ -189,6 +192,11 @@ def run_ssh_task(job_id: str, command: str, connection: SSHConnection,
                     LOGGER.info("Captured structured report: status=%s", report_data.get('status', {}).get('code'))
                 except (json.JSONDecodeError, IndexError) as e:
                     LOGGER.warning("Failed to parse report JSON: %s", e)
+                continue
+
+            # The run's resource report (usage_report.py), written as the run ends.
+            if line.startswith(USAGE_REPORT):
+                job_store.update(job_id, usage_report=line[len(USAGE_REPORT):].strip())
                 continue
 
             # Detect work_dir metadata from submit_ssh_job
@@ -307,10 +315,13 @@ def run_ssh_task(job_id: str, command: str, connection: SSHConnection,
             job_store.append_log(job_id, f"\nError: {str(e)}")
             job_store.finalize(job_id, status="failed", phase="Error")
 
-    # Emails the owner that the run completed or failed (run_mail, once per run).
+    # Emails the owner that the run completed or failed (run_mail, once per run), and adds the
+    # hosting server's use to the run's resource report for the accounts that get it.
+    job_store.update(job_id, log_bytes=log_bytes)
     final = job_store.get_status(job_id)
     if final in ("completed", "failed"):
         run_mail.notify(job_id, final, connection)
+        hosting_usage.add_to_report(job_id, connection)
 
 
 def submit_job(job_id: str, command: str, connection: SSHConnection,

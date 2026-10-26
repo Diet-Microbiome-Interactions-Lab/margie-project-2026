@@ -329,7 +329,7 @@ def main():
             "fin": num(col(r, "ADJUSTED_CONFIDENCE_WITH_OPERON_CONTEXT")),
             "finh": num(col(r, "ADJUSTED_CONFIDENCE_WITH_OPERON_CONTEXT_hybrid")),
             "tih": TIER_IDX.get(col(r, "CONFIDENCE_TIER_hybrid").strip(), -1),
-            "imp": 1 if col(r, "DOES_OPERON_CONTEXT_IMPROVE_CONFIDENCE?").strip().lower() == "yes" else 0,
+            "imp": 1 if col(r, "DOES_OPERON_CONTEXT_IMPROVE_CONFIDENCE?").strip().lower() in ("increases", "yes") else 0,
             "ecs": col(r, "EC_EVIDENCE_STATUS"),
             "c4r": col(r, "C4_score_reasoning")[:200] if (c4v is not None and c4v < 1) else "",
             "rv": 1 if rv else 0,
@@ -978,7 +978,7 @@ function evidenceTrail(g){
   let h=`<div class="trail"><h4>evidence trail</h4>`
        +`<div class="cnt">${k!=null?`C1 counts <b>${k} of 7</b> databases (TIGRFAM, PGAP and NCBIfam share one)`:"evidence"}`
        +`${g.src?` | chosen: <b>${esc(g.src)}</b>`:""}</div>`
-       +`<div class="cnt ehint">dimmed: not counted in C1 (no function in the name, such as hypothetical, uncharacterized or a UPF or DUF family)</div>`;
+       +`<div class="cnt ehint">dimmed: not counted in C1 (no function in the name, such as hypothetical, uncharacterized or a UPF or DUF family, or the TIGRFAM slot it shares with PGAP and NCBIfam already counted)</div>`;
   if(g.c4!=null && g.c4<1)
     h+=`<div class="ecflag">⚑ EC conflict: C4 = ${pct(g.c4)}${g.ecs?" ("+esc(g.ecs)+")":""}. `
       +`${esc(g.c4r||"tools disagree on the EC number; compare the [EC:…] tags below.")}</div>`;

@@ -32,7 +32,7 @@ from dataclasses import asdict
 from bioinformatics_tools.api import build_gate, licensing
 from bioinformatics_tools.api.auth import decode_token, decrypt_private_key, get_current_user
 from bioinformatics_tools.api.models import GenomeSend, SlurmSend
-from bioinformatics_tools.api.services import job_history_client, job_runner, read_cache, scratch_cache, tool_assets, user_stores
+from bioinformatics_tools.api.services import hosting_usage, job_history_client, job_runner, read_cache, scratch_cache, tool_assets, user_stores
 from bioinformatics_tools.api.services.job_store import job_store
 from bioinformatics_tools.utilities import ssh_sftp, ssh_slurm
 from bioinformatics_tools.utilities.ssh_connection import (
@@ -1401,6 +1401,19 @@ def _dane_wf_command(workflow: str, genome_path: str, output_dir: str, selected_
     )
 
 
+def _with_usage_report(command: str, job_id: str, output_dir: str) -> str:
+    """The run's command between the two calls of usage_report.py: `start` notes the sizes of the
+    run folder and the MARGIE databases, `report` writes the run's resource report to the working
+    folder. The driver ends with the workflow's exit code."""
+    report = '~/bioinformatics-tools/.venv/bin/python -m bioinformatics_tools.workflow_tools.usage_report'
+    args = f'--job {shlex.quote(job_id)} --run-dir {shlex.quote(output_dir)}'
+    return (f'timeout 600 {report} start {args} || true\n'
+            f'{command}\n'
+            'rc=$?\n'
+            f'timeout 900 {report} report {args} --exit-code $rc || true\n'
+            'exit $rc')
+
+
 def _command_script(job_id: str, workflow: str, genome_path: str, output_dir: str, selected_tools_csv: str | None, *,
                     resume: bool = False, full_operon_map: bool = False, env: list[tuple[str, str]] | None = None,
                     note: str = "") -> str:
@@ -1536,6 +1549,11 @@ def _launch_job(
         job_id, workflow, genome_path, output_dir, selected_tools_csv,
         resume=bool(copy_from_work_dir), full_operon_map=run_full_operon_map, env=license_pairs,
     ))
+    # Each run writes its resource use to the working folder when it ends (usage_report.py).
+    if workflow == 'margie_sb':
+        command = _with_usage_report(command, job_id, output_dir)
+        if hosting_usage.enabled(current_user["username"], current_user["cluster_username"]):
+            job_store.update(job_id, hosting_start=hosting_usage.snapshot())
     job_runner.submit_job(
         job_id,
         command,
