@@ -65,22 +65,22 @@
 				"options": [
 					"It is 'conserved protein' plus a locus tag, lacking a function word",
 					"It comes from eggNOG, whose hits rank below UniProt's hits in labelling",
-					"It is shorter than the length that labelling asks of each label",
+					"It is shorter than the length that labelling asks of each product descriptor",
 					"It names a gene that RASTtk's SEED subsystems leave without a name"
 				],
 				"answer": 0,
 				"explain": "The last is_uninformative rule covers text that lacks a function word, such as …ase, transport or regulator, and is 'conserved protein' plus a locus tag. The FAQ gives 'conserved protein YbgC' as its example."
 			},
 			{
-				"question": "Suppose UniProt had reported nothing for this gene. Which label would labelling give it?",
+				"question": "Suppose UniProt had reported nothing for this gene. Which best product descriptor would labelling give it?",
 				"options": [
 					"'Function unknown', as COG is the last tool in the hierarchy",
 					"'No DB hits', as the two descriptions left are uninformative",
-					"'hypothetical protein', the label for genes of unknown function",
+					"'hypothetical protein', the product descriptor for genes of unknown function",
 					"'conserved protein YbgC', from eggNOG, in pass 2"
 				],
 				"answer": 3,
-				"explain": "When each remaining hit is uninformative, pass 2 takes the first tool in the hierarchy with any description. eggNOG (tier 4) comes before COG (tier 8); 'No DB hits' labels a gene the tools leave undescribed."
+				"explain": "When each remaining hit is uninformative, pass 2 takes the first tool in the hierarchy with any description. eggNOG (tier 4) comes before COG (tier 8); 'No DB hits' is the best product descriptor of a gene the tools leave undescribed."
 			}
 		],
 		"explain": "One rule set, is_uninformative, decides whether a description names a function, for labelling, C1 and the operon reference alike. Labelling prefers an informative hit and falls back to the first description of any kind."
@@ -239,10 +239,10 @@
 		"scenario": "In a RASTtk genome, PGAP | NCBIfam | TIGRFAM | HAMAP | PIRSF report nothing for one gene. UniProt Swiss-Prot's best hit is 'Glucokinase' at 35% identity. KEGG's top row is 'uncharacterized protein', and its second row, also above KofamScan's threshold, is 'glucokinase [EC:2.7.1.2]'. eggNOG reports 'Glucokinase'.",
 		"parts": [
 			{
-				"question": "Why does UniProt, in tier 2, leave the label to a lower tier?",
+				"question": "Why does UniProt, in tier 2, leave the best product descriptor to a lower tier?",
 				"options": [
 					"Its best hit falls below the 40% identity gate",
-					"Swiss-Prot sets labels for Prodigal genomes alone",
+					"Swiss-Prot sets product descriptors for Prodigal genomes alone",
 					"Its reviewed names rank below KEGG's orthology names",
 					"Its best hit names a function that eggNOG repeats"
 				],
@@ -250,7 +250,7 @@
 				"explain": "UniProt is the one tool gated at labelling, at identity 40% or more. At 35% its hit fails the gate, and the audit trail tags UniProt gate_failed."
 			},
 			{
-				"question": "Which tool and text set the gene's label?",
+				"question": "Which tool and text set the gene's best product descriptor?",
 				"options": [
 					"eggNOG's 'Glucokinase', as KEGG's top row is uninformative",
 					"KEGG's 'uncharacterized protein', its top-ranked row by e-value",
@@ -258,7 +258,7 @@
 					"KEGG's 'glucokinase [EC:2.7.1.2]', its informative second row"
 				],
 				"answer": 3,
-				"explain": "Within a tool, an informative lower-ranked hit is preferred to an uninformative top hit, and the gate note records the swap. KEGG (tier 3) comes before eggNOG (tier 4), so KEGG's second row sets the label, as KEGG wrote it."
+				"explain": "Within a tool, an informative lower-ranked hit is preferred to an uninformative top hit, and the gate note records the swap. KEGG (tier 3) comes before eggNOG (tier 4), so KEGG's second row sets the best product descriptor, as KEGG wrote it."
 			},
 			{
 				"question": "How does the audit trail in labeled-genes.tsv tag UniProt and eggNOG?",
@@ -272,7 +272,7 @@
 				"explain": "The audit trail tags each decision tool winner | no_hit | uninformative | gate_failed | available_but_lower_priority. UniProt failed its gate, KEGG won, and eggNOG held a usable hit below the winner."
 			}
 		],
-		"explain": "Labelling walks the trust hierarchy and takes the first tool whose best informative hit passes its gate. The label is that tool's text, and the other tools' evidence stays beside it in labeled-genes.tsv."
+		"explain": "Labelling walks the trust hierarchy and takes the first tool whose best informative hit passes its gate. The best product descriptor is that tool's text, and the other tools' evidence stays beside it in labeled-genes.tsv."
 	},
 	{
 		"id": "margie2-009",
@@ -363,15 +363,15 @@
 				"right": "Operons with the same tool hits, in any gene order"
 			},
 			{
-				"left": "By label, ordered",
-				"right": "Operons whose members carry the same labels, in the same order"
+				"left": "By product descriptor, ordered",
+				"right": "Operons whose members carry the same product descriptors, in the same order"
 			},
 			{
-				"left": "By label, composition",
-				"right": "Operons whose members carry the same labels, in any order"
+				"left": "By product descriptor, composition",
+				"right": "Operons whose members carry the same product descriptors, in any order"
 			}
 		],
-		"explain": "Each operon gets four hashes from its members' gene fingerprints and labels in genomic order. Evidence hashes match the same tool hits, label hashes match the same labels across species, composition hashes ignore gene order, and only genes in an operon get them."
+		"explain": "Each operon gets four hashes from its members' gene fingerprints and product descriptors in genomic order. Evidence hashes match the same tool hits, product descriptor hashes match the same product descriptors across species, composition hashes ignore gene order, and only genes in an operon get them."
 	},
 	{
 		"id": "margie2-012",
@@ -430,7 +430,7 @@
 		"topic": "margie",
 		"level": "hard",
 		"kind": "match",
-		"question": "In C3, n is the number of pool genomes in which both labels of a pair occur in qualifying operons, and k the number in which the pair shares an operon. Match each pair's counts to its Jeffreys posterior mean, (k + ½)/(n + 1).",
+		"question": "In C3, n is the number of pool genomes in which both product descriptors of a pair occur in qualifying operons, and k the number in which the pair shares an operon. Match each pair's counts to its Jeffreys posterior mean, (k + ½)/(n + 1).",
 		"pairs": [
 			{
 				"left": "k = 1, n = 1",
@@ -460,7 +460,7 @@
 		"topic": "margie",
 		"level": "hard",
 		"kind": "match",
-		"question": "In a genome that Prodigal called, the genes take their labels from the annotation tools. Match each gene's best hits to the source of its label.",
+		"question": "In a genome that Prodigal called, the genes take their product descriptors from the annotation tools. Match each gene's best hits to the source of its best product descriptor.",
 		"pairs": [
 			{
 				"left": "A Pfam DUF hit and an informative COG hit",
@@ -480,10 +480,10 @@
 			},
 			{
 				"left": "Zero descriptions from any tool",
-				"right": "The label 'No DB hits'"
+				"right": "The best product descriptor 'No DB hits'"
 			}
 		],
-		"explain": "Pass 1 takes the first tool in the hierarchy whose best hit is informative and passes its gate: Pfam's DUF hits qualify, and UniProt needs 40% identity. Pass 2 takes the first description of any kind, and a gene the tools leave undescribed is labelled 'No DB hits'."
+		"explain": "Pass 1 takes the first tool in the hierarchy whose best hit is informative and passes its gate: Pfam's DUF hits qualify, and UniProt needs 40% identity. Pass 2 takes the first description of any kind, and a gene the tools leave undescribed gets 'No DB hits' as its best product descriptor."
 	},
 	{
 		"id": "margie2-016",
@@ -520,9 +520,9 @@
 		"topic": "margie",
 		"level": "hard",
 		"kind": "truefalse",
-		"statement": "In C3's membership channel, an operon with four informative labels gives three label pairs, one for each pair of consecutive genes.",
+		"statement": "In C3's membership channel, an operon with four informative product descriptors gives three pairs, one for each pair of consecutive genes.",
 		"answer": false,
-		"explain": "The membership channel pairs informative genes that share a qualifying operon at any distance: s informative labels give s(s − 1)/2 pairs, here 4 × 3 / 2 = 6, each counted once per operon. Consecutive informative pairs make up the adjacency channel, so k(adjacent) ≤ k(membership) ≤ n."
+		"explain": "The membership channel pairs informative genes that share a qualifying operon at any distance: s informative product descriptors give s(s − 1)/2 pairs, here 4 × 3 / 2 = 6, each counted once per operon. Consecutive informative pairs make up the adjacency channel, so k(adjacent) ≤ k(membership) ≤ n."
 	},
 	{
 		"id": "margie2-018",

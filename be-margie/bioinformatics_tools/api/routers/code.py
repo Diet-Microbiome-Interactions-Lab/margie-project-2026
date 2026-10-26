@@ -59,7 +59,7 @@ STEPS = [
     {
         "key": "labeling",
         "title": "Labeling",
-        "what": "Gives each gene one label, with its EC consensus, operon context and tool agreement.",
+        "what": "Gives each gene its best product descriptor, with its EC consensus, operon context and tool agreement.",
         "files": ["labeling/assign-canonical-label.py", "labeling/add-ec-consensus.py",
                   "labeling/add-operon-info.py", "labeling/add-cluster-agreement.py"],
     },
@@ -72,7 +72,7 @@ STEPS = [
     {
         "key": "scoring",
         "title": "Scoring",
-        "what": "Scores each label: hierarchy and confidence tiers, C1 to C4, and the final 0-1 confidence.",
+        "what": "Scores each gene's best product descriptor: hierarchy and confidence tiers, C1 to C4, and the final 0-1 confidence.",
         "files": ["scoring/score-hierarchy-tier.py", "scoring/score-confidence-tier.py",
                   "scoring/score-c1-tool-coverage.py", "scoring/score-c2-operon-probability.py",
                   "scoring/c3_score_organism.py", "scoring/score-c4-ec-agreement.py",

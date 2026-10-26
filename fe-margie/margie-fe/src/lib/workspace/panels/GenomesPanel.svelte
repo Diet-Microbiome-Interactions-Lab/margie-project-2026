@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { Check, ChevronDown, CircleHelp, X } from 'lucide-svelte';
+	import { ChevronDown, CircleHelp, X } from 'lucide-svelte';
 	import { formatBytes } from '$lib/api';
 	import NestedGenomes from '../NestedGenomes.svelte';
 	import Panel from '../Panel.svelte';
@@ -9,7 +9,8 @@
 
 	/**
 	 * Genome table: a toolbar (selection and table tools), then one row per FASTA file with domain
-	 * and genetic code as coloured selects and the gene caller it will get.
+	 * and genetic code as coloured selects and the gene caller it will get. With GTDB-Tk on (Gene
+	 * calling, on Analyze), an empty domain or code is worked out by GTDB-Tk and shows quietly.
 	 */
 
 	let fileInput = $state<HTMLInputElement>();
@@ -121,29 +122,8 @@
 		);
 	}
 
-	let switchingGtdbtk = $state(false);
-
-	/** Genomes GTDB-Tk would classify: those missing either field. */
-	const needGtdbtk = $derived(ws.genomes.filter((g) => !g.domain || !g.genetic_code).length);
-
-	/**
-	 * Toggles RUN_GTDBTK for the whole run; it affects only genomes missing domain or genetic code.
-	 * saveSettings reloads the genomes, so ws.runGtdbtk and the caller column update themselves.
-	 */
-	async function toggleGtdbtk() {
-		if (switchingGtdbtk) return;
-		switchingGtdbtk = true;
-		const on = !ws.runGtdbtk;
-		const saved = await ws.saveSettings({ RUN_GTDBTK: on ? '1' : '0' });
-		switchingGtdbtk = false;
-		if (!saved) return;
-		ui.notify(
-			on
-				? 'GTDB-Tk will classify the genomes with no domain or genetic code.'
-				: 'GTDB-Tk is off. Genomes with no domain or genetic code use Prodigal.',
-			'ok'
-		);
-	}
+	/** An empty domain or code: GTDB-Tk works it out when on; off, the genome goes to Prodigal. */
+	const blank = $derived(ws.runGtdbtk ? 'GTDB-Tk' : 'Unknown');
 </script>
 
 <svelte:window onpointerup={() => (dragTo = null)} onpointercancel={() => (dragTo = null)} />
@@ -152,18 +132,6 @@
 	<!-- On the cluster, domain and code are saved to the account's config, where the run reads them. -->
 	{#if ws.genomes.length}
 		{#if ws.savingGenomes}<span class="gp-saving">Saving</span>{/if}
-		<button
-			type="button"
-			class="gp-pill"
-			aria-pressed={ws.runGtdbtk}
-			disabled={switchingGtdbtk}
-			title={needGtdbtk
-				? `Classify the ${needGtdbtk} genome${needGtdbtk === 1 ? '' : 's'} with no domain or genetic code. ${backend.cluster ? 'Runs on the highmem partition, about 400 GB of memory.' : 'Needs a high-memory machine.'}`
-				: 'Every genome already has a domain and genetic code, so GTDB-Tk has nothing to classify.'}
-			onclick={toggleGtdbtk}
-		>
-			{#if ws.runGtdbtk}<Check size={14} />{/if}Work out domain and genetic code with GTDB-Tk
-		</button>
 		<span class="gp-more">
 			<button type="button" class="gp-pill" aria-expanded={moreOpen} aria-haspopup="menu" onclick={() => (moreOpen = !moreOpen)}>More<ChevronDown size={13} /></button>
 			{#if moreOpen}
@@ -299,14 +267,14 @@
 				<div>
 					<b>Which to choose</b>
 					<p>
-						Known organism: its domain, and code 11 unless it belongs to the groups above. Not sure: leave both Unknown and switch on
-						<i>Work out domain and genetic code with GTDB-Tk</i>, which places the genome in the GTDB taxonomy first. Left Unknown without it, the
-						genome's genes are called by Prodigal alone, without RASTtk.
+						Known organism: its domain, and code 11 unless it belongs to the groups above. Not sure: leave both empty with GTDB-Tk on (Gene
+						calling, on Analyze), which places the genome in the GTDB taxonomy first. Left empty without it, the genome's genes are called by
+						Prodigal alone, without RASTtk.
 					</p>
 				</div>
 				<div>
 					<b>Gene caller</b>
-					<p>Follows from the two: RASTtk when both are set; GTDB-Tk then RASTtk when they are Unknown and GTDB-Tk is on; Prodigal otherwise.</p>
+					<p>Follows from the two: RASTtk when both are set; GTDB-Tk then RASTtk when they are empty and GTDB-Tk is on; Prodigal otherwise.</p>
 				</div>
 			</div>
 		{/if}
@@ -331,11 +299,12 @@
 								class="gp-badge"
 								class:bac={g.domain === 'Bacteria'}
 								class:arc={g.domain === 'Archaea'}
-								class:unk={!g.domain}
+								class:unk={!g.domain && !ws.runGtdbtk}
+								class:auto={!g.domain && ws.runGtdbtk}
 								aria-label="Domain of {g.name}"
 								title={DOMAIN_NOTE[g.domain ?? ''] ?? ''}
 								value={g.domain} onchange={(e) => ws.edit(g.name, 'domain', e.currentTarget.value)}>
-								<option value="">Unknown</option>
+								<option value="">{blank}</option>
 								<option value="Bacteria">Bacteria</option>
 								<option value="Archaea">Archaea</option>
 							</select>
@@ -343,13 +312,14 @@
 						<span role="cell">
 							<input
 								class="gp-badge gp-code"
-								class:unk={!g.genetic_code}
+								class:unk={!g.genetic_code && !ws.runGtdbtk}
+								class:auto={!g.genetic_code && ws.runGtdbtk}
 								type="number"
 								min="1"
 								max="100"
 								step="1"
 								list="gp-codes"
-								placeholder="Unknown"
+								placeholder={blank}
 								aria-label="Genetic code of {g.name}"
 								title={CODE_NOTE[g.genetic_code ?? ''] ?? `Translation table ${g.genetic_code}`}
 								value={g.genetic_code}
@@ -605,11 +575,6 @@
 		border-color: var(--mg-border-strong);
 		color: var(--mg-text);
 	}
-	.gp-pill[aria-pressed='true'] {
-		border-color: color-mix(in srgb, var(--mg-accent) 45%, var(--mg-border));
-		background: color-mix(in srgb, var(--mg-accent) 7%, var(--mg-surface));
-		color: var(--mg-accent-ink, var(--mg-accent));
-	}
 	.gp-pill:disabled {
 		opacity: 0.5;
 		cursor: not-allowed;
@@ -816,8 +781,14 @@
 	}
 	.gp-badge.bac,
 	.gp-badge.arc,
-	.gp-badge.unk {
+	.gp-badge.unk,
+	.gp-badge.auto {
 		padding-left: 22px;
+	}
+	/* Left to GTDB-Tk: quiet, as nothing is missing. */
+	.gp-badge.auto {
+		--dot: var(--mg-border-strong);
+		color: var(--mg-text-3);
 	}
 	.gp-badge.bac {
 		--dot: var(--mg-accent);

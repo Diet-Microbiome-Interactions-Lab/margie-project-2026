@@ -195,7 +195,7 @@
 			},
 			{
 				"left": "The operon reference",
-				"right": "Label and label-pair counts per genome, which C3 scores against"
+				"right": "Counts of product descriptors and their pairs per genome, which C3 scores against"
 			},
 			{
 				"left": "The fingerprint databases",
@@ -354,7 +354,7 @@
 			{
 				"question": "Some rows carry a heavy box border. What does the border mean?",
 				"options": [
-					"The gene's label came from UniProt",
+					"The gene's best product descriptor came from UniProt",
 					"The gene is flagged for review (NEEDS_REVIEW? = yes)",
 					"The gene sits in an operon",
 					"The gene's hits came from the protein cache"
@@ -365,7 +365,7 @@
 			{
 				"question": "Some rows are light grey with grey text. Which features are they?",
 				"options": [
-					"Genes whose label is hypothetical protein",
+					"Genes whose best product descriptor is hypothetical protein",
 					"Genes outside an operon",
 					"Genes whose final confidence is low",
 					"Non-coding features, which have no confidence tier"
@@ -386,7 +386,7 @@
 			"The gene's hybrid confidence tier, CONFIDENCE_TIER_hybrid",
 			"The gene's default confidence tier, CONFIDENCE_TIER",
 			"The categorical tier from the trust hierarchy and EC agreement",
-			"The tool that set the gene's label"
+			"The tool that set the gene's best product descriptor"
 		],
 		"answer": 0,
 		"explain": "make-final-excel.py tints each row by CONFIDENCE_TIER_hybrid, the tier of the final score computed with the hybrid C3, and its Legend sheet says so; rows with no tier are grey."
@@ -455,7 +455,7 @@
 			"It scales the lift by UniOP's probability that the gene shares an operon with its neighbours",
 			"It turns the lift into a penalty when C2 is low",
 			"It adds the lift a second time for genes in long operons",
-			"It stands in for C3 when the gene's label is hypothetical"
+			"It stands in for C3 when the gene's best product descriptor is hypothetical"
 		],
 		"answer": 0,
 		"explain": "C3 sets the boost and C2 scales it, so conserved context lifts a gene only when it lies in an operon, in proportion to UniOP's probability. A low C2 makes the lift small and takes nothing away."
@@ -465,22 +465,22 @@
 		"topic": "margie",
 		"level": "hard",
 		"kind": "match",
-		"question": "Besides the 0 to 1 confidence, MARGIE gives each gene a categorical tier: the hierarchy score of its label's source (PGAP, NCBIfam or TIGRFAM 4 | HAMAP, PIRSF or UniProt 3 | KEGG or eggNOG 2 | RASTtk 1 | Pfam, CDD or COG 0) plus its EC agreement (full consensus +2 | majority +1 | single source or none 0). A sum of 5 or more is high, 2 to 4 moderate and below 2 low, and conflicting EC numbers give flagged_for_review. Match each gene to its categorical tier.",
+		"question": "Besides the 0 to 1 confidence, MARGIE gives each gene a categorical tier: the hierarchy score of its best product descriptor's source (PGAP, NCBIfam or TIGRFAM 4 | HAMAP, PIRSF or UniProt 3 | KEGG or eggNOG 2 | RASTtk 1 | Pfam, CDD or COG 0) plus its EC agreement (full consensus +2 | majority +1 | single source or none 0). A sum of 5 or more is high, 2 to 4 moderate and below 2 low, and conflicting EC numbers give flagged_for_review. Match each gene to its categorical tier.",
 		"pairs": [
 			{
-				"left": "Label from TIGRFAM, EC numbers in full consensus",
+				"left": "Product descriptor from TIGRFAM, EC numbers in full consensus",
 				"right": "high"
 			},
 			{
-				"left": "Label from KEGG, an EC number from a single source",
+				"left": "Product descriptor from KEGG, an EC number from a single source",
 				"right": "moderate"
 			},
 			{
-				"left": "Label from RASTtk, no EC evidence",
+				"left": "Product descriptor from RASTtk, no EC evidence",
 				"right": "low"
 			},
 			{
-				"left": "Label from PGAP, EC numbers conflicting",
+				"left": "Product descriptor from PGAP, EC numbers conflicting",
 				"right": "flagged_for_review"
 			}
 		],
@@ -491,7 +491,7 @@
 		"topic": "margie",
 		"level": "intermediate",
 		"kind": "truefalse",
-		"statement": "The categorical tier, from the label's place in the trust hierarchy and its EC agreement, is added to the 0 to 1 confidence as a bonus for labels from curated family models.",
+		"statement": "The categorical tier, from the best product descriptor's place in the trust hierarchy and its EC agreement, is added to the 0 to 1 confidence as a bonus for product descriptors from curated family models.",
 		"answer": false,
 		"explain": "The categorical tier travels with C4 as provenance and stays out of the 0 to 1 score, which comes from C1 to C4 alone."
 	},
@@ -599,22 +599,22 @@
 		"topic": "margie",
 		"level": "hard",
 		"kind": "choice",
-		"question": "For any pair of labels in the operon pool, k in the adjacency channel is at most k in the membership channel, which is at most n. Why?",
+		"question": "For any pair of product descriptors in the operon pool, k in the adjacency channel is at most k in the membership channel, which is at most n. Why?",
 		"options": [
 			"The adjacency channel counts only genomes added after the starter reference",
 			"Membership pairs are counted twice, once for each gene",
 			"Adjacency counts are discounted by the enrichment weight before they are stored",
-			"An adjacent pair is also a membership pair, and n counts the genomes in which both labels occur in qualifying operons"
+			"An adjacent pair is also a membership pair, and n counts the genomes in which both product descriptors occur in qualifying operons"
 		],
 		"answer": 3,
-		"explain": "Two consecutive informative genes also share their operon, so each genome that counts a pair as adjacent also counts it as sharing an operon, and either k counts genomes among the n that carry both labels."
+		"explain": "Two consecutive informative genes also share their operon, so each genome that counts a pair as adjacent also counts it as sharing an operon, and either k counts genomes among the n that carry both product descriptors."
 	},
 	{
 		"id": "margie3-030",
 		"topic": "margie",
 		"level": "hard",
 		"kind": "case",
-		"scenario": "In genome G, the three-gene operon A–B–C has informative labels throughout, and UniOP links A–B and B–C. In the pool genomes these genes sit in the order A–C–B, so the pool gives the pair A–B no adjacency support (ρ_adj = 0), while B–C has ρ_adj = 0.81. In the membership channel, ρ_op(A,B) = 0.6, ρ_op(A,C) = 0.5 and ρ_op(B,C) = 0.7.",
+		"scenario": "In genome G, the three-gene operon A–B–C has informative product descriptors throughout, and UniOP links A–B and B–C. In the pool genomes these genes sit in the order A–C–B, so the pool gives the pair A–B no adjacency support (ρ_adj = 0), while B–C has ρ_adj = 0.81. In the membership channel, ρ_op(A,B) = 0.6, ρ_op(A,C) = 0.5 and ρ_op(B,C) = 0.7.",
 		"parts": [
 			{
 				"question": "What adjacency C3 does the operon get, and which genes take it?",
@@ -666,7 +666,7 @@
 		"topic": "margie",
 		"level": "hard",
 		"kind": "match",
-		"question": "Genome G is added to the operon pool. In each operon below, A, B and C carry different informative labels, H1 and H2 are hypothetical proteins, and the operon lies on one contig. Match each operon to what it adds to the pool's pair counts.",
+		"question": "Genome G is added to the operon pool. In each operon below, A, B and C carry different informative product descriptors, H1 and H2 are hypothetical proteins, and the operon lies on one contig. Match each operon to what it adds to the pool's pair counts.",
 		"pairs": [
 			{
 				"left": "A–B–C",
@@ -689,7 +689,7 @@
 				"right": "No pairs, as its informative members do not outnumber its uninformative ones"
 			}
 		],
-		"explain": "An operon enters the pool only when its informative members outnumber its uninformative ones. It then adds a membership pair for each two of its distinct informative labels and an adjacency pair for each two consecutive informative genes, so a hypothetical gene between two genes breaks their adjacency."
+		"explain": "An operon enters the pool only when its informative members outnumber its uninformative ones. It then adds a membership pair for each two of its distinct informative product descriptors and an adjacency pair for each two consecutive informative genes, so a hypothetical gene between two genes breaks their adjacency."
 	},
 	{
 		"id": "margie3-033",
@@ -713,11 +713,11 @@
 			},
 			{
 				"left": "Labelling",
-				"right": "Takes it as the gene's label, as no tool gives a description that names a function"
+				"right": "Takes it as the gene's best product descriptor, as no tool gives a description that names a function"
 			},
 			{
 				"left": "The operon pool",
-				"right": "Leaves the label out and skips any adjacency pair with that gene"
+				"right": "Leaves the product descriptor out and skips any adjacency pair with that gene"
 			},
 			{
 				"left": "The adjacency C3",
@@ -725,25 +725,25 @@
 			},
 			{
 				"left": "Fingerprints",
-				"right": "Gives the gene a fingerprint, with its label recorded"
+				"right": "Gives the gene a fingerprint, with its best product descriptor recorded"
 			}
 		],
-		"explain": "The operon pool keeps only informative labels, since one uninformative label stands for many unrelated proteins. Consolidation still keeps each hit, labelling falls back to the description when no tool names a function, the gene takes its operon's adjacency C3, and it gets a fingerprint like any other gene."
+		"explain": "The operon pool keeps only informative product descriptors, since one uninformative product descriptor stands for many unrelated proteins. Consolidation still keeps each hit, labelling falls back to the description when no tool names a function, the gene takes its operon's adjacency C3, and it gets a fingerprint like any other gene."
 	},
 	{
 		"id": "margie3-035",
 		"topic": "margie",
 		"level": "intermediate",
 		"kind": "choice",
-		"question": "Why does C3's operon pool identify each gene by its cleaned label rather than by its protein sequence?",
+		"question": "Why does C3's operon pool identify each gene by its cleaned best product descriptor rather than by its protein sequence?",
 		"options": [
-			"C3 checks the label whose confidence it reports, and a cleaned label groups one function named through different sources",
+			"C3 checks the best product descriptor whose confidence it reports, and cleaning it groups one function named through different sources",
 			"Protein sequences are not kept after gene calling",
-			"Labels let C3 skip leaving the scored genome out of the pool",
-			"Labels are short enough for the pool to fit in the MARGIE database"
+			"Product descriptors let C3 skip leaving the scored genome out of the pool",
+			"Product descriptors are short enough for the pool to fit in the MARGIE database"
 		],
 		"answer": 0,
-		"explain": "A gene's identity in the pool is its consensus label with source tags such as 'KEGG:' removed and case ignored; within C3, protein sequences serve only to recognise a genome for leave-one-out."
+		"explain": "A gene's identity in the pool is its best product descriptor with source tags such as 'KEGG:' removed and case ignored; within C3, protein sequences serve only to recognise a genome for leave-one-out."
 	},
 	{
 		"id": "margie3-036",
@@ -767,7 +767,7 @@
 		"kind": "truefalse",
 		"statement": "Prodigal writes a genome's gene calls in RASTtk's columns, so the later phases run on a Prodigal genome as they do on a RASTtk genome.",
 		"answer": true,
-		"explain": "Prodigal writes its gene calls to prodigal/ in RASTtk's columns, so phases 4 to 13 run the same way; its genomes take their labels from the other tools, and C1 reaches at most 6/7."
+		"explain": "Prodigal writes its gene calls to prodigal/ in RASTtk's columns, so phases 4 to 13 run the same way; its genomes take their product descriptors from the other tools, and C1 reaches at most 6/7."
 	},
 	{
 		"id": "margie3-038",
@@ -896,7 +896,7 @@
 			{
 				"question": "How does W's envelope call reach each gene's row in the final tables?",
 				"options": [
-					"Labelling writes it into each product label",
+					"Labelling writes it into each gene's best product descriptor",
 					"Scoring multiplies C1 by an envelope weight",
 					"The three ENVELOPE_ columns are added to each localisation table before loading, and consolidation carries them into each gene's row",
 					"It stays in envelope_summary.tsv, outside the gene tables"
@@ -931,22 +931,22 @@
 			"From the most narrowly curated evidence, such as curated prokaryotic family models, down to the broadest, such as COG"
 		],
 		"answer": 3,
-		"explain": "The hierarchy runs from curated prokaryotic family models (PGAP | NCBIfam | TIGRFAM) through family rules, reviewed proteins and orthology to RASTtk's names, domain models and COG; the label comes from the first tool whose best hit is informative and passes its gate."
+		"explain": "The hierarchy runs from curated prokaryotic family models (PGAP | NCBIfam | TIGRFAM) through family rules, reviewed proteins and orthology to RASTtk's names, domain models and COG; the best product descriptor comes from the first tool whose best hit is informative and passes its gate."
 	},
 	{
 		"id": "margie3-045",
 		"topic": "margie",
 		"level": "hard",
 		"kind": "choice",
-		"question": "A gene's label comes from KEGG, and TCDB also has a hit for it. What does labelling do with the TCDB hit?",
+		"question": "A gene's best product descriptor comes from KEGG, and TCDB also has a hit for it. What does labelling do with the TCDB hit?",
 		"options": [
-			"Compares its description with the label by shared words, and reports possible agreement or a need for review",
-			"Lets it replace the label when its e-value is lower",
+			"Compares its description with the best product descriptor by shared words, and reports possible agreement or a need for review",
+			"Lets it replace the best product descriptor when its e-value is lower",
 			"Counts it as one of C1's seven sources",
 			"Drops it, as TCDB covers transporters only"
 		],
 		"answer": 0,
-		"explain": "MEROPS, TCDB and dbCAN cover narrow groups of proteins, so they confirm the label the hierarchy sets: their hits are compared with it by shared words of four or more letters and reported as possible agreement or as needing review."
+		"explain": "MEROPS, TCDB and dbCAN cover narrow groups of proteins, so they confirm the best product descriptor the hierarchy sets: their hits are compared with it by shared words of four or more letters and reported as possible agreement or as needing review."
 	},
 	{
 		"id": "margie3-046",
@@ -956,7 +956,7 @@
 		"scenario": "In a genome that RASTtk called, one gene has these best hits: PGAP 'hypothetical protein' | TIGRFAM 'glucokinase' | eggNOG 'Glucokinase' | RASTtk 'Glucokinase (EC 2.7.1.2)'. No other tool reports it.",
 		"parts": [
 			{
-				"question": "Which tool sets the gene's label?",
+				"question": "Which tool sets the gene's best product descriptor?",
 				"options": [
 					"TIGRFAM, the first tool in the hierarchy whose best hit names a function",
 					"PGAP, the first tool in the hierarchy",
@@ -964,7 +964,7 @@
 					"RASTtk, as its name carries an EC number"
 				],
 				"answer": 0,
-				"explain": "PGAP comes first but reports only an unnamed protein, so the label passes to the next tool with an informative hit, TIGRFAM in tier 1."
+				"explain": "PGAP comes first but reports only an unnamed protein, so the best product descriptor passes to the next tool with an informative hit, TIGRFAM in tier 1."
 			},
 			{
 				"question": "How does the audit trail tag PGAP for this gene?",
@@ -983,13 +983,13 @@
 					"2/7, as PGAP's hit cancels TIGRFAM's",
 					"3/7: RASTtk, eggNOG and the shared TIGRFAM slot",
 					"4/7, counting each of the four tools that report the gene",
-					"1/7, the label's source alone"
+					"1/7, the best product descriptor's source alone"
 				],
 				"answer": 1,
 				"explain": "TIGRFAM, PGAP and NCBIfam share one C1 slot, which counts when one of them gives an informative hit; with RASTtk and eggNOG that makes 3 of the 7 sources."
 			}
 		],
-		"explain": "An uninformative hit from a top-tier tool passes the label down the hierarchy and adds nothing to C1, while the shared TIGRFAM slot counts once."
+		"explain": "An uninformative hit from a top-tier tool passes the best product descriptor down the hierarchy and adds nothing to C1, while the shared TIGRFAM slot counts once."
 	},
 	{
 		"id": "margie3-047",
@@ -1125,14 +1125,14 @@
 		"kind": "truefalse",
 		"statement": "C3 multiplies each adjacent pair's reliability by UniOP's probability for that pair, so a weakly linked pair counts for less in the operon's C3.",
 		"answer": false,
-		"explain": "C3 counts how often a pair of labels recurs across the pool genomes: each pair's ρ is the Jeffreys mean (k + ½)/(n + 1) times an enrichment weight, with no UniOP term. UniOP's probability enters the score as C2, and in the adjacency channel it only decides which side-by-side pairs are used: those UniOP links."
+		"explain": "C3 counts how often a pair of product descriptors recurs across the pool genomes: each pair's ρ is the Jeffreys mean (k + ½)/(n + 1) times an enrichment weight, with no UniOP term. UniOP's probability enters the score as C2, and in the adjacency channel it only decides which side-by-side pairs are used: those UniOP links."
 	},
 	{
 		"id": "margie3-055",
 		"topic": "margie",
 		"level": "hard",
 		"kind": "case",
-		"scenario": "Genome G has the operon A–H–B, and UniOP links A–H and H–B. A and B carry informative labels, and H is a hypothetical protein. In the operon pool, ρ_adj(A,B) = 0.7 and ρ_op(A,B) = 0.6.",
+		"scenario": "Genome G has the operon A–H–B, and UniOP links A–H and H–B. A and B carry informative product descriptors, and H is a hypothetical protein. In the operon pool, ρ_adj(A,B) = 0.7 and ρ_op(A,B) = 0.6.",
 		"parts": [
 			{
 				"question": "What adjacency C3, the default, does the operon get?",
@@ -1160,7 +1160,7 @@
 				"question": "What is H's hybrid C3?",
 				"options": [
 					"0.5, the neutral value",
-					"0, as H has no label to pair",
+					"0, as H has no product descriptor to pair",
 					"0.6, the mean of the informative members' hybrid values, 0.6 for A and 0.6 for B",
 					"0.3, half of the informative members' mean"
 				],
@@ -1177,7 +1177,7 @@
 		"kind": "choice",
 		"question": "Where does a gene's C2 come from?",
 		"options": [
-			"The operon pool: how often the gene's label shares an operon in other genomes",
+			"The operon pool: how often the gene's best product descriptor shares an operon in other genomes",
 			"The number of genes in the gene's operon, divided by ten",
 			"UniOP's probabilities for the gene and its side-by-side neighbours in its own genome",
 			"The hybrid C3 of the gene's strongest partner"
@@ -1205,11 +1205,11 @@
 				"right": "The gene: its strongest partnership in the pool, side by side or anywhere in its operon"
 			},
 			{
-				"left": "ρ for a pair of labels",
-				"right": "The operon pool: of the genomes that hold both labels, how many pair them"
+				"left": "ρ for a pair of product descriptors",
+				"right": "The operon pool: of the genomes that hold both product descriptors, how many pair them"
 			}
 		],
-		"explain": "C2 and the hybrid C3 are worked out gene by gene, the adjacency C3 once per operon, and each ρ from the pool's counts n and k for a pair of labels."
+		"explain": "C2 and the hybrid C3 are worked out gene by gene, the adjacency C3 once per operon, and each ρ from the pool's counts n and k for a pair of product descriptors."
 	},
 	{
 		"topic": "margie",
@@ -1279,16 +1279,16 @@
 		"id": "margie3-063",
 		"level": "intermediate",
 		"kind": "truefalse",
-		"statement": "A hypothetical protein inside an operon gets a C2 like its named neighbours, as UniOP works from the gene calls (the proteins and their positions), not from MARGIE's labels.",
+		"statement": "A hypothetical protein inside an operon gets a C2 like its named neighbours, as UniOP works from the gene calls (the proteins and their positions), not from MARGIE's product descriptors.",
 		"answer": true,
-		"explain": "C2 is read from UniOP's pair probabilities, which do not depend on a gene's label. Labels matter for C3: a hypothetical protein takes no part in a pair there, and in the hybrid score it takes the mean of its operon's informative members."
+		"explain": "C2 is read from UniOP's pair probabilities, which do not depend on a gene's best product descriptor. Product descriptors matter for C3: a hypothetical protein takes no part in a pair there, and in the hybrid score it takes the mean of its operon's informative members."
 	},
 	{
 		"topic": "margie",
 		"id": "margie3-064",
 		"level": "hard",
 		"kind": "case",
-		"scenario": "Genome G has the four-gene operon A–B–C–D, each gene with an informative label. UniOP gives the pairs A–B 0.9, B–C 0.6 and C–D 0.8. The operon pool gives ρ_adj(A,B) = 0.8, ρ_adj(B,C) = 0.2 and ρ_adj(C,D) = 0.4, and for D's co-members ρ_op(A,D) = 0.9, ρ_op(B,D) = 0.3 and ρ_op(C,D) = 0.5.",
+		"scenario": "Genome G has the four-gene operon A–B–C–D, each gene with an informative product descriptor. UniOP gives the pairs A–B 0.9, B–C 0.6 and C–D 0.8. The operon pool gives ρ_adj(A,B) = 0.8, ρ_adj(B,C) = 0.2 and ρ_adj(C,D) = 0.4, and for D's co-members ρ_op(A,D) = 0.9, ρ_op(B,D) = 0.3 and ρ_op(C,D) = 0.5.",
 		"parts": [
 			{
 				"question": "What are the C2 values of A, B, C and D?",
@@ -1331,7 +1331,7 @@
 		"id": "margie3-065",
 		"level": "hard",
 		"kind": "case",
-		"scenario": "Genome G has the operon A–H–B, in which H is a hypothetical protein and A and B carry informative labels. UniOP gives A–H 0.7 and H–B 0.9. In the operon pool, ρ_op(A,B) = 0.6.",
+		"scenario": "Genome G has the operon A–H–B, in which H is a hypothetical protein and A and B carry informative product descriptors. UniOP gives A–H 0.7 and H–B 0.9. In the operon pool, ρ_op(A,B) = 0.6.",
 		"parts": [
 			{
 				"question": "What are the C2 values of A, H and B?",
@@ -1342,7 +1342,7 @@
 					"A 0.7, H 0.8 and B 0.9"
 				],
 				"answer": 3,
-				"explain": "C2 comes from UniOP's pairs, whatever the labels: A takes its one pair, 0.7; H the mean of its two, (0.7 + 0.9)/2 = 0.8; B its one pair, 0.9."
+				"explain": "C2 comes from UniOP's pairs, whatever the product descriptors: A takes its one pair, 0.7; H the mean of its two, (0.7 + 0.9)/2 = 0.8; B its one pair, 0.9."
 			},
 			{
 				"question": "A's hybrid C3 is 0.6, from B by membership past H. What is A's hybrid context term?",
@@ -1367,7 +1367,7 @@
 				"explain": "The adjacency channel leaves out A–H and H–B, so no pair is left and the operon's C3 is 0 (0.5 is for an operon of hypothetical proteins only). In the hybrid score, A and B each get 0.6, so H takes 0.6, and its context term is 0.8 × 0.6 = 0.48."
 			}
 		],
-		"explain": "A hypothetical gene has a C2 like any other, since UniOP does not read labels; the hybrid C3 lets context reach past it, and each gene's own C2 scales what it gets."
+		"explain": "A hypothetical gene has a C2 like any other, since UniOP does not read product descriptors; the hybrid C3 lets context reach past it, and each gene's own C2 scales what it gets."
 	},
 	{
 		"topic": "margie",
@@ -1377,11 +1377,11 @@
 		"question": "Why does C2 scale C3 in the context term, rather than add to the score on its own?",
 		"options": [
 			"C2 is a penalty that lowers the score of a gene outside an operon",
-			"Sitting in an operon is not by itself evidence for a gene's label; the evidence is that the neighbourhood recurs in other genomes (C3), and C2 sets how much of it the gene takes",
+			"Sitting in an operon is not by itself evidence for a gene's best product descriptor; the evidence is that the neighbourhood recurs in other genomes (C3), and C2 sets how much of it the gene takes",
 			"C2 already holds the pool's counts, so adding it would count C3 twice",
 			"Adding C2 would give a gene outside an operon a context term of 0.5"
 		],
 		"answer": 1,
-		"explain": "UniOP's probability says the gene is likely transcribed with its neighbours in this genome, which does not test its label. C3 tests the label against other genomes, and C2 scales that lift, from half of C3 to the whole of it for an operon gene."
+		"explain": "UniOP's probability says the gene is likely transcribed with its neighbours in this genome, which does not test its best product descriptor. C3 tests the best product descriptor against other genomes, and C2 scales that lift, from half of C3 to the whole of it for an operon gene."
 	}
 ]

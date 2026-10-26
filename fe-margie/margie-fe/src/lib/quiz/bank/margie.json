@@ -57,7 +57,7 @@
 		"question": "What does the consolidation phase (phase 9) produce for a genome?",
 		"options": [
 			"One table with one row per gene, joining each tool's results with their columns kept",
-			"One product label for each gene, taken from the most trusted tool that has a good hit",
+			"One best product descriptor for each gene, taken from the most trusted tool that has a good hit",
 			"A 0 to 1 confidence for each gene, built from four separate measures of its evidence",
 			"A list of the genome's operons, worked out from the distances between neighbouring genes"
 		],
@@ -69,9 +69,9 @@
 		"topic": "margie",
 		"level": "easy",
 		"kind": "truefalse",
-		"statement": "When no higher-tier tool has an informative hit, a MEROPS, TCDB or dbCAN hit can set a gene's product label.",
+		"statement": "When no higher-tier tool has an informative hit, a MEROPS, TCDB or dbCAN hit can set a gene's best product descriptor.",
 		"answer": false,
-		"explain": "The label comes from the trust hierarchy, and MEROPS, TCDB and dbCAN hits are reported beside it as a cross-check. When no tool of tiers 1 to 8 qualifies, the label falls back to the first tool of those tiers with any description, or to 'No DB hits'."
+		"explain": "The best product descriptor comes from the trust hierarchy, and MEROPS, TCDB and dbCAN hits are reported beside it as a cross-check. When no tool of tiers 1 to 8 qualifies, the best product descriptor falls back to the first tool of those tiers with any description, or to 'No DB hits'."
 	},
 	{
 		"id": "margie-006",
@@ -126,15 +126,15 @@
 		"topic": "margie",
 		"level": "easy",
 		"kind": "choice",
-		"question": "How does the labelling phase choose a gene's single product label?",
+		"question": "How does the labelling phase choose a gene's best product descriptor?",
 		"options": [
 			"The first tool, in a fixed trust order, with an informative hit passing its threshold",
 			"The description that most of the tools agree on, with any tie broken by the lowest E-value",
 			"The hit with the lowest E-value across the tools, from whichever database it came from",
-			"A label that a language model writes from the descriptions that the tools return"
+			"A product descriptor that a language model writes from the descriptions that the tools return"
 		],
 		"answer": 0,
-		"explain": "Labelling walks a fixed hierarchy, from curated prokaryotic family rules (PGAP, NCBIfam, TIGRFAM) down to COG, and takes the first tool with an informative hit that passes its threshold. Tools are ranked by how curated their models are, and the label comes from one tool's hit."
+		"explain": "Labelling walks a fixed hierarchy, from curated prokaryotic family rules (PGAP, NCBIfam, TIGRFAM) down to COG, and takes the first tool with an informative hit that passes its threshold. Tools are ranked by how curated their models are, and the best product descriptor comes from one tool's hit."
 	},
 	{
 		"id": "margie-011",
@@ -176,7 +176,7 @@
 			},
 			{
 				"left": "Phase 10",
-				"right": "Giving each gene one label by the trust hierarchy"
+				"right": "Giving each gene its best product descriptor by the trust hierarchy"
 			}
 		],
 		"explain": "Genes are called in phase 3, after quality and taxonomy, then annotated (phase 4) and grouped into operons (phase 5). The envelope type (phase 7) comes from phase 4's marker hits and sets the model for the localisation tools (phase 8); consolidation (phase 9) and labelling (phase 10) follow."
@@ -209,7 +209,7 @@
 				"right": "Tier 8, the last before the fallback"
 			}
 		],
-		"explain": "The order runs from curated family rules (PGAP, NCBIfam, TIGRFAM) through HAMAP, PIRSF and Swiss-Prot, then KEGG, eggNOG, RASTtk, Pfam, CDD and COG. A gene takes its label from the first of these with an informative hit that passes its threshold; UniProt's threshold is 40% identity."
+		"explain": "The order runs from curated family rules (PGAP, NCBIfam, TIGRFAM) through HAMAP, PIRSF and Swiss-Prot, then KEGG, eggNOG, RASTtk, Pfam, CDD and COG. A gene takes its best product descriptor from the first of these with an informative hit that passes its threshold; UniProt's threshold is 40% identity."
 	},
 	{
 		"id": "margie-014",
@@ -293,7 +293,7 @@
 			"A hash of the gene's DNA sequence, used to find its earlier annotations in the cache",
 			"A hash of the gene's pattern of hits across the tools, in a fixed tool order",
 			"A list of the gene's operon neighbours, which is used to work out the gene's C3 score",
-			"A short code for the tier of the tool that gave the gene its single product label"
+			"A short code for the tier of the tool that gave the gene its best product descriptor"
 		],
 		"answer": 1,
 		"explain": "Each gene's hits, slot by slot in a fixed tool order with empty slots kept, are joined and hashed with SHA-256, so the same evidence can be recognised in other genomes. Operon fingerprints combine their members' fingerprints, and the shared fingerprint databases count how often each pattern has been seen."
@@ -428,7 +428,7 @@
 		"topic": "margie",
 		"level": "hard",
 		"kind": "case",
-		"scenario": "An operon has four genes in order, A–B–C–D, and UniOP links each adjacent pair. C is a hypothetical protein; A, B and D have informative labels. In the OCC reference, A–B has a rho_adj of 0.6. B and D are seldom adjacent in other genomes but share an operon in many, with a membership rho_op of 0.5; A and D have no support in either channel.",
+		"scenario": "An operon has four genes in order, A–B–C–D, and UniOP links each adjacent pair. C is a hypothetical protein; A, B and D have informative product descriptors. In the OCC reference, A–B has a rho_adj of 0.6. B and D are seldom adjacent in other genomes but share an operon in many, with a membership rho_op of 0.5; A and D have no support in either channel.",
 		"parts": [
 			{
 				"question": "What is the operon's adjacency C3, the default channel?",
@@ -537,7 +537,7 @@
 			"Operons whose members share one COG functional category between them"
 		],
 		"answer": 1,
-		"explain": "Only qualifying operons count: those in which members with an informative label outnumber those labelled, for example, 'hypothetical protein'. From each, the reference adds which descriptors are present, which pairs share the operon and which pairs sit adjacent on the same contig."
+		"explain": "Only qualifying operons count: those in which members with an informative product descriptor outnumber those named, for example, 'hypothetical protein'. From each, the reference adds which descriptors are present, which pairs share the operon and which pairs sit adjacent on the same contig."
 	},
 	{
 		"id": "margie-030",
@@ -578,11 +578,11 @@
 		"options": [
 			"Sequencing reads, and back the assembled contigs with their quality statistics",
 			"Metagenome reads, and back the taxa found with their relative abundance",
-			"Genome assemblies, and back each gene's label, operon and a 0 to 1 confidence",
+			"Genome assemblies, and back each gene's best product descriptor, operon and confidence",
 			"Protein structures, and back each protein's binding sites with docking scores"
 		],
 		"answer": 2,
-		"explain": "MARGIE takes prokaryotic genome assemblies as FASTA files. She calls their genes, annotates them with many tools at once, finds operons and scores how much the evidence for each gene's label agrees."
+		"explain": "MARGIE takes prokaryotic genome assemblies as FASTA files. She calls their genes, annotates them with many tools at once, finds operons and scores how much the evidence for each gene's best product descriptor agrees."
 	},
 	{
 		"id": "margie-032",
@@ -604,9 +604,9 @@
 		"topic": "margie",
 		"level": "easy",
 		"kind": "truefalse",
-		"statement": "MARGIE writes a gene's label by combining words from the descriptions that the different tools report for it.",
+		"statement": "MARGIE writes a gene's best product descriptor by combining words from the descriptions that the different tools report for it.",
 		"answer": false,
-		"explain": "The label is one tool's hit description, taken as the tool wrote it, from the first tool in the trust hierarchy with an informative hit, and the other tools' evidence stays beside it in the same row so the label can be checked."
+		"explain": "The best product descriptor is one tool's hit description, taken as the tool wrote it, from the first tool in the trust hierarchy with an informative hit, and the other tools' evidence stays beside it in the same row so the best product descriptor can be checked."
 	},
 	{
 		"id": "margie-034",
@@ -618,10 +618,10 @@
 			"Consolidation writes it straight from the tools' tables, before labelling",
 			"The website builds it in the browser from the MARGIE database",
 			"The genome viewer writes it when the map is drawn",
-			"At the end of scoring, joining each gene's label and its sources with C1 to C4, their reasoning, the confidence and the tier"
+			"At the end of scoring, joining each gene's best product descriptor and its sources with C1 to C4, their reasoning, the confidence and the tier"
 		],
 		"answer": 3,
-		"explain": "make-final-annotation-with-confidence.py runs as the last step of scoring: it joins labelling's table (the label, its source and audit trail) with C1 to C4, their formulas and reasoning, the final confidence and the tier. The genome viewer and the Excel copy are made from it."
+		"explain": "make-final-annotation-with-confidence.py runs as the last step of scoring: it joins labelling's table (the best product descriptor, its source and audit trail) with C1 to C4, their formulas and reasoning, the final confidence and the tier. The genome viewer and the Excel copy are made from it."
 	},
 	{
 		"id": "margie-035",
@@ -803,7 +803,7 @@
 		"options": [
 			"It restores the whole genome's outputs, as most of its proteins are known",
 			"It sends each protein again, as the cache serves whole genomes only",
-			"It copies the matched proteins' labels, so labelling skips them",
+			"It copies the matched proteins' product descriptors, so labelling skips them",
 			"It sends only the proteins not yet stored under that tool's key"
 		],
 		"answer": 3,
@@ -845,14 +845,14 @@
 			},
 			{
 				"left": "product_descriptor_source",
-				"right": "The tool the gene's label came from"
+				"right": "The tool the gene's best product descriptor came from"
 			},
 			{
 				"left": "product_descriptor_hierarchy",
 				"right": "The tool chain labelling walked for the gene"
 			}
 		],
-		"explain": "Each tool's table carries its own provenance on each row, and consolidation keeps those columns as they are. Labelling adds where the label came from and how it was reached."
+		"explain": "Each tool's table carries its own provenance on each row, and consolidation keeps those columns as they are. Labelling adds where the best product descriptor came from and how it was reached."
 	},
 	{
 		"id": "margie-049",
@@ -876,22 +876,22 @@
 		"kind": "truefalse",
 		"statement": "UniProt Swiss-Prot is the one tool whose hits labelling gates, at 40% identity, while the other tools' hits are used under the cutoffs they applied when they searched.",
 		"answer": true,
-		"explain": "Only UniProt is gated at labelling: its hit sets the label in the first pass only at 40% identity or more. The other tools applied their own cutoffs when they searched, such as the trusted cutoffs of PGAP and TIGRFAM and KofamScan's adaptive thresholds for KEGG."
+		"explain": "Only UniProt is gated at labelling: its hit sets the best product descriptor in the first pass only at 40% identity or more. The other tools applied their own cutoffs when they searched, such as the trusted cutoffs of PGAP and TIGRFAM and KofamScan's adaptive thresholds for KEGG."
 	},
 	{
 		"id": "margie-051",
 		"topic": "margie",
 		"level": "intermediate",
 		"kind": "choice",
-		"question": "Why does MARGIE leave uninformative labels, such as hypothetical protein, out of the operon reference?",
+		"question": "Why does MARGIE leave uninformative product descriptors, such as hypothetical protein, out of the operon reference?",
 		"options": [
-			"One such label covers many unrelated proteins, so it would pair genes of unrelated function",
-			"They carry no EC number, and the operon reference stores EC numbers rather than labels",
+			"One such product descriptor covers many unrelated proteins, so it would pair genes of unrelated function",
+			"They carry no EC number, and the operon reference stores EC numbers rather than product descriptors",
 			"UniOP predicts no operons for genes that have no named function in phase 4",
 			"Their proteins are left out of the protein-level cache, so they have no hash to count"
 		],
 		"answer": 0,
-		"explain": "C3 uses each gene's label as its identity. Counted as one identity, hypothetical protein would pair genes of unrelated function, so the pool takes only operons where informative members outnumber uninformative ones and skips pairs with an uninformative member."
+		"explain": "C3 uses each gene's best product descriptor as its identity. Counted as one identity, hypothetical protein would pair genes of unrelated function, so the pool takes only operons where informative members outnumber uninformative ones and skips pairs with an uninformative member."
 	},
 	{
 		"id": "margie-052",
@@ -913,10 +913,10 @@
 		"topic": "margie",
 		"level": "intermediate",
 		"kind": "case",
-		"scenario": "A student reads one gene's row in a genome's final table. Its label came from KEGG, although PGAP ranks higher in the trust hierarchy and reported a hit for the gene.",
+		"scenario": "A student reads one gene's row in a genome's final table. Its best product descriptor came from KEGG, although PGAP ranks higher in the trust hierarchy and reported a hit for the gene.",
 		"parts": [
 			{
-				"question": "How does MARGIE record why PGAP did not set the label?",
+				"question": "How does MARGIE record why PGAP did not set the best product descriptor?",
 				"options": [
 					"cache-report.tsv lists the tools skipped for each gene",
 					"The C4 formula names the tools that conflicted",
@@ -924,13 +924,13 @@
 					"The envelope summary lists the tools each gene passed"
 				],
 				"answer": 2,
-				"explain": "Labelling writes an audit trail beside the label, in labeled-genes.tsv and in the final table: each decision tool is tagged WINNER, no_hit, uninformative, gate_failed or available_but_lower_priority, with its gate note."
+				"explain": "Labelling writes an audit trail beside the best product descriptor, in labeled-genes.tsv and in the final table: each decision tool is tagged WINNER, no_hit, uninformative, gate_failed or available_but_lower_priority, with its gate note."
 			},
 			{
 				"question": "The audit trail tags PGAP uninformative. What does that say about PGAP's hit?",
 				"options": [
 					"It fell below a 40% identity gate that PGAP shares with UniProt",
-					"Its best hit names no function, such as hypothetical protein, so the label passed down the hierarchy",
+					"Its best hit names no function, such as hypothetical protein, so the best product descriptor passed down the hierarchy",
 					"It came from the protein cache, which labelling passes over",
 					"KEGG's hit had a lower e-value, which outranks the hierarchy"
 				],
@@ -938,14 +938,14 @@
 				"explain": "PGAP reported a hit, so it is not no_hit, but the hit names no function. UniProt is the one tool gated at labelling, so PGAP cannot fail a gate, and labelling went on down the hierarchy to KEGG's informative hit."
 			}
 		],
-		"explain": "The final table carries the reasons behind each label: the audit trail tags each tool, so a curator can see why a higher-ranked tool was passed over."
+		"explain": "The final table carries the reasons behind each gene's best product descriptor: the audit trail tags each tool, so a curator can see why a higher-ranked tool was passed over."
 	},
 	{
 		"id": "margie-054",
 		"topic": "margie",
 		"level": "hard",
 		"kind": "truefalse",
-		"statement": "In C3, a label pair that the pool's genomes carry but that shares an operon in none of them (k = 0) is scored low and pulls the operon's geometric mean down.",
+		"statement": "In C3, a pair of product descriptors that the pool's genomes carry but that shares an operon in none of them (k = 0) is scored low and pulls the operon's geometric mean down.",
 		"answer": false,
 		"explain": "A pair with k = 0 counts as zero evidence and is left out; the adjacency C3 is the geometric mean over the operon's supported pairs. An operon with zero supported pairs gets 0, which leaves the gene's own evidence as its score."
 	},
