@@ -137,6 +137,24 @@ export const FAQS: Faq[] = [
 		"thesis": false
 	},
 	{
+		"id": "resource-use",
+		"group": "Running MARGIE",
+		"q": "Where does MARGIE record what a run used?",
+		"a": [
+			"<p>When a run ends, MARGIE writes its resource use to <b>resource-utilization-statistics</b> in the working folder: a PDF for the run, <code>&lt;run folder&gt;--&lt;job&gt;.pdf</code> (landscape Letter, three pages at most), and a row in <b>runs.tsv</b> beside it, in seconds and bytes, for adding up runs later.</p>",
+			"<p>The PDF reads SLURM's accounting for the run's own job and each step job: jobs | wall-clock, core and CPU hours | CPU use | peak memory | bytes read from and written to disk | time in the queue, by partition and by phase, with the largest jobs. It gives the files the run read and wrote by folder and by type, the growth of the MARGIE databases, the space the run consumed, and rates per wall hour, per core hour and per genome. Network transfers to outside services, such as RASTtk's, are outside SLURM's accounting.</p>"
+		],
+		"refs": [],
+		"code": [
+			{
+				"path": "usage_report.py",
+				"symbol": "collect",
+				"why": "Gathers a run's SLURM accounting, files and database sizes for its report."
+			}
+		],
+		"thesis": false
+	},
+	{
 		"id": "versions",
 		"group": "Running MARGIE",
 		"q": "Which versions of the reference databases does MARGIE use?",

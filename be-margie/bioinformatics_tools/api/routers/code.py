@@ -115,8 +115,9 @@ STEPS = [
         "key": "run-records",
         "title": "A run's folders and records",
         "what": "Says where each step's results came from (the cache report), leaves each genome's folder with its final "
-                "files on top and the step folders under per-tool-phased-output/, and writes a job's PDF report.",
-        "files": ["cache_report.py", "reorganize_outputs.py", "report/job_report.py"],
+                "files on top and the step folders under per-tool-phased-output/, writes a job's PDF report, and records "
+                "the run's resource use in the working folder.",
+        "files": ["cache_report.py", "reorganize_outputs.py", "report/job_report.py", "usage_report.py"],
     },
 ]
 
