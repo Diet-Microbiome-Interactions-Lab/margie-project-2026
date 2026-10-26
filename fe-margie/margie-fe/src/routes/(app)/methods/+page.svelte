@@ -317,6 +317,12 @@
 			<li><b>After gene calling: the protein hash.</b> A protein annotated before with a tool comes back from the protein cache; the tool runs on the new proteins. A tool new to a protein runs and is added; the protein's other tools stay.</li>
 		</ol>
 		<p>
+			The caches keep each tool's processed table, not the container's raw output. A step restored from the genome cache has no
+			folder under <span class="mg-mono">original_container_outputs</span>, and a tool run on the proteins new to a run keeps the raw
+			output of those proteins alone; <span class="mg-mono">cache-report.tsv</span>, in the run folder, names the steps that came
+			from the caches.
+		</p>
+		<p>
 			The caches keep RASTtk-based results. A genome bound for Prodigal takes RASTtk's gene calls and results when its genome hash has them, so Prodigal annotates novel genomes. A Prodigal genome reads the protein cache, and its results are loaded into the database without entering the caches. A later RASTtk run of the genome replaces them; a Prodigal run leaves RASTtk-based results in place.
 		</p>
 		<p>
