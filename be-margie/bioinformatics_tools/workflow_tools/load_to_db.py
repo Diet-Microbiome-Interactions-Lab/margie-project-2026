@@ -229,16 +229,41 @@ def _organism_names_for_fasta(db_path: str, fasta_hash) -> set[str]:
         return set()
 
 
+def _name_taken(db_path: str, name: str, fasta_hash) -> bool:
+    """Whether run_log has `name` for another genome (none of this genome's hashes)."""
+    hashes = _hash_list(fasta_hash)
+    if not hashes or not name:
+        return False
+
+    def _query() -> bool:
+        conn = _get_connection(db_path)
+        try:
+            _ensure_run_log(conn)
+            return conn.execute(
+                "SELECT 1 FROM run_log WHERE organism_name = ? AND fasta_hash IS NOT NULL AND fasta_hash != '' "
+                f"AND fasta_hash NOT IN ({','.join('?' * len(hashes))}) LIMIT 1", (name, *hashes)).fetchone() is not None
+        finally:
+            conn.close()
+
+    try:
+        return _retry_operation(_query)
+    except sqlite3.OperationalError:
+        return True
+
+
 def _delete_stale_organism_rows(db_path: str, table_name: str,
                                 organism_name: str,
                                 fasta_hash=None) -> int:
     """Delete existing rows for THIS GENOME from table_name before reloading.
 
-    Called only when _already_loaded() returned False. Rows are matched by every
-    name the genome has been loaded under, so a rerun under a new label never
-    leaves a duplicate copy.
+    Called only when _already_loaded() returned False. With the genome's hashes (--fasta), rows
+    are matched by genome_hash; rows from before genome_hash, by every name run_log ties to this
+    genome, and by this name unless run_log has it for another genome. Without them, by name.
     """
-    targets = {organism_name} | _organism_names_for_fasta(db_path, fasta_hash)
+    hashes = _hash_list(fasta_hash)
+    targets = _organism_names_for_fasta(db_path, fasta_hash) if hashes else set()
+    if not hashes or not _name_taken(db_path, organism_name, hashes):
+        targets.add(organism_name)
     targets = {t for t in targets if t}
 
     def _do_delete() -> int:
@@ -253,22 +278,27 @@ def _delete_stale_organism_rows(db_path: str, table_name: str,
             cols = {row[1] for row in conn.execute(f'PRAGMA table_info("{table_name}")')}
             # The gene calls' table (rasttk) names the genome in its organism column.
             col = "organism_name" if "organism_name" in cols else "organism" if "organism" in cols else None
-            if not col:
-                return 0
-            _ensure_organism_index(conn, table_name, col)
-            placeholders = ",".join("?" * len(targets))
-            cursor = conn.execute(
-                f'DELETE FROM "{table_name}" WHERE "{col}" IN ({placeholders})',
-                tuple(sorted(targets)),
-            )
-            deleted = cursor.rowcount
+            deleted = 0
+            if hashes and "genome_hash" in cols:
+                _ensure_organism_index(conn, table_name, "genome_hash")
+                deleted += conn.execute(
+                    f'DELETE FROM "{table_name}" WHERE genome_hash IN ({",".join("?" * len(hashes))})',
+                    tuple(hashes)).rowcount
+            if col and targets:
+                _ensure_organism_index(conn, table_name, col)
+                placeholders = ",".join("?" * len(targets))
+                only_unhashed = "genome_hash IS NULL AND " if "genome_hash" in cols else ""
+                deleted += conn.execute(
+                    f'DELETE FROM "{table_name}" WHERE {only_unhashed}"{col}" IN ({placeholders})',
+                    tuple(sorted(targets)),
+                ).rowcount
             if deleted:
                 conn.commit()
             return deleted
         finally:
             conn.close()
 
-    if not targets:
+    if not targets and not hashes:
         return 0
     if len(targets) > 1:
         print(f"Note: {table_name} — this FASTA was previously loaded as "
@@ -433,17 +463,23 @@ def _infer_type(value: str) -> str:
 
 
 def load_csv_to_db(csv_path: str, db_path: str, table_name: str,
-                   delimiter: str = ",") -> int:
+                   delimiter: str = ",", genome_hash: str | None = None) -> int:
     """Load a delimited file with headers into a table named `table_name`.
 
     - Creates the table from headers if it doesn't exist.
     - Infers column types (INTEGER/REAL/TEXT) from sample rows.
     - Adds an autoincrement `id` primary key.
+    - With `genome_hash`, each row carries the genome's sequence hash (genome_hash), which names
+      the genome in the table; organism_name stays as its label.
     """
     with open(csv_path, newline="") as fh:
         reader = csv.reader(fh, delimiter=delimiter)
         headers = [h.strip() for h in next(reader)]
         data_rows = list(reader)
+    if genome_hash and "genome_hash" not in headers:
+        n = len(headers)
+        headers.append("genome_hash")
+        data_rows = [(r + [""] * (n - len(r)))[:n] + [genome_hash] for r in data_rows]
 
     if not data_rows:
         return 0
@@ -520,6 +556,8 @@ def load_csv_to_db(csv_path: str, db_path: str, table_name: str,
                     existing.add(h.lower())
             if "organism_name" in existing:
                 _ensure_organism_index(conn, table_name)
+            if "genome_hash" in existing:
+                _ensure_organism_index(conn, table_name, "genome_hash")
             conn.executemany(insert_sql, rows)
             conn.commit()
         finally:
@@ -600,9 +638,9 @@ def main():
         n = load_gff_to_db(args.input_file, args.db_path, args.source_tool)
     elif args.format == "tsv":
         n = load_csv_to_db(args.input_file, args.db_path, args.table_name,
-                           delimiter="\t")
+                           delimiter="\t", genome_hash=fasta_hash)
     else:
-        n = load_csv_to_db(args.input_file, args.db_path, args.table_name)
+        n = load_csv_to_db(args.input_file, args.db_path, args.table_name, genome_hash=fasta_hash)
 
     _record_load(args.db_path, input_hash, label, args.input_file, n,
                  fasta_hash=fasta_hash, organism_name=organism_name)

@@ -1,12 +1,14 @@
-"""A genome's name stands for it in the database's tables (workflow.name_clashes): a run whose genome
-has a name another genome (other DNA) already has there stops before anything is loaded; the same
-genome under its name, or its file saved again with other line lengths, goes on."""
+"""Each genome runs as <name>--<the first 8 characters of its hash> (workflow.named_with_hash: a folder
+of links the run reads, the files as they are), keeping its own settings, so genomes that share a
+file name stay apart. workflow.name_clashes, a check kept behind it, finds a name another genome
+(other DNA) has in the MARGIE database; the same genome, or its file saved again, is not one."""
 
 import json
 import sqlite3
 
 from bioinformatics_tools.workflow_tools.load_to_db import fasta_hashes
-from bioinformatics_tools.workflow_tools.workflow import name_clashes
+from bioinformatics_tools.workflow_tools.workflow import name_clashes, name_with_hash, named_with_hash
+from bioinformatics_tools.workflow_tools.workflow_helpers import discover_genomes, genome_calls
 
 
 def _db(tmp_path, logged=(), linked=()):
@@ -30,7 +32,7 @@ def test_another_genome_under_the_name_stops_the_run(tmp_path):
     old = _fasta(tmp_path / "", "old", "ACGT" * 50)
     db = _db(tmp_path, logged=[("coli", fasta_hashes(old)[0])])
     new = _fasta(tmp_path, "coli", "TTGA" * 50)
-    assert name_clashes(db, {"coli": new}) == ["coli (coli.fna)"]
+    assert name_clashes(db, {"coli": new}) == ["coli"]
 
 
 def test_the_same_genome_goes_on_even_saved_again(tmp_path):
@@ -43,5 +45,28 @@ def test_the_same_genome_goes_on_even_saved_again(tmp_path):
 
 def test_a_name_seen_only_with_its_proteins_is_checked_too(tmp_path):
     db = _db(tmp_path, linked=[("someone-else", ["dorei"])])
-    assert name_clashes(db, {"dorei": _fasta(tmp_path, "dorei", "GGCC" * 40)}) == ["dorei (dorei.fna)"]
+    assert name_clashes(db, {"dorei": _fasta(tmp_path, "dorei", "GGCC" * 40)}) == ["dorei"]
     assert name_clashes(db, {"new": _fasta(tmp_path, "new", "GGCC" * 40)}) == []
+
+
+def test_each_genome_runs_under_its_name_and_hash_with_its_settings(tmp_path):
+    inputs = tmp_path / "in"
+    inputs.mkdir()
+    coli, dorei = _fasta(inputs, "coli", "TTGA" * 50), _fasta(inputs, "dorei", "GGCC" * 40)
+    folder = named_with_hash({"coli": coli, "dorei": dorei}, str(tmp_path / "run" / ".margie-input"))
+    genomes = discover_genomes(folder)
+    named = {f"coli--{fasta_hashes(coli)[0][:8]}", f"dorei--{fasta_hashes(dorei)[0][:8]}"}
+    assert set(genomes) == named
+    renamed = f"coli--{fasta_hashes(coli)[0][:8]}"
+    assert open(genomes[renamed]).read() == open(coli).read()
+    # Its settings in config.yaml stay with it, by its file's name.
+    config = {"margie_sb": {"genome_info": {"coli.fna": {"domain": "Archaea", "genetic_code": "11"}}}}
+    assert genome_calls({renamed: genomes[renamed]}, config)[renamed]["domain"].lower().startswith("arch")
+
+
+def test_a_name_that_already_carries_its_hash_keeps_it(tmp_path):
+    coli = _fasta(tmp_path, "coli", "TTGA" * 50)
+    named = name_with_hash("coli", coli)
+    assert name_with_hash(named, coli) == named
+    # Another genome's hash on the name is replaced by this genome's.
+    assert name_with_hash("coli--0000aaaa", coli) == named
