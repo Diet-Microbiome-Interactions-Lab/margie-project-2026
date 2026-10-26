@@ -49,8 +49,11 @@ ALWAYS_EXCLUDED: frozenset[str] = frozenset({
 })
 
 SPECIAL_FILENAME_OVERRIDES: dict[str, str] = {
-    "rasttk": "rast.tsv",
+    "rasttk": "rast.tsv", "prodigal": "prodigal.tsv",
 }
+
+# The gene callers' tables, in order of preference: the first present is the merge's gene list.
+GENE_CALLERS: tuple[str, ...] = ("rasttk", "prodigal")
 
 
 # ─── Per-tool row-key strategy ─────────────────────────────────────────────────
@@ -83,7 +86,7 @@ ROW_KEY_SPEC: dict[str, KeySpec] = {
     # Tools with exactly one row per gene.
     "psortb": KeySpec("none", ()), "signalp4": KeySpec("none", ()),
     "signalp6": KeySpec("none", ()), "operon": KeySpec("none", ()),
-    "rasttk": KeySpec("none", ()),
+    "rasttk": KeySpec("none", ()), "prodigal": KeySpec("none", ()),
 }
 
 # Rendered as bare deduplicated values, never "key: value".
@@ -144,7 +147,8 @@ def normalise_col(raw_col: str, tool_name: str) -> str:
 def discover_tool_tables(output_root: Path, extra_excluded: set[str]) -> list[tuple[str, Path]]:
     """Lists (tool_name, path) for each tool's results table under output_root/<tool>/.
 
-    InterPro yields one entry per member-database file; rasttk's file is rast.tsv.
+    InterPro yields one entry per member-database file; rasttk's file is rast.tsv and prodigal's
+    prodigal.tsv. With both gene callers' tables present, RASTtk's is the one listed.
     """
     excluded = ALWAYS_EXCLUDED | extra_excluded
     pairs: list[tuple[str, Path]] = []
@@ -176,6 +180,10 @@ def discover_tool_tables(output_root: Path, extra_excluded: set[str]) -> list[tu
             pairs.append((tool_name, tsv))
             break
 
+    callers = [name for name, _ in pairs if name in GENE_CALLERS]
+    if len(callers) > 1:
+        keep = min(callers, key=GENE_CALLERS.index)
+        pairs = [(name, path) for name, path in pairs if name not in GENE_CALLERS or name == keep]
     return pairs
 
 

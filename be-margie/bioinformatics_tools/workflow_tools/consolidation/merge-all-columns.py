@@ -15,6 +15,7 @@ from pathlib import Path
 
 from _shared import (
     BARE_VALUE_COLUMNS,
+    GENE_CALLERS,
     RASTTK_IDENTITY_COLUMNS,
     ToolTable,
     discover_tool_tables,
@@ -146,20 +147,25 @@ def aggregate_shared_interpro_columns(interpro_tables: list[ToolTable], fid: str
     return merged
 
 
-def assert_shared_feature_namespace(all_tables: list[ToolTable]) -> None:
-    """Exits if a non-empty tool table shares no feature_id with RASTtk's table.
-
-    Such a table comes from a different RASTtk submission; since the merge
-    unions feature_ids, it would otherwise add its genes as unrelated rows.
-    """
+def gene_table(all_tables: list[ToolTable]) -> ToolTable | None:
+    """The gene caller's table (RASTtk's, else Prodigal's): the genes the merge is built on."""
     by_tool = {t.tool_name: t for t in all_tables}
-    rast = by_tool.get("rasttk")
+    return next((by_tool[c] for c in GENE_CALLERS if c in by_tool), None)
+
+
+def assert_shared_feature_namespace(all_tables: list[ToolTable]) -> None:
+    """Exits if a non-empty tool table shares no feature_id with the gene caller's table.
+
+    Such a table comes from other gene calls (a different RASTtk submission); since the
+    merge unions feature_ids, it would otherwise add its genes as unrelated rows.
+    """
+    rast = gene_table(all_tables)
     if not rast or not rast.rows_by_feature:
-        return                                  # no rasttk table to compare against
+        return                                  # no gene table to compare against
     spine = set(rast.rows_by_feature)
     foreign = []
     for t in all_tables:
-        if t.tool_name == "rasttk" or not t.rows_by_feature:
+        if t is rast or not t.rows_by_feature:
             continue
         fids = set(t.rows_by_feature)
         if not (fids & spine):
@@ -168,7 +174,7 @@ def assert_shared_feature_namespace(all_tables: list[ToolTable]) -> None:
         return
     print("[merge-all-columns] ERROR: feature_id namespace mismatch — refusing to merge.",
           file=sys.stderr)
-    print(f"    rasttk defines {len(spine)} feature_ids, e.g. {sorted(spine)[0]}", file=sys.stderr)
+    print(f"    {rast.tool_name} defines {len(spine)} feature_ids, e.g. {sorted(spine)[0]}", file=sys.stderr)
     for name, n, example in foreign:
         print(f"    {name:14s} has {n} feature_ids sharing NONE of them, e.g. {example}",
               file=sys.stderr)
@@ -186,7 +192,7 @@ def build_merged_rows(
 ) -> tuple[list[dict], list[str]]:
     """Builds one merged row per feature_id across all tool tables and returns rows plus column order."""
     by_tool: dict[str, ToolTable] = {t.tool_name: t for t in all_tables}
-    rast = by_tool.get("rasttk")
+    rast = gene_table(all_tables)
 
     assert_shared_feature_namespace(all_tables)
 
@@ -227,7 +233,7 @@ def build_merged_rows(
             rast_merged = merge_rows_for_gene(rast, fid)
             for col in rast.tool_columns:
                 row[col] = rast_merged.get(col, "")
-            # Identity columns (GLOBAL_COLUMNS) come from rasttk's first raw row.
+            # Identity columns (GLOBAL_COLUMNS) come from the gene table's first raw row.
             rast_rows = rast.rows_by_feature.get(fid, [])
             if rast_rows:
                 r0 = rast_rows[0]
@@ -240,7 +246,7 @@ def build_merged_rows(
                 row["domain"] = domain_override
 
         for t in all_tables:
-            if t.tool_name == "rasttk":
+            if t is rast:
                 continue
             tmerged = merge_rows_for_gene(t, fid)
             for col in t.tool_columns:

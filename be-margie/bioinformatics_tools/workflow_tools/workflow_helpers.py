@@ -187,6 +187,16 @@ def genome_calls(genomes: dict[str, str], config) -> dict[str, dict[str, str]]:
     return out
 
 
+def gene_call_files(prefix: str, caller: str) -> dict[str, str]:
+    """A genome's gene-call files under its results prefix, as margie_sb.smk writes them: RASTtk's
+    in rasttk/ (rast.*), Prodigal's in prodigal/ (prodigal.*). Keys: table, faa, gff, computed
+    (the compute token) and loaded (the database token)."""
+    folder, stem = ('prodigal', 'prodigal') if caller == 'prodigal' else ('rasttk', 'rast')
+    return {'table': f"{prefix}{folder}/{stem}.tsv", 'faa': f"{prefix}{folder}/{stem}.faa",
+            'gff': f"{prefix}{folder}/{stem}.gff", 'computed': f"{prefix}{folder}/{folder}_compute.tkn",
+            'loaded': f"{prefix}{folder}/{folder}_db.tkn"}
+
+
 def discover_genomes(input_path: str, recursive: bool = False) -> dict[str, str]:
     """Resolves an input path to a {stem: filepath} map.
 
