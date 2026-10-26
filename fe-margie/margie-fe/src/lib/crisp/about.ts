@@ -183,7 +183,7 @@ export const FUNDING: { funder: string; award: string; title: string; url: strin
 export const AI_USAGE = {
 	paragraphs: [
 		"MARGIE's platform orchestration, the engine, API and interface she runs on, was developed by Dane Deemer (Deemer, 2020; Deemer, 2025). The methods and the host scripts of the pipeline were developed by Sajal Bhattarai, who designed and implemented the phase 9 to 12 scripts (consolidation, labeling, scoring and fingerprinting) and defined their core ideas, architecture and intended behaviour. Sajal Bhattarai also improved MARGIE's graphical interface, building on Dane Deemer's architecture.",
-		'Claude models (Anthropic, Inc.) were used interactively during development to debug the code and scripts, to improve their robustness, and to help refine the visualizations: the circular operon diagrams and the interactive genome map pages. Sajal Bhattarai checked the code, scripts and visualizations repeatedly and validated that they run as intended.'
+		"Claude (Anthropic, Inc.) was used interactively in development mode by Sajal Bhattarai to debug and test the code and scripts, improve their robustness, and build and refine parts of the website and its visualizations (the circular operon diagrams and the interactive genome map pages). Sajal Bhattarai designed MARGIE's methods, directed each change, and checked and validated the code, scripts, visualizations and text."
 	],
 	reference: { apa: 'Anthropic. (2026). Claude [Large language model].', url: 'https://www.anthropic.com/claude' }
 };
