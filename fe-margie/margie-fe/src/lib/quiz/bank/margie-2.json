@@ -26,12 +26,12 @@
 					"Neither pair, as each new run folder starts with empty caches"
 				],
 				"answer": 0,
-				"explain": "The genome-level and protein-level caches serve RASTtk genomes, so a RASTtk genome run before comes back from the MARGIE database. A Prodigal genome's tools run fresh, since its feature ids follow Prodigal's numbering."
+				"explain": "The caches keep RASTtk-based results, so a RASTtk genome run before comes back whole from the MARGIE database. A Prodigal genome's results stay out of the caches, so its tools run again, on the proteins the protein cache does not already hold."
 			},
 			{
 				"question": "The student plans to compare the four genomes gene by gene. Which setup suits that comparison?",
 				"options": [
-					"Keep the mix, as Prodigal writes RASTtk's file layout",
+					"Keep the mix, as Prodigal's gene table has RASTtk's columns",
 					"Keep the mix, as scoring evens out the two callers' calls",
 					"Fill in the table or turn on GTDB-Tk, so RASTtk calls the four",
 					"Run each genome with both callers and keep the longer gene set"
@@ -61,15 +61,15 @@
 				"explain": "The GTDB-Tk step holds the classification, with the domain and genetic code, in genome_info/genome_info.tsv. Consolidation takes the genome's domain from this file."
 			},
 			{
-				"question": "Genome B also has a rasttk/ folder. What does it hold?",
+				"question": "Genome B has a prodigal/ folder where genome A has rasttk/. What does it hold?",
 				"options": [
 					"An empty folder, kept for a later RASTtk run of genome B",
-					"Prodigal's calls, in rast.faa | rast.gff | rast.tsv",
+					"Prodigal's gene calls, in prodigal.faa | prodigal.gff | prodigal.tsv",
 					"RASTtk's own calls, made as a check on Prodigal's",
 					"A copy of genome A's RASTtk files, kept for reuse"
 				],
 				"answer": 1,
-				"explain": "Prodigal writes RASTtk's file layout, rast.faa | rast.gff | rast.tsv, so phases 4 to 13 run the same way for both genomes."
+				"explain": "Prodigal writes its own folder: the proteins, the GFF and the gene table, in RASTtk's columns. Phases 4 to 13 read each genome's own gene calls, so they run the same way for both genomes."
 			},
 			{
 				"question": "Which file holds each gene's EC consensus across tools, its operon information and its TIGRFAM family-cluster agreement?",
