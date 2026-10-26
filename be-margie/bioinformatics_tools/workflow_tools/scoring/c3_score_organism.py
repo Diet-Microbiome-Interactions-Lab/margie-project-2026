@@ -384,12 +384,14 @@ def _breakdown_and_formula(info, raw_operon_id):
 SCORED_AGAINST = "scored-against.json"
 
 
-def write_scored_against(path, reference, compared, left_out_self):
-    """Writes how many genomes of the OCC reference this genome was scored against (itself left out)."""
+def write_scored_against(path, reference, compared, left_out_self, left_out_as=None):
+    """Writes how many genomes of the OCC reference this genome was scored against (itself left out),
+    and the reference's name for it (left_out_as), which the report figures leave out too."""
     Path(path).write_text(json.dumps({
         "reference": str(Path(reference).resolve()),
         "genomes": compared,
         "left_out_self": left_out_self,
+        "left_out_as": left_out_as,
         "scored_at": datetime.now(timezone.utc).isoformat(timespec="seconds"),
     }, indent=1) + "\n")
 
@@ -449,6 +451,7 @@ def main():
 
     # Leave-one-out: drops this genome from the reference by fingerprint, else by name.
     left_out = False
+    token = None
     if args.leave_one_out:
         run_root = Path(args.genes_file).resolve().parents[2]
         fp = L.genome_fingerprint(genes["aa_hash"])
@@ -472,7 +475,8 @@ def main():
     # What this genome was compared with, beside its scores: Results says when the reference has
     # grown since, so it can be scored again against the larger reference.
     write_scored_against(Path(args.output).parent / SCORED_AGAINST, args.reference,
-                         compared=len(ref.get("organisms_added", ())), left_out_self=left_out)
+                         compared=len(ref.get("organisms_added", ())), left_out_self=left_out,
+                         left_out_as=token if left_out else None)
 
     pmap = load_pairwise_probs(args.operon_results)
     print(f"  UniOP per-pair probabilities: {len(pmap)}")

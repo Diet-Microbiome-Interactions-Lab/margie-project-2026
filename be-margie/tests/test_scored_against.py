@@ -28,6 +28,15 @@ def test_scoring_writes_what_it_compared_with(tmp_path):
     record = json.loads(out.read_text())
     assert record['genomes'] == 28 and record['left_out_self'] is True
     assert record['reference'].endswith('occ_reference.pkl') and record['scored_at']
+    assert record['left_out_as'] is None
+
+
+def test_scoring_records_the_reference_name_it_left_out(tmp_path):
+    scorer = _module('c3_score_organism_t', 'c3_score_organism.py')
+    out = tmp_path / scorer.SCORED_AGAINST
+    scorer.write_scored_against(out, tmp_path / 'occ_reference.pkl', compared=37, left_out_self=True,
+                                left_out_as='coli')
+    assert json.loads(out.read_text())['left_out_as'] == 'coli'
 
 
 def test_the_reference_update_writes_its_size():

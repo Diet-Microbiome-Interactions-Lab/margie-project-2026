@@ -962,7 +962,7 @@ rule update_operon_fingerprint_database:
         """
 
 
-localrules: load_consolidation_to_db
+localrules: load_consolidation_to_db, load_labeling_to_db, load_scoring_to_db, load_fingerprint_to_db
 
 
 rule load_consolidation_to_db:
@@ -982,40 +982,26 @@ rule load_consolidation_to_db:
 
 
 rule load_labeling_to_db:
-    """Loads each labeling TSV into its own main_database table."""
+    """Marks labeling done for the genome. Its tables stay in the results folder and are not
+    loaded: labeling runs again on each run, and nothing reads them from main_database."""
     input:
         labeled=LABELING_LABELED,
         ec_consensus=LABELING_EC_CONSENSUS,
         operon_info=LABELING_OPERON_INFO,
         cluster_agreement=LABELING_CLUSTER_AGREEMENT,
-        compute_tkn=LABELING_COMPUTE_TOKEN,
-        fasta=lambda wildcards: GENOMES[wildcards.genome]
+        compute_tkn=LABELING_COMPUTE_TOKEN
     output:
         tkn=LABELING_TOKEN
-    retries: LOAD_RETRIES
-    resources:
-        runtime=load_minutes,
-        margie_sb_db_writer=1
-    params:
-        gene_caller=gene_caller,
-        db=MAIN_DATABASE,
-        script=LOAD_SCRIPT
     shell:
         """
-        {LOADER_PYTHON} {params.script} tsv {input.labeled} {params.db} labeling_labeled \
-            --fasta {input.fasta} --delete-organism {wildcards.genome} --gene-caller {params.gene_caller}
-        {LOADER_PYTHON} {params.script} tsv {input.ec_consensus} {params.db} labeling_ec_consensus \
-            --fasta {input.fasta} --delete-organism {wildcards.genome} --gene-caller {params.gene_caller}
-        {LOADER_PYTHON} {params.script} tsv {input.operon_info} {params.db} labeling_operon_info \
-            --fasta {input.fasta} --delete-organism {wildcards.genome} --gene-caller {params.gene_caller}
-        {LOADER_PYTHON} {params.script} tsv {input.cluster_agreement} {params.db} labeling_cluster_agreement \
-            --fasta {input.fasta} --delete-organism {wildcards.genome} --gene-caller {params.gene_caller}
-        echo "labeling loaded for {wildcards.genome}" > {output.tkn}
+        echo "labeling done for {wildcards.genome}; its tables are in the results folder" > {output.tkn}
         """
 
 
 rule load_scoring_to_db:
-    """Loads each scoring TSV, C1-C4 included, into main_database; a genome's rows are replaced."""
+    """Marks scoring done for the genome. Its tables, C1-C4 included, stay in the results folder
+    and are not loaded: scoring runs again on each run against the operon reference as it stands,
+    and nothing reads them from main_database."""
     input:
         hierarchy_tier=SCORING_HIERARCHY_TIER,
         confidence_tier=SCORING_CONFIDENCE_TIER,
@@ -1024,35 +1010,12 @@ rule load_scoring_to_db:
         c3=SCORING_C3,
         c4=SCORING_C4,
         confidence_final=SCORING_CONFIDENCE_FINAL,
-        compute_tkn=SCORING_COMPUTE_TOKEN,
-        fasta=lambda wildcards: GENOMES[wildcards.genome]
+        compute_tkn=SCORING_COMPUTE_TOKEN
     output:
         tkn=SCORING_TOKEN
-    retries: LOAD_RETRIES
-    resources:
-        runtime=load_minutes,
-        margie_sb_db_writer=1
-    params:
-        gene_caller=gene_caller,
-        db=MAIN_DATABASE,
-        script=LOAD_SCRIPT
     shell:
         """
-        {LOADER_PYTHON} {params.script} tsv {input.hierarchy_tier} {params.db} scoring_hierarchy_tier \
-            --fasta {input.fasta} --delete-organism {wildcards.genome} --gene-caller {params.gene_caller} --force
-        {LOADER_PYTHON} {params.script} tsv {input.confidence_tier} {params.db} scoring_confidence_tier \
-            --fasta {input.fasta} --delete-organism {wildcards.genome} --gene-caller {params.gene_caller} --force
-        {LOADER_PYTHON} {params.script} tsv {input.c1} {params.db} scoring_c1_tool_coverage \
-            --fasta {input.fasta} --delete-organism {wildcards.genome} --gene-caller {params.gene_caller} --force
-        {LOADER_PYTHON} {params.script} tsv {input.c2} {params.db} scoring_c2_operon_probability \
-            --fasta {input.fasta} --delete-organism {wildcards.genome} --gene-caller {params.gene_caller} --force
-        {LOADER_PYTHON} {params.script} tsv {input.c3} {params.db} scoring_c3_operon_context \
-            --fasta {input.fasta} --delete-organism {wildcards.genome} --gene-caller {params.gene_caller} --force
-        {LOADER_PYTHON} {params.script} tsv {input.c4} {params.db} scoring_c4_ec_agreement \
-            --fasta {input.fasta} --delete-organism {wildcards.genome} --gene-caller {params.gene_caller} --force
-        {LOADER_PYTHON} {params.script} tsv {input.confidence_final} {params.db} scoring_confidence_final \
-            --fasta {input.fasta} --delete-organism {wildcards.genome} --gene-caller {params.gene_caller} --force
-        echo "scoring loaded for {wildcards.genome}" > {output.tkn}
+        echo "scoring done for {wildcards.genome}; its tables are in the results folder" > {output.tkn}
         """
 
 
@@ -1391,33 +1354,21 @@ rule load_llm_to_db:
 
 
 rule load_fingerprint_to_db:
-    """Loads each fingerprint TSV into main_database; a genome's rows are replaced."""
+    """Marks fingerprinting done for the genome. Its tables stay in the results folder and are not
+    loaded: fingerprinting runs again on each run against the fingerprint databases as they stand,
+    and nothing reads them from main_database."""
     input:
         hash_pattern=FINGERPRINT_HASH_PATTERN,
         hash_label=FINGERPRINT_HASH_LABEL,
         label_pattern=FINGERPRINT_LABEL_PATTERN,
         full=FINGERPRINT_FULL,
         full_with_scores=FINGERPRINT_FULL_WITH_SCORES,
-        compute_tkn=FINGERPRINT_COMPUTE_TOKEN,
-        fasta=lambda wildcards: GENOMES[wildcards.genome]
+        compute_tkn=FINGERPRINT_COMPUTE_TOKEN
     output:
         tkn=FINGERPRINT_TOKEN
-    retries: LOAD_RETRIES
-    resources:
-        runtime=load_minutes,
-        margie_sb_db_writer=1
-    params:
-        gene_caller=gene_caller,
-        db=MAIN_DATABASE,
-        script=LOAD_SCRIPT
     shell:
         """
-        {LOADER_PYTHON} {params.script} tsv {input.hash_pattern} {params.db} fingerprint_hash_pattern --fasta {input.fasta} --delete-organism {wildcards.genome} --gene-caller {params.gene_caller}
-        {LOADER_PYTHON} {params.script} tsv {input.hash_label} {params.db} fingerprint_hash_label --fasta {input.fasta} --delete-organism {wildcards.genome} --gene-caller {params.gene_caller}
-        {LOADER_PYTHON} {params.script} tsv {input.label_pattern} {params.db} fingerprint_label_pattern --fasta {input.fasta} --delete-organism {wildcards.genome} --gene-caller {params.gene_caller}
-        {LOADER_PYTHON} {params.script} tsv {input.full} {params.db} fingerprint_full --fasta {input.fasta} --delete-organism {wildcards.genome} --gene-caller {params.gene_caller}
-        {LOADER_PYTHON} {params.script} tsv {input.full_with_scores} {params.db} fingerprint_full_with_scores --fasta {input.fasta} --delete-organism {wildcards.genome} --gene-caller {params.gene_caller} --force
-        echo "fingerprint loaded for {wildcards.genome}" > {output.tkn}
+        echo "fingerprint done for {wildcards.genome}; its tables are in the results folder" > {output.tkn}
         """
 
 
