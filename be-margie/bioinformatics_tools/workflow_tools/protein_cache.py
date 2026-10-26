@@ -1,14 +1,25 @@
 """
 Per-protein annotation cache in the job's SQLite database, keyed by the protein's
-sequence hash and a tool_key (container, database and settings).
+sequence hash and a tool_key: the tool and the settings that change its answer (its thresholds,
+InterPro's analyses). A new version of a tool's container or database leaves the cache as it is,
+so genomes annotated once are not run again.
 
 split() writes novel.faa plus the cached rows before a tool runs, MERGE_SH joins
 both into the tool's results file, and store() adds the genome's new proteins with the
-genome they came from, so a later genome's report names the genomes it matched.
+genome they came from, so a later genome's report names the genomes it matched. A protein
+already cached for a tool is not run again; a tool new to it is run and added, and the
+protein's other tools stay as they are. When a cached protein is computed anyway (cached by
+another genome during the run), its result columns are compared with the cached ones exactly,
+and a difference replaces the cached entry.
 Only tools whose rows depend on the protein alone are listed in TOOLS.
+
+link_genome() records each genome's proteins and genes by hash (protein_genomes,
+genome_proteomes, genome_genes), so a set of proteins names its genome; record_fingerprints()
+adds each gene's fingerprint.
 """
 from __future__ import annotations
 
+import csv
 import hashlib
 import json
 import logging
@@ -28,7 +39,7 @@ except ImportError:  # imported from margie_sb.smk, with this folder on sys.path
 
 LOGGER = logging.getLogger(__name__)
 
-SCHEMA = 1
+SCHEMA = 2
 WORKFLOW = 'margie_sb'
 PC_DIR = 'protein-cache'
 
@@ -49,6 +60,28 @@ CREATE TABLE IF NOT EXISTS protein_cache_header (
     filename TEXT NOT NULL,
     header TEXT NOT NULL,
     PRIMARY KEY (tool, tool_key, filename)
+) WITHOUT ROWID;
+CREATE TABLE IF NOT EXISTS protein_genomes (
+    aa_hash TEXT NOT NULL,
+    genome_hash TEXT NOT NULL,
+    PRIMARY KEY (aa_hash, genome_hash)
+) WITHOUT ROWID;
+CREATE INDEX IF NOT EXISTS protein_genomes_by_genome ON protein_genomes (genome_hash);
+CREATE TABLE IF NOT EXISTS genome_proteomes (
+    genome_hash TEXT PRIMARY KEY,
+    proteins INTEGER NOT NULL,
+    protein_set TEXT NOT NULL,
+    names TEXT NOT NULL DEFAULT '[]',
+    first_linked TEXT NOT NULL,
+    last_linked TEXT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS genome_proteomes_by_set ON genome_proteomes (protein_set);
+CREATE TABLE IF NOT EXISTS genome_genes (
+    genome_hash TEXT NOT NULL,
+    gene_hash TEXT NOT NULL,
+    aa_hash TEXT NOT NULL DEFAULT '',
+    fingerprint TEXT NOT NULL DEFAULT '',
+    PRIMARY KEY (genome_hash, gene_hash)
 ) WITHOUT ROWID;
 """
 
@@ -107,24 +140,52 @@ def _stat(path: str) -> list:
         return [path, None, None]
 
 
-def tool_key(tool: str, cfg: dict) -> str:
-    """Hashes what the tool's answer depends on besides the protein: container, database, settings."""
-    parts: dict = {'schema': SCHEMA, 'tool': tool}
-    parts['runs'] = MODULE_TOOLS.get(tool) or _stat(sif_path(f'{tool}.sif', config=cfg, workflow_id=WORKFLOW))
-    if tool not in NO_DATABASE:
-        db = tool_db_path(tool, config=cfg, workflow_id=WORKFLOW)
-        parts['db'] = [db] + _stat(db)[1:]
-    parts['params'] = {k: str(rc(k, d, config=cfg)) for k, d in TOOL_PARAMS.get(tool, [])}
+def _params(tool: str, cfg: dict) -> dict:
+    params = {k: str(rc(k, d, config=cfg)) for k, d in TOOL_PARAMS.get(tool, [])}
     if tool == 'interpro':
         analyses = interpro_analyses(cfg)
-        parts['params']['analyses'] = analyses
-        parts['params']['applications'] = str(rc('interpro.applications', ','.join(analyses), config=cfg))
+        params['analyses'] = analyses
+        params['applications'] = str(rc('interpro.applications', ','.join(analyses), config=cfg))
+    return params
+
+
+def tool_key(tool: str, cfg: dict) -> str:
+    """Hashes what the tool's answer depends on besides the protein that MARGIE keeps to: the
+    tool and the settings that change results. Container and database versions stay out."""
+    parts: dict = {'schema': SCHEMA, 'tool': tool, 'params': _params(tool, cfg)}
     return hashlib.sha256(json.dumps(parts, sort_keys=True).encode()).hexdigest()[:32]
+
+
+_carried: set = set()
+
+
+def _carry_over(conn, tool: str, cfg: dict, key: str) -> None:
+    """Moves the tool's entries made under earlier keys (schema 1 named the container and database
+    files) under this key, the newest entry of each protein first; an older duplicate goes. Runs
+    once per tool and process, and finds nothing to do once the cache is moved."""
+    if (tool, key) in _carried:
+        return
+    _carried.add((tool, key))
+    older = [k for k, _ in conn.execute(
+        'SELECT tool_key, max(cached_at) FROM protein_cache WHERE tool = ? AND tool_key != ? GROUP BY tool_key ORDER BY 2 DESC',
+        (tool, key))]
+    if not older:
+        return
+    moved = 0
+    with conn:
+        for old in older:
+            moved += conn.execute('UPDATE OR IGNORE protein_cache SET tool_key = ? WHERE tool = ? AND tool_key = ?', (key, tool, old)).rowcount
+            conn.execute('UPDATE OR IGNORE protein_cache_header SET tool_key = ? WHERE tool = ? AND tool_key = ?', (key, tool, old))
+            conn.execute('DELETE FROM protein_cache WHERE tool = ? AND tool_key = ?', (tool, old))
+            conn.execute('DELETE FROM protein_cache_header WHERE tool = ? AND tool_key = ?', (tool, old))
+    LOGGER.info('protein cache: %d %s entries from %d earlier key(s) moved to the settings key', moved, tool, len(older))
 
 
 def enabled(cfg: dict) -> bool:
     v = rc(f'{WORKFLOW}.protein_cache', True, config=cfg)
     return str(v).strip().lower() not in ('false', '0', 'no', 'off')
+
+
 
 
 def pc_dir(prefix: str, tool: str) -> str:
@@ -256,6 +317,7 @@ def split(db: str, faa: str, prefix: str, genome: str, tools: list[str], cfg: di
     try:
         for tool in tools:
             key = tool_key(tool, cfg)
+            _carry_over(conn, tool, cfg, key)
             files = tool_files(tool, cfg)
             cached = _cached_hashes(conn, tool, key, files[0][0], hashes)
             out = Path(pc_dir(prefix, tool))
@@ -310,6 +372,31 @@ def split(db: str, faa: str, prefix: str, genome: str, tools: list[str], cfg: di
 
 # ---- after a tool's results are in ----
 
+# Columns that name the run rather than the answer: the gene, the genome, the run's files and
+# the tool, command, database and model it recorded.
+_PROVENANCE = re.compile(r'^(feature_id|organism_name|input_path|output_path)$|_(tool|command|database|model)_used$', re.I)
+
+
+def _answer(header: str | None, lines: list[str], kind: str) -> list:
+    """A protein's rows as their results only, in a fixed order: what two runs are compared by."""
+    if kind == 'domtbl':
+        return sorted(_DOMTBL_ID.sub(lambda m: m.group(1) + '-', line, count=1) for line in lines)
+    cols = (header or '').split('\t')
+    keep = [i for i, c in enumerate(cols) if not _PROVENANCE.search(c)]
+    return sorted(tuple((cols[i], parts[i] if i < len(parts) else '') for i in keep)
+                  for parts in (line.split('\t') for line in lines))
+
+
+def _computed_here(prefix: str, tool: str, proteins: list) -> set[str]:
+    """Hashes of the proteins this genome's run of the tool computed: those in its novel.faa when
+    the protein cache split the run, else every protein."""
+    novel = Path(pc_dir(prefix, tool)) / 'novel.faa'
+    if not novel.is_file():
+        return {h for _, h, _, _ in proteins}
+    ids = {fid for fid, _, _ in read_fasta(str(novel))}
+    return {h for fid, h, _, _ in proteins if fid in ids}
+
+
 def store(db: str, faa: str, prefix: str, tool: str, cfg: dict, genome: str = '') -> int:
     """Adds the genome's uncached proteins from the tool's final results, each with the genome it
     came from; returns the count."""
@@ -324,8 +411,11 @@ def store(db: str, faa: str, prefix: str, tool: str, cfg: dict, genome: str = ''
         first.setdefault(h, fid)
     conn = _connect(db)
     try:
-        new = sorted(set(first) - _cached_hashes(conn, tool, key, files[0][0], sorted(first)))
-        if not new:
+        _carry_over(conn, tool, cfg, key)
+        cached = _cached_hashes(conn, tool, key, files[0][0], sorted(first))
+        new = sorted(set(first) - cached)
+        again = sorted(cached & _computed_here(prefix, tool, proteins))
+        if not new and not again:
             return 0
         tables = {}
         for filename, kind in files:
@@ -342,6 +432,20 @@ def store(db: str, faa: str, prefix: str, tool: str, cfg: dict, genome: str = ''
             LOGGER.warning('protein cache: %d of %d feature ids in %s are not proteins of %s; not caching %s',
                            strangers, len(rows), folder / files[0][0], faa, tool)
             return 0
+        # Computed again: replaced where any result column differs from the cached one.
+        changed: list[str] = []
+        for chunk in _chunks(again):
+            held: dict[tuple[str, str], str] = {}
+            for h, filename, lines in conn.execute(
+                    'SELECT aa_hash, filename, lines FROM protein_cache WHERE tool = ? AND tool_key = ? '
+                    f'AND aa_hash IN ({",".join("?" * len(chunk))})', (tool, key, *chunk)):
+                held[(h, filename)] = lines
+            heads = {f: (r[0] if (r := conn.execute('SELECT header FROM protein_cache_header WHERE tool = ? AND tool_key = ? '
+                                                     'AND filename = ?', (tool, key, f)).fetchone()) else None) for f, _ in files}
+            for h in chunk:
+                if any(_answer(heads[f], (held.get((h, f)) or '').splitlines(), kind)
+                       != _answer(tables[f][0], tables[f][1].get(first[h], []), kind) for f, kind in files):
+                    changed.append(h)
         stamp = datetime.now(timezone.utc).isoformat()
         with conn:
             for filename, (header, _) in tables.items():
@@ -352,7 +456,12 @@ def store(db: str, faa: str, prefix: str, tool: str, cfg: dict, genome: str = ''
                 conn.executemany('INSERT OR IGNORE INTO protein_cache (aa_hash, tool, tool_key, filename, lines, cached_at, genome) '
                                  'VALUES (?, ?, ?, ?, ?, ?, ?)',
                                  [(h, tool, key, filename, '\n'.join(rows.get(first[h], [])), stamp, genome) for h in new])
-        return len(new)
+                conn.executemany('UPDATE protein_cache SET lines = ?, cached_at = ?, genome = ? '
+                                 'WHERE tool = ? AND tool_key = ? AND filename = ? AND aa_hash = ?',
+                                 [('\n'.join(rows.get(first[h], [])), stamp, genome, tool, key, filename, h) for h in changed])
+        if changed:
+            LOGGER.info('protein cache: %d %s entries replaced, their results differing from the cached ones', len(changed), tool)
+        return len(new) + len(changed)
     finally:
         conn.close()
 
@@ -394,3 +503,64 @@ def install_merge_script(folder: str) -> str:
     except OSError as exc:
         LOGGER.warning('protein cache: could not write %s: %s', path, exc)
     return str(path)
+
+
+# ---- which genome each protein and gene belongs to ----
+
+def link_genome(db: str, faa: str, genome_hash: str, name: str = '', genes: dict[str, str] | None = None) -> int:
+    """Records the genome's proteins by hash (protein_genomes), its protein set (a hash of its sorted
+    protein hashes, in genome_proteomes) and, with `genes` ({feature id: gene hash}), its genes
+    (genome_genes); returns the number of distinct proteins."""
+    proteins = _proteins(faa)
+    hashes = sorted({h for _, h, _, _ in proteins})
+    if not genome_hash or not hashes:
+        return 0
+    protein_set = hashlib.sha256('\n'.join(hashes).encode()).hexdigest()[:32]
+    stamp = datetime.now(timezone.utc).isoformat()
+    conn = _connect(db)
+    try:
+        with conn:
+            conn.executemany('INSERT OR IGNORE INTO protein_genomes (aa_hash, genome_hash) VALUES (?, ?)',
+                             [(h, genome_hash) for h in hashes])
+            row = conn.execute('SELECT names FROM genome_proteomes WHERE genome_hash = ?', (genome_hash,)).fetchone()
+            names = json.loads(row[0]) if row else []
+            if name and name not in names:
+                names.append(name)
+            if row:
+                conn.execute('UPDATE genome_proteomes SET proteins = ?, protein_set = ?, names = ?, last_linked = ? WHERE genome_hash = ?',
+                             (len(hashes), protein_set, json.dumps(names), stamp, genome_hash))
+            else:
+                conn.execute('INSERT INTO genome_proteomes VALUES (?, ?, ?, ?, ?, ?)',
+                             (genome_hash, len(hashes), protein_set, json.dumps(names), stamp, stamp))
+            if genes:
+                by_fid = {fid: h for fid, h, _, _ in proteins}
+                conn.executemany('INSERT INTO genome_genes (genome_hash, gene_hash, aa_hash) VALUES (?, ?, ?) '
+                                 'ON CONFLICT (genome_hash, gene_hash) DO UPDATE SET aa_hash = excluded.aa_hash',
+                                 [(genome_hash, g, by_fid.get(fid, '')) for fid, g in genes.items()])
+    finally:
+        conn.close()
+    return len(hashes)
+
+
+def record_fingerprints(db: str, genome_hash: str, hash_label_tsv: str, genes: dict[str, str]) -> int:
+    """Adds each gene's fingerprint (its pattern hash, from the fingerprint step's hash-label table)
+    to genome_genes; returns how many genes got one."""
+    path = Path(hash_label_tsv)
+    if not genome_hash or not genes or not path.is_file():
+        return 0
+    found: list[tuple[str, str, str]] = []
+    with open(path, newline='', encoding='utf-8', errors='replace') as fh:
+        for row in csv.DictReader(fh, delimiter='\t'):
+            m = re.search(r'pattern hash:\s*([0-9a-f]+)', row.get('fingerprint') or '')
+            gene = genes.get(row.get('feature_id') or '')
+            if m and gene:
+                found.append((m.group(1), genome_hash, gene))
+    if not found:
+        return 0
+    conn = _connect(db)
+    try:
+        with conn:
+            conn.executemany('UPDATE genome_genes SET fingerprint = ? WHERE genome_hash = ? AND gene_hash = ?', found)
+    finally:
+        conn.close()
+    return len(found)

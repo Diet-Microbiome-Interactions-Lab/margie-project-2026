@@ -95,7 +95,7 @@ def test_gtdbtk_is_stored_once_the_batch_is_split(mock_sleep, mock_locate, mock_
         f.write_text('x\n')
     # g1's Stage 1 wave never comes: no database token and no RASTtk, as when a run stops early.
     with patch.object(wf, '_restore_gene_calls', return_value=({}, {})), \
-            patch(f'{W}.restore_all', side_effect=lambda db_path, f, m: {k: False for k in m}), \
+            patch(f'{W}.restore_all', side_effect=lambda db_path, f, m, **kw: {k: False for k in m}), \
             patch(f'{W}.cached_when', return_value={}), patch(f'{W}.store') as stored, patch(f'{W}.store_all'), \
             patch(f'{W}.log_workflow_run'), patch(f'{W}.is_already_processed', return_value=False), \
             patch(f'{W}.fasta_hashes', return_value='h'), patch(f'{W}.current_rast_genome_id', return_value=None), \
@@ -121,7 +121,7 @@ def test_the_run_names_its_restored_genomes_to_snakemake(mock_sleep, mock_locate
         (out / 'g1' / f).parent.mkdir(parents=True, exist_ok=True)
         (out / 'g1' / f).write_text('x\n')
     with patch.object(wf, '_restore_gene_calls', return_value=({'g1': True, 'g2': False}, {'g1': True})), \
-            patch(f'{W}.restore_all', side_effect=lambda db_path, f, m: {k: False for k in m}), \
+            patch(f'{W}.restore_all', side_effect=lambda db_path, f, m, **kw: {k: False for k in m}), \
             patch(f'{W}.cached_when', return_value={}), patch(f'{W}.store'), patch(f'{W}.store_all'), \
             patch(f'{W}.log_workflow_run'), patch(f'{W}.is_already_processed', return_value=False), \
             patch(f'{W}.fasta_hashes', return_value='h'), patch(f'{W}.current_rast_genome_id', return_value=None), \

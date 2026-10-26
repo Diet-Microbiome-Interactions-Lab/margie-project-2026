@@ -60,11 +60,11 @@ def test_a_run_restores_the_tools_first_and_stores_merges_under_their_tables(moc
     cache_map = lambda s: {'pfam': [f'{g}/pfam/pfam_results.tsv'], 'consolidation@abc': merged}
     calls, stored = [], []
 
-    def fake_restore_all(db_path, genome_file, mapping):
+    def fake_restore_all(db_path, genome_file, mapping, **kw):
         calls.append(list(mapping))
         return {k: k == 'pfam' for k in mapping}
 
-    def fake_store(db_path, genome_file, name, paths):
+    def fake_store(db_path, genome_file, name, paths, **kw):
         stored.append(name)
 
     def fake_stage2(cmd):  # Stage 2 writes the merge
@@ -76,7 +76,7 @@ def test_a_run_restores_the_tools_first_and_stores_merges_under_their_tables(moc
             patch(f'{w.__name__}.restore_all', side_effect=fake_restore_all), \
             patch(f'{w.__name__}.cached_when', return_value={}), \
             patch(f'{w.__name__}.store', side_effect=fake_store), \
-            patch(f'{w.__name__}.store_all', side_effect=lambda db_path, f, m: stored.extend(m)), \
+            patch(f'{w.__name__}.store_all', side_effect=lambda db_path, f, m, **kw: stored.extend(m)), \
             patch(f'{w.__name__}.log_workflow_run'), \
             patch(f'{w.__name__}.is_already_processed', return_value=False), patch(f'{w.__name__}.fasta_hashes', return_value='h'), \
             patch(f'{w.__name__}.current_rast_genome_id', return_value=None), \
