@@ -131,3 +131,66 @@ def test_each_protein_has_one_fingerprint_replaced_when_it_differs(tmp_path):
         protein_cache.record_fingerprints(db, genome, str(table), {fid: "geneA" if genome == "hashA" else "geneB"})
         row = sqlite3.connect(db).execute("SELECT fingerprint, label FROM protein_fingerprints WHERE aa_hash = ?", (h,)).fetchone()
         assert row == (fp, label)
+
+
+def _labeled(tmp_path, name, rows, localization=None):
+    """A genome folder with labeled-genes.tsv: (feature id, sequence, {TOOL: (ids, descriptions)})."""
+    folder = tmp_path / name
+    (folder / "labeling").mkdir(parents=True)
+    tools = sorted({tool for _, _, hits in rows for tool in hits})
+    head = ["feature_id", "aa_seq"] + [f"{tl}_{k}" for tl in tools for k in ("all_ids", "all_descriptions")]
+    lines = ["\t".join(head)] + ["\t".join([fid, seq] + [v for tl in tools for v in hits.get(tl, ("", ""))]) for fid, seq, hits in rows]
+    (folder / "labeling" / "labeled-genes.tsv").write_text("\n".join(lines) + "\n")
+    for tool, text in (localization or {}).items():
+        (folder / tool).mkdir()
+        (folder / tool / f"{tool}_results.tsv").write_text(text)
+    return str(folder / "labeling" / "labeled-genes.tsv"), f"{folder}/"
+
+
+CORE = {t: (f"{t}1", f"{t} one") for t in protein_cache.CORE_TOOLS}
+
+
+def _record(db, seq):
+    conn = sqlite3.connect(db)
+    conn.row_factory = sqlite3.Row
+    return dict(conn.execute("SELECT * FROM protein_records WHERE protein_hash = ?", (protein_cache.protein_hash(seq),)).fetchone())
+
+
+def test_a_protein_record_reads_core_tools_then_additional_ones(tmp_path):
+    db = str(tmp_path / "margie.db")
+    faa, _ = _genome(tmp_path, "A", [("a1", "MKVLAAG")])
+    protein_cache.link_genome(db, faa, "hashA", "A")
+    psortb = "feature_id\tPSORTB_localization\tPSORTB_gram_class\na1\tCytoplasmic\tnegative\n"
+    labeled, prefix = _labeled(tmp_path, "GA", [("a1", "MKVLAAG", {**CORE, "DBCAN": ("GH13", "alpha-amylase")})], {"psortb": psortb})
+    assert protein_cache.record_proteins(db, labeled, prefix, "hashA") == 1
+    rec = _record(db, "MKVLAAG")
+    assert rec["genomes"] == 1 and rec["genome_hashes"] == "hashA"
+    assert rec["cog"] == "COG1 — COG one" and rec["pgap"] == "PGAP1 — PGAP one"
+    assert rec["additional"] == "DBCAN: GH13 — alpha-amylase"
+    assert rec["core_fingerprint"] and rec["extra_fingerprint"]
+    # PSORTb depends on the genome too: kept by genome hash and protein hash.
+    assert sqlite3.connect(db).execute("SELECT genome_hash, tool, value FROM genome_protein_descriptors").fetchall() == [
+        ("hashA", "PSORTB", "Cytoplasmic (negative)")]
+
+
+def test_a_new_tool_changes_only_the_additional_fingerprint(tmp_path):
+    db = str(tmp_path / "margie.db")
+    labeled, prefix = _labeled(tmp_path, "GA", [("a1", "MKVLAAG", CORE)])
+    protein_cache.record_proteins(db, labeled, prefix)
+    first = _record(db, "MKVLAAG")
+    labeled, prefix = _labeled(tmp_path, "GB", [("b1", "MKVLAAG", {**CORE, "TCDB": ("2.A.1", "MFS")})])
+    protein_cache.record_proteins(db, labeled, prefix)
+    second = _record(db, "MKVLAAG")
+    assert second["core_fingerprint"] == first["core_fingerprint"]
+    assert second["extra_fingerprint"] != first["extra_fingerprint"] and second["additional"] == "TCDB: 2.A.1 — MFS"
+
+
+def test_a_different_core_descriptor_replaces_and_moves_the_core_fingerprint(tmp_path):
+    db = str(tmp_path / "margie.db")
+    labeled, prefix = _labeled(tmp_path, "GA", [("a1", "MKVLAAG", CORE)])
+    protein_cache.record_proteins(db, labeled, prefix)
+    first = _record(db, "MKVLAAG")
+    labeled, prefix = _labeled(tmp_path, "GB", [("b1", "MKVLAAG", {**CORE, "COG": ("COG2", "COG two")})])
+    protein_cache.record_proteins(db, labeled, prefix)
+    second = _record(db, "MKVLAAG")
+    assert second["cog"] == "COG2 — COG two" and second["core_fingerprint"] != first["core_fingerprint"]
