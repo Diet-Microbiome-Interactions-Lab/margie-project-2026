@@ -1456,7 +1456,7 @@ export async function clusterApi<T = any>(path: string, init: RequestInit = {}):
 			case 'POST /stores/stop':
 				return storesAnswer(call('POST', '/v1/ssh/stores/stop'));
 			case 'POST /stores/setup':
-				// {fresh, build_password}: every database starts empty (a new lab's own).
+				// {fresh}: every database starts empty (a new lab's own).
 				return storesAnswer(call('POST', '/v1/ssh/stores/setup', body ?? {}));
 			case 'GET /stores/check':
 				return get(`/v1/ssh/stores/${q(params.get('id') ?? '')}/backup-check`);
