@@ -17,7 +17,8 @@ SMK = Path(__file__).resolve().parents[1] / 'bioinformatics_tools' / 'workflow_t
 def _load_rules():
     text = SMK.read_text()
     blocks = re.split(r'\n(?=rule |localrules|checkpoint )', text)
-    return {m.group(1): b for b in blocks if (m := re.match(r'rule (load_\w+_to_db):', b))}
+    # A load rule calls the loader; load_consolidation_to_db only marks consolidation done.
+    return {m.group(1): b for b in blocks if (m := re.match(r'rule (load_\w+_to_db):', b)) and 'LOADER_PYTHON' in b}
 
 
 def _load_minutes(db_path):
