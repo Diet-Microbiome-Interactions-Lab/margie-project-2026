@@ -70,7 +70,7 @@
 			items: [
 				{ href: '/settings', label: 'Settings', icon: SlidersHorizontal, note: 'Folders, cores and the steps a run takes' },
 				{ href: '/profile', label: 'User profile', icon: UserRound, note: 'Your details, cluster account and SSH key' },
-				{ href: '/quiz', label: 'Quiz', icon: Lightbulb, note: 'Questions on microbes, metabolism, bioinformatics, the gut and MARGIE' }
+				{ href: '/quiz', label: 'Quiz', icon: Lightbulb, note: 'Questions on microbes, metabolism, energetics, bioinformatics, the gut and MARGIE' }
 			]
 		}
 	];
