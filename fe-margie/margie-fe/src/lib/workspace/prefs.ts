@@ -91,7 +91,7 @@ export interface UiPrefs {
 	step: 0 | 1 | 2 | 3;
 	/** The quiz was opened by answering one of its unlock questions (routes/(app)/quiz); kept with the account. */
 	quizOpen: boolean;
-	/** The look's version: 2 since Modern took Graphite as its accent, 4 since animations are full and at half speed by default (see sanitizePrefs). */
+	/** The look's version: 2 since Modern took Graphite as its accent, 4 since animations are full and at half speed by default, 5 since Modern with Crystal violet is the look for everyone (see sanitizePrefs). */
 	looks: number;
 }
 
@@ -147,7 +147,7 @@ export const DEFAULT_PREFS: UiPrefs = {
 	mode: 'clean',
 	welcomed: false,
 	theme: 'system',
-	accent: 'graphite',
+	accent: 'crystal',
 	radius: 6,
 	density: 'comfortable',
 	textSize: 'm',
@@ -182,7 +182,7 @@ export const DEFAULT_PREFS: UiPrefs = {
 	board: BOARD,
 	step: 0,
 	quizOpen: false,
-	looks: 4
+	looks: 5
 };
 
 /** Keys "Set as default" keeps: the look, not folded sections, pane widths or panels. */
@@ -268,6 +268,9 @@ export function sanitizePrefs(raw: unknown, base: UiPrefs = DEFAULT_PREFS): UiPr
 	const colours = r.colours as { light?: unknown; dark?: unknown } | undefined;
 	if (!(typeof r.looks === 'number' && r.looks >= 2) && 'accent' in r && accent === 'blue' && (!r.palette || r.palette === 'crisp') && !own(colours?.light) && !own(colours?.dark)) accent = 'graphite';
 	const fromV4 = typeof r.looks === 'number' && r.looks >= 4;
+	// From version 5 everyone starts on Modern with Crystal violet: a look saved before takes them.
+	const fromV5 = typeof r.looks === 'number' && r.looks >= 5;
+	if (!fromV5) accent = base.accent;
 	let panels = base.panels;
 	if (Array.isArray(r.panels) && r.board === BOARD) {
 		const seen = new Set<PanelId>();
@@ -314,7 +317,7 @@ export function sanitizePrefs(raw: unknown, base: UiPrefs = DEFAULT_PREFS): UiPr
 		stripes: typeof r.stripes === 'boolean' ? r.stripes : base.stripes,
 		shades: oneOf(r.shades, ['off', 'trace', 'soft', 'medium', 'vivid', 'bold'] as const, base.shades),
 		contrast: oneOf(r.contrast, ['normal', 'more', 'high'] as const, base.contrast),
-		palette: typeof r.palette === 'string' && (r.palette === '' || presetOf(r.palette, '').id === r.palette) ? r.palette : base.palette,
+		palette: fromV5 && typeof r.palette === 'string' && (r.palette === '' || presetOf(r.palette, '').id === r.palette) ? r.palette : base.palette,
 		colours: coloursOf(r.colours, base.colours),
 		vision: oneOf(r.vision, VISION_IDS, base.vision),
 		visionStrength:
@@ -336,7 +339,7 @@ export function sanitizePrefs(raw: unknown, base: UiPrefs = DEFAULT_PREFS): UiPr
 		board: BOARD,
 		step: oneOf(r.step, [0, 1, 2, 3] as const, base.step),
 		quizOpen: typeof r.quizOpen === 'boolean' ? r.quizOpen : base.quizOpen,
-		looks: 4
+		looks: 5
 	};
 }
 
