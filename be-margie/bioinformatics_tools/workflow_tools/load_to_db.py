@@ -620,9 +620,7 @@ def _add_common_args(p: argparse.ArgumentParser) -> None:
     p.add_argument("--force", action="store_true",
                    help="Reload even if this input was already loaded at the "
                         "current pipeline version (bypasses the version-aware "
-                        "skip). Used for scoring, which must overwrite the DB on "
-                        "every run because its OCC operon reference is a moving "
-                        "target -- see rule load_scoring_to_db in margie_sb.smk.")
+                        "skip), for tables rewritten on each run.")
 
 
 def main():

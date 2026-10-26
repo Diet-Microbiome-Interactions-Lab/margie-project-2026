@@ -61,8 +61,8 @@ def test_a_snippet_is_the_file_s_own_lines(client):
 
 
 def test_a_rule_runs_to_the_next_rule(client):
-    got = client.get('/v1/code/snippet', params={'path': 'margie_sb.smk', 'symbol': 'rule:load_scoring_to_db'}).json()
-    assert got['text'].startswith('rule load_scoring_to_db:') or got['text'].startswith('#')
+    got = client.get('/v1/code/snippet', params={'path': 'margie_sb.smk', 'symbol': 'rule:load_cog_to_db'}).json()
+    assert got['text'].startswith('rule load_cog_to_db:') or got['text'].startswith('#')
     assert 'rule ' not in got['text'].split('\n', 1)[1]
     assert 'runtime=load_minutes' in got['text']
 

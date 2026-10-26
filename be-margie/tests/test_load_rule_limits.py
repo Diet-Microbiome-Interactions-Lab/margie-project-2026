@@ -57,11 +57,22 @@ def test_without_a_database_the_time_is_the_base(tmp_path):
 
 def test_each_load_rule_has_the_limit_the_slot_and_retries():
     rules = _load_rules()
-    assert len(rules) >= 30
+    assert len(rules) >= 29
     for name, block in rules.items():
         assert 'runtime=load_minutes' in block, name
         assert 'margie_sb_db_writer=1' in block, name
         assert 'retries: LOAD_RETRIES' in block, name
+
+
+def test_steps_that_run_again_on_each_run_are_not_loaded():
+    text = SMK.read_text()
+    local = re.search(r'^localrules: load_consolidation_to_db.*$', text, re.M).group(0)
+    for step in ('consolidation', 'labeling', 'scoring', 'fingerprint'):
+        name = f'load_{step}_to_db'
+        block = re.search(rf'\nrule {name}:\n(.*?)\n\n\n', text, re.S).group(1)
+        assert 'LOADER_PYTHON' not in block and 'margie_sb_db_writer' not in block, name
+        assert 'its tables are in the results folder' in block, name
+        assert name in local, name
 
 
 def test_the_run_caps_database_writers_at_one():

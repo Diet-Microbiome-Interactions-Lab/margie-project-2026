@@ -7,6 +7,7 @@ gene-track and operon-page drawing used by every report figure (PNG plus TSV).
 """
 from __future__ import annotations
 
+import json
 import os
 import re
 import sys
@@ -667,6 +668,16 @@ def comparison_pool(occ_reference, operon_db, leave_out: str | None = None):
     if leave_out:
         pool.discard(leave_out)
     return pool, missing
+
+
+def left_out_as(run_root, organism: str) -> str:
+    """Returns the OCC reference's name for this genome, as its C3 scoring left it out
+    (scoring/scored-against.json); the genome's own name when scoring did not record one."""
+    try:
+        got = json.loads((Path(run_root) / organism / "scoring" / "scored-against.json").read_text())
+        return str(got.get("left_out_as") or organism)
+    except (OSError, ValueError, AttributeError):
+        return organism
 
 
 def load_occ_organisms(occ_reference=DEFAULT_OCC_REFERENCE):

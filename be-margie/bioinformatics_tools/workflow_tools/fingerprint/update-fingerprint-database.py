@@ -3,7 +3,8 @@
 
 Adds the genome's labeled-genes-fingerprint-hash-label.tsv counts to
 fingerprint-database.tsv incrementally, under an fcntl lock with a .tmp write
-and rename. Columns: pattern_id, fingerprint_hash, fingerprint_label,
+and rename. A genome already in the database, by name, is not counted again.
+Columns: pattern_id, fingerprint_hash, fingerprint_label,
 fingerprint_frequency (genes with this pattern), fingerprint_label_frequency
 (genes with this label), organisms ("|"-joined).
 """
@@ -81,6 +82,11 @@ def _do_update(new_counts: dict[str, int], new_labels: dict[str, str], organism:
                     "gene_count": int(row["fingerprint_frequency"]),
                     "organisms": set(o for o in row.get("organisms", "").split("|") if o),
                 }
+
+    # A genome counts once: a run of a genome already in the database leaves it as it is.
+    if any(organism in p["organisms"] for p in patterns.values()):
+        print(f"[update-fingerprint-database] {organism} is already in {db_tsv.name}; not counted again")
+        return
 
     for h, count in new_counts.items():
         if h in patterns:

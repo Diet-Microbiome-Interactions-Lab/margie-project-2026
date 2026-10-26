@@ -117,8 +117,10 @@ def main() -> None:
     genes = L.load_organism_genes(run_root, args.organism)
     operons = L.build_operons(genes)
 
-    # Leave-one-out pool: OCC organisms minus this one, as in the standard reports.
-    restrict, missing = L.comparison_pool(args.occ_reference, args.operon_db, leave_out=org_label)
+    # Leave-one-out pool: OCC organisms minus this one, under the reference's name for it, as in
+    # the standard reports.
+    restrict, missing = L.comparison_pool(args.occ_reference, args.operon_db,
+                                          leave_out=L.left_out_as(run_root, args.organism))
     recurrence = L.load_operon_recurrence(Path(args.operon_db), restrict_to=restrict)
     pool_list = sorted(restrict)
     pstats = L.aggregate_pool_stats(L.load_pool_stats(Path(args.occ_reference)), pool_list) if not missing else None
