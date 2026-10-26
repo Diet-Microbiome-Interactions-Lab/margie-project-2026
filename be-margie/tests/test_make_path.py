@@ -91,3 +91,24 @@ def test_the_same_name_changes_nothing(authed_client):  # noqa: F811
     r, remote = _rename(authed_client, "RENAMED", path="/scratch/u/a.txt", name="a.txt")
     assert r.json() == {"path": "/scratch/u/a.txt", "old": "/scratch/u/a.txt", "renamed": False}
     remote.assert_not_called()
+
+
+# ---- a run without the cache ----
+
+def test_a_run_without_the_cache_says_so_on_its_command_line():
+    from bioinformatics_tools.api.routers import ssh
+    on = ssh._dane_wf_command("margie_sb", "/g", "/o", "cog")
+    off = ssh._dane_wf_command("margie_sb", "/g", "/o", "cog", use_cache=False)
+    assert "use_cache" not in on and off.endswith(" margie_sb.use_cache: false")
+    script = ssh._command_script("j", "margie_sb", "/g", "/o", "cog", use_cache=False)
+    assert "  margie_sb.use_cache: false" in script
+
+
+def test_resume_and_restart_keep_a_run_without_the_cache():
+    from bioinformatics_tools.api.routers import ssh
+    with patch(f"{SSH}._run_remote_check", return_value=(0, "NOCACHE\n")) as run:
+        assert ssh._ran_without_cache(None, "/scratch/u/run-1") is True
+    assert "/scratch/u/run-1/run-command.sh" in run.call_args[0][1]
+    with patch(f"{SSH}._run_remote_check", return_value=(1, "")):
+        assert ssh._ran_without_cache(None, "/scratch/u/run-2") is False
+    assert ssh._ran_without_cache(None, None) is False

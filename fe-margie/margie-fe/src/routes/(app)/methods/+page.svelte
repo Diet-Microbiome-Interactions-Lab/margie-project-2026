@@ -320,7 +320,8 @@
 			The caches keep each tool's processed table, not the container's raw output. A step restored from the genome cache has no
 			folder under <span class="mg-mono">original_container_outputs</span>, and a tool run on the proteins new to a run keeps the raw
 			output of those proteins alone; <span class="mg-mono">cache-report.tsv</span>, in the run folder, names the steps that came
-			from the caches.
+			from the caches. A run without the cache (unlocked on Analyze, after a yes) restores nothing: each tool runs again and keeps its
+			raw output, and the results still go into the caches.
 		</p>
 		<p>
 			The caches keep RASTtk-based results. A genome bound for Prodigal takes RASTtk's gene calls and results when its genome hash has them, so Prodigal annotates novel genomes. A Prodigal genome reads the protein cache, and its results are loaded into the database without entering the caches. A later RASTtk run of the genome replaces them; a Prodigal run leaves RASTtk-based results in place.

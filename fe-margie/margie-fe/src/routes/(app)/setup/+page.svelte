@@ -125,6 +125,15 @@
 					</li>
 				{/each}
 			</ol>
+			<div class="sg-card sg-cache">
+				<b>MARGIE’s cache</b>
+				<span
+					>Genomes and proteins annotated before come back from MARGIE’s database with their processed tables, so their tools do not run
+					again; <span class="mg-mono">cache-report.tsv</span>, in each run folder, says which steps came from the cache. Those steps have no
+					raw output in <span class="mg-mono">original_container_outputs</span>. When you need it, unlock <b>Run without the cache</b> under the Run
+					button on Analyze: the next run runs each tool again and keeps its raw output.</span
+				>
+			</div>
 			<a class="mg-btn primary sg-start" href={uiBase.to('/analyze')}>Start on Analyze <ArrowRight size={15} /></a>
 		</section>
 
@@ -250,6 +259,16 @@
 	}
 	.sg-go:hover {
 		text-decoration: underline;
+	}
+	.sg-cache {
+		gap: 4px;
+		font-size: var(--mg-fs-sm);
+		animation: rise calc(320ms * var(--mo-k, 1)) ease-out both;
+		animation-delay: calc(6 * 70ms * var(--mo-k, 1));
+	}
+	.sg-cache > span {
+		color: var(--mg-text-2);
+		line-height: 1.5;
 	}
 	.sg-start {
 		display: inline-flex;
