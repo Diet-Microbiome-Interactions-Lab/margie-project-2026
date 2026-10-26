@@ -141,7 +141,6 @@
 
 		<footer class="foot">
 			<p>
-				Who made MARGIE, how to cite it and the tools it runs:
 				<a class="mg-link" href={uiBase.to('/contributors')}>Contributors</a> |
 				<a class="mg-link" href={uiBase.to('/acknowledgements')}>Acknowledgements</a>
 			</p>
