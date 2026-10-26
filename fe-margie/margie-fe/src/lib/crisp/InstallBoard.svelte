@@ -7,7 +7,6 @@
 	import { ui } from '$lib/workspace/ui.svelte';
 	import SetupPage from '$lib/workspace/pages/SetupPage.svelte';
 	import BuildBar from '$lib/workspace/blocks/BuildBar.svelte';
-	import { even } from '$lib/workspace/even';
 
 	/**
 	 * The Install page: two boxes, what is ready (ring and checklist) beside what a run can use
@@ -171,7 +170,7 @@
 			<span class="mg-note">{ws.tools.length ? `${ws.tools.length} tools in ${phases.length} phase${phases.length === 1 ? '' : 's'}` : ''}</span>
 		</header>
 		<p class="mg-note mg-explain">The tools Analyze can add to a run, by the phase they run in. Gene calling and scoring are part of every run.</p>
-		<ol class="ib-phases mg-even" use:even={170}>
+		<ol class="ib-phases">
 			{#each phases as [n, tools] (n)}
 				<li>
 					<span class="ib-ph">{n === null ? 'Other' : `Phase ${n}`}</span>
@@ -389,26 +388,31 @@
 	.ib-t-danger .ib-check .val {
 		color: var(--mg-warn);
 	}
-	/* ---- the tools by phase, in even tiles ---- */
+	/* ---- the tools by phase, one row each: the phase, then its tools ---- */
 	.ib-phases {
-		gap: 8px;
+		display: flex;
+		flex-direction: column;
 		margin: 0;
 		padding: 0;
 		list-style: none;
 	}
 	.ib-phases > li {
-		display: flex;
-		flex-direction: column;
-		gap: 6px;
+		display: grid;
+		grid-template-columns: 76px minmax(0, 1fr);
+		align-items: baseline;
+		gap: 12px;
 		min-width: 0;
-		padding: 10px 12px;
-		border: 1px solid var(--mg-border);
-		border-radius: var(--mg-r-sm);
+		padding: 9px 0;
+		border-top: 1px solid var(--mg-border);
+	}
+	.ib-phases > li:first-child {
+		border-top: none;
 	}
 	.ib-ph {
 		font-size: var(--mg-fs-xs);
 		font-weight: 600;
 		color: var(--mg-text-3);
+		white-space: nowrap;
 	}
 	.ib-names {
 		display: flex;
