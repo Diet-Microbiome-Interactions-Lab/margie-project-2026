@@ -19,9 +19,9 @@
 		"topic": "margie",
 		"level": "easy",
 		"kind": "truefalse",
-		"statement": "MARGIE calls a genome's genes with RASTtk when its domain and genetic code are known, from the genome table or from GTDB-Tk, and otherwise calls them with Prodigal.",
+		"statement": "MARGIE calls a genome's genes with RASTtk when its domain and genetic code are known, from the genome table or from GTDB-Tk, and otherwise, for a genome new to the MARGIE database, calls them with Prodigal.",
 		"answer": true,
-		"explain": "RASTtk needs both the domain and the genetic code, so the gene caller is chosen genome by genome: GTDB-Tk supplies both when it runs, and with GTDB-Tk off the genome table gives them. Prodigal writes its gene calls in RASTtk's layout, so the later steps are shared."
+		"explain": "RASTtk needs both the domain and the genetic code, so the gene caller is chosen genome by genome: GTDB-Tk supplies both when it runs, and with GTDB-Tk off the genome table gives them. Prodigal writes its gene calls to its own prodigal/ folder, with its gene table in RASTtk's columns, so the later steps are shared. A genome whose sequence already has RASTtk results in the MARGIE database takes those instead of Prodigal's."
 	},
 	{
 		"id": "margie-003",
@@ -141,7 +141,7 @@
 		"topic": "margie",
 		"level": "intermediate",
 		"kind": "choice",
-		"question": "A run leaves GTDB-Tk off. The genome table gives one genome's domain as Bacteria but no genetic code. Which gene caller does MARGIE use for that genome?",
+		"question": "A run leaves GTDB-Tk off. The genome table gives the domain of a genome new to MARGIE as Bacteria but no genetic code. Which gene caller does MARGIE use for that genome?",
 		"options": [
 			"RASTtk, filling in genetic code 11 as the usual code for bacteria",
 			"Prodigal, because RASTtk needs both the domain and the genetic code",
@@ -149,7 +149,7 @@
 			"Neither: the run stops until the genetic code is added to the table"
 		],
 		"answer": 1,
-		"explain": "RASTtk is used when a genome's domain and genetic code are both known, from the genome table or from GTDB-Tk. With GTDB-Tk off and the code missing, this genome's genes are called by Prodigal, while other genomes in the same run can still use RASTtk."
+		"explain": "RASTtk is used when a genome's domain and genetic code are both known, from the genome table or from GTDB-Tk. With GTDB-Tk off and the code missing, this new genome's genes are called by Prodigal, while other genomes in the same run can still use RASTtk."
 	},
 	{
 		"id": "margie-012",
