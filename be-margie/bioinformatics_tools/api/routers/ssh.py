@@ -1577,17 +1577,32 @@ COMMAND_FILE = "run-command.sh"
 
 
 def _dane_wf_command(workflow: str, genome_path: str, output_dir: str, selected_tools_csv: str | None, *,
-                     resume: bool = False, full_operon_map: bool = False, license_env: str = "") -> str:
+                     resume: bool = False, full_operon_map: bool = False, license_env: str = "", use_cache: bool = True) -> str:
     """The dane_wf command line a job runs (caragols dispatches do_margie_sb as "margie sb")."""
     dispatch_tokens = workflow.replace('_', ' ')
     selected_tools_arg = f" {workflow}.selected_tools: {selected_tools_csv}" if selected_tools_csv else ""
     # Opt-in full operon atlas; the smk runs it after the report figures.
     full_operon_map_arg = " run_full_operon_map: true" if full_operon_map else ""
     resume_arg = f" {workflow}.resume: true" if resume else ""
+    # Without the cache: each tool runs and keeps its raw output (workflow.py, use_cache).
+    cache_arg = "" if use_cache else f" {workflow}.use_cache: false"
     return (
         f"{license_env}~/bioinformatics-tools/.venv/bin/dane_wf {dispatch_tokens}"
-        f" input: {genome_path} output_dir: {output_dir}{selected_tools_arg}{full_operon_map_arg}{resume_arg}"
+        f" input: {genome_path} output_dir: {output_dir}{selected_tools_arg}{full_operon_map_arg}{resume_arg}{cache_arg}"
     )
+
+
+def _ran_without_cache(conn, work_dir: str | None) -> bool:
+    """Whether a job ran without the cache, from the command saved beside its results (Resume and
+    Restart run it the same way)."""
+    if not work_dir:
+        return False
+    path = shlex.quote(f"{work_dir.rstrip('/')}/{COMMAND_FILE}")
+    try:
+        _, out = _run_remote_check(conn, f"grep -q 'use_cache: false' {path} 2>/dev/null && echo NOCACHE")
+    except Exception:
+        return False
+    return "NOCACHE" in out
 
 
 def _with_usage_report(command: str, job_id: str, output_dir: str) -> str:
@@ -1605,7 +1620,7 @@ def _with_usage_report(command: str, job_id: str, output_dir: str) -> str:
 
 def _command_script(job_id: str, workflow: str, genome_path: str, output_dir: str, selected_tools_csv: str | None, *,
                     resume: bool = False, full_operon_map: bool = False, env: list[tuple[str, str]] | None = None,
-                    note: str = "") -> str:
+                    note: str = "", use_cache: bool = True) -> str:
     """The same command as _dane_wf_command, set out to run again from a shell on the cluster:
     from the code's folder, one argument to a line."""
     head = [
@@ -1624,6 +1639,8 @@ def _command_script(job_id: str, workflow: str, genome_path: str, output_dir: st
         parts.append("  run_full_operon_map: true")
     if resume:
         parts.append(f"  {workflow}.resume: true")
+    if not use_cache:
+        parts.append(f"  {workflow}.use_cache: false")
     body = [f"{line} \\" for line in parts[:-1]] + [parts[-1]]
     return "\n".join(head + ["cd ~/bioinformatics-tools", 'export PATH="$HOME/.local/bin:$PATH"'] + body) + "\n"
 
@@ -1680,6 +1697,7 @@ def _launch_job(
     relaunched_from: str | None = None,
     copy_from_work_dir: str | None = None,
     run_full_operon_map: bool = False,
+    use_cache: bool = True,
 ) -> dict:
     """Generates job_id and output_dir, optionally copies a previous run's output
     forward (Resume, with margie_sb.resume: true), records the job and submits dane_wf.
@@ -1733,10 +1751,12 @@ def _launch_job(
     command = _dane_wf_command(
         workflow, genome_path, output_dir, selected_tools_csv,
         resume=bool(copy_from_work_dir), full_operon_map=run_full_operon_map, license_env=license_env,
+        use_cache=use_cache,
     )
     _save_command(conn, output_dir, job_id, _command_script(
         job_id, workflow, genome_path, output_dir, selected_tools_csv,
         resume=bool(copy_from_work_dir), full_operon_map=run_full_operon_map, env=license_pairs,
+        use_cache=use_cache,
     ))
     # Each run writes its resource use to the working folder when it ends (usage_report.py).
     if workflow == 'margie_sb':
@@ -2449,6 +2469,7 @@ def run_workflow(genome_data: GenomeSend, current_user: dict = Depends(get_curre
         slurm_account=slurm_account, slurm_partition=slurm_partition,
         slurm_walltime=slurm_walltime,
         run_full_operon_map=effective_full_operon_map,
+        use_cache=genome_data.use_cache,
     )
 
 
@@ -3078,6 +3099,7 @@ def resume_job(job_id: str, current_user: dict = Depends(get_current_user)):
         slurm_account=slurm_account, slurm_partition=slurm_partition,
         slurm_walltime=slurm_walltime,
         relaunched_from=job_id, copy_from_work_dir=work_dir,
+        use_cache=not _ran_without_cache(conn, work_dir),
     )
 
 
@@ -3120,6 +3142,7 @@ def restart_job(job_id: str, current_user: dict = Depends(get_current_user)):
         slurm_account=slurm_account, slurm_partition=slurm_partition,
         slurm_walltime=slurm_walltime,
         relaunched_from=job_id,
+        use_cache=not _ran_without_cache(conn, original.get("work_dir")),
     )
 
 

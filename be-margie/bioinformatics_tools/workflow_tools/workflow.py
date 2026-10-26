@@ -937,6 +937,14 @@ class WorkflowBase(ProgramBase):
         # QUAST runs beside Stage 1 and 2 when picked (run_quast, off by default).
         run_quast_enabled = smk_config.get('run_quast', False) not in (False, 'false', '0', 'no', None)
 
+        # A run without the cache (margie_sb.use_cache false, chosen on Analyze): nothing comes back from
+        # the MARGIE database, neither gene calls, GTDB-Tk, a tool's tables nor proteins, so each tool runs
+        # and keeps its raw output; the genome's results are still stored in the genome cache.
+        node = (self.conf.get('margie_sb', {}) if self.conf else {}) or {}
+        use_cache = str(node.get('use_cache', True)).strip().lower() not in ('false', '0', 'no', 'off')
+        if not use_cache:
+            LOGGER.info('This run does not use the cache: each tool runs on each genome and keeps its raw output')
+
         restored: dict[str, dict[str, bool]] = {}
         gtdbtk_restored: dict[str, bool] = {}
         rasttk_restored: dict[str, bool] = {}
@@ -944,7 +952,7 @@ class WorkflowBase(ProgramBase):
         # with their database token too.
         gtdbtk_stored: set[str] = set()
         gtdbtk_loaded: set[str] = set()
-        if db_path:
+        if db_path and use_cache:
             # Deferred so restored files are newer than Stage 1's rast.faa.
             LOGGER.info('Phase4+ cache restore deferred to per-genome pre-Stage-2 (after rasttk outputs are fresh)')
             # gtdbtk/rasttk are not in cache_map_fn: genome by genome here, before Stage 1.
@@ -1107,7 +1115,7 @@ class WorkflowBase(ProgramBase):
 
         # Per-protein cache config: the account's config plus this run's settings.
         pc_cfg = {**(self.conf or {}), **smk_config}
-        pc_on = bool(db_path) and key_name == 'margie_sb' and protein_cache.enabled(pc_cfg)
+        pc_on = bool(db_path) and key_name == 'margie_sb' and protein_cache.enabled(pc_cfg) and use_cache
 
         total = len(genome_files)
         pending = set(genome_files.keys())
@@ -1190,7 +1198,7 @@ class WorkflowBase(ProgramBase):
                 genes = hashed if isinstance(hashed, dict) else {}
             # Restored after rast.faa so mtimes are newer; must precede the skip below. A Prodigal
             # genome restores nothing: the MARGIE database keeps RASTtk-based results.
-            if db_path and genome not in prodigal_genomes:
+            if db_path and use_cache and genome not in prodigal_genomes:
                 genome_cache_map_now = cache_map_fn(genome)
                 tools_map = {k: v for k, v in genome_cache_map_now.items() if not input_keyed(k)}
                 genome_restored = _safely(f'Restoring {genome} from the cache', restore_all,

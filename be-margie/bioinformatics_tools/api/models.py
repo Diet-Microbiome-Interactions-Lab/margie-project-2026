@@ -31,6 +31,8 @@ class GenomeSend(BaseModel):
     # File names within genome_path to run; None runs the whole folder.
     genomes: list[str] | None = None
     run_full_operon_map: bool = False  # opt-in: full per-genome operon atlas (heavy), downstream of the report figures
+    # False: nothing comes back from MARGIE's caches, so each tool runs and keeps its raw output (Analyze, unlocked).
+    use_cache: bool = True
 
 
 # --- Auth models -------------------------------------------------------------
