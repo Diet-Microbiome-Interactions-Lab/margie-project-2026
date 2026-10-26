@@ -17,8 +17,8 @@
 <svelte:head><title>Contributors | MARGIE</title></svelte:head>
 
 <ReadingPage title="Contributors" lede="The people and the lab behind MARGIE, and the citations for work that uses MARGIE." shade="page-contributors">
-	<section class="rp-sec" id="people" data-toc="People and lab">
-		<h2>People and lab</h2>
+	<section class="rp-sec" id="people" data-toc="People behind the project">
+		<h2>People behind the project</h2>
 		<div class="rp-trio">
 			{#each PEOPLE as p (p.name)}
 				<div class="rp-tile"><b>{p.name}</b>{#if p.role}<span>{p.role}</span>{/if}</div>
