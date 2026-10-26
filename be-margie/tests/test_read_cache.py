@@ -75,3 +75,46 @@ def test_config_reads_are_reused(_conn, authed_client):  # noqa: F811
         assert authed_client.get("/v1/ssh/config").json() == {"a": 1}
         assert authed_client.get("/v1/ssh/config").json() == {"a": 1}
     assert read.call_count == 1
+
+
+def test_readers_meanwhile_wait_for_the_same_answer():
+    calls, release = [], threading.Event()
+
+    def ask():
+        calls.append(1)
+        release.wait(2)
+        return "answer"
+
+    got = []
+    readers = [threading.Thread(target=lambda: got.append(read_cache.get((1, "jobs"), ask))) for _ in range(5)]
+    for t in readers:
+        t.start()
+    time.sleep(0.1)
+    release.set()
+    for t in readers:
+        t.join(2)
+    assert got == ["answer"] * 5 and len(calls) == 1
+
+
+def test_an_answer_asked_for_before_a_drop_is_not_kept():
+    def ask():
+        read_cache.drop(1, "config_file")  # a change lands while the cluster answers
+        return {"old": True}
+
+    assert read_cache.get((1, "config_file"), ask) == {"old": True}
+    assert (1, "config_file") not in read_cache._answers
+    assert read_cache.get((1, "config_file"), lambda: {"new": True}) == {"new": True}
+
+
+@patch("bioinformatics_tools.api.routers.ssh.ssh_sftp.read_remote_yaml", return_value={"margie_sb": {"a": 1}})
+def test_the_job_pages_share_one_read_of_config_yaml_and_change_their_own_copy(read):
+    from bioinformatics_tools.api.routers import ssh
+
+    first = ssh._read_config(FAKE_USER, conn=None)
+    first["margie_sb"]["a"] = 2
+    assert ssh._read_config(FAKE_USER, conn=None) == {"margie_sb": {"a": 1}}
+    assert read.call_count == 1
+    with patch("bioinformatics_tools.api.routers.ssh.ssh_sftp.write_remote_yaml"):
+        ssh._write_config(FAKE_USER, first, conn=None)
+    ssh._read_config(FAKE_USER, conn=None)
+    assert read.call_count == 2

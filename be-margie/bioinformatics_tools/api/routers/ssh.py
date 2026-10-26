@@ -8,6 +8,7 @@ validated by get_current_user(), which returns the user's cluster credentials.
 _build_connection() decrypts the stored private key and builds a per-user
 SSHConnection for each request.
 """
+import copy
 import csv
 import io
 import json
@@ -446,7 +447,7 @@ def _resolve_effective_main_db(current_user: dict, conn, user_config: dict, *, p
     """Resolves main_database, optionally persisting the promoted per-user path to the config."""
     main_db, changed = _promote_shared_main_db_to_user_db(current_user, user_config, conn)
     if changed and persist:
-        ssh_sftp.write_remote_yaml(_config_path(current_user["home_dir"]), user_config, connection=conn)
+        _write_config(current_user, user_config, conn)
     return main_db
 
 
@@ -561,7 +562,7 @@ def _resolve_job_work_dir(job_id: str, current_user: dict, conn) -> str:
         work_dir = remembered
     else:
         try:
-            user_config = ssh_sftp.read_remote_yaml(_config_path(current_user["home_dir"]), connection=conn)
+            user_config = _read_config(current_user, conn)
         except Exception:
             raise HTTPException(status_code=404, detail="Job not found")
 
@@ -814,6 +815,21 @@ def _build_connection(current_user: dict):
 def _config_path(home_dir: str) -> str:
     """Remote path to the user's BSP config file."""
     return f'{home_dir}/.config/bioinformatics-tools/config.yaml'
+
+
+def _read_config(current_user: dict, conn) -> dict:
+    """The user's config.yaml, read once per read_cache's times (the job pages poll it): a copy
+    the caller can change. Changes here drop it (_write_config, _changes_drop_reads)."""
+    path = _config_path(current_user["home_dir"])
+    found = read_cache.get((current_user["user_id"], "config_file"),
+                           lambda: ssh_sftp.read_remote_yaml(path, connection=conn))
+    return copy.deepcopy(found)
+
+
+def _write_config(current_user: dict, config: dict, conn) -> None:
+    """Saves config.yaml and drops the reads of it."""
+    ssh_sftp.write_remote_yaml(_config_path(current_user["home_dir"]), config, connection=conn)
+    read_cache.drop(current_user["user_id"], "config", "config_file")
 
 
 def _yaml_block(data: dict, indent: int = 0) -> str:
@@ -1226,6 +1242,7 @@ def get_config(current_user: dict = Depends(get_current_user)):
                 changed = user_stores.fill_default_partition(conn, config) or changed
                 if changed:
                     ssh_sftp.write_remote_yaml(path, config, connection=conn)
+                    read_cache.drop(current_user["user_id"], "config_file")
         except Exception as exc:
             LOGGER.warning("Could not fill the default folders for %s: %s", current_user["username"], exc)
         return config
@@ -1244,6 +1261,7 @@ def save_config(config: dict, current_user: dict = Depends(get_current_user)):
     path = _config_path(current_user["home_dir"])
     try:
         ssh_sftp.write_remote_yaml(path, config, connection=conn)
+        read_cache.drop(current_user["user_id"], "config", "config_file")
         return {"success": True}
     except Exception as exc:
         LOGGER.error("Failed to write remote config for %s: %s", current_user["username"], exc)
@@ -1573,7 +1591,7 @@ STORES_NOT_READY = "stores-not-ready"
 
 def _stores_user_config(current_user: dict, conn) -> dict:
     try:
-        return ssh_sftp.read_remote_yaml(_config_path(current_user["home_dir"]), connection=conn)
+        return _read_config(current_user, conn)
     except Exception:
         raise HTTPException(status_code=400, detail="Configuration file not found. Create your configuration first.")
 
@@ -1590,8 +1608,8 @@ def _stores_settle(current_user: dict, conn, user_config: dict) -> None:
     """Records a finished copy, and saves the config if it now points elsewhere."""
     user = current_user["cluster_username"]
     if _stores_call(user_stores.apply_finished, conn, user_config, user):
-        ssh_sftp.write_remote_yaml(_config_path(current_user["home_dir"]), user_config, connection=conn)
-        read_cache.drop(current_user["user_id"], "config", "jobs")
+        _write_config(current_user, user_config, conn)
+        read_cache.drop(current_user["user_id"], "jobs")
 
 
 def _margie_sb_stores_ready(current_user: dict, conn, user_config: dict) -> str:
@@ -1607,7 +1625,7 @@ def _margie_sb_stores_ready(current_user: dict, conn, user_config: dict) -> str:
     if not st["ready"]:
         raise HTTPException(status_code=409, detail=f"{STORES_NOT_READY}: your databases are not on scratch yet. They are copied there once, before your first run.")
     if user_stores.point_config(conn, user_config, user):
-        ssh_sftp.write_remote_yaml(_config_path(current_user["home_dir"]), user_config, connection=conn)
+        _write_config(current_user, user_config, conn)
     return user_config["main_database"]
 
 
@@ -1728,7 +1746,7 @@ def _job_report_paths(current_user: dict, conn, run_id: str) -> tuple[str, str, 
     """Returns the report's PDF, its work folder and the account's config. Reports live in
     <working databases>/user-requested-job-reports, one per job, replaced when prepared again."""
     try:
-        user_config = ssh_sftp.read_remote_yaml(_config_path(current_user["home_dir"]), connection=conn)
+        user_config = _read_config(current_user, conn)
     except Exception:
         raise HTTPException(status_code=400, detail="Configuration file not found. Create your configuration first.")
     folder = f"{_stores_call(user_stores.scratch_root, conn, user_config)}/{JOB_REPORTS}"
@@ -2066,7 +2084,7 @@ def clone_build_recipes(body: dict | None = None, current_user: dict = Depends(g
     conn = _build_connection(current_user)
     user_config = _stores_user_config(current_user, conn)
     found = _stores_call(tool_assets.clone_recipes, conn, user_config, current_user["home_dir"], (body or {}).get("url"))
-    ssh_sftp.write_remote_yaml(_config_path(current_user["home_dir"]), user_config, connection=conn)
+    _write_config(current_user, user_config, conn)
     return found
 
 
@@ -2293,7 +2311,7 @@ def _load_job_for_action(job_id: str, current_user: dict, conn) -> dict:
         return job
 
     try:
-        user_config = ssh_sftp.read_remote_yaml(_config_path(current_user["home_dir"]), connection=conn)
+        user_config = _read_config(current_user, conn)
     except Exception:
         raise HTTPException(status_code=404, detail="Job not found")
     main_db = user_config.get('main_database')
@@ -2432,7 +2450,7 @@ def _job_status(job_id: str, current_user: dict) -> dict:
 
     conn = _build_connection(current_user)
     try:
-        user_config = ssh_sftp.read_remote_yaml(_config_path(current_user["home_dir"]), connection=conn)
+        user_config = _read_config(current_user, conn)
     except Exception:
         raise HTTPException(status_code=404, detail="Job not found")
 
@@ -2601,10 +2619,10 @@ def list_jobs(
     """Lists this user's job history, optionally for one workflow, most recent first.
     A user with no history gets an empty list."""
     conn = _build_connection(current_user)
-    # The slowest read every page makes: reused for 5 s, then returned while it is asked again.
+    # The slowest read every page makes: reused for 10 s, then returned while it is asked again.
     key = (current_user["user_id"], "jobs", workflow, page, page_size)
     # A copy in the working folder answers an API that has just started (scratch_cache).
-    return read_cache.get(key, lambda: _list_jobs(conn, current_user, workflow, page, page_size), fresh=5.0,
+    return read_cache.get(key, lambda: _list_jobs(conn, current_user, workflow, page, page_size), fresh=10.0,
                           backup=scratch_cache.backup(conn, current_user, key))
 
 
@@ -2612,7 +2630,7 @@ def _list_jobs(conn, current_user: dict, workflow: str | None, page: int, page_s
     """Reads one page of the job history from the cluster."""
     empty_response = {"jobs": [], "page": page, "page_size": page_size, "total_jobs": 0, "total_pages": 1}
     try:
-        user_config = ssh_sftp.read_remote_yaml(_config_path(current_user["home_dir"]), connection=conn)
+        user_config = _read_config(current_user, conn)
     except Exception:
         return empty_response
 
@@ -2651,7 +2669,7 @@ def clear_job_history(body: dict | None = None, current_user: dict = Depends(get
     job_ids = [str(j) for j in ((body or {}).get("job_ids") or []) if re.fullmatch(r"[A-Za-z0-9-]{1,64}", str(j))]
     conn = _build_connection(current_user)
     try:
-        user_config = ssh_sftp.read_remote_yaml(_config_path(current_user["home_dir"]), connection=conn)
+        user_config = _read_config(current_user, conn)
     except Exception:
         raise HTTPException(status_code=400, detail="Configuration file not found. Create your configuration first.")
     main_db = user_config.get("main_database")
@@ -2692,7 +2710,7 @@ def cancel_job(job_id: str, current_user: dict = Depends(get_current_user)):
         slurm_ids = [sj["job_id"] for sj in job_store.get_slurm_jobs(job_id)]
     else:
         try:
-            user_config = ssh_sftp.read_remote_yaml(_config_path(current_user["home_dir"]), connection=conn)
+            user_config = _read_config(current_user, conn)
         except Exception:
             raise HTTPException(status_code=404, detail="Job not found")
 
@@ -2766,7 +2784,7 @@ def _main_db_for(current_user: dict, conn) -> tuple[str, dict]:
     """Returns main_database and the user config, raising HTTPException(400) if either is missing.
     Pre-flight for resume_job/restart_job."""
     try:
-        user_config = ssh_sftp.read_remote_yaml(_config_path(current_user["home_dir"]), connection=conn)
+        user_config = _read_config(current_user, conn)
     except Exception:
         raise HTTPException(
             status_code=400,
@@ -3619,7 +3637,7 @@ def transfer_paths(payload: dict, current_user: dict = Depends(get_current_user)
     ssh_sftp.write_remote_text_file(f"{d}/meta.json", json.dumps({"op": op, "into": into, "items": items, "refused": refused}) + "\n", connection=conn)
 
     try:
-        cfg = ssh_sftp.read_remote_yaml(_config_path(current_user["home_dir"]), connection=conn) or {}
+        cfg = _read_config(current_user, conn) or {}
     except Exception:
         cfg = {}
     compute = (cfg.get("compute") or {}).get("cluster_default") or {}
@@ -3728,7 +3746,7 @@ def delete_paths(payload: dict, current_user: dict = Depends(get_current_user)):
     resolved = [_resolve_browse_path(x.strip(), current_user).rstrip("/") or "/" for x in paths]
     q = shlex.quote
     try:
-        cfg = ssh_sftp.read_remote_yaml(_config_path(current_user["home_dir"]), connection=conn) or {}
+        cfg = _read_config(current_user, conn) or {}
     except Exception:
         cfg = {}
     group = user_stores.depot(cfg)

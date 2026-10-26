@@ -1390,3 +1390,21 @@ class TestAuth:
         )
         assert resp.status_code == 200
         assert resp.json()["Genomes"] == ["genome1.fasta"]
+
+
+def test_requests_get_more_threads_and_slow_ones_are_logged(client, monkeypatch, caplog):
+    """Plain endpoints wait on SSH in AnyIO's thread pool: the API raises it from 40 at start-up
+    and logs each request slower than SLOW_REQUEST with the threads in use."""
+    import logging
+
+    import anyio.to_thread
+
+    from bioinformatics_tools.api import main
+
+    total = client.portal.call(lambda: anyio.to_thread.current_default_thread_limiter().total_tokens)
+    assert total == main.API_THREADS == 200
+    monkeypatch.setattr(main, "SLOW_REQUEST", 0.0)
+    with caplog.at_level(logging.INFO, logger=main.LOGGER.name):
+        assert client.get("/openapi.json").status_code == 200
+    assert any("Slow request: GET /openapi.json 200 in" in r.getMessage() and "(threads " in r.getMessage()
+               for r in caplog.records)

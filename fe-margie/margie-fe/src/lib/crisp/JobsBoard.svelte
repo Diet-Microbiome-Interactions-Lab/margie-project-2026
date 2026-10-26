@@ -254,7 +254,7 @@
 		}
 		if (shown?.id === id && shown.status === 'running') timer = setTimeout(() => follow(id, false), 2000);
 	}
-	/** The picked job's id: the job list's 3 s refresh brings new run objects but the same id, so the log is kept and followed, not read again. */
+	/** The picked job's id: the job list's refresh (3 s while a run goes) brings new run objects but the same id, so the log is kept and followed, not read again. */
 	const shownId = $derived(shown?.id ?? null);
 	$effect(() => {
 		const id = shownId;
@@ -341,7 +341,7 @@
 			});
 		untrack(read);
 		if (status !== 'running') return () => (stop = true);
-		const t = setInterval(read, 30_000);
+		const t = setInterval(() => document.visibilityState === 'visible' && read(), 30_000);
 		return () => {
 			stop = true;
 			clearInterval(t);
