@@ -29,9 +29,9 @@
 	/** What each group's questions cover. */
 	const META: Record<string, { blurb: string }> = {
 		'Running MARGIE': { blurb: 'How MARGIE reaches your cluster, calls genes and writes results, and the versions and licences behind each step.' },
-		'Inside the pipeline': { blurb: 'Hashing, consolidation, labels, envelopes, operons and fingerprints: what each step does and why.' },
+		'Inside the pipeline': { blurb: 'Hashing, consolidation, product descriptors, envelopes, operons and fingerprints: what each step does and why.' },
 		'Databases and provenance': { blurb: 'What MARGIE keeps, how she grows with each genome, and how each result can be traced.' },
-		Scoring: { blurb: 'How confident MARGIE is in each label: the four measures, C3 in depth, and how it was checked.' }
+		Scoring: { blurb: "How confident MARGIE is in each gene's best product descriptor: the four measures, C3 in depth, and how it was checked." }
 	};
 	const slug = (g: string) => 'g-' + g.toLowerCase().replace(/[^a-z]+/g, '-');
 

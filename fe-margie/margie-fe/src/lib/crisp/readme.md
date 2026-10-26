@@ -27,13 +27,13 @@ How a run annotates and scores is set out under **Methods**.
 
 ## What comes out
 
-- `FINAL_ANNOTATION_WITH_CONFIDENCE.tsv`: each gene's label, its source, location and topology, the four scoring measures with their reasoning, its 0 to 1 confidence and tier.
+- `FINAL_ANNOTATION_WITH_CONFIDENCE.tsv`: each gene's best product descriptor, its source, location and topology, the four scoring measures with their reasoning, its 0 to 1 confidence and tier.
 - A GFF of the annotation, each tool's own results, gene and operon fingerprints, and a genome map.
 - In the working folder's `resource-utilization-statistics/`: the run's resource use, a PDF of up to three landscape pages (SLURM hours by partition and phase, memory, disk read and written, files, space and rates), and a row of `runs.tsv` in seconds and bytes for adding up runs.
 
 ## How does MARGIE work
 
-Each genome's genes are called (RASTtk, or Prodigal) and annotated by the chosen tools, each on its own. MARGIE's own steps then take over: **consolidation** joins the tools' results into one row per gene, **labeling** gives each gene one label, the **operon database** adds the genome's operon contexts to the reference that C3 scores against, **scoring** measures how much the evidence agrees (C1 to C4, then a 0 to 1 confidence), **fingerprinting** writes each gene's and operon's fingerprint and the final tables, and the **fingerprint databases** take in the genome's fingerprints. **Methods** describes each phase, and the [FAQ](/faq) answers how each step works, with the papers it rests on and the code that does it.
+Each genome's genes are called (RASTtk, or Prodigal) and annotated by the chosen tools, each on its own. MARGIE's own steps then take over: **consolidation** joins the tools' results into one row per gene, **labeling** gives each gene its best product descriptor, the **operon database** adds the genome's operon contexts to the reference that C3 scores against, **scoring** measures how much the evidence agrees (C1 to C4, then a 0 to 1 confidence), **fingerprinting** writes each gene's and operon's fingerprint and the final tables, and the **fingerprint databases** take in the genome's fingerprints. **Methods** describes each phase, and the [FAQ](/faq) answers how each step works, with the papers it rests on and the code that does it.
 
 <!-- code-card -->
 
