@@ -1312,7 +1312,7 @@ rule build_gene_evidence_report:
         operon_fp_db_label_composition=OPERON_FINGERPRINT_DATABASE_LABEL_COMPOSITION
     shell:
         """
-        echo "=== MARGIE_SB PHASE 14: EVIDENCE ({wildcards.genome}) ==="
+        echo "=== MARGIE_SB PHASE 15: EVIDENCE ({wildcards.genome}) ==="
         {LOADER_PYTHON} {EVIDENCE_SCRIPTS_DIR}/build-gene-report.py \
             --consolidated {input.merged} \
             --confidence-final {input.confidence_final} \
@@ -1466,7 +1466,7 @@ rule run_ani_batch:
     container: sif_path('ani.sif', config=config, workflow_id='margie_sb')
     shell:
         """
-        echo "=== MARGIE_SB PHASE 13: ANI (pool, this run contributed {params.genome_count} genomes) ==="
+        echo "=== MARGIE_SB PHASE 14: ANI (pool, this run contributed {params.genome_count} genomes) ==="
         /usr/local/bin/run -i {params.pool_dir} -o {params.output_dir} -t {threads} \
             --min-af {params.min_af} --kmer {params.kmer} --organism-name margie_genome_pool
         cp {params.output_dir}/ani/processed/ani_results.tsv {output.results}
@@ -1518,7 +1518,7 @@ rule run_aai_batch:
     container: sif_path('aai.sif', config=config, workflow_id='margie_sb')
     shell:
         """
-        echo "=== MARGIE_SB PHASE 13: AAI (pool, this run contributed {params.genome_count} genomes) ==="
+        echo "=== MARGIE_SB PHASE 14: AAI (pool, this run contributed {params.genome_count} genomes) ==="
         /usr/local/bin/run -i {params.pool_dir} -o {params.output_dir} -t {threads} \
             --min-identity {params.min_identity} --min-aln-len {params.min_aln_len} \
             --evalue {params.evalue} --organism-name margie_genome_pool
@@ -1572,7 +1572,7 @@ rule run_closest_organisms_batch:
     container: sif_path('closest.sif', config=config, workflow_id='margie_sb')
     shell:
         """
-        echo "=== MARGIE_SB PHASE 13: CLOSEST-ORGANISMS ==="
+        echo "=== MARGIE_SB PHASE 14: CLOSEST-ORGANISMS ==="
         /usr/local/bin/run -o {params.output_dir} --ani {input.ani} --aai {input.aai} \
             --top-n {params.top_n} --min-identity {params.min_identity} \
             --gap-scaling {params.gap_scaling} --collection-name margie_collection

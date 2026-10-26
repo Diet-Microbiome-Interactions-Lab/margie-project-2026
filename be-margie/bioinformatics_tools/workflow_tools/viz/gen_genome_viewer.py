@@ -329,7 +329,7 @@ def main():
             "fin": num(col(r, "ADJUSTED_CONFIDENCE_WITH_OPERON_CONTEXT")),
             "finh": num(col(r, "ADJUSTED_CONFIDENCE_WITH_OPERON_CONTEXT_hybrid")),
             "tih": TIER_IDX.get(col(r, "CONFIDENCE_TIER_hybrid").strip(), -1),
-            "imp": 1 if col(r, "DOES_OPERON_CONTEXT_IMPROVE_CONFIDENCE?").strip().lower() == "yes" else 0,
+            "imp": 1 if col(r, "DOES_OPERON_CONTEXT_IMPROVE_CONFIDENCE?").strip().lower() in ("increases", "yes") else 0,
             "ecs": col(r, "EC_EVIDENCE_STATUS"),
             "c4r": col(r, "C4_score_reasoning")[:200] if (c4v is not None and c4v < 1) else "",
             "rv": 1 if rv else 0,

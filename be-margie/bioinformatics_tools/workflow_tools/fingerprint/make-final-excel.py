@@ -142,7 +142,7 @@ def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__,
                                      formatter_class=argparse.RawDescriptionHelpFormatter)
     parser.add_argument("--input",  required=True,
-                        help="FINAL-scored-labeled-genes-annotated.tsv")
+                        help="FINAL_ANNOTATION_WITH_CONFIDENCE.tsv")
     parser.add_argument("--output", required=True,
                         help="Output .xlsx path")
     args = parser.parse_args()
