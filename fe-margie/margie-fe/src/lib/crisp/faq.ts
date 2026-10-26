@@ -141,7 +141,7 @@ export const FAQS: Faq[] = [
 		"group": "Running MARGIE",
 		"q": "Where does MARGIE record what a run used?",
 		"a": [
-			"<p>When a run ends, MARGIE writes its resource use to <b>resource-utilization-statistics</b> in the working folder: a PDF for the run, <code>&lt;run folder&gt;--&lt;job&gt;.pdf</code> (landscape Letter, three pages at most), and a row in <b>runs.tsv</b> beside it, in seconds and bytes, for adding up runs later.</p>",
+			"<p>When a run started from the website or the desktop app ends, MARGIE writes its resource use to <b>resource-utilization-statistics</b> in the working folder: a PDF for the run, <code>&lt;run folder&gt;--&lt;job&gt;.pdf</code> (landscape Letter, three pages at most), and a row in <b>runs.tsv</b> beside it, in seconds and bytes, for adding up runs later.</p>",
 			"<p>The PDF reads SLURM's accounting for the run's own job and each step job: jobs | wall-clock, core and CPU hours | CPU use | peak memory | bytes read from and written to disk | time in the queue, by partition and by phase, with the largest jobs. It gives the files the run read and wrote by folder and by type, the growth of the MARGIE databases, the space the run consumed, and rates per wall hour, per core hour and per genome. Network transfers to outside services, such as RASTtk's, are outside SLURM's accounting.</p>"
 		],
 		"refs": [],
@@ -688,7 +688,7 @@ export const FAQS: Faq[] = [
 			{
 				"path": "load_to_db.py",
 				"symbol": "_already_loaded",
-				"why": "Skips a load already recorded for this genome, tool and pipeline version."
+				"why": "Skips a load when the newest load of the table for this genome, pipeline version and gene caller came from the same file."
 			},
 			{
 				"path": "output_cache.py",

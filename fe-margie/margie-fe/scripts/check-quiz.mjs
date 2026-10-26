@@ -33,7 +33,8 @@ const choice = (where, options, answer) => {
 	if (!Number.isInteger(answer) || answer < 0 || answer > 3) problems.push(`${where}: answer must be 0 to 3`);
 };
 
-for (const file of fs.readdirSync(dir).filter((f) => f.endsWith('.json')).sort()) {
+// Finder's " 2" copies (ignored by git) are left out.
+for (const file of fs.readdirSync(dir).filter((f) => f.endsWith('.json') && !f.includes(' 2')).sort()) {
 	const list = JSON.parse(fs.readFileSync(path.join(dir, file), 'utf8'));
 	const by = { level: {}, kind: {}, answerAt: {} };
 	for (const q of list) {

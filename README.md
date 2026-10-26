@@ -56,6 +56,9 @@ repository. Its hosting setup is kept in a separate, private repository.
 3. **Settings**: your SLURM account, folders and databases.
 4. **Analyze**: choose genomes and tools, then start the run.
 5. **Jobs** follows the run; **Results** holds the tables, figures and genome map.
+6. When a run ends, its resource use (SLURM hours by partition and phase, memory, disk read and written,
+   files and space) goes to `resource-utilization-statistics/` in the working folder: a PDF and a row of
+   `runs.tsv`, in seconds and bytes, for adding up runs later.
 
 ## Using the Desktop App
 
