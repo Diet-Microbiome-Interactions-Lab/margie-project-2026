@@ -44,3 +44,15 @@ def test_an_existing_backup_is_never_overwritten(db, tmp_path):
     with pytest.raises(ValueError):
         jh.clear_jobs(db, str(backup), "ada", "ada")
     assert _ids(db) == ["a1", "a2", "a3", "b1"]
+
+
+def test_one_job_is_cleared_on_its_own(db, tmp_path):
+    backup = str(tmp_path / "job-a1.db")
+    assert jh.clear_jobs(db, backup, "ada", "ada", job_ids=["a1"]) == {"backup": backup, "removed": 1, "kept": 1}
+    assert _ids(db) == ["a2", "a3", "b1"]
+    assert _ids(backup) == ["a1"]
+
+
+def test_a_job_still_going_or_of_another_user_stays(db, tmp_path):
+    assert jh.clear_jobs(db, str(tmp_path / "x.db"), "ada", "ada", job_ids=["a3", "b1"])["removed"] == 0
+    assert _ids(db) == ["a1", "a2", "a3", "b1"]

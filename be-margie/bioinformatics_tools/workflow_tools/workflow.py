@@ -994,6 +994,51 @@ class WorkflowBase(ProgramBase):
         last_proc = None
         progress_memo: dict[str, tuple[int, int]] = {}  # genome -> completeness, for most-complete-first ordering
 
+        # Run again (the Jobs page): while Stage 2 goes, the API asks for a failed genome with
+        # <output_dir>/.margie-requests/<genome>.again; the genome goes back in the queue and its
+        # Stage 2 runs again from the failed step, keeping its finished steps. The answer is written
+        # beside it (<genome>.taken or <genome>.declined), and `open` says the run takes requests.
+        run_root = (smk_config.get('output_dir') or self.conf.get('output_dir', '') or '').rstrip('/')
+        requests_dir = Path(run_root) / '.margie-requests' if run_root else None
+        asked_again: set[str] = set()
+
+        def _requests_open(on: bool) -> None:
+            if requests_dir is None:
+                return
+            try:
+                if on:
+                    requests_dir.mkdir(parents=True, exist_ok=True)
+                    (requests_dir / 'open').write_text(f"{os.environ.get('SLURM_JOB_ID', '')}\n")
+                else:
+                    (requests_dir / 'open').unlink(missing_ok=True)
+            except OSError as exc:
+                LOGGER.warning('Run again requests: %s could not be %s: %s', requests_dir, 'opened' if on else 'closed', exc)
+
+        def _answer(genome: str, taken: bool, note: str) -> None:
+            try:
+                (requests_dir / f"{genome}.{'taken' if taken else 'declined'}").write_text(note + '\n')
+            except OSError as exc:
+                LOGGER.warning('Run again requests: no answer written for %s: %s', genome, exc)
+
+        def _asks() -> list[str]:
+            """The genomes asked for again since the last look; each request is read once."""
+            if requests_dir is None:
+                return []
+            try:
+                asks = sorted(requests_dir.glob('*.again'))
+            except OSError:
+                return []
+            names = []
+            for ask in asks:
+                try:
+                    ask.unlink()
+                except OSError:
+                    continue
+                names.append(ask.name[:-len('.again')])
+            return names
+
+        _requests_open(True)
+
         # Stage 2 takes up to `at_once` genomes at a time (margie_sb.stage2.at_once): a genome starts
         # once its gene calls are in and a place is free, and its own steps run as before. Their
         # database loads take turns through SQLite's lock (the load rules wait and retry), and the
@@ -1132,6 +1177,9 @@ class WorkflowBase(ProgramBase):
             stage2_command = self.build_executable(selected_wf, config_overrides=stage2_config, mode=mode,
                                                     compute_config=compute_config, extra_resources=extra_resources,
                                                     rerun_triggers=rerun_triggers, target=stage2_target)
+            if genome in asked_again:
+                # Run again: a step stopped part way starts afresh.
+                stage2_command.append('--rerun-incomplete')
             LOGGER.info('Starting Stage 2 (%s) for %s: %s', stage2_target, genome, ' '.join(stage2_command))
             stage2_proc = self._start_background_subprocess(stage2_command)
 
@@ -1244,6 +1292,25 @@ class WorkflowBase(ProgramBase):
                     active.remove(slot)
                     _finish(slot)
 
+            # Run again: a failed genome asked for from the Jobs page goes back in the queue.
+            for genome in _asks():
+                if genome in failed:
+                    failed.remove(genome)
+                    asked_again.add(genome)
+                    progress_memo.pop(genome, None)
+                    processed -= 1
+                    queue.append(genome)
+                    LOGGER.info('Running %s again from its failed step, as asked from the Jobs page', genome)
+                    _answer(genome, True, f'{genome} goes back in the queue and runs again from its failed step.')
+                else:
+                    why = ('it is running now' if any(s['genome'] == genome for s in active)
+                           else 'it is waiting for its turn' if genome in queue or genome in pending
+                           else 'it has finished' if genome in finished
+                           else 'its gene calls (RASTtk or Prodigal) did not finish; Resume runs them again once this run ends' if genome in skipped
+                           else 'it is not in this run')
+                    LOGGER.info('A request to run %s again was set aside: %s', genome, why)
+                    _answer(genome, False, f'{genome} was not run again: {why}.')
+
             if not queue:
                 if not active and stage1.poll() is not None and pending:
                     # No token after Stage 1 exit: phase1-3 failure, skipped.
@@ -1273,6 +1340,7 @@ class WorkflowBase(ProgramBase):
             if active:
                 time.sleep(10)
 
+        _requests_open(False)
         last_proc = last['proc']
 
         # Stage 3: LLM for all genomes at once; --keep-going lets one failure pass.

@@ -1698,72 +1698,199 @@ def refresh_genome_viewer(body: dict | None = None, current_user: dict = Depends
     return {"viewer": f"{folder}/{viewer}"}
 
 
-# ---- Job report: a PDF of the job with its logs, provenance and licence record, zipped in its folder ----
+# ---- Job report: a PDF of the job, prepared in the background and kept in the working databases folder ----
+
+JOB_REPORTS = "user-requested-job-reports"
+# A report whose log has not moved for this long has stopped (its login-node process ended).
+_REPORT_STALE = 20 * 60
+
+
+def _job_report_paths(current_user: dict, conn, run_id: str) -> tuple[str, str, dict]:
+    """Returns the report's PDF, its work folder and the account's config. Reports live in
+    <working databases>/user-requested-job-reports, one per job, replaced when prepared again."""
+    try:
+        user_config = ssh_sftp.read_remote_yaml(_config_path(current_user["home_dir"]), connection=conn)
+    except Exception:
+        raise HTTPException(status_code=400, detail="Configuration file not found. Create your configuration first.")
+    folder = f"{_stores_call(user_stores.scratch_root, conn, user_config)}/{JOB_REPORTS}"
+    stem = re.sub(r"[^A-Za-z0-9]", "", run_id)[:8]
+    return f"{folder}/MARGIE-job-report-{stem}.pdf", f"{folder}/.work-{stem}", user_config
+
 
 @router.post("/job-report")
 def job_report(body: dict | None = None, current_user: dict = Depends(get_current_user)):
-    """Starts a job's report on the cluster (workflow_tools/report/job_report.py); returns {zip, work}: where the zip
-    will be, and the folder job-report-status reads.
+    """Starts a job's report on the cluster (workflow_tools/report/job_report.py) in the background;
+    job-report-status follows it. Returns {state: running, file}.
 
     body: {run_id, model}, the model being what the Jobs page shows (the job, its summary, each step).
-    The job's log and the account's licence acceptances are added here."""
+    The licence acceptances, the run's log and the backup folder are added here."""
     body = body or {}
     run_id = str(body.get("run_id") or "").strip()
     model = body.get("model") or {}
-    out_dir = str((model.get("run") or {}).get("outputDir") or "").strip()
-    if not run_id or not out_dir:
-        raise HTTPException(status_code=400, detail="Which job, and which output folder?")
+    if not run_id:
+        raise HTTPException(status_code=400, detail="Which job?")
     status = _job_status(run_id, current_user)
-    out_dir = _resolve_browse_path(out_dir, current_user).rstrip("/")
+    conn = _build_connection(current_user)
+    pdf, work, user_config = _job_report_paths(current_user, conn, run_id)
+    out_dir = str(status.get("output_dir") or status.get("work_dir") or "").strip()
+    model.setdefault("run", {})["outputDir"] = _resolve_browse_path(out_dir, current_user).rstrip("/") if out_dir else ""
+    model["files"] = {"runLog": f"{current_user['home_dir'].rstrip('/')}/{ssh_slurm.RUN_FILE_DIR}/{ssh_slurm.run_file_stem(run_id)}.log"}
+    model["backupRoot"] = user_stores.backup_root(user_config)
     from bioinformatics_tools.api.database import get_db
     with get_db() as db:
         rows = db.execute(
             "SELECT terms_version, terms_sha256, accepted_items, accepted_at, usage_type, licensed_tools "
             "FROM license_acceptances WHERE username = ? ORDER BY id", (current_user["username"],)).fetchall()
     licence = [dict(r) for r in rows]
-    conn = _build_connection(current_user)
     # The report is made with the account's own clone, brought up to the deployed version first.
     try:
         sync_remote_dane_wf(conn)
     except Exception as exc:
         LOGGER.warning("dane_wf version-sync before a job report failed, using the clone as it is: %s", exc)
     q = shlex.quote
-    work = f"{out_dir}/.job-report"
-    code, out = user_stores._run(conn, f"mkdir -p {q(work)}")
+    code, _ = user_stores._run(conn, f"mkdir -p {q(work)}")
     if code != 0:
-        raise HTTPException(status_code=404, detail=f"Could not write to {out_dir} on the cluster.")
+        raise HTTPException(status_code=500, detail=f"Could not write to {work} on the cluster.")
     ssh_sftp.write_remote_text_file(f"{work}/model.json", json.dumps(model), connection=conn)
-    ssh_sftp.write_remote_text_file(f"{work}/job-log.txt", status.get("logs") or "", connection=conn)
     ssh_sftp.write_remote_text_file(f"{work}/licence.json", json.dumps(licence, indent=2), connection=conn)
     repo = f"{current_user['home_dir']}/bioinformatics-tools"
     script = f"{repo}/bioinformatics_tools/workflow_tools/report/job_report.py"
-    name = f"MARGIE-job-report-{re.sub(r'[^A-Za-z0-9]', '', run_id)[:8]}.zip"
-    # Runs on in the background (a large run's logs take a while); job-report-status follows it.
-    cmd = (f"rm -f {q(work)}/report.exit; PY=${{MARGIE_PYTHON:-{q(repo)}/.venv/bin/python}}; "
-           f"nohup sh -c '\"$0\" {q(script)} --run-dir {q(out_dir)} --work {q(work)} --out {q(out_dir + '/' + name)} "
+    # Runs on in the background (counting a large database's genes takes minutes).
+    cmd = (f"rm -f {q(work)}/report.exit; : > {q(work)}/report.log; PY=${{MARGIE_PYTHON:-{q(repo)}/.venv/bin/python}}; "
+           f"nohup sh -c 'nice -n 10 \"$0\" {q(script)} --work {q(work)} --out {q(pdf)} "
            f"> {q(work)}/report.log 2>&1; echo $? > {q(work)}/report.exit' \"$PY\" >/dev/null 2>&1 &")
     code, out = user_stores._run(conn, cmd, timeout=60)
     if code != 0:
         raise HTTPException(status_code=500, detail=f"The report could not be started: {out.strip()[-400:]}")
-    return {"zip": f"{out_dir}/{name}", "work": work}
+    return {"state": "running", "file": pdf}
 
 
 @router.get("/job-report-status")
-def job_report_status(work: str, current_user: dict = Depends(get_current_user)):
-    """Returns {state: running | done | failed, error} for a report started by job-report."""
-    work = _resolve_browse_path(work, current_user).rstrip("/")
-    if not work.endswith("/.job-report"):
-        raise HTTPException(status_code=400, detail="Not a job report folder.")
+def job_report_status(run_id: str, current_user: dict = Depends(get_current_user)):
+    """Returns {state: none | running | done | failed, file, size, made, note} for a job's report."""
+    conn = _build_connection(current_user)
+    pdf, work, _ = _job_report_paths(current_user, conn, run_id)
+    q = shlex.quote
+    _, out = user_stores._run(conn, (
+        f"echo \"exit=$(cat {q(work)}/report.exit 2>/dev/null)\"; "
+        f"echo \"pdf=$(stat -c '%s %Y' {q(pdf)} 2>/dev/null)\"; "
+        f"echo \"log=$(stat -c %Y {q(work)}/report.log 2>/dev/null)\"; "
+        f"echo \"now=$(date +%s)\"; "
+        f"echo \"last=$(tail -n 1 {q(work)}/report.log 2>/dev/null)\""))
+    got = dict(line.split("=", 1) for line in out.splitlines() if "=" in line)
+    size_made = got.get("pdf", "").split()
+    done = {"file": pdf, "size": int(size_made[0]), "made": int(size_made[1])} if len(size_made) == 2 else None
+    code, log_at, now = got.get("exit", "").strip(), got.get("log", "").strip(), got.get("now", "0").strip()
+    last = re.sub(r"^\[[0-9:]+\]\s*", "", got.get("last", "").strip())
+    if code == "0" or (not code and not log_at):
+        return {"state": "done", **done, "note": ""} if done else {"state": "none", "file": pdf, "note": ""}
+    if code:
+        _, tail = user_stores._run(conn, f"tail -n 12 {q(work)}/report.log 2>/dev/null")
+        return {"state": "failed", "file": pdf, "note": tail.strip()[-600:]}
+    if log_at.isdigit() and now.isdigit() and int(now) - int(log_at) > _REPORT_STALE:
+        return {"state": "failed", "file": pdf, "note": f"The report stopped before it finished; its last step was: {last}"}
+    return {"state": "running", "file": pdf, "note": last}
+
+
+# ---- A failed step: run its genome again, and find where it failed in the logs ----
+
+_GENOME_NAME = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._-]*$")
+_RULE_NAME = re.compile(r"^[A-Za-z0-9_]+$")
+
+
+def _run_folder(status: dict, current_user: dict) -> str:
+    out_dir = str(status.get("output_dir") or status.get("work_dir") or "").strip()
+    if not out_dir:
+        raise HTTPException(status_code=400, detail="This job has no output folder.")
+    return _resolve_browse_path(out_dir, current_user).rstrip("/")
+
+
+@router.post("/rerun-genome")
+def rerun_genome(body: dict | None = None, current_user: dict = Depends(get_current_user)):
+    """Asks a running annotation to run a failed genome again from its failed step. The run's
+    controller reads <output_dir>/.margie-requests (workflow.py, Stage 2) and answers within a few
+    seconds. Returns {state: taken | declined | waiting, note}."""
+    body = body or {}
+    run_id = str(body.get("run_id") or "").strip()
+    genome = str(body.get("genome") or "").strip()
+    if not run_id or not _GENOME_NAME.match(genome):
+        raise HTTPException(status_code=400, detail="Which job, and which genome?")
+    status = _job_status(run_id, current_user)
+    ended = "The run has ended, so Resume picks it up: the genome's failed steps run again and its finished steps are kept."
+    if status.get("status") in ("completed", "failed", "cancelled") or status.get("still_active") is False:
+        raise HTTPException(status_code=409, detail=ended)
+    out_dir = _run_folder(status, current_user)
     conn = _build_connection(current_user)
     q = shlex.quote
-    _, out = user_stores._run(conn, f"cat {q(work)}/report.exit 2>/dev/null")
-    code = out.strip()
-    if not code:
-        return {"state": "running", "error": ""}
-    if code == "0":
-        return {"state": "done", "error": ""}
-    _, log = user_stores._run(conn, f"tail -n 12 {q(work)}/report.log 2>/dev/null")
-    return {"state": "failed", "error": log.strip()[-600:]}
+    req = f"{out_dir}/.margie-requests"
+    _, out = user_stores._run(conn, f"test -f {q(req)}/open && echo open")
+    if "open" not in out:
+        raise HTTPException(status_code=409, detail=(
+            "This run started before Run again was added, so it takes no requests. "
+            "Once it ends, Resume runs its failed steps again and keeps the finished ones."))
+    code, out = user_stores._run(
+        conn, f"rm -f {q(req)}/{q(genome)}.taken {q(req)}/{q(genome)}.declined; "
+              f"printf '%s\\n' {q(current_user['username'])} > {q(req)}/{q(genome)}.again")
+    if code != 0:
+        raise HTTPException(status_code=500, detail=f"The request could not be written in {req}.")
+    # The controller looks every 10 s or so.
+    for _ in range(12):
+        time.sleep(2.5)
+        _, out = user_stores._run(
+            conn, f"cd {q(req)} && for a in taken declined; do [ -f {q(genome)}.$a ] && echo \"$a\" && cat {q(genome)}.$a && rm -f {q(genome)}.$a; done; true")
+        lines = out.strip().splitlines()
+        if lines and lines[0] in ("taken", "declined"):
+            return {"state": lines[0], "note": " ".join(lines[1:]).strip()}
+    return {"state": "waiting", "note": f"Asked: the run takes the request once its controller looks again, and {genome}'s steps show as running then."}
+
+
+@router.get("/failure-log")
+def failure_log(run_id: str, genome: str, rules: str = "", current_user: dict = Depends(get_current_user)):
+    """Where a genome's step failed: the last 'Error in rule' block in the run's log for one of
+    `rules` (comma-separated) that names the genome, with the lines around it, and the end of that
+    step's own SLURM log. Returns {found, line, lines: [{n, text, hit}], step: {path, lines} | null}."""
+    if not _GENOME_NAME.match(genome):
+        raise HTTPException(status_code=400, detail="Which genome?")
+    wanted = [r for r in (x.strip() for x in rules.split(",")) if _RULE_NAME.match(r)][:8]
+    status = _job_status(run_id, current_user)
+    out_dir = _run_folder(status, current_user)
+    conn = _build_connection(current_user)
+    q = shlex.quote
+    log = f"{current_user['home_dir'].rstrip('/')}/{ssh_slurm.RUN_FILE_DIR}/{ssh_slurm.run_file_stem(run_id)}.log"
+    pats = " ".join(f"-e {q(f'Error in rule {r}:')}" for r in wanted) or f"-e {q('Error in rule ')}"
+    # The block's fields (input, output, log, wildcards) name the genome; other runs' lines interleave.
+    find = (f"grep -n -F -A 30 {pats} -- {q(log)} 2>/dev/null | "
+            f"awk -v g={q(genome)} '{{ split($0, a, /[:-]/) }} /Error in rule/ {{ s = a[1] }} "
+            f"s && index($0, g) && /(input|output|log|wildcards):/ {{ hit = s }} END {{ print hit }}'")
+    _, out = user_stores._run(conn, find, timeout=180)
+    line = int(out.strip()) if out.strip().isdigit() else 0
+    if not line:
+        stage2 = q('failed for genome "' + genome + '"')
+        _, out = user_stores._run(conn, f"grep -n -F -- {stage2} {q(log)} 2>/dev/null | tail -n 1 | cut -d: -f1", timeout=180)
+        line = int(out.strip()) if out.strip().isdigit() else 0
+    if not line:
+        return {"found": False, "line": 0, "lines": [], "step": None}
+    first = max(1, line - 8)
+    _, out = user_stores._run(conn, f"sed -n '{first},{line + 40}p' {q(log)}", timeout=60)
+    lines = []
+    for k, text in enumerate(out.splitlines()):
+        n = first + k
+        hit = n == line or (n > line and n <= line + 30 and genome in text
+                            and re.search(r"(message|input|output|log|wildcards|jobid|external_jobid):", text) is not None)
+        hit = hit or (n > line and n <= line + 12 and "message:" in text)
+        lines.append({"n": n, "text": text[:2000], "hit": bool(hit)})
+    # The step's own SLURM log, named in the block's log: field.
+    step = None
+    for row in lines:
+        m = re.search(r"\blog:\s*(\S+?\.log)\b", row["text"])
+        if row["n"] > line and m and genome in m.group(1) and m.group(1).startswith(out_dir + "/"):
+            path = m.group(1)
+            _, tail = user_stores._run(conn, f"tail -n 80 {q(path)} 2>/dev/null", timeout=60)
+            step = {"path": path, "lines": [
+                {"text": t[:2000], "hit": re.search(r"error|exception|traceback|failed|killed|oom|denied|no such file", t, re.I) is not None}
+                for t in tail.splitlines()]}
+            break
+    return {"found": True, "line": line, "lines": lines, "step": step}
 
 
 # ---- AI keys: ~/.config/margie on the cluster, JSON or provider=key lines ----
@@ -2498,10 +2625,11 @@ def _list_jobs(conn, current_user: dict, workflow: str | None, page: int, page_s
 
 
 @router.post("/job_history/clear")
-def clear_job_history(current_user: dict = Depends(get_current_user)):
-    """Clears the job list: copies this user's finished jobs into a backup in the working folder
-    (job-history-backups/job-history-<time>.db), then removes them from the history. A job still
-    going stays. Returns {backup, removed, kept}."""
+def clear_job_history(body: dict | None = None, current_user: dict = Depends(get_current_user)):
+    """Clears the job list: copies this user's finished jobs (or only body.job_ids among them) into a
+    backup in the working folder (job-history-backups/job-history-<time>.db), then removes them from
+    the history. A job still going stays. Returns {backup, removed, kept}."""
+    job_ids = [str(j) for j in ((body or {}).get("job_ids") or []) if re.fullmatch(r"[A-Za-z0-9-]{1,64}", str(j))]
     conn = _build_connection(current_user)
     try:
         user_config = ssh_sftp.read_remote_yaml(_config_path(current_user["home_dir"]), connection=conn)
@@ -2517,9 +2645,11 @@ def clear_job_history(current_user: dict = Depends(get_current_user)):
     except Exception as exc:
         LOGGER.warning("dane_wf version-sync before clearing the history failed, using the clone as it is: %s", exc)
     stamp = datetime.now(timezone.utc).strftime("%Y-%m-%d-%H%M%S")
+    name = f"job-{job_ids[0][:8]}-{stamp}" if len(job_ids) == 1 else f"job-history-{stamp}"
     result = job_history_client.clear_jobs(
-        conn, main_db, f"{root}/job-history-backups/job-history-{stamp}.db",
-        owner_username=current_user["username"], owner_cluster_username=current_user["cluster_username"])
+        conn, main_db, f"{root}/job-history-backups/{name}.db",
+        owner_username=current_user["username"], owner_cluster_username=current_user["cluster_username"],
+        job_ids=job_ids or None)
     if result is None:
         raise HTTPException(status_code=500, detail="Could not clear the job history; nothing was removed. "
                                                     "Your copy of MARGIE on the cluster may be older than the site (it updates before each run).")

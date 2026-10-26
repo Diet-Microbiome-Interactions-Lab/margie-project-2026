@@ -304,14 +304,17 @@ _GOING = ("pending", "queued", "running")
 
 
 def clear_jobs(db_path: str, backup_path: str, owner_username: str | None = None,
-               owner_cluster_username: str | None = None) -> dict:
-    """Copies the owner's finished jobs into a new SQLite file at backup_path (table api_jobs), then
-    removes them from the history; a job still going stays. Nothing is removed unless every row is in
-    the backup. Returns {backup, removed, kept}."""
+               owner_cluster_username: str | None = None, job_ids: list[str] | None = None) -> dict:
+    """Copies the owner's finished jobs (or only `job_ids` among them) into a new SQLite file at
+    backup_path (table api_jobs), then removes them from the history; a job still going stays.
+    Nothing is removed unless every row is in the backup. Returns {backup, removed, kept}."""
     ensure_table(db_path)
     ownership, owner_params = _ownership_where(owner_username, owner_cluster_username)
     where = f"status NOT IN ({', '.join('?' * len(_GOING))})" + (f" AND {ownership}" if ownership else "")
     params = [*_GOING, *owner_params]
+    if job_ids:
+        where += f" AND job_id IN ({', '.join('?' * len(job_ids))})"
+        params += list(job_ids)
     backup = os.path.expanduser(backup_path)
     if os.path.exists(backup):
         raise ValueError(f"backup already exists: {backup_path}")
@@ -372,7 +375,8 @@ def dispatch(action: str, payload: dict):
                           payload.get("owner_username"), payload.get("owner_cluster_username"))
     if action == "clear":
         return clear_jobs(db_path, payload["backup_path"],
-                          payload.get("owner_username"), payload.get("owner_cluster_username"))
+                          payload.get("owner_username"), payload.get("owner_cluster_username"),
+                          payload.get("job_ids"))
     raise ValueError(f"unknown action: {action}")
 
 

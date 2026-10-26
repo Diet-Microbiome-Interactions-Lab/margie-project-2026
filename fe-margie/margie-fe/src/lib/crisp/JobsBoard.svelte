@@ -1,5 +1,5 @@
 <script lang="ts">
-	import { ArrowDownToLine, ArrowUpToLine, Check, Copy, Database, FileText, FolderOpen, PanelLeftClose, PanelLeftOpen, RotateCcw, RotateCw, Square, TextWrap } from 'lucide-svelte';
+	import { ArrowDownToLine, ArrowUpToLine, Check, Copy, Database, Ellipsis, Eraser, FileDown, FileText, FolderOpen, PanelLeftClose, PanelLeftOpen, RotateCcw, RotateCw, Square, TextWrap } from 'lucide-svelte';
 	import { backend } from '$lib/workspace/backend.svelte';
 	import { call } from '$lib/cluster/http';
 	import { downloadBlob } from '$lib/cluster/backend';
@@ -51,12 +51,61 @@
 	const again = (r: Run) => r.kind === 'annotate' && (r.status === 'failed' || r.status === 'cancelled');
 	let busy = $state('');
 
-	/** The job report: what this page shows, made into a PDF with the logs and records on the cluster. */
-	let reporting = $state('');
-	async function jobReport() {
+	/**
+	 * The job report: what this page shows, made into a PDF on the cluster in the background and kept
+	 * in the working databases folder (user-requested-job-reports), to download then or later.
+	 */
+	type Report = { state: 'checking' | 'none' | 'running' | 'done' | 'failed'; file?: string; size?: number; made?: number; note?: string };
+	let reports = $state<Record<string, Report>>({});
+	const following = new Set<string>();
+	let gone = false;
+	onDestroy(() => (gone = true));
+	const reportable = (r: Run | null) => !!r && backend.cluster && r.kind === 'annotate' && !!r.outputDir;
+	async function reportStatus(id: string): Promise<Report> {
+		let r: Report;
+		try {
+			r = await call<Report>('GET', `/v1/ssh/job-report-status?run_id=${encodeURIComponent(id)}`);
+		} catch (e) {
+			r = { state: 'none', note: e instanceof Error ? e.message : '' };
+		}
+		reports[id] = r;
+		if (r.state === 'running') followReport(id);
+		return r;
+	}
+	/** Follows a report being prepared, and says when it is ready. */
+	async function followReport(id: string) {
+		if (following.has(id)) return;
+		following.add(id);
+		try {
+			while (!gone) {
+				await new Promise((r) => setTimeout(r, 5000));
+				let r: Report;
+				try {
+					r = await call<Report>('GET', `/v1/ssh/job-report-status?run_id=${encodeURIComponent(id)}`);
+				} catch {
+					continue;
+				}
+				reports[id] = r;
+				if (r.state === 'done') return ui.notify('The job report is ready to download.', 'ok');
+				if (r.state === 'failed') return ui.notify(`The job report could not be made. ${r.note ?? ''}`, 'error');
+				if (r.state !== 'running') return;
+			}
+		} finally {
+			following.delete(id);
+		}
+	}
+	$effect(() => {
+		const id = reportable(shown) ? shownId : null;
+		if (id && !reports[id]) untrack(() => {
+			reports[id] = { state: 'checking' };
+			reportStatus(id);
+		});
+	});
+	async function prepareReport() {
 		const run = shown;
-		if (!run || !prog || reporting) return;
-		reporting = 'Preparing…';
+		if (!run || !prog || reports[run.id]?.state === 'running') return;
+		const id = run.id;
+		reports[id] = { state: 'running', note: 'starting' };
 		try {
 			const clockOf = (tool: string, genome: string) => clock?.started.find((e) => e.tool === tool && e.genome === genome);
 			const model = {
@@ -90,6 +139,8 @@
 								source: c.src?.source ?? '',
 								level: c.src?.level ?? '',
 								detail: c.src?.detail ?? '',
+								database: c.src?.database ?? '',
+								cachedAt: c.src?.cached_at ?? '',
 								file: c.store?.file?.name ?? '',
 								fileSize: c.store?.file?.size ?? 0,
 								loaded: !!c.store?.loaded,
@@ -100,29 +151,68 @@
 				),
 				clock: clock?.started ?? []
 			};
-			const started = await call<{ zip: string; work: string }>('POST', '/v1/ssh/job-report', { run_id: run.id, model });
-			const t0 = Date.now();
-			for (;;) {
-				await new Promise((r) => setTimeout(r, 3000));
-				const st = await call<{ state: string; error: string }>('GET', `/v1/ssh/job-report-status?work=${encodeURIComponent(started.work)}`);
-				if (st.state === 'done') break;
-				if (st.state === 'failed') throw new Error(`The report could not be made: ${st.error}`);
-				reporting = `Preparing… ${Math.round((Date.now() - t0) / 1000)} s`;
-			}
-			reporting = 'Downloading…';
-			const { blob, name } = await downloadBlob(started.zip);
+			const started = await call<Report>('POST', '/v1/ssh/job-report', { run_id: id, model });
+			reports[id] = { ...started, state: 'running' };
+			ui.notify('Preparing the job report on the cluster. It is kept in your working databases folder (user-requested-job-reports), to download now or later.', 'info');
+			followReport(id);
+		} catch (e) {
+			const why = e instanceof Error ? e.message : 'The job report could not be started.';
+			reports[id] = { state: 'failed', note: why };
+			ui.notify(why, 'error');
+		}
+	}
+	/** Opens a job and prepares its report once its progress is read (the job menu sends here). */
+	async function prepareFor(r: Run) {
+		picked = r.id;
+		for (let k = 0; k < 100 && !(shown?.id === r.id && prog); k++) await new Promise((t) => setTimeout(t, 300));
+		if (shown?.id === r.id && prog) prepareReport();
+		else ui.notify("The job's progress could not be read yet. Try again in a moment.", 'error');
+	}
+	async function downloadReport(id: string) {
+		const file = reports[id]?.file;
+		if (!file) return;
+		try {
+			const { blob, name } = await downloadBlob(file);
 			const url = URL.createObjectURL(blob);
 			const a = Object.assign(document.createElement('a'), { href: url, download: name });
 			document.body.append(a);
 			a.click();
 			a.remove();
 			setTimeout(() => URL.revokeObjectURL(url), 10_000);
-			ui.notify(`The job report is saved, and kept in the job's folder as ${name}.`, 'ok');
 		} catch (e) {
-			ui.notify(e instanceof Error ? e.message : 'The job report could not be made.', 'error');
-		} finally {
-			reporting = '';
+			ui.notify(e instanceof Error ? e.message : 'The job report could not be downloaded.', 'error');
 		}
+	}
+	const madeWhen = (r: Report | undefined) => (r?.made ? ago(new Date(r.made * 1000).toISOString()) : '');
+
+	/** A job's menu (its ⋯, or a right click on it): its report, its folder, and clearing it from the history. */
+	let menu = $state<{ run: Run; x: number; y: number; up: boolean } | null>(null);
+	function openMenu(ev: MouseEvent, r: Run, fromButton = false) {
+		ev.preventDefault();
+		if (fromButton && menu?.run.id === r.id) return (menu = null);
+		const at = fromButton ? (ev.currentTarget as HTMLElement).getBoundingClientRect() : null;
+		const x = at ? at.right - 230 : ev.clientX;
+		const y = at ? at.bottom + 4 : ev.clientY;
+		menu = { run: r, x: Math.max(8, Math.min(x, innerWidth - 238)), y, up: y + 170 > innerHeight };
+		if (reportable(r) && reports[r.id]?.state !== 'running') {
+			reports[r.id] = { ...(reports[r.id] ?? {}), state: 'checking' };
+			reportStatus(r.id);
+		}
+	}
+	/** Mounts the menu at the interface's root, so a size container does not place it. */
+	function toRoot(node: HTMLElement) {
+		(node.closest('[data-mg-root]') ?? document.querySelector('[data-mg-root]') ?? document.body).appendChild(node);
+		return { destroy: () => node.remove() };
+	}
+	async function clearOne(r: Run) {
+		menu = null;
+		const sure = confirm(
+			`Clear "${title(r)}" (${shortId(r.id)}) from the job history?\n\nA backup of its record is saved first, in your working folder (job-history-backups). ` +
+				'Its results, run folder and the cached tool results in your MARGIE database stay as they are.'
+		);
+		if (!sure) return;
+		const done = await ws.clearRun(r.id);
+		if (done?.removed && picked === r.id) picked = null;
 	}
 	async function relaunch(r: Run, how: 'resume' | 'restart') {
 		busy = how;
@@ -172,6 +262,7 @@
 		untrack(() => {
 			if (timer) clearTimeout(timer);
 			log = null;
+			failure = null;
 			follow(id, true);
 		});
 		return () => {
@@ -186,10 +277,53 @@
 	const partial = $derived(!!log && log.size > log.text.length);
 	const tone = (l: string) => (/error|failed|traceback|exception/i.test(l) ? 'err' : /warn/i.test(l) ? 'warn' : /\b(done|finished|completed)\b/i.test(l) ? 'ok' : '');
 	let logEl = $state<HTMLElement | null>(null);
-	/** Brings the log into view (a failed step's popup sends here). */
-	function showLog() {
+
+	/**
+	 * Where a failed step failed (its popup's Show where it failed): the block in the run's log for
+	 * that step and genome, its lines highlighted, then the end of the step's own SLURM log.
+	 */
+	type LogLine = { n?: number; text: string; hit: boolean };
+	let failure = $state<{ g: string; t: string; loading: boolean; error: string; line: number; lines: LogLine[]; step: { path: string; lines: LogLine[] } | null } | null>(null);
+	let failBox = $state<HTMLElement | null>(null);
+	async function showLog(g: string, t: string, rules: string[]) {
 		logEl?.scrollIntoView({ behavior: 'smooth', block: 'start' });
-		box?.focus();
+		if (!shown || !backend.cluster) {
+			box?.focus();
+			return;
+		}
+		const id = shown.id;
+		failure = { g, t, loading: true, error: '', line: 0, lines: [], step: null };
+		const same = () => shown?.id === id && failure?.g === g && failure?.t === t;
+		try {
+			const d = await call<{ found: boolean; line: number; lines: LogLine[]; step: { path: string; lines: LogLine[] } | null }>(
+				'GET',
+				`/v1/ssh/failure-log?run_id=${encodeURIComponent(id)}&genome=${encodeURIComponent(g)}&rules=${encodeURIComponent(rules.join(','))}`
+			);
+			if (!same()) return;
+			failure = { g, t, loading: false, error: d.found ? '' : `The run's log has no error block for ${t} on this genome.`, line: d.line, lines: d.lines, step: d.step };
+			await tick();
+			const hit = failBox?.querySelector<HTMLElement>('.hit');
+			if (failBox && hit) failBox.scrollTop = Math.max(0, hit.offsetTop - failBox.clientHeight / 3);
+			failBox?.focus({ preventScroll: true });
+		} catch (e) {
+			if (same()) failure = { ...failure!, loading: false, error: e instanceof Error ? e.message : String(e) };
+		}
+	}
+
+	/**
+	 * Run again (a failed step's popup): a running annotation takes the genome back into its queue
+	 * from the failed step; an ended one is resumed, which runs its failed steps again.
+	 */
+	async function rerunGenome(g: string) {
+		if (!shown) return;
+		if (!going) return relaunch(shown, 'resume');
+		ui.notify(`Asking the run to run ${g} again…`, 'info');
+		try {
+			const r = await call<{ state: 'taken' | 'declined' | 'waiting'; note: string }>('POST', '/v1/ssh/rerun-genome', { run_id: shown.id, genome: g });
+			ui.notify(r.note, r.state === 'declined' ? 'error' : r.state === 'taken' ? 'ok' : 'info');
+		} catch (e) {
+			ui.notify(e instanceof Error ? e.message : 'The request could not be sent.', 'error');
+		}
 	}
 
 	// ------------------------------------------------ fresh or restored: the run's cache report
@@ -321,6 +455,8 @@
 	}
 </script>
 
+<svelte:window onkeydown={(e) => e.key === 'Escape' && menu && (menu = null)} onresize={() => (menu = null)} />
+
 {#if ws.runs.length}
 	<div class="board">
 		<div class="top-wrap" style="height: {topHeight}px">
@@ -336,8 +472,15 @@
 				</div>
 		<ul class="list" aria-label="Jobs">
 			{#each ws.runs as r (r.id)}
-				<li>
-					<button type="button" class="row {r.status}" aria-pressed={shown?.id === r.id} onclick={() => (picked = r.id)} title="{title(r)} | {r.id} | {statusWord(r)}{r.started ? ` | started ${ago(r.started)}` : ''}">
+				<li class="li">
+					<button
+						type="button"
+						class="row {r.status}"
+						aria-pressed={shown?.id === r.id}
+						onclick={() => (picked = r.id)}
+						oncontextmenu={(e) => openMenu(e, r)}
+						title="{title(r)} | {r.id} | {statusWord(r)}{r.started ? ` | started ${ago(r.started)}` : ''}"
+					>
 						<span class="dot" aria-hidden="true"></span>
 						<span class="r-name">{title(r)}</span>
 						<span class="sep" aria-hidden="true">|</span>
@@ -345,6 +488,14 @@
 						<span class="sep" aria-hidden="true">|</span>
 						<span class="r-st">{statusWord(r)}</span>
 					</button>
+					<button
+						type="button"
+						class="row-more"
+						aria-label="More for {title(r)}"
+						aria-haspopup="menu"
+						aria-expanded={menu?.run.id === r.id}
+						onclick={(e) => openMenu(e, r, true)}><Ellipsis size={15} /></button
+					>
 				</li>
 			{/each}
 		</ul>
@@ -365,10 +516,25 @@
 						</span>
 					</div>
 					<div class="job-acts">
-						{#if backend.cluster && shown.kind === 'annotate' && shown.outputDir && prog}
-							<button type="button" class="mg-btn small" disabled={!!reporting} onclick={jobReport} title="A PDF of this job's summary and each step, zipped with its logs, the tools' provenance records, the cache report and the licence acceptances"
-								><FileText size={14} />{reporting || 'Prepare the job report'}</button
-							>
+						{#if reportable(shown) && prog}
+							{@const rep = reports[shown.id]}
+							{#if rep?.state === 'done'}
+								<button type="button" class="mg-btn small primary" onclick={() => downloadReport(shown.id)} title="The PDF prepared {madeWhen(rep)}, kept in your working databases folder (user-requested-job-reports)"
+									><FileDown size={14} />Download the job report</button
+								>
+								<button type="button" class="mg-btn small" aria-label="Prepare the job report again" title="Prepare the job report again, from the job as it is now" onclick={prepareReport}><RotateCw size={14} /></button>
+							{:else if rep?.state === 'running'}
+								<button type="button" class="mg-btn small" disabled title={rep.note ? `Now: ${rep.note}` : 'On the cluster'}><FileText size={14} />Preparing the report…</button>
+							{:else}
+								<button
+									type="button"
+									class="mg-btn small"
+									disabled={rep?.state === 'checking'}
+									onclick={prepareReport}
+									title="A PDF of the job: its summary, where its results came from and the databases they came from, each genome and step with its time and SLURM jobs, and the licence acceptances"
+									><FileText size={14} />Prepare the job report</button
+								>
+							{/if}
 						{/if}
 						{#if shown.outputDir}
 							<a class="mg-btn small" href={folderHref(shown.outputDir)} title={shown.outputDir}><FolderOpen size={14} />Folder</a>
@@ -456,7 +622,16 @@
 			<Resizer id={TOP} fallback={topFallback} min={220} max={2400} edge="bottom" label="Drag to make the job list and its details taller or shorter" />
 		</div>
 		{#if prog && shown}
-			<ProgressGrid {prog} {going} runDir={shown.outputDir ?? ''} fromLog={srcFromLog} reported={!!srcRows} {elapsedOf} onLog={showLog} />
+			<ProgressGrid
+				{prog}
+				{going}
+				runDir={shown.outputDir ?? ''}
+				fromLog={srcFromLog}
+				reported={!!srcRows}
+				{elapsedOf}
+				onLog={showLog}
+				onRerun={backend.cluster && shown.kind === 'annotate' && shown.outputDir ? rerunGenome : undefined}
+			/>
 		{/if}
 		<div class="term-wrap" style="height: {logHeight}px" bind:this={logEl}>
 		<aside class="term" aria-label="Log of {shown ? title(shown) : 'the job'}">
@@ -472,12 +647,59 @@
 			</div>
 			{#if shown}<JobCommand run={shown} />{/if}
 			{#if log?.error}<p class="term-err">{log.error}</p>{/if}
+			{#if failure}
+				<div class="fail-bar">
+					<span class="fail-t">Where <b>{failure.t}</b> failed for <span class="mg-mono">{failure.g}</span>{failure.line ? ` | line ${failure.line.toLocaleString('en-US')} of the run's log` : ''}</span>
+					<span class="mg-grow"></span>
+					<button type="button" class="term-btn" onclick={() => (failure = null)}>Back to the whole log</button>
+				</div>
+				<div class="out fail-out mg-mono" class:wrap role="textbox" aria-readonly="true" aria-multiline="true" tabindex="0" aria-label="Where the step failed" bind:this={failBox}>{#if failure.loading}<span class="dim">Finding the step in the run's log…</span>{:else}{#if failure.error}<span class="ln err">{failure.error}</span>
+{/if}{#each failure.lines as l, k (k)}<span class="ln" class:hit={l.hit}><span class="ln-n">{l.n}</span>{l.text}</span>
+{/each}{#if failure.step}<span class="fail-h">The step's own log (its SLURM job), the last {failure.step.lines.length} lines | {failure.step.path}</span>
+{#each failure.step.lines as l, k (k)}<span class="ln" class:hit={l.hit}>{l.text}</span>
+{/each}{/if}{/if}</div>
+			{:else}
 			<div class="out mg-mono" class:wrap role="textbox" aria-readonly="true" aria-multiline="true" tabindex="0" aria-label="Log text" onkeydown={logKey} bind:this={box}>{#if logText}{#each lines as l, k (k)}<span class="ln {tone(l)}">{l}</span>
 {/each}{:else}<span class="dim">{shown ? (log ? 'Nothing in the log yet.' : 'Reading the log…') : ''}</span>{/if}{#if going}<span class="cursor" aria-hidden="true"></span>{/if}</div>
+			{/if}
 		</aside>
 			<Resizer id={LOG} fallback={logFallback} min={260} max={2400} edge="bottom" label="Drag to make the log taller or shorter" />
 		</div>
 	</div>
+	{#if menu}
+		{@const m = menu}
+		{@const rep = reports[m.run.id]}
+		<div class="jb-menu-wrap" use:toRoot>
+			<button type="button" class="jb-menu-scrim" aria-label="Close the menu" onclick={() => (menu = null)} oncontextmenu={(e) => { e.preventDefault(); menu = null; }}></button>
+			<div class="jb-menu" class:up={m.up} role="menu" aria-label={title(m.run)} style="left: {m.x}px; top: {m.y}px">
+				{#if reportable(m.run)}
+					{#if rep?.state === 'done'}
+						<button type="button" role="menuitem" onclick={() => { menu = null; downloadReport(m.run.id); }}><FileDown size={14} />Download the job report</button>
+						<button type="button" role="menuitem" onclick={() => { menu = null; prepareFor(m.run); }}><RotateCw size={14} />Prepare the job report again</button>
+					{:else if rep?.state === 'running'}
+						<button type="button" role="menuitem" disabled><FileText size={14} />Preparing the job report…</button>
+					{:else if rep?.state === 'checking'}
+						<button type="button" role="menuitem" disabled><FileText size={14} />Looking for its report…</button>
+					{:else}
+						<button type="button" role="menuitem" onclick={() => { menu = null; prepareFor(m.run); }}><FileText size={14} />Prepare the job report</button>
+					{/if}
+				{/if}
+				{#if m.run.outputDir}
+					<a role="menuitem" href={folderHref(m.run.outputDir)} onclick={() => (menu = null)}><FolderOpen size={14} />Open its folder</a>
+				{/if}
+				{#if backend.cluster}
+					<button
+						type="button"
+						role="menuitem"
+						class="danger"
+						disabled={m.run.status === 'running'}
+						title={m.run.status === 'running' ? 'A job stays in the list while it is going' : 'Its record is backed up first; its results stay'}
+						onclick={() => clearOne(m.run)}><Eraser size={14} />Clear from history</button
+					>
+				{/if}
+			</div>
+		</div>
+	{/if}
 {:else}
 	<p class="empty">
 		<strong>No jobs yet.</strong>
@@ -570,10 +792,98 @@
 		padding: 4px 6px 6px;
 		overflow: auto;
 	}
+	.li {
+		display: flex;
+		align-items: center;
+		gap: 2px;
+	}
+	.row-more {
+		flex: none;
+		display: grid;
+		place-items: center;
+		width: 26px;
+		height: 26px;
+		border: none;
+		border-radius: var(--mg-r-sm);
+		background: none;
+		color: var(--mg-text-3);
+		cursor: pointer;
+		opacity: 0;
+	}
+	.li:hover .row-more,
+	.row-more:focus-visible,
+	.row-more[aria-expanded='true'] {
+		opacity: 1;
+	}
+	.row-more:hover,
+	.row-more[aria-expanded='true'] {
+		background: color-mix(in oklab, var(--mg-text) 8%, transparent);
+		color: var(--mg-text);
+	}
+	@media (hover: none) {
+		.row-more {
+			opacity: 1;
+		}
+	}
+	/* A job's menu, at the screen's root (toRoot). */
+	.jb-menu-scrim {
+		position: fixed;
+		inset: 0;
+		z-index: 60;
+		border: none;
+		background: transparent;
+		cursor: default;
+	}
+	.jb-menu {
+		position: fixed;
+		z-index: 61;
+		display: flex;
+		flex-direction: column;
+		width: 230px;
+		padding: 4px;
+		border: 1px solid var(--mg-border);
+		border-radius: var(--mg-r);
+		background: var(--mg-surface);
+		box-shadow: var(--cr-pop-shadow, 0 8px 24px rgb(0 0 0 / 0.14));
+	}
+	.jb-menu.up {
+		transform: translateY(-100%);
+	}
+	.jb-menu :is(button, a) {
+		display: flex;
+		align-items: center;
+		gap: 10px;
+		height: 32px;
+		padding: 0 10px;
+		border: none;
+		border-radius: var(--mg-r-sm);
+		background: none;
+		color: var(--mg-text);
+		font: inherit;
+		font-size: var(--mg-fs-sm);
+		text-align: left;
+		text-decoration: none;
+		cursor: pointer;
+	}
+	.jb-menu :is(button, a):hover:not(:disabled) {
+		background: color-mix(in srgb, var(--mg-text) 7%, transparent);
+	}
+	.jb-menu button.danger {
+		color: var(--mg-danger);
+	}
+	.jb-menu button.danger:hover:not(:disabled) {
+		background: color-mix(in srgb, var(--mg-danger) 12%, transparent);
+	}
+	.jb-menu button:disabled {
+		opacity: 0.5;
+		cursor: not-allowed;
+	}
 	.row {
 		display: flex;
 		align-items: center;
 		gap: 6px;
+		flex: 1 1 auto;
+		min-width: 0;
 		width: 100%;
 		height: 32px;
 		padding: 0 10px;
@@ -1039,6 +1349,51 @@
 	}
 	.dim {
 		color: #8b949e;
+	}
+	/* Where a failed step failed: its lines marked, the line numbers of the run's log beside them. */
+	.fail-bar {
+		display: flex;
+		align-items: center;
+		gap: 8px;
+		padding: 6px 8px 6px var(--mg-pad);
+		border-bottom: 1px solid rgba(255, 255, 255, 0.09);
+		background: color-mix(in srgb, var(--mg-danger) 16%, #14171b);
+	}
+	.fail-t {
+		min-width: 0;
+		overflow: hidden;
+		text-overflow: ellipsis;
+		white-space: nowrap;
+		font-size: var(--cr-fs-micro);
+		color: #e6eaee;
+	}
+	.fail-out {
+		position: relative;
+	}
+	.fail-out .ln {
+		padding-left: 9px;
+		border-left: 3px solid transparent;
+	}
+	.fail-out .ln.hit {
+		border-left-color: var(--mg-danger);
+		background: color-mix(in srgb, var(--mg-danger) 24%, transparent);
+		color: #fff;
+	}
+	.ln-n {
+		display: inline-block;
+		min-width: 9ch;
+		margin-right: 10px;
+		color: #6e7781;
+		user-select: none;
+	}
+	.fail-h {
+		display: block;
+		margin: 14px 0 6px;
+		padding-top: 10px;
+		border-top: 1px solid rgba(255, 255, 255, 0.12);
+		font-weight: 600;
+		color: #c9d0d6;
+		word-break: break-all;
 	}
 	.cursor {
 		display: inline-block;
