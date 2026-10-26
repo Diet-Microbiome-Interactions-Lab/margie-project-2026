@@ -19,6 +19,7 @@ _PROJECT_ROOT = Path(__file__).resolve().parents[2]
 load_dotenv(dotenv_path=_PROJECT_ROOT / '.env', override=False)
 load_dotenv(override=False)  # Must run before local imports that read env vars at import time
 
+import anyio.to_thread
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
@@ -67,6 +68,47 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+# Requests to plain (def) endpoints run in AnyIO's thread pool; most of them wait on SSH, so a
+# pool of 40 fills with a few users' pages. BSP_API_THREADS sets its size.
+API_THREADS = int(os.getenv('BSP_API_THREADS', '200'))
+# A request slower than this many seconds is logged with the threads in use.
+SLOW_REQUEST = float(os.getenv('BSP_SLOW_REQUEST_S', '2'))
+
+
+def _threads_in_use() -> str:
+    limiter = anyio.to_thread.current_default_thread_limiter()
+    return f'{limiter.borrowed_tokens}/{int(limiter.total_tokens)}'
+
+
+class _RequestTimes:
+    """Logs each HTTP request slower than SLOW_REQUEST: method, path, status, seconds and the
+    threads in use as it ends."""
+
+    def __init__(self, inner):
+        self.inner = inner
+
+    async def __call__(self, scope, receive, send):
+        if scope['type'] != 'http':
+            return await self.inner(scope, receive, send)
+        start = time.monotonic()
+        status = [0]
+
+        async def sent(message):
+            if message['type'] == 'http.response.start':
+                status[0] = message['status']
+            await send(message)
+
+        try:
+            await self.inner(scope, receive, sent)
+        finally:
+            took = time.monotonic() - start
+            if took >= SLOW_REQUEST:
+                LOGGER.info('Slow request: %s %s %s in %.1f s (threads %s)', scope.get('method'),
+                            scope.get('path'), status[0] or '-', took, _threads_in_use())
+
+
+app.add_middleware(_RequestTimes)
+
 # Records node and pid under $HOME so any login node can stop a stale server.
 API_ADVERT = Path(
     os.getenv('BSP_API_ADVERT',
@@ -106,6 +148,12 @@ def _remove_api_advert() -> None:
 def startup_event():
     init_db()
     _write_api_advert()
+
+
+@app.on_event('startup')
+async def _thread_pool():
+    anyio.to_thread.current_default_thread_limiter().total_tokens = API_THREADS
+    LOGGER.info('Request threads: %d', API_THREADS)
 
 
 @app.on_event('shutdown')

@@ -146,9 +146,9 @@
 		load();
 	});
 
-	// Polls often while a run is going, rarely otherwise.
+	// Polls often while a run is going, rarely otherwise; a hidden tab waits.
 	$effect(() => {
-		const timer = setInterval(load, ws.active ? 3000 : 15000);
+		const timer = setInterval(() => document.visibilityState === 'visible' && load(), ws.active ? 3000 : 15000);
 		return () => clearInterval(timer);
 	});
 
