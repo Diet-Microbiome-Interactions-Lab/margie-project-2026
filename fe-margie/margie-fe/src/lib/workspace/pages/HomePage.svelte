@@ -8,18 +8,11 @@
 	import LogoPuzzle from '../LogoPuzzle.svelte';
 	import MargieLogo from '../MargieLogo.svelte';
 	import { LOGO_PUZZLE } from '$lib/features';
-	import { CITE_URL, LAB, THESIS_DOI } from '$lib/crisp/about';
 
 	/**
 	 * Home: the logo, what MARGIE is, and where to start; under Learn more, what a run does,
-	 * what comes out, and a drawing of each page; credits and how to cite at the bottom.
+	 * what comes out, and a drawing of each page; at the bottom, links to Contributors and Acknowledgements.
 	 */
-	/** What to cite: the lab's repository, which holds the backend and the interface. */
-	const CITE = CITE_URL;
-	/** The code: the backend and the website, both in the lab's repository. */
-	const BACKEND = `${CITE_URL}/tree/main/be-margie`;
-	const FRONTEND = `${CITE_URL}/tree/main/fe-margie`;
-	const BSP = 'https://github.com/wintermutant/bioinformatics-tools';
 
 	/** The pages, in the sidebar's order, each with what it is for. */
 	const TABS = [
@@ -147,33 +140,10 @@
 			</section>
 
 		<footer class="foot">
-			<div class="credit">
-				<p class="lab">A product of the {LAB.name}. PI: {LAB.pi} (<a class="mg-link" href="mailto:{LAB.email}">{LAB.email}</a>).</p>
-				<p>
-					MARGIE is a Snakemake pipeline housed, among other tools, within the Bioinformatics Supercomputing Platform (BSP) developed by Dane
-					Deemer. For BSP's other features (still under active development), see the
-					<a class="mg-link" href={BSP} target="_blank" rel="noreferrer">Bioinformatics Supercomputing Platform</a>.
-				</p>
-				<p class="links">
-					<a class="mg-link" href={BACKEND} target="_blank" rel="noreferrer">Backend</a>
-					<a class="mg-link" href={FRONTEND} target="_blank" rel="noreferrer">Frontend</a>
-				</p>
-			</div>
-			<div class="cite">
-				<span class="cite-t">How to cite</span>
-				<p>
-					Bhattarai S, Deemer D, Lindemann SR. <i>MARGIE: Mostly Automated Rapid Genome Inference Environment.</i> Purdue University. Software,
-					MIT licence. <a class="mg-link" href={CITE} target="_blank" rel="noreferrer">github.com/Diet-Microbiome-Interactions-Lab/margie-project-2026</a>
-				</p>
-				<p>
-					And the thesis in which it was first built: Bhattarai S (2026). <i>Mostly Automated Rapid Genome Inference Environment.</i> Thesis,
-					Purdue University. <a class="mg-link" href={THESIS_DOI} target="_blank" rel="noreferrer">doi:10.25394/PGS.33103682.v1</a>
-				</p>
-				<p class="cite-note">
-					Please also cite each tool and database MARGIE runs; their references, with one BibTeX file of each, are on
-					<a class="mg-link" href={uiBase.to('/contributors#cite-with')}>Contributors</a>.
-				</p>
-			</div>
+			<p>
+				<a class="mg-link" href={uiBase.to('/contributors')}>Contributors</a> |
+				<a class="mg-link" href={uiBase.to('/acknowledgements')}>Acknowledgements</a>
+			</p>
 		</footer>
 		</div>
 	{/if}
@@ -562,44 +532,6 @@
 		color: var(--mg-text-2);
 		text-align: center;
 	}
-	.credit {
-		display: flex;
-		flex-direction: column;
-		align-items: center;
-		gap: 8px;
-		max-width: 80ch;
-	}
-	.links {
-		display: flex;
-		gap: 16px;
-	}
-	.cite {
-		display: flex;
-		flex-direction: column;
-		gap: 6px;
-		max-width: 80ch;
-		text-align: left;
-		padding: 14px 18px;
-		border: 1px solid var(--cr-card-edge, var(--mg-border));
-		border-radius: var(--mg-r);
-		background: var(--cr-card, var(--mg-surface));
-		user-select: text;
-	}
-	.cite-t {
-		font-size: var(--mg-fs-xs);
-		font-weight: 700;
-		letter-spacing: 0.06em;
-		text-transform: uppercase;
-		color: var(--mg-text-3);
-	}
-	.cite p {
-		color: var(--mg-text);
-	}
-	.cite .cite-note {
-		font-size: var(--mg-fs-xs);
-		color: var(--mg-text-3);
-	}
-
 	@keyframes rise {
 		from {
 			opacity: 0;
