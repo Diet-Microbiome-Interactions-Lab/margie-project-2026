@@ -3,9 +3,11 @@ Workflow tools generate
 Invoked: $ dane_wf wf: example <params/options/io>
 '''
 import hashlib
+import json
 import logging
 import os
 import re
+import sqlite3
 import subprocess
 import sys
 import tempfile
@@ -75,6 +77,30 @@ def _consolidation_shared():
         spec.loader.exec_module(module)
         _CONSOLIDATION_SHARED = module
     return _CONSOLIDATION_SHARED
+
+
+def name_clashes(db_path: str, genome_files: dict[str, str]) -> list[str]:
+    """Genome names this run shares with another genome (other DNA) in the database: a genome's name
+    stands for it in the database's tables, so the two would mix. A name counts when none of the
+    genomes recorded under it (run_log, genome_proteomes) has this genome's hash."""
+    if not Path(db_path).exists():
+        return []
+    conn = sqlite3.connect(f'file:{db_path}?mode=ro', uri=True, timeout=60)
+    known: dict[str, set[str]] = {}
+    try:
+        tables = {r[0] for r in conn.execute("SELECT name FROM sqlite_master WHERE type = 'table'")}
+        if 'run_log' in tables and {'organism_name', 'fasta_hash'} <= {r[1] for r in conn.execute('PRAGMA table_info(run_log)')}:
+            for name, h in conn.execute("SELECT DISTINCT organism_name, fasta_hash FROM run_log "
+                                        "WHERE organism_name IS NOT NULL AND organism_name != '' AND fasta_hash IS NOT NULL AND fasta_hash != ''"):
+                known.setdefault(name, set()).add(h)
+        if 'genome_proteomes' in tables:
+            for h, names in conn.execute('SELECT genome_hash, names FROM genome_proteomes'):
+                for name in json.loads(names or '[]'):
+                    known.setdefault(name, set()).add(h)
+    finally:
+        conn.close()
+    return [f'{name} ({Path(path).name})' for name, path in sorted(genome_files.items())
+            if name in known and not known[name] & set(fasta_hashes(path))]
 
 
 def merged_inputs_fingerprint(genome_dir: str) -> str:
@@ -854,6 +880,17 @@ class WorkflowBase(ProgramBase):
                     return 1
 
         db_path = smk_config.get('main_database')
+        # A name another genome (other DNA) has in the database would mix the two in its tables, and a
+        # reload would replace the other genome's rows: the run stops before anything is loaded.
+        if db_path:
+            clashes = _safely('Checking the genome names against the database', name_clashes, db_path, genome_files)
+            if isinstance(clashes, list) and clashes:
+                msg = ('Your MARGIE database already has a different genome (other DNA) under '
+                       + ('this name' if len(clashes) == 1 else 'these names') + ': ' + '; '.join(clashes)
+                       + '. Rename the file (for example coli_strainB.fna) and start the run again.')
+                LOGGER.error(msg)
+                self.failed(msg)
+                return 1
         # Off: nothing reads GTDB-Tk, so its batch is neither restored nor run.
         run_gtdbtk_enabled = smk_config.get('run_gtdbtk', True) not in (False, 'false', '0', 'no')
         # QUAST runs beside Stage 1 and 2 when picked (run_quast, off by default).
