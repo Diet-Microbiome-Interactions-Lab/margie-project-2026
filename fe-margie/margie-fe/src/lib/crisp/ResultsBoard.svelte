@@ -14,7 +14,7 @@
 	import LoadProgress from '$lib/crisp/LoadProgress.svelte';
 	import FolderView, { type FolderRoot } from '$lib/workspace/FolderView.svelte';
 	import { uiBase } from '$lib/workspace/base.svelte';
-	import { ws, type GenomeSummary } from '$lib/workspace/data.svelte';
+	import { summaryKey, ws, type GenomeSummary, type ResultRun } from '$lib/workspace/data.svelte';
 	import { GLYPH_TIERS } from '$lib/workspace/final-summary';
 	import { count, figureNote, figureTitle } from '$lib/workspace/format';
 	import Resizer from '$lib/workspace/motion/Resizer.svelte';
@@ -162,11 +162,37 @@
 	];
 	const NAMED = GLYPH_TIERS.slice(0, 5);
 
-	const running = $derived(ws.progress?.genomes.find((g) => g.state === 'running')?.name ?? '');
+	/*
+	 * Which run's results to show (?run=<its folder>): by default each genome's latest finished result,
+	 * from whichever run made it; or one run's own genomes.
+	 */
+	const runName = $derived(page.url.searchParams.get('run') ?? '');
+	const pickedRun = $derived(ws.resultRuns.find((r) => r.name === runName));
+	const source = $derived(pickedRun ? pickedRun.organisms : ws.results);
+	const finishedHere = $derived(pickedRun ? pickedRun.organisms.filter((r) => r.final?.table) : ws.finished);
+	/** The genome's folder in the picked run; '' for its latest result. */
+	const folderOf = (g: string) => (pickedRun ? (pickedRun.organisms.find((r) => r.organism === g)?.folder ?? '') : '');
+	const runParam = $derived(pickedRun ? `&run=${encodeURIComponent(pickedRun.name)}` : '');
+	const active = (r: ResultRun) => (ws.active?.outputDir ?? '').replace(/\/$/, '') === r.dir;
+	/** "2026-10-26 20:14 | 3 of 115 finished | running": the run's start, from its folder's name. */
+	function runLabel(r: ResultRun) {
+		const m = /^(\d{4}-\d{2}-\d{2})-(\d{2})(\d{2})$/.exec(r.name);
+		const done = r.organisms.filter((o) => o.final?.table).length;
+		return [m ? `${m[1]} ${m[2]}:${m[3]} UTC` : r.name, `${done} of ${r.organisms.length} finished`, ...(active(r) ? ['running'] : [])].join(' | ');
+	}
+	function pickRun(name: string) {
+		const q = new URLSearchParams(page.url.searchParams);
+		if (name) q.set('run', name);
+		else q.delete('run');
+		q.delete('g');
+		goto(`?${q}`, { replaceState: true, noScroll: true, keepFocus: true });
+	}
+
+	const running = $derived(!pickedRun || active(pickedRun) ? (ws.progress?.genomes.find((g) => g.state === 'running')?.name ?? '') : '');
 	const rows = $derived([
-		...ws.finished.map((r) => ({ name: r.organism, state: r.organism === running ? 'running' : 'done' })),
-		...(running && !ws.finished.some((r) => r.organism === running) ? [{ name: running, state: 'running' }] : []),
-		...ws.results.filter((r) => !r.final?.table && r.organism !== running).map((r) => ({ name: r.organism, state: 'partial' }))
+		...finishedHere.map((r) => ({ name: r.organism, state: r.organism === running ? 'running' : 'done' })),
+		...(running && !finishedHere.some((r) => r.organism === running) ? [{ name: running, state: 'running' }] : []),
+		...source.filter((r) => !r.final?.table && r.organism !== running).map((r) => ({ name: r.organism, state: 'partial' }))
 	]);
 	/** ?folder shows the whole results folder; with nothing to pick it is the default. */
 	const whole = $derived(page.url.searchParams.has('folder') || (!page.url.searchParams.get('g') && !rows.length));
@@ -175,6 +201,7 @@
 
 	/** The results folder, and the per-genome folder when it lives elsewhere. */
 	const wholeRoots = $derived.by((): FolderRoot[] => {
+		if (pickedRun) return [{ label: `Run ${pickedRun.name}`, path: pickedRun.dir }];
 		const { outputRoot, genomesDir } = ws.resultRoots;
 		if (!outputRoot) return [];
 		const inside = genomesDir === outputRoot || genomesDir.startsWith(outputRoot + '/');
@@ -183,7 +210,7 @@
 
 	/** A genome's own results folder and each tool's folder for it, as far as the run has got. */
 	function genomeRoots(g: string): FolderRoot[] {
-		const r = ws.results.find((x) => x.organism === g);
+		const r = source.find((x) => x.organism === g);
 		return [...(r?.folder ? [{ label: 'Genome results', path: r.folder }] : []), ...(r?.tools ?? []).map((t) => ({ label: t.tool, path: t.path }))];
 	}
 
@@ -210,7 +237,7 @@
 		{ id: 'nonoperonic', label: 'Not in operons' }
 	];
 	const show = $derived<Show>((SHOWS.find((x) => x.id === page.url.searchParams.get('show'))?.id ?? 'all') as Show);
-	const address = (t: Tab, s: Show) => `?g=${encodeURIComponent(selected)}&tab=${t}${s === 'all' ? '' : `&show=${s}`}`;
+	const address = (t: Tab, s: Show) => `?g=${encodeURIComponent(selected)}&tab=${t}${s === 'all' ? '' : `&show=${s}`}${runParam}`;
 	const setTab = (t: Tab) => goto(address(t, show), { replaceState: true, noScroll: true, keepFocus: true });
 	const setShow = (s: Show) => goto(address(tab, s), { replaceState: true, noScroll: true, keepFocus: true });
 	/** The report table's filter for the choice: which column holds what. */
@@ -285,10 +312,10 @@
 	 * or its result changes, not on each refresh of the results list while a run goes, which would
 	 * remount the map and figure viewers (ending full screen and resetting a zoom).
 	 */
-	const pickedResult = $derived(ws.finished.find((r) => r.organism === selected)?.final?.table ?? '');
+	const pickedResult = $derived(finishedHere.find((r) => r.organism === selected)?.final?.table ?? '');
 	/** The final table's size in bytes, where the results list has it (one folder down), else 0. */
 	const pickedSize = $derived.by(() => {
-		const r = ws.finished.find((x) => x.organism === selected);
+		const r = finishedHere.find((x) => x.organism === selected);
 		if (!r?.folder || !pickedResult.startsWith(r.folder + '/')) return 0;
 		const [folder, name, more] = pickedResult.slice(r.folder.length + 1).split('/');
 		return name && more === undefined ? (r.files?.[folder]?.find((f) => f.name === name)?.size ?? 0) : 0;
@@ -302,7 +329,7 @@
 		// A new genome clears the page; a newer result for the same one replaces it once loaded.
 		if (untrack(() => summary?.genome) !== g) summary = null;
 		loading = true;
-		ws.loadSummary(g).then((s) => {
+		ws.loadSummary(g, untrack(() => folderOf(g))).then((s) => {
 			if (selected !== g) return;
 			summary = s;
 			loading = false;
@@ -310,7 +337,7 @@
 	});
 
 	$effect(() => {
-		for (const r of ws.finished.slice(0, 30)) ws.loadSummary(r.organism);
+		for (const r of finishedHere.slice(0, 30)) ws.loadSummary(r.organism, pickedRun ? r.folder : '');
 	});
 
 	// The next two figures load in the background, so stepping through them does not wait.
@@ -408,7 +435,7 @@
 	function sub(name: string, state: string) {
 		if (state === 'running') return genesOnly ? 'gene calls' : 'running';
 		if (state === 'partial') return genesOnly ? 'gene calls only' : ws.active?.kind === 'annotate' ? 'in progress' : 'not finished';
-		const s = ws.summaries[name];
+		const s = ws.summaries[summaryKey(name, folderOf(name))];
 		return s ? `${count(s.genes)} genes` : '';
 	}
 	const ringState = (state: string) => (state === 'running' ? 'running' : state === 'done' ? 'done' : 'pending');
@@ -436,17 +463,28 @@
 				<svg viewBox="0 0 16 16" aria-hidden="true" class:flip={listShut}><path d="M10 4 6 8l4 4" /></svg>
 			</button>
 		</div>
+		{#if ws.resultRuns.length && !listShut}
+			<label class="rb-run">
+				<span class="rb-run-label">Run</span>
+				<select class="mg-select" value={pickedRun?.name ?? ''} onchange={(e) => pickRun(e.currentTarget.value)} title={pickedRun ? runLabel(pickedRun) : "Each genome's latest finished result, from whichever run made it"}>
+					<option value="">Latest of each genome</option>
+					{#each ws.resultRuns as r (r.dir)}
+						<option value={r.name}>{runLabel(r)}</option>
+					{/each}
+				</select>
+			</label>
+		{/if}
 		<nav class="rb-list" aria-label="Genomes with results" inert={listShut}>
-			<a class="rb-row" href="?folder" aria-current={whole ? 'page' : undefined} data-sveltekit-replacestate data-sveltekit-noscroll>
+			<a class="rb-row" href="?folder{runParam}" aria-current={whole ? 'page' : undefined} data-sveltekit-replacestate data-sveltekit-noscroll>
 				<span class="rb-row-icon" aria-hidden="true"><FolderOpen size={14} /></span>
-				<span class="rb-row-name">Results folder</span>
+				<span class="rb-row-name">{pickedRun ? 'Run folder' : 'Results folder'}</span>
 				<span class="rb-row-sub">{ws.active ? 'live' : ''}</span>
 			</a>
 			{#each rows as r, i (r.name)}
 				<a
 					class="rb-row {r.state}"
 					style="--i: {Math.min(i, 12)}"
-					href="?g={encodeURIComponent(r.name)}&tab={tab}{show === 'all' ? '' : `&show=${show}`}"
+					href="?g={encodeURIComponent(r.name)}&tab={tab}{show === 'all' ? '' : `&show=${show}`}{runParam}"
 					aria-current={r.name === selected ? 'page' : undefined}
 					data-sveltekit-replacestate
 					data-sveltekit-noscroll
@@ -463,8 +501,8 @@
 		{#if whole}
 			<header class="rb-head">
 				<div class="rb-title">
-					<h2 id="rb-title">Results folder</h2>
-					<Explain><p class="rb-note">Every tool's output and each genome's results, as they are on disk.</p></Explain>
+					<h2 id="rb-title">{pickedRun ? 'Run folder' : 'Results folder'}</h2>
+					<Explain><p class="rb-note">{pickedRun ? "This run's tool output and genome results, as they are on disk." : "Every tool's output and each genome's results, as they are on disk."}</p></Explain>
 				</div>
 			</header>
 			<div class="rb-pane rb-flow">
@@ -757,7 +795,7 @@
 		{/if}
 	</section>
 	{#if chatOpen && summary && !whole}
-		<GenomeChat genome={summary.genome} context={chatContext} onclose={() => ui.toggleFold(CHAT, true)} />
+		<GenomeChat genome={summary.genome} folder={folderOf(summary.genome)} context={chatContext} onclose={() => ui.toggleFold(CHAT, true)} />
 	{/if}
 </div>
 
@@ -848,6 +886,25 @@
 		transform: rotate(180deg);
 	}
 	/* Height 0 and grow: the list scrolls in whatever height the report makes. */
+	/* Which run's results the list shows. */
+	.rb-run {
+		display: flex;
+		flex-direction: column;
+		gap: 4px;
+		padding: 8px 8px 8px 16px;
+		border-bottom: 1px solid var(--mg-border);
+	}
+	.rb-run-label {
+		font-size: var(--mg-fs-xs);
+		color: var(--mg-text-3);
+	}
+	.rb-run select {
+		width: 100%;
+		min-width: 0;
+		padding: 4px 6px;
+		font-size: var(--mg-fs-sm);
+		text-overflow: ellipsis;
+	}
 	.rb-list {
 		flex-grow: 1;
 		height: 0;

@@ -8,7 +8,7 @@ import { ApiError, type Run } from '$lib/api';
 import { NOT_YET } from '$lib/license';
 import { isWorkflowPathParam } from '$lib/configParams';
 import { backend } from '$lib/workspace/backend.svelte';
-import type { CheckRow, Genome, GenomeSummary, OrganismResult, Overview, Setting, SetupRow, Tool, ToolClock, ToolJob } from '$lib/workspace/data.svelte';
+import type { CheckRow, Genome, GenomeSummary, OrganismResult, Overview, ResultRun, Setting, SetupRow, Tool, ToolClock, ToolJob } from '$lib/workspace/data.svelte';
 import { FinalTally, type FinalCounts } from '$lib/workspace/final-summary';
 import { TABLE_EXT, extOf, parseDelimited, queryFromParams, queryLoaded, type CellStyle, type Table } from '$lib/workspace/viewers/table-query';
 import { sheetsOf } from '$lib/workspace/viewers/excel-sheets';
@@ -1209,8 +1209,11 @@ function genomeFrom(dir: string, kids: Kid[]): OrganismResult & { jobDir: string
 	return { organism, tools, folder: dir, final: final.table ? final : undefined, files: byFolder, jobDir: dir.slice(0, dir.lastIndexOf('/')) };
 }
 
-/** Genome result folders across the latest runs, cached for 20 s. */
-const resultList = new Cache(async () => {
+type Found = OrganismResult & { jobDir: string };
+
+/** Genome result folders across the latest runs, cached for 20 s: each genome's latest (picked), and each
+ * run's own (runs, newest first). */
+const resultList = new Cache(async (): Promise<{ picked: Found[]; runs: (ResultRun & { organisms: Found[] })[] }> => {
 	const [rows, cfg] = await Promise.all([jobs.get().catch(() => [] as JobRow[]), config.get()]);
 	// The run folders in the results folder (named by their start, newest first), then any other
 	// run in the job history, so a cleared history leaves Results as it was.
@@ -1225,30 +1228,49 @@ const resultList = new Cache(async () => {
 		.map((name) => `${root}/${name}`);
 	const fromJobs = rows.filter((j) => j.work_dir).map((j) => (j.work_dir as string).replace(/\/$/, ''));
 	const runs = [...new Set([...fromFolder, ...fromJobs])].slice(0, RUNS_LOOKED_AT);
-	if (!runs.length) return [];
+	if (!runs.length) return { picked: [], runs: [] };
 	// The runs' genome folders, three levels deep, in one trip to the cluster (/v1/ssh/tree).
 	const { trees } = await call<{ trees: Record<string, Kid[]> }>('POST', '/v1/ssh/tree', { paths: runs, depth: 3, prune: [...RUN_LEVEL] });
 	// Newest run first: a genome annotated more than once shows its latest finished result, so a run still
 	// working on it (or one that stopped before it) leaves the earlier map and figures in view.
-	const picked = new Map<string, OrganismResult & { jobDir: string }>();
+	const picked = new Map<string, Found>();
+	const byRun: (ResultRun & { organisms: Found[] })[] = [];
+	const byName = (a: Found, b: Found) => a.organism.localeCompare(b.organism);
 	for (const run of runs) {
 		const entries = trees[run] ?? [];
+		const here: Found[] = [];
 		for (const [kind, name] of entries) {
-			if (kind !== 'd' || name.includes('/') || name.startsWith('.') || RUN_LEVEL.has(name) || picked.get(name)?.final) continue;
+			if (kind !== 'd' || name.includes('/') || name.startsWith('.') || RUN_LEVEL.has(name)) continue;
 			const kids = entries.filter(([, r]) => r.startsWith(`${name}/`)).map(([k, r, size]) => [k, r.slice(name.length + 1), size] as Kid);
 			const found = genomeFrom(`${run}/${name}`, kids);
-			if (!picked.has(name) || found.final) picked.set(name, found);
+			here.push(found);
+			if (!picked.get(name)?.final && (!picked.has(name) || found.final)) picked.set(name, found);
 		}
+		if (here.length) byRun.push({ dir: run, name: baseName(run), organisms: here.sort(byName) });
 	}
-	return [...picked.values()].sort((a, b) => a.organism.localeCompare(b.organism));
+	return { picked: [...picked.values()].sort(byName), runs: byRun };
 }, 20_000);
+
+/** The listing's fields of a genome result (without the run folder it was found in). */
+const listed = ({ organism, tools, folder, final, files }: Found): OrganismResult => ({ organism, tools, folder, final, files });
+
+/** A genome's result: one run's (by its folder), else its latest. */
+async function resultOf(genome: string, folder?: string): Promise<Found | undefined> {
+	const { picked, runs } = await resultList.get();
+	return folder ? runs.flatMap((r) => r.organisms).find((x) => x.folder === folder && x.organism === genome) : picked.find((x) => x.organism === genome);
+}
 
 /** Returns the Results page listing. */
 async function results() {
 	const [m, cfg] = await Promise.all([me.get(), config.get()]);
 	const output = await expand(str(dig(cfg, `${WORKFLOW}.output_path`)) || m.home_dir);
-	const organisms = await resultList.get().catch(() => [] as OrganismResult[]);
-	return { outputRoot: output, genomesDir: '', organisms: organisms.map(({ organism, tools, folder, final, files }) => ({ organism, tools, folder, final, files })) };
+	const { picked, runs } = await resultList.get().catch(() => ({ picked: [] as Found[], runs: [] as (ResultRun & { organisms: Found[] })[] }));
+	return {
+		outputRoot: output,
+		genomesDir: '',
+		organisms: picked.map(listed),
+		runs: runs.map((r) => ({ dir: r.dir, name: r.name, organisms: r.organisms.map(listed) }))
+	};
 }
 
 /** Returns the API URL and token, for chat keys kept in the HPC home (lib/server/genome-chat). */
@@ -1261,11 +1283,10 @@ export function chatLink(): { api: string; token: string } | null {
  * Returns what genome chat needs to read a genome's results on the cluster:
  * API, token, folder, report table and owning jobs.
  */
-export async function chatRemote(genome: string): Promise<ChatRemote | null> {
+export async function chatRemote(genome: string, folder?: string): Promise<ChatRemote | null> {
 	const token = getToken();
 	if (!token) return null;
-	const organisms = await resultList.get().catch(() => [] as (OrganismResult & { jobDir: string })[]);
-	const r = organisms.find((o) => o.organism === genome);
+	const r = await resultOf(genome, folder).catch(() => undefined);
 	if (!r?.folder) return null;
 	const rows = await jobs.get().catch(() => [] as JobRow[]);
 	const owning = rows
@@ -1352,8 +1373,8 @@ async function mapCurrent(viewer: string | undefined): Promise<boolean | undefin
 }
 
 /** Builds a genome's report summary: counts, figures and tools run. */
-async function summary(genome: string): Promise<GenomeSummary> {
-	const r = (await resultList.get()).find((x) => x.organism === genome);
+async function summary(genome: string, folder?: string): Promise<GenomeSummary> {
+	const r = await resultOf(genome, folder);
 	if (!r?.final?.table) throw new ApiError(`No finished results for ${genome} on the cluster.`, 404);
 	const final = r.final;
 	const scored = await scoredAgainst(r.folder as string);
@@ -1422,7 +1443,7 @@ export async function clusterApi<T = any>(path: string, init: RequestInit = {}):
 		const transfer = route.match(/^\/files\/transfer\/([0-9a-f]{12})$/);
 		if (transfer && method === 'GET') return get(`/v1/ssh/transfer_paths/${transfer[1]}`);
 		const report = route.match(/^\/results\/([^/]+)$/);
-		if (report && method === 'GET') return summary(decodeURIComponent(report[1]));
+		if (report && method === 'GET') return summary(decodeURIComponent(report[1]), params.get('folder') ?? undefined);
 		switch (`${method} ${route}`) {
 			// The Code page: the scripts behind MARGIE's own steps, as the server has them (routers/code.py).
 			case 'GET /code':
