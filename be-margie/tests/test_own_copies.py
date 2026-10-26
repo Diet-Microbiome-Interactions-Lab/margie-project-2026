@@ -133,9 +133,11 @@ def test_empty_folders_get_their_defaults_and_set_ones_stay():
     cfg = {"margie_sb": {"input_path": "", "output_path": "/scratch/c/u/my-results"}}
     with patch.object(us, "_run", side_effect=lambda conn, cmd, timeout=60: ran.append(cmd) or (0, "c u" if "hostname" in cmd else "")):
         assert us.fill_default_folders(None, cfg)
+    # No group folder here: the containers and reference databases get sif and reference-databases/db in the working folder.
     assert cfg["margie_sb"] == {"input_path": "/scratch/c/u/margie/margie-input", "output_path": "/scratch/c/u/my-results",
-                                "working_folder": "/scratch/c/u/margie"}
-    assert "/scratch/c/u/margie/margie-input" in ran[-1] and "/scratch/c/u/margie/margie-databases" in ran[-1]
+                                "working_folder": "/scratch/c/u/margie", "sif_path": "/scratch/c/u/margie/sif",
+                                "db_root": "/scratch/c/u/margie/reference-databases/db"}
+    assert all(f"/scratch/c/u/margie/{d}" in ran[-1] for d in ("margie-input", "margie-databases", "sif", "reference-databases/db"))
     with patch.object(us, "_run", side_effect=AssertionError("nothing to do")):
         assert not us.fill_default_folders(None, cfg)
 
@@ -155,12 +157,23 @@ def test_a_chosen_working_folder_holds_the_empty_folders():
     assert us.scratch_root(None, cfg) == "/scratch/c/u/thesis/margie-databases"
 
 
-def test_empty_container_and_reference_folders_take_the_groups():
+def test_empty_container_and_reference_folders_take_the_groups_where_the_account_reads_them():
     shared = {"sif_path": "/group/sif", "db_root": "/group/databases/reference-database-for-annotation/db"}
     cfg = {"margie_sb": {"working_folder": "/w", "input_path": "/w/in", "output_path": "/w/out", "sif_path": "", "db_root": "/mine/db"}}
-    with patch.object(us, "SHARED_FOLDER_DEFAULTS", shared), patch.object(us, "_run", side_effect=AssertionError("nothing to make")):
+    ran = []
+    with patch.object(us, "SHARED_FOLDER_DEFAULTS", shared), \
+         patch.object(us, "_run", side_effect=lambda conn, cmd, timeout=60: ran.append(cmd) or (0, "0" if "-r" in cmd else "")):
         assert us.fill_default_folders(None, cfg)
     assert cfg["margie_sb"]["sif_path"] == "/group/sif" and cfg["margie_sb"]["db_root"] == "/mine/db"
+    assert "/group/sif" not in ran[-1]  # the group's folder is read, not made
+
+
+def test_a_group_folder_the_account_cannot_read_leaves_sif_and_db_in_the_working_folder():
+    shared = {"sif_path": "/group/sif", "db_root": "/group/db"}
+    cfg = {"margie_sb": {"working_folder": "/w", "input_path": "/w/in", "output_path": "/w/out"}}
+    with patch.object(us, "SHARED_FOLDER_DEFAULTS", shared), patch.object(us, "_run", return_value=(0, "")):
+        assert us.fill_default_folders(None, cfg)
+    assert cfg["margie_sb"]["sif_path"] == "/w/sif" and cfg["margie_sb"]["db_root"] == "/w/reference-databases/db"
 
 
 def test_the_install_list_joins_folders_with_one_slash():
@@ -199,3 +212,56 @@ def test_a_copy_found_by_extension_is_renamed_into_place(tmp_path):
     v = _adopt(tmp_path, JOB_DB, {"path": str(tmp_path / "lab.db"), "how": "ext", "version": 1})
     assert v == 1 and (tmp_path / "sqlite" / "u-margie-thesis-22-prokaryotes-base-v1.db").read_text() == "db"
     assert not (tmp_path / "lab.db").exists()
+
+
+def test_without_a_group_folder_no_path_counts_as_the_labs():
+    from bioinformatics_tools.api.services import tool_assets
+    with patch.object(us, "DEPOT", ""):
+        assert not tool_assets._in_lab("/scratch/c/u/margie/sif")
+    with patch.object(us, "DEPOT", "/shared/lab/margie"):
+        assert tool_assets._in_lab("/shared/lab/margie/sif") and not tool_assets._in_lab("/shared/lab/margie-old")
+
+
+# ---- margie-build that comes with the server ----
+
+def test_the_servers_margie_build_goes_in_without_its_history_or_lab_notes(tmp_path, monkeypatch):
+    import io
+    import tarfile
+    from bioinformatics_tools.api.services import tool_assets
+    b = tmp_path / "margie-build"
+    (b / ".git").mkdir(parents=True)
+    (b / ".git" / "config").write_text("x")
+    (b / "build.sh").write_text("#!/bin/bash\n")
+    (b / "README.md").write_text("lab notes")
+    (b / "build-containers").mkdir()
+    (b / "build-containers" / "README.md").write_text("lab notes")
+    (b / "build-containers" / "build-all.sh").write_text("x")
+    monkeypatch.setattr(tool_assets, "BUILD_BUNDLE", str(b))
+    assert tool_assets.bundled()
+    names = tarfile.open(fileobj=io.BytesIO(tool_assets._bundle_tar())).getnames()
+    assert "margie-build/build.sh" in names and "margie-build/build-containers/build-all.sh" in names
+    assert not [n for n in names if ".git" in n or n.endswith("README.md")]
+    monkeypatch.setattr(tool_assets, "BUILD_BUNDLE", "")
+    assert not tool_assets.bundled()
+
+
+def test_a_folder_of_the_users_own_is_not_replaced(monkeypatch, tmp_path):
+    from bioinformatics_tools.api.services import tool_assets
+    (tmp_path / "build.sh").write_text("x")
+    monkeypatch.setattr(tool_assets, "BUILD_BUNDLE", str(tmp_path))
+    with patch.object(tool_assets, "_run", return_value=(1, "")):
+        try:
+            tool_assets.install_bundle(None, {}, "/home/u")
+            assert False, "replaced a folder MARGIE did not make"
+        except us.StoreError as e:
+            assert "did not make it" in str(e)
+
+
+def test_builds_outside_the_group_keep_their_records_and_group_their_own():
+    from bioinformatics_tools.api.services import tool_assets
+    with patch.object(us, "DEPOT", "/shared/lab/margie"), patch.object(us, "_run", return_value=(0, "")):
+        env = tool_assets.build_env(None, {"margie_sb": {"working_folder": "/scratch/c/u/margie"}})
+    assert env == [["env", "MARGIE_RECORDS_DIR", "/scratch/c/u/margie/licensing-records"], ["env", "MARGIE_OPERATOR", "@user"],
+                   ["env", "MARGIE_SHARED_GROUP", "@group"]]
+    with patch.object(us, "DEPOT", "/shared/lab/margie"), patch.object(us, "_run", return_value=(0, "0")):
+        assert tool_assets.build_env(None, {}) == []

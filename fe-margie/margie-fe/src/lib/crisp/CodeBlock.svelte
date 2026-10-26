@@ -62,7 +62,7 @@
 		background: var(--cb-bg);
 		color: var(--cb-text);
 		font-family: var(--mg-mono);
-		font-size: max(13px, calc(var(--mg-fs) * 0.96));
+		font-size: max(12px, calc(var(--mg-fs) * 0.88));
 		line-height: 1.6;
 		tab-size: 4;
 	}

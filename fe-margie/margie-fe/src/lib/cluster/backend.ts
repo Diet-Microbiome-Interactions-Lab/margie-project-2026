@@ -13,6 +13,7 @@ import { FinalTally, type FinalCounts } from '$lib/workspace/final-summary';
 import { TABLE_EXT, extOf, parseDelimited, queryFromParams, queryLoaded, type CellStyle, type Table } from '$lib/workspace/viewers/table-query';
 import { sheetsOf } from '$lib/workspace/viewers/excel-sheets';
 import { call, fetchRaw, get } from './http';
+import { codeKey } from './code-key';
 import { readWithProgress } from './transfers.svelte';
 import { getApiUrl } from '$lib/config';
 import { getToken } from '$lib/auth';
@@ -51,6 +52,8 @@ interface Param {
 	description: string;
 	type: string;
 	required?: boolean;
+	/** Shown in the empty field (this account's own folder, where the default is the group's and hidden). */
+	placeholder?: string;
 }
 interface WorkflowTool {
 	key?: string;
@@ -741,12 +744,15 @@ const PATHS: Record<string, string> = {
 	working_folder: 'Working folder',
 	input_path: 'Genomes folder',
 	output_path: 'Results folder',
-	sif_path: 'Containers folder',
-	db_root: 'Databases folder',
+	stores_root: 'MARGIE databases folder',
+	sif_path: 'Containers folder (sif)',
+	db_root: 'Reference databases folder',
 	backup_root: 'Backup location',
 	// Where margie-build is, which builds containers and databases (Install).
 	build_repo: 'Build recipes (margie-build)'
 };
+/** Settings → Folders, in the order a setup goes: the working folder, what goes in it, then the tools'. */
+export const FOLDER_ORDER = ['working_folder', 'input_path', 'output_path', 'stores_root', 'sif_path', 'db_root', 'build_repo'].map((k) => `${WORKFLOW}.${k}`);
 // The databases a run reads (set to the working copies by the API, services/user_stores.py; editable
 // for files that were moved) and where a first run copies each one from.
 // Labelled "Part: name", so Settings shows them under parts: what every run needs, what runs read
@@ -757,7 +763,6 @@ export const DB_KEPT = 'Where results are kept';
 export const DB_BACKUPS = 'Backups';
 const EXTENDED: Record<string, string> = {
 	shared_root: `${DB_NEEDED}: Group folder (your group's shared MARGIE folder)`,
-	stores_root: `${DB_NEEDED}: Databases folder (your own copies of MARGIE's databases)`,
 	'operon_database.occ_reference_pkl': `${DB_READ}: Operon reference (occ_reference.pkl)`,
 	'fingerprint_database.path': `${DB_READ}: Fingerprint database (fingerprint-database.tsv)`,
 	'report_figures.operon_db': `${DB_READ}: Operon fingerprint database, label-ordered`,
@@ -782,6 +787,18 @@ const COMPUTE: Record<string, string> = {
 };
 /** Notes Settings shows (in Guided mode, or under a section's ?) in place of the workflow's own. */
 const NOTE: Record<string, string> = {
+	[`${WORKFLOW}.working_folder`]:
+		"MARGIE's own folder on the cluster. margie-input (genomes), margie-output (results) and margie-databases (MARGIE's databases) go in it, and sif and reference-databases/db when your account cannot read your group's containers and reference databases. Default: margie in your scratch, /scratch/<cluster>/<you>/margie. A new path moves the folders that sit in it; a folder you set yourself stays, and files stay where they are.",
+	[`${WORKFLOW}.input_path`]: 'Where runs read genomes from. Default: margie-input in the working folder.',
+	[`${WORKFLOW}.output_path`]: 'Where runs write their results. Default: margie-output in the working folder.',
+	[`${WORKFLOW}.stores_root`]:
+		"The databases MARGIE builds from your runs and adds to with each genome: the MARGIE database (SQLite), the operon reference, the fingerprint databases and the genome pool. Default: margie-databases in the working folder. The first run copies your group's base databases into it, or starts new ones where your account reads none.",
+	[`${WORKFLOW}.sif_path`]:
+		"The Apptainer containers (.sif) the tools run in. Default: your group's containers folder when your account can read it, else sif in the working folder, where Install builds or copies them.",
+	[`${WORKFLOW}.db_root`]:
+		"The reference databases the annotation tools search (Pfam, KEGG, COG, eggNOG, InterPro, GTDB-Tk's and the others), one folder per tool. Default: your group's when your account can read them, else reference-databases/db in the working folder, where Install downloads them. They take many hours to set up: back them up once they are, in your group's shared space where the whole group can use them.",
+	[`${WORKFLOW}.build_repo`]:
+		"margie-build: the recipes Install builds the containers and reference databases from. MARGIE looks here first, then in your group's folder, then in ~/margie-build, which Install can clone.",
 	'compute.cluster_default.partition':
 		'The partition every job goes to unless its phase or tool names another. Give a phase or a tool its own (highmem for large memory, a GPU partition for GPU tools) under Phases or Per tool.'
 };
@@ -815,12 +832,15 @@ function describeParam(p: Param, toolLabel: Map<string, string>): { label: strin
 		const k = key.slice('compute.cluster_default.'.length);
 		return { label: COMPUTE[k] ?? humanize(k), group: 'Cluster' };
 	}
-	// A per-tool database folder override.
+	// A tool's database folder (db.<tool>, which runs read): in its row under Per tool.
 	if (key.startsWith('db.')) {
 		const t = key.slice(3);
-		return { label: `${toolLabel.get(t) ?? humanize(t)} database`, group: 'Other folders' };
+		return { label: `${toolLabel.get(t) ?? humanize(t)}: database`, group: 'Per tool' };
 	}
 	const rest = key.slice(WORKFLOW.length + 1);
+	// <tool>.db and <tool>.sif are not what runs read (db.<tool>, and <sif_path>/<tool>.sif): Per tool
+	// shows those instead, so these stay out of Settings.
+	if (/^[\w-]+\.(db|sif)$/.test(rest)) return { label: humanize(rest), group: '' };
 	// Where backups go belongs with the backups.
 	if (rest === 'backup_root') return { label: `${DB_BACKUPS}: Backup location (on depot)`, group: 'Databases' };
 	if (PATHS[rest]) return { label: PATHS[rest], group: 'Folders' };
@@ -861,10 +881,17 @@ async function settingsList(): Promise<{ settings: Setting[]; configMissing: boo
 			description,
 			value,
 			default: def,
+			placeholder: str(p.placeholder) || undefined,
 			// The history database has no default to go back to: the API picks one per account.
 			overridden: p.param !== 'main_database' && value !== '' && value !== def
 		};
 	});
+	// A tool's database folder shows where runs look while it is unset: <reference databases folder>/<tool>.
+	const dbRoot = (() => {
+		const s = settings.find((x) => x.key === `${WORKFLOW}.db_root`);
+		return (s?.value || s?.default || s?.placeholder || '').replace(/\/+$/, '');
+	})();
+	if (dbRoot) for (const s of settings) if (s.key.startsWith('db.') && !s.placeholder) s.placeholder = `${dbRoot}/${s.key.slice(3)}`;
 	// Aliases have no group, so Settings lists each setting once.
 	for (const [alias, real] of Object.entries(ALIASES)) {
 		const s = settings.find((x) => x.key === real);
@@ -887,6 +914,16 @@ async function settingsList(): Promise<{ settings: Setting[]; configMissing: boo
 	});
 	// No config.yaml on the cluster yet: Settings offers to write the default one.
 	return { settings, configMissing: !Object.keys(cfg ?? {}).length };
+}
+
+/** Sets the working folder (the default config.yaml first, when there is none); the folders in it follow. */
+async function setWorkingFolder(body: { path?: string }) {
+	const d = await call('POST', '/v1/ssh/setup/working-folder', { path: body.path ?? '' });
+	config.drop();
+	installed.drop();
+	// The settings' placeholders follow the new folders.
+	workflows.drop();
+	return d;
 }
 
 /** Writes the default config.yaml (the API fills in the account's own SLURM defaults). */
@@ -1387,10 +1424,11 @@ export async function clusterApi<T = any>(path: string, init: RequestInit = {}):
 			// The Code page: the scripts behind MARGIE's own steps, as the server has them (routers/code.py).
 			case 'GET /code':
 				return get('/v1/code');
+			// A script's text comes with the code password, where the server sets one (code-key.ts).
 			case 'GET /code/file':
-				return get(`/v1/code/file?path=${q(params.get('path') ?? '')}`);
+				return call('POST', '/v1/code/file', { path: params.get('path') ?? '', password: codeKey() });
 			case 'GET /code/snippet':
-				return get(`/v1/code/snippet?path=${q(params.get('path') ?? '')}&symbol=${q(params.get('symbol') ?? '')}`);
+				return call('POST', '/v1/code/snippet', { path: params.get('path') ?? '', symbol: params.get('symbol') ?? '', password: codeKey() });
 			case 'GET /runs':
 				return listRuns();
 			case 'POST /runs':
@@ -1448,6 +1486,11 @@ export async function clusterApi<T = any>(path: string, init: RequestInit = {}):
 				return saveSettings(body ?? {});
 			case 'POST /settings/create-default':
 				return createDefaultConfig();
+			// First-time setup: the working folder, set before anything goes in it.
+			case 'GET /setup':
+				return get('/v1/ssh/setup');
+			case 'POST /setup/working-folder':
+				return setWorkingFolder(body ?? {});
 			// Settings → Advanced: whether the workflow has edits by hand, and putting a default back.
 			case 'GET /settings/advanced':
 				return get('/v1/ssh/advanced_files');

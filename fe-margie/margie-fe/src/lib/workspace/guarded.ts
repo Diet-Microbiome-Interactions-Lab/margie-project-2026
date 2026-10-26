@@ -10,12 +10,8 @@ export const GUARDED: Record<string, { title: string; why: string }> = {
 	SETUP_REPO: {
 		title: 'Unlock the build folder',
 		why: 'This is where MARGIE looks for margie-build, which builds the container images and downloads the databases. Changing it redirects every build.'
-	},
-	// The same folder on a cluster: it needs the password too, not only a click.
-	'margie_sb.build_repo': {
-		title: 'Unlock where margie-build is',
-		why: 'Empty, MARGIE uses the lab’s copy on depot, or your own clone when the cluster has none (Install). Pointing it elsewhere changes how every container and database you set up is built.'
 	}
+	// On a cluster, margie_sb.build_repo is a folder like the others: building itself asks for the build password (Install).
 };
 
 export const isGuarded = (key: string) => key in GUARDED;

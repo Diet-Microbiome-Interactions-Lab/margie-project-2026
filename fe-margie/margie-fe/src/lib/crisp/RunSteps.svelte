@@ -44,6 +44,8 @@
 	const gtdbtkMissing = $derived(
 		[ws.images.find((r) => r.name === 'gtdbtk'), ws.databases.find((r) => r.name === 'gtdbtk')].some((r) => r && r.status !== 'ok')
 	);
+	/** Before any genome is added: RASTtk with GTDB-Tk on (it gives each genome both), else per genome. */
+	const defaultCaller = $derived(calling.gtdbtk ? 'rasttk' : '');
 	const callers = $derived(
 		backend.cluster
 			? all
@@ -52,7 +54,9 @@
 					: byRast
 						? `RASTtk ${byRast}, Prodigal ${all - byRast}`
 						: `Prodigal for all ${all}`
-				: ''
+				: defaultCaller
+					? 'RASTtk'
+					: 'RASTtk or Prodigal, per genome'
 			: calling.caller === 'rasttk'
 				? 'RASTtk'
 				: calling.caller === 'prodigal'
@@ -256,8 +260,13 @@
 					<span class="rs-ph">Phase 3 | Gene caller</span>
 					{#if backend.cluster}
 						<div class="rs-split" aria-label="Gene caller by genome">
-							<span class="rs-cell" class:on={byRast > 0}><b>RASTtk</b><span>{byRast} genome{byRast === 1 ? '' : 's'}</span></span>
-							<span class="rs-cell" class:on={all - byRast > 0}><b>Prodigal</b><span>{all - byRast} genome{all - byRast === 1 ? '' : 's'}</span></span>
+							{#if all}
+								<span class="rs-cell" class:on={byRast > 0}><b>RASTtk</b><span>{byRast} genome{byRast === 1 ? '' : 's'}</span></span>
+								<span class="rs-cell" class:on={all - byRast > 0}><b>Prodigal</b><span>{all - byRast} genome{all - byRast === 1 ? '' : 's'}</span></span>
+							{:else}
+								<span class="rs-cell" class:on={defaultCaller === 'rasttk'}><b>RASTtk</b><span>{defaultCaller ? 'default' : 'domain and code known'}</span></span>
+								<span class="rs-cell"><b>Prodigal</b><span>{defaultCaller ? 'not needed' : 'the rest'}</span></span>
+							{/if}
 						</div>
 						{#if !calling.gtdbtk && known < all}
 							<p class="mg-note">
@@ -513,8 +522,9 @@
 		font-size: var(--mg-fs-xs);
 	}
 	.rs-cell.on {
-		border-color: color-mix(in srgb, var(--mg-accent) 45%, var(--mg-border));
-		color: var(--mg-text);
+		border-color: var(--mg-accent);
+		background: var(--mg-accent);
+		color: var(--mg-on-accent, #fff);
 	}
 	.warn {
 		color: var(--mg-warn);

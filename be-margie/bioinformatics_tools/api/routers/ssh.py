@@ -965,8 +965,83 @@ def _build_default_config_text(config: dict) -> str:
 
 @router.get("/workflows")
 def list_workflows(current_user: dict = Depends(get_current_user)):
-    """Returns the user-facing workflows with metadata, path defaults resolved for this user."""
-    return _get_available_workflows(current_user.get("cluster_username"))
+    """Returns the user-facing workflows with metadata, path defaults resolved for this user
+    (the group's folders only for an account that reads them: _defaults_for)."""
+    workflows = _get_available_workflows(current_user.get("cluster_username"))
+    try:
+        conn = _build_connection(current_user)
+    except Exception:
+        conn = None
+    for wf in workflows:
+        if wf.get("id") == "margie_sb":
+            wf["configurable_params"] = _defaults_for(current_user, conn, wf.get("configurable_params") or [])
+    return workflows
+
+
+def _reads_group(current_user: dict, conn) -> bool:
+    """Whether this account reads the group's shared folder, asked once in a while; False when
+    it cannot be asked."""
+    if not user_stores.DEPOT or conn is None:
+        return False
+    try:
+        return bool(read_cache.get((current_user["user_id"], "group"), lambda: user_stores.reads_group(conn),
+                                   fresh=600, stale=3600))
+    except Exception:
+        return False
+
+
+def _defaults_for(current_user: dict, conn, params: list[dict]) -> list[dict]:
+    """Settings' defaults for this account, with placeholders for the folders a first setup makes
+    (genomes, results, the databases folder and its stores). One that reads the group's shared folder keeps the
+    group's folders as defaults. For any other account a default in that folder is left empty, so
+    the group's paths are not shown, and its own folders show as placeholders: sif and reference-databases/db in its
+    working folder, and the group folder its SLURM account suggests (user_stores.suggested_group)."""
+    member = _reads_group(current_user, conn)
+    cfg: dict = {}
+    working = root = ""
+    if conn is not None:
+        try:
+            cfg = _read_config(current_user, conn) or {}
+            working = str(user_stores._cfg_get(cfg, user_stores.WORKING_KEY) or "").strip().rstrip("/") \
+                or user_stores.working_folder(conn, {})
+            root = str(user_stores._cfg_get(cfg, "margie_sb.stores_root") or "").strip().rstrip("/") \
+                or f"{working}/{user_stores.ROOT_NAME}"
+        except Exception:
+            pass
+    # The databases folder's settings, as the first setup makes them (for any account).
+    shown = user_stores.default_paths(root, current_user.get("cluster_username") or "you") if root else {}
+    if working:
+        shown.update({"margie_sb.input_path": f"{working}/{user_stores.INPUT_NAME}",
+                      "margie_sb.output_path": f"{working}/{user_stores.OUTPUT_NAME}",
+                      "margie_sb.stores_root": root})
+    if not member:
+        group = user_stores.suggested_group(cfg)
+        shown.update({
+            "margie_sb.sif_path": f"{working}/{user_stores.TOOL_FOLDERS['sif_path']}" if working else "",
+            "margie_sb.db_root": f"{working}/{user_stores.TOOL_FOLDERS['db_root']}" if working else "",
+            "margie_sb.shared_root": group,
+            "margie_sb.backup_root": f"{group}/databases/margie-generated-databases" if group else "",
+        })
+    out = []
+    for p in params:
+        d = p.get("default")
+        if not member and isinstance(d, str) and user_stores.in_group(d):
+            p = {**p, "default": ""}
+        if shown.get(p.get("param")) and not p.get("default"):
+            p = {**p, "placeholder": shown[p["param"]]}
+        out.append(p)
+    return out
+
+
+def _without_group(cfg: dict) -> dict:
+    """The config with every value in the group's shared folder emptied (a new config, for an
+    account that does not read that folder)."""
+    for k, v in list(cfg.items()):
+        if isinstance(v, dict):
+            _without_group(v)
+        elif isinstance(v, str) and user_stores.in_group(v):
+            cfg[k] = ""
+    return cfg
 
 
 @router.get("/health")
@@ -1275,6 +1350,8 @@ def create_default_config(current_user: dict = Depends(get_current_user)):
     path = _config_path(current_user["home_dir"])
 
     default_config = _build_default_config_payload(current_user.get("cluster_username"))
+    if not _reads_group(current_user, conn):
+        _without_group(default_config)
     default_config_text = _build_default_config_text(default_config)
 
     try:
@@ -1284,6 +1361,100 @@ def create_default_config(current_user: dict = Depends(get_current_user)):
     except Exception as exc:
         LOGGER.error("Failed to create default config for %s: %s", current_user["username"], exc)
         raise HTTPException(status_code=500, detail=f"Failed to create default config: {exc}")
+
+
+# Settings that follow the working folder while they sit in it (a folder set apart from it stays).
+_IN_WORKING = {"margie_sb.input_path": user_stores.INPUT_NAME, "margie_sb.output_path": user_stores.OUTPUT_NAME,
+               "margie_sb.stores_root": user_stores.ROOT_NAME}
+
+
+def _setup_state(current_user: dict, conn, cfg: dict) -> dict:
+    """First-time setup as the cluster has it: the working folder (as set, else the one MARGIE
+    suggests), the folders in it, where containers and reference databases go (the group's when
+    the account reads them, else sif and reference-databases/db in the working folder) and where margie-build is."""
+    get = lambda key: str(user_stores._cfg_get(cfg, key) or "").strip().rstrip("/")  # noqa: E731
+    working = get(user_stores.WORKING_KEY)
+    default = user_stores.working_folder(conn, {})
+    at = working or default
+    group = {n: user_stores.SHARED_FOLDER_DEFAULTS.get(n, "") for n in user_stores.TOOL_FOLDERS}
+    seen = user_stores.readable(conn, [g for g in group.values() if g])
+    tools = {n: get(f"margie_sb.{n}") or user_stores.tool_folder(conn, n, at, seen) for n in user_stores.TOOL_FOLDERS}
+    recipes = tool_assets.build_recipes(conn, cfg, current_user["home_dir"])
+    return {
+        "configured": bool(cfg),
+        "working_folder": working,
+        "default": default,
+        "folders": {
+            "input": get("margie_sb.input_path") or f"{at}/{user_stores.INPUT_NAME}",
+            "output": get("margie_sb.output_path") or f"{at}/{user_stores.OUTPUT_NAME}",
+            "databases": get("margie_sb.stores_root") or f"{at}/{user_stores.ROOT_NAME}",
+            "containers": tools["sif_path"],
+            "references": tools["db_root"],
+        },
+        # The group's folders where this account reads them ("" otherwise, so their paths stay unshown).
+        "group": {n: {"path": g if g in seen else "", "readable": g in seen} for n, g in group.items()},
+        # A group folder to back up to, from the SLURM account (shown, not set).
+        "suggested_group": user_stores.suggested_group(cfg),
+        "build": {"path": recipes["path"] or "", "source": recipes["source"] or "", "clone_to": recipes["clone_to"],
+                  "bundled": bool(recipes.get("bundled"))},
+    }
+
+
+@router.get("/setup")
+def setup_state(current_user: dict = Depends(get_current_user)):
+    """The working folder and the folders a first run uses (_setup_state)."""
+    conn = _build_connection(current_user)
+    try:
+        cfg = _read_config(current_user, conn) or {}
+    except Exception as exc:
+        raise HTTPException(status_code=502, detail=f"Could not read your config.yaml: {exc}")
+    return _stores_call(_setup_state, current_user, conn, cfg)
+
+
+@router.post("/setup/working-folder")
+def setup_working_folder(body: dict | None = None, current_user: dict = Depends(get_current_user)):
+    """Sets the working folder ({path}, else the suggested one) and fills the folders left empty:
+    margie-input, margie-output and margie-databases in it, and the containers and reference
+    databases (the group's where the account reads them, else sif and reference-databases/db in it). Writes the
+    default config.yaml first when there is none. A folder in the old working folder moves with
+    it; one set apart from it stays. The folders are made; files stay where they are."""
+    conn = _build_connection(current_user)
+    home = current_user["home_dir"]
+    try:
+        cfg = _read_config(current_user, conn) or {}
+    except Exception as exc:
+        raise HTTPException(status_code=502, detail=f"Could not read your config.yaml: {exc}")
+    if not cfg:
+        cfg = _build_default_config_payload(current_user.get("cluster_username"))
+        # The default config names the group's containers and reference databases; the folders
+        # are chosen below by what this account reads, and an account outside the group gets
+        # none of the group's paths.
+        for name in user_stores.TOOL_FOLDERS:
+            user_stores._cfg_set(cfg, f"margie_sb.{name}", "")
+        if not _reads_group(current_user, conn):
+            _without_group(cfg)
+    asked = str((body or {}).get("path") or "").strip()
+
+    def apply() -> None:
+        target = tool_assets._target(conn, asked, home) if asked else user_stores.working_folder(conn, {})
+        before = str(user_stores._cfg_get(cfg, user_stores.WORKING_KEY) or "").strip().rstrip("/")
+        if before and before != target:
+            for key, sub in _IN_WORKING.items():
+                if str(user_stores._cfg_get(cfg, key) or "").strip().rstrip("/") == f"{before}/{sub}":
+                    user_stores._cfg_set(cfg, key, f"{target}/{sub}")
+        user_stores._cfg_set(cfg, user_stores.WORKING_KEY, target)
+        user_stores.fill_default_folders(conn, cfg)
+        user_stores.fill_default_partition(conn, cfg)
+        inside = [str(user_stores._cfg_get(cfg, k) or "") for k in _IN_WORKING]
+        inside = [x for x in inside if x.startswith(f"{target}/")]
+        # The databases folder's own folders too, so a copy can go straight in.
+        inside += user_stores.database_folders(user_stores.scratch_root(conn, cfg))
+        user_stores._run(conn, "mkdir -p -- " + " ".join(shlex.quote(x) for x in [target, *inside]))
+
+    _stores_call(apply)
+    _write_config(current_user, cfg, conn)
+    LOGGER.info("Working folder for %s: %s", current_user["username"], user_stores._cfg_get(cfg, user_stores.WORKING_KEY))
+    return _stores_call(_setup_state, current_user, conn, cfg)
 
 
 @router.post("/test-path-writable")
@@ -2055,6 +2226,12 @@ def setup_assets(body: dict | None = None, current_user: dict = Depends(get_curr
     conn = _build_connection(current_user)
     user_config = _stores_user_config(current_user, conn)
     _stores_settle(current_user, conn, user_config)
+    # A build with no margie-build on the cluster uses the copy that comes with this server.
+    if bool(body.get("builds", True)) and tool_assets.bundled():
+        found = _stores_call(tool_assets.build_recipes, conn, user_config, current_user["home_dir"])
+        if not found["path"]:
+            _stores_call(tool_assets.install_bundle, conn, user_config, current_user["home_dir"])
+            _write_config(current_user, user_config, conn)
     accepted = {str(t) for t in (body.get("accept") or [])}
     return _stores_call(tool_assets.start, conn, user_config, current_user["home_dir"],
                         bool(body.get("builds", True)), accepted, bool(body.get("optional", False)),
@@ -2078,12 +2255,19 @@ def build_unlock(body: dict | None = None, current_user: dict = Depends(get_curr
 
 @router.post("/assets/build-recipes")
 def clone_build_recipes(body: dict | None = None, current_user: dict = Depends(get_current_user)):
-    """Clones margie-build into the user's home and points margie_sb.build_repo at it.
-    body: {url, build_password}; cloning is part of building, so it needs the password."""
-    build_gate.check((body or {}).get("build_password"))
+    """Clones margie-build into the user's home and points margie_sb.build_repo at it; with
+    {bundled: true}, or no address to clone from, puts this server's copy there instead
+    (tool_assets.install_bundle). body: {url, bundled, build_password}; setting margie-build up is
+    part of building, so it needs the password."""
+    body = body or {}
+    build_gate.check(body.get("build_password"))
     conn = _build_connection(current_user)
     user_config = _stores_user_config(current_user, conn)
-    found = _stores_call(tool_assets.clone_recipes, conn, user_config, current_user["home_dir"], (body or {}).get("url"))
+    url = str(body.get("url") or "").strip()
+    if body.get("bundled") or (not url and not tool_assets.BUILD_REPO and tool_assets.bundled()):
+        found = _stores_call(tool_assets.install_bundle, conn, user_config, current_user["home_dir"])
+    else:
+        found = _stores_call(tool_assets.clone_recipes, conn, user_config, current_user["home_dir"], url)
     _write_config(current_user, user_config, conn)
     return found
 
@@ -3859,7 +4043,10 @@ def restore_default(payload: dict, current_user: dict = Depends(get_current_user
         code, out = _run_remote_check(conn, keep)
         if code != 0:
             raise HTTPException(status_code=_permission_status(Exception(out)), detail=f"Could not keep a copy of {path}: {out}")
-        text = _build_default_config_text(_build_default_config_payload(current_user.get("cluster_username")))
+        fresh = _build_default_config_payload(current_user.get("cluster_username"))
+        if not _reads_group(current_user, conn):
+            _without_group(fresh)
+        text = _build_default_config_text(fresh)
         try:
             ssh_sftp.write_remote_text_file(path, text, connection=conn)
         except Exception as exc:
