@@ -209,6 +209,8 @@ export interface BackupCheck {
 }
 
 const STORES_NOT_READY = 'stores-not-ready';
+// Milliseconds between reads of the runs list with no run going.
+const IDLE_POLL = 15_000;
 
 /**
  * Recommended: the phase 4 annotation tools, which the envelope stage and scoring read. Phase 4's
@@ -279,6 +281,7 @@ class Workspace {
 	#logRun = '';
 	#logOffset = 0;
 	#poll: ReturnType<typeof setInterval> | null = null;
+	#onShow: (() => void) | null = null;
 	#saveTimer: ReturnType<typeof setTimeout> | null = null;
 	#lastActive = '';
 
@@ -573,7 +576,15 @@ class Workspace {
 	startPolling() {
 		if (this.#poll) return;
 		let ticks = 0;
+		let busy = false;
+		let last = 0;
+		// Every 3 s while a run is going, every 15 s otherwise; a hidden tab waits, and one tick
+		// at a time, so a slow answer does not stack requests.
 		const tick = async () => {
+			if (busy || document.visibilityState === 'hidden') return;
+			if (!this.active && Date.now() - last < IDLE_POLL) return;
+			busy = true;
+			last = Date.now();
 			try {
 				await this.loadRuns();
 				const active = this.active;
@@ -592,8 +603,18 @@ class Workspace {
 				}
 			} catch {
 				// The next tick tries again.
+			} finally {
+				busy = false;
 			}
 		};
+		// Back in a tab: reads at once.
+		this.#onShow = () => {
+			if (document.visibilityState === 'visible') {
+				last = 0;
+				void tick();
+			}
+		};
+		document.addEventListener('visibilitychange', this.#onShow);
 		tick();
 		this.#poll = setInterval(tick, 3000);
 	}
@@ -601,6 +622,8 @@ class Workspace {
 	stopPolling() {
 		if (this.#poll) clearInterval(this.#poll);
 		this.#poll = null;
+		if (this.#onShow) document.removeEventListener('visibilitychange', this.#onShow);
+		this.#onShow = null;
 	}
 
 	// ------------------------------------------------------------ genomes
