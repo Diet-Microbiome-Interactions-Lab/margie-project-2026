@@ -1,0 +1,779 @@
+[
+	{
+		"id": "gut3-001",
+		"topic": "gut",
+		"level": "easy",
+		"kind": "choice",
+		"question": "Which pair of bile acids does the human liver make from cholesterol?",
+		"options": [
+			"Cholic acid and chenodeoxycholic acid",
+			"Deoxycholic acid and lithocholic acid",
+			"Taurine and glycine",
+			"Cholesterol sulfate and coprostanol"
+		],
+		"answer": 0,
+		"explain": "Cholic acid and chenodeoxycholic acid are the two primary bile acids of humans, made in the liver from cholesterol and conjugated with glycine or taurine before secretion. Deoxycholic and lithocholic acids are secondary bile acids formed later by gut bacteria."
+	},
+	{
+		"id": "gut3-002",
+		"topic": "gut",
+		"level": "easy",
+		"kind": "choice",
+		"question": "Which two gases from colonic fermentation are measured in breath tests of gut function?",
+		"options": [
+			"Oxygen and nitrogen",
+			"Hydrogen and methane",
+			"Carbon monoxide and ethene",
+			"Nitric oxide and ammonia"
+		],
+		"answer": 1,
+		"explain": "Fermentation releases hydrogen, part of which archaea convert to methane. Both gases cross into the blood and are exhaled, so breath hydrogen and breath methane report on fermentation in the gut."
+	},
+	{
+		"id": "gut3-003",
+		"topic": "gut",
+		"level": "easy",
+		"kind": "choice",
+		"question": "Which part of the human gut holds the densest microbial community?",
+		"options": ["The stomach", "The duodenum", "The colon", "The oesophagus"],
+		"answer": 2,
+		"explain": "Cell density rises along the tract and reaches roughly 10^11 per gram of content in the colon, where transit is slow, the pH is mild and fermentable substrate arrives from the small intestine."
+	},
+	{
+		"id": "gut3-004",
+		"topic": "gut",
+		"level": "easy",
+		"kind": "choice",
+		"question": "Which epithelial cells secrete the mucins that build the colonic mucus layer?",
+		"options": ["Enterocytes", "Paneth cells", "Enteroendocrine cells", "Goblet cells"],
+		"answer": 3,
+		"explain": "Goblet cells secrete MUC2, which polymerises into the inner and outer mucus layers of the colon. Paneth cells sit in small-intestinal crypts and release antimicrobial peptides instead."
+	},
+	{
+		"id": "gut3-005",
+		"topic": "gut",
+		"level": "easy",
+		"kind": "choice",
+		"question": "Which term covers the dietary carbohydrates that reach the colon and can be used there by bacteria?",
+		"options": [
+			"Microbiota-accessible carbohydrates",
+			"Essential fatty acids",
+			"Conjugated bile acids",
+			"Postbiotics"
+		],
+		"answer": 0,
+		"explain": "Microbiota-accessible carbohydrates are the fraction that escapes host digestion and absorption and arrives in the colon as fermentable substrate. The term keeps the focus on what the community can use rather than on an analytical fibre value."
+	},
+	{
+		"id": "gut3-006",
+		"topic": "gut",
+		"level": "easy",
+		"kind": "choice",
+		"question": "What becomes of most bile acids that reach the end of the small intestine?",
+		"options": [
+			"They are fermented to short-chain fatty acids",
+			"They are taken up in the ileum and returned to the liver",
+			"They leave the body unchanged in stool",
+			"They are absorbed across the stomach wall"
+		],
+		"answer": 1,
+		"explain": "Around 95 per cent of the bile acid pool is reabsorbed in the terminal ileum and carried back to the liver in portal blood, the enterohepatic circulation. Only the small remainder enters the colon, where bacteria modify it."
+	},
+	{
+		"id": "gut3-007",
+		"topic": "gut",
+		"level": "easy",
+		"kind": "truefalse",
+		"statement": "Hydrogen gas is one product of fibre fermentation in the colon, and part of it is absorbed and leaves the body in breath.",
+		"answer": true,
+		"explain": "Fermenters release hydrogen as they reoxidise NADH. Some is consumed in the colon by methanogens, sulfate reducers and acetogens, some leaves as flatus, and the part that crosses into the blood is exhaled, which is what a breath hydrogen test measures."
+	},
+	{
+		"id": "gut3-008",
+		"topic": "gut",
+		"level": "easy",
+		"kind": "truefalse",
+		"statement": "The primary bile acids are made by gut bacteria from dietary fat.",
+		"answer": false,
+		"explain": "Hepatocytes make the primary bile acids from cholesterol, and the liver conjugates them with glycine or taurine. Gut bacteria act on them afterwards, deconjugating them and removing the 7α-hydroxyl group to give secondary bile acids."
+	},
+	{
+		"id": "gut3-009",
+		"topic": "gut",
+		"level": "easy",
+		"kind": "truefalse",
+		"statement": "Human salivary and pancreatic amylases cut the β-1,4 bonds of cellulose and xylan as well as the α-1,4 bonds of starch.",
+		"answer": false,
+		"explain": "Human amylases act on α-1,4-linked glucose chains only. People secrete no enzyme for the β-1,4 backbones of cellulose or xylan, which is why those polysaccharides reach the colon for bacteria to work on."
+	},
+	{
+		"id": "gut3-010",
+		"topic": "gut",
+		"level": "easy",
+		"kind": "match",
+		"question": "Match each fermentation acid with the number of carbon atoms it holds.",
+		"pairs": [
+			{ "left": "Formate", "right": "One carbon" },
+			{ "left": "Acetate", "right": "Two carbons" },
+			{ "left": "Propionate", "right": "Three carbons" },
+			{ "left": "Butyrate", "right": "Four carbons" },
+			{ "left": "Valerate", "right": "Five carbons" }
+		],
+		"explain": "These acids are named by chain length, and the three short-chain fatty acids that dominate colonic fermentation hold two, three and four carbons. Formate, with its single carbon, and valerate appear in smaller amounts."
+	},
+	{
+		"id": "gut3-011",
+		"topic": "gut",
+		"level": "easy",
+		"kind": "match",
+		"question": "Match each class of resistant starch with an example of it.",
+		"pairs": [
+			{
+				"left": "RS1",
+				"right": "Starch shut inside intact plant cells, as in coarsely milled grains and seeds"
+			},
+			{ "left": "RS2", "right": "Native granules, as in raw potato and green banana" },
+			{ "left": "RS3", "right": "Starch that has retrograded on cooling after cooking" },
+			{ "left": "RS4", "right": "Starch modified chemically, for example by cross-linking" }
+		],
+		"explain": "The four classes differ in why host amylase works on them slowly: physical enclosure, granule structure, retrogradation, or a chemical modification. Each resists digestion and reaches the colon, where how far it is fermented differs between the classes."
+	},
+	{
+		"id": "gut3-012",
+		"topic": "gut",
+		"level": "easy",
+		"kind": "case",
+		"scenario": "A stool sample from a healthy adult is analysed for bile acids. Little cholic acid is found, and most of the bile acid present is deoxycholic acid together with lithocholic acid.",
+		"parts": [
+			{
+				"question": "What are deoxycholic acid and lithocholic acid called?",
+				"options": [
+					"Secondary bile acids",
+					"Primary bile acids",
+					"Conjugated bile acids",
+					"Bile pigments"
+				],
+				"answer": 0,
+				"explain": "Secondary bile acids are the products of bacterial action in the colon, while the primary bile acids cholic and chenodeoxycholic acid come from the liver."
+			},
+			{
+				"question": "Which change in the colon produced them?",
+				"options": [
+					"Oxidation of cholesterol by the colonic epithelium",
+					"Removal of the 7α-hydroxyl group by gut bacteria",
+					"Conjugation with taurine in the liver",
+					"Sulfation in the intestinal wall"
+				],
+				"answer": 1,
+				"explain": "After bile salt hydrolase frees the bile acid from its glycine or taurine, bacterial 7α-dehydroxylation turns cholic acid into deoxycholic acid and chenodeoxycholic acid into lithocholic acid."
+			}
+		],
+		"explain": "Faecal bile acids are largely microbial products: deconjugation followed by 7α-dehydroxylation converts the liver's primary bile acids into the secondary ones that dominate stool."
+	},
+	{
+		"id": "gut3-013",
+		"topic": "gut",
+		"level": "easy",
+		"kind": "case",
+		"scenario": "Volunteers add coarse wheat bran to their usual diet for two weeks. Stool weight rises and whole-gut transit time shortens, while the faecal short-chain fatty acid concentration shifts little.",
+		"parts": [
+			{
+				"question": "Why does coarse wheat bran raise stool weight?",
+				"options": [
+					"It ferments quickly, so bacterial gas fills the stool",
+					"It is digested to glucose, which holds water osmotically",
+					"Its particles ferment poorly and hold water, which adds bulk",
+					"It kills the bacteria whose cells make up the stool"
+				],
+				"answer": 2,
+				"explain": "Coarse bran particles resist fermentation and retain water, so they add both undegraded solids and water to the stool. Faecal bulking is the classic effect of insoluble cereal fibre."
+			},
+			{
+				"question": "What does the shorter transit time mean for fermentation in the colon?",
+				"options": [
+					"Fermentation runs for longer, so more acid accumulates",
+					"Fermentation halts, since the bacteria are washed out of the colon",
+					"Transit time has no bearing on fermentation",
+					"Substrate spends less time in the colon, so less of it is fermented"
+				],
+				"answer": 3,
+				"explain": "Transit time sets how long the community has to work on arriving substrate, so faster transit leaves fermentation less complete and carries more undegraded material into the stool."
+			},
+			{
+				"question": "Which fibre would be chosen instead to raise the viscosity of the gut contents?",
+				"options": ["Oat β-glucan", "Coarse wheat bran", "Crystalline cellulose", "Lignin"],
+				"answer": 0,
+				"explain": "Soluble mixed-linkage β-glucan dissolves into viscous solutions that slow gastric emptying and flatten the rise in blood glucose. Bran and cellulose are insoluble and act by bulking, while lignin is not a polysaccharide and raises no viscosity."
+			}
+		],
+		"explain": "Insoluble cereal fibre works largely by physical means: it bulks the stool and speeds transit, which is a separate effect from the acid yield of a readily fermented fibre."
+	},
+	{
+		"id": "gut3-014",
+		"topic": "gut",
+		"level": "intermediate",
+		"kind": "choice",
+		"question": "Which reaction does bacterial bile salt hydrolase carry out?",
+		"options": [
+			"It removes the 7α-hydroxyl group from cholic acid",
+			"It oxidises the 3-hydroxyl group of the bile acid to a keto group",
+			"It cleaves the amide bond joining glycine or taurine to the bile acid",
+			"It adds a sulfate group to the bile acid before excretion"
+		],
+		"answer": 2,
+		"explain": "Bile salt hydrolase splits the amide bond of the conjugate, releasing the free bile acid plus glycine or taurine. This deconjugation is the gateway step, since 7α-dehydroxylating bacteria act on free bile acids."
+	},
+	{
+		"id": "gut3-015",
+		"topic": "gut",
+		"level": "intermediate",
+		"kind": "choice",
+		"question": "Which property of pectin decides whether an esterase is needed before polygalacturonase can cut its backbone?",
+		"options": [
+			"The ratio of mannose to galactose in its side chains",
+			"The number of β-1,3 links in its backbone",
+			"The length of its arabinan side chains",
+			"The degree of methyl esterification of its galacturonic acid residues"
+		],
+		"answer": 3,
+		"explain": "Polygalacturonase and pectate lyase work on de-esterified galacturonan, so pectin methylesterase has to strip the methyl groups from a highly esterified pectin first. Pectin lyase, by contrast, attacks the esterified polymer directly."
+	},
+	{
+		"id": "gut3-016",
+		"topic": "gut",
+		"level": "intermediate",
+		"kind": "choice",
+		"question": "In a cellulosome, what holds the enzymes onto the scaffoldin protein?",
+		"options": [
+			"Dockerin modules on the enzymes binding cohesin modules of the scaffoldin",
+			"Disulfide bonds between neighbouring catalytic domains",
+			"A lipid anchor shared by the enzymes",
+			"Hydrogen bonds between the enzymes and the cellulose surface"
+		],
+		"answer": 0,
+		"explain": "Each cellulosomal enzyme carries a dockerin that binds a cohesin module of the scaffoldin with high affinity, which assembles many activities into one complex. A carbohydrate-binding module on the scaffoldin then holds the complex on the cellulose."
+	},
+	{
+		"id": "gut3-017",
+		"topic": "gut",
+		"level": "intermediate",
+		"kind": "choice",
+		"question": "What does a carbohydrate-binding module contribute to a fibre-degrading enzyme?",
+		"options": [
+			"It cleaves the glycosidic bond once the catalytic domain is removed",
+			"It holds the enzyme on its substrate, keeping the catalytic domain near the chains to be cut",
+			"It carries the released sugars across the outer membrane",
+			"It adds sugar units to a growing polysaccharide chain"
+		],
+		"answer": 1,
+		"explain": "Carbohydrate-binding modules have no catalytic activity of their own | by binding the polysaccharide they raise the enzyme concentration at the substrate surface. Deleting one lowers activity on insoluble substrates far more than on soluble ones."
+	},
+	{
+		"id": "gut3-018",
+		"topic": "gut",
+		"level": "intermediate",
+		"kind": "choice",
+		"question": "In a colonic community supplied with plenty of sulfate, why do sulfate-reducing bacteria tend to take the hydrogen that methanogens would otherwise use?",
+		"options": [
+			"Sulfate itself is toxic to methanogens at the concentrations reached in the colon",
+			"Methanogens are inhibited by fermentation acids, while sulfate reducers are not",
+			"Sulfate reduction yields more energy per hydrogen, and sulfate reducers can hold hydrogen at a lower concentration",
+			"They form spores that carry them through the competition"
+		],
+		"answer": 2,
+		"explain": "With sulfate available, reducing sulfate to sulfide is thermodynamically more favourable than reducing carbon dioxide to methane, and sulfate reducers draw hydrogen down to a lower threshold. That keeps hydrogen below the level hydrogenotrophic methanogens need."
+	},
+	{
+		"id": "gut3-019",
+		"topic": "gut",
+		"level": "intermediate",
+		"kind": "truefalse",
+		"statement": "Bile salt hydrolase activity is found in gut bacteria of several groups, among them Bacillota (Firmicutes), Bacteroidota and Actinomycetota.",
+		"answer": true,
+		"explain": "Genes for bile salt hydrolase are widespread in the colonic community, including members of Bacteroides, Clostridium, Lactobacillus and Bifidobacterium. Deconjugation is therefore a common activity, while 7α-dehydroxylation is restricted to far fewer taxa."
+	},
+	{
+		"id": "gut3-020",
+		"topic": "gut",
+		"level": "intermediate",
+		"kind": "truefalse",
+		"statement": "Sialic acid freed from mucin glycans by a bacterial sialidase can be taken up by other gut bacteria that carry no sialidase of their own.",
+		"answer": true,
+		"explain": "Sialidase action releases free sialic acid into the mucus layer, and species with a transporter and a sialic acid lyase can grow on it without being able to cut it from the glycan. This is cross-feeding on a host-derived sugar."
+	},
+	{
+		"id": "gut3-021",
+		"topic": "gut",
+		"level": "intermediate",
+		"kind": "truefalse",
+		"statement": "Butyrate is the short-chain fatty acid at the highest concentration in peripheral blood, because little of it is used in the colon.",
+		"answer": false,
+		"explain": "Colonocytes oxidise much of the butyrate they take up and the liver clears most of what gets past them, so butyrate in peripheral blood stays low. Acetate is the short-chain fatty acid that dominates there."
+	},
+	{
+		"id": "gut3-022",
+		"topic": "gut",
+		"level": "intermediate",
+		"kind": "match",
+		"question": "Match each sugar of mucin O-glycans with its place in the structure.",
+		"pairs": [
+			{
+				"left": "N-acetylgalactosamine",
+				"right": "The first sugar, attached to a serine or threonine of the mucin protein"
+			},
+			{ "left": "Galactose", "right": "A neutral sugar in the backbone of the extended core chains" },
+			{ "left": "N-acetylglucosamine", "right": "An amino sugar that extends the core chains" },
+			{ "left": "Fucose", "right": "A deoxy sugar that caps chain ends" },
+			{
+				"left": "Sialic acid",
+				"right": "An acidic nine-carbon sugar that caps chains and carries a negative charge"
+			}
+		],
+		"explain": "Mucin O-glycans start from an N-acetylgalactosamine on the protein, extend with galactose and N-acetylglucosamine, and finish in fucose and sialic acid caps. A forager needs fucosidases and sialidases before it can reach the core sugars."
+	},
+	{
+		"id": "gut3-023",
+		"topic": "gut",
+		"level": "intermediate",
+		"kind": "match",
+		"question": "Match each glycoside hydrolase family with the activity its characterised gut members carry.",
+		"pairs": [
+			{ "left": "GH16", "right": "Cuts the mixed-linkage β-glucan of oats and barley" },
+			{ "left": "GH29", "right": "Removes fucose from host glycans" },
+			{ "left": "GH33", "right": "Removes sialic acid from host glycans" },
+			{ "left": "GH51", "right": "Removes arabinose side chains from arabinoxylan" },
+			{ "left": "GH2", "right": "Acts as a β-galactosidase on lactose and other short β-galactosides" }
+		],
+		"explain": "A family groups enzymes by fold and mechanism, and for these families the characterised gut enzymes carry the activity shown. Reading the family together with its utilisation locus is what points to the substrate."
+	},
+	{
+		"id": "gut3-024",
+		"topic": "gut",
+		"level": "intermediate",
+		"kind": "match",
+		"question": "Match each property of a dietary fibre with the effect it has in the gut.",
+		"pairs": [
+			{
+				"left": "High viscosity in solution",
+				"right": "Slower gastric emptying and a flatter rise in blood glucose"
+			},
+			{
+				"left": "Insoluble particles that ferment poorly",
+				"right": "Added faecal bulk and shorter transit"
+			},
+			{
+				"left": "Rapid fermentability",
+				"right": "Gas and short-chain fatty acids formed in the proximal colon"
+			},
+			{
+				"left": "A backbone carrying many kinds of side chain and linkage",
+				"right": "A wider enzyme set needed, so fewer species gain access"
+			}
+		],
+		"explain": "Physical behaviour and fermentability are separate properties of a fibre, and a fibre can act through one without the other. Fine structure sets how many members of the community can use it."
+	},
+	{
+		"id": "gut3-025",
+		"topic": "gut",
+		"level": "intermediate",
+		"kind": "case",
+		"scenario": "In a mouse study, a diet high in milk fat raises the share of bile acids conjugated with taurine rather than glycine. The sulfide-forming gut bacterium Bilophila wadsworthia increases, and faecal sulfide rises.",
+		"parts": [
+			{
+				"question": "Which part of a taurine-conjugated bile acid does this bacterium use?",
+				"options": [
+					"The steroid rings, which it oxidises to carbon dioxide",
+					"The taurine, whose sulfonate group it reduces to sulfide",
+					"The glycine, which it ferments to acetate",
+					"The 7α-hydroxyl group, which it removes"
+				],
+				"answer": 1,
+				"explain": "B. wadsworthia respires the sulfonate group of taurine and releases the sulfur as hydrogen sulfide, which is why a shift towards taurine conjugation gives it more substrate."
+			},
+			{
+				"question": "Which enzyme activity supplies it with free taurine from the conjugate?",
+				"options": [
+					"Bile acid 7α-dehydroxylase",
+					"Dissimilatory sulfite reductase",
+					"Bile salt hydrolase",
+					"Pancreatic lipase"
+				],
+				"answer": 2,
+				"explain": "Bile salt hydrolase cleaves the amide bond and frees taurine from the bile acid, so deconjugation by the wider community makes the taurine available."
+			},
+			{
+				"question": "How should this result be reported?",
+				"options": [
+					"Milk fat produces hydrogen sulfide in the human colon",
+					"Dietary taurine is the one source of colonic sulfide",
+					"Sulfide-forming bacteria are absent from healthy guts",
+					"In these mice, a shift in bile acid conjugation was followed by a rise in a sulfide-forming bacterium"
+				],
+				"answer": 3,
+				"explain": "The careful wording keeps a mouse observation separate from a human claim. Colonic sulfide also comes from sulfate reduction and from sulfur-containing amino acids."
+			}
+		],
+		"explain": "Diet shapes the bile acid pool, and the conjugating amino acid itself is a substrate: taurine conjugation feeds sulfide formation, which links fat intake to a sulfur cycle in the colon."
+	},
+	{
+		"id": "gut3-026",
+		"topic": "gut",
+		"level": "intermediate",
+		"kind": "case",
+		"scenario": "Two fibres are compared in faecal batch fermentation at matched carbohydrate load: inulin and psyllium husk. Inulin gives a fast rise in gas and short-chain fatty acids, while psyllium gives much less of each over 24 hours. In volunteers, psyllium raises the water content of stool.",
+		"parts": [
+			{
+				"question": "What does the low gas and acid output from psyllium show?",
+				"options": [
+					"It is fermented slowly and incompletely by this community",
+					"It was digested by host enzymes before reaching the bottle",
+					"It holds no carbohydrate",
+					"It raises the pH, which stops fermentation"
+				],
+				"answer": 0,
+				"explain": "Psyllium husk is a highly branched, gel-forming arabinoxylan that the colonic community degrades poorly, so much of it passes through the colon largely intact."
+			},
+			{
+				"question": "Which property accounts for its effect on stool water?",
+				"options": [
+					"Rapid fermentation to acids that draw water in osmotically",
+					"Gel formation that holds water through the colon",
+					"Stimulation of bile acid synthesis in the liver",
+					"Conversion to butyrate by colonocytes"
+				],
+				"answer": 1,
+				"explain": "Psyllium forms a viscous gel that resists fermentation, so the water it binds stays with the stool. That combination of viscosity and poor fermentability is the basis of its use as a bulk laxative."
+			}
+		],
+		"explain": "Fermentability and physical behaviour pull in different directions: a fibre that ferments poorly yields little acid yet can still act strongly on stool form."
+	},
+	{
+		"id": "gut3-027",
+		"topic": "gut",
+		"level": "intermediate",
+		"kind": "case",
+		"scenario": "A team profiles stool before and after a fibre supplement by 16S rRNA gene amplicon sequencing. The relative abundance of one genus falls from 20 per cent to 10 per cent. qPCR of total bacterial 16S copies in the same samples shows that the total load roughly doubled.",
+		"parts": [
+			{
+				"question": "What has most likely happened to the absolute number of that genus?",
+				"options": [
+					"It has halved",
+					"It has fallen about four fold",
+					"It is about unchanged",
+					"It cannot be estimated even roughly"
+				],
+				"answer": 2,
+				"explain": "A halved proportion of a doubled total leaves about the same absolute number. Amplicon data are compositional, so a proportion can fall while the count holds steady."
+			},
+			{
+				"question": "Which further measurement would give absolute numbers most directly?",
+				"options": [
+					"Sequencing a longer region of the 16S gene",
+					"Rarefying the libraries to even depth",
+					"Calculating a diversity index for each sample",
+					"Flow cytometry of cells per gram, combined with the profiles"
+				],
+				"answer": 3,
+				"explain": "Multiplying a measured cell count per gram by the sequencing proportions converts relative data into quantitative abundances, which is the standard way to recover absolute numbers."
+			},
+			{
+				"question": "Why does 16S copy number complicate the qPCR estimate of load?",
+				"options": [
+					"Genomes carry different numbers of 16S copies, so copies per gram are not cells per gram",
+					"qPCR detects RNA rather than DNA",
+					"The 16S gene is missing from some gut bacteria",
+					"qPCR responds only to living cells"
+				],
+				"answer": 0,
+				"explain": "Copy number per genome ranges from one to more than ten, so the qPCR signal tracks community membership as well as cell number. Copy-number correction or a direct cell count reduces the problem."
+			}
+		],
+		"explain": "Sequencing reports proportions, not counts, so a shift in a proportion needs a measure of total load before it can be read as a change in numbers."
+	},
+	{
+		"id": "gut3-028",
+		"topic": "gut",
+		"level": "hard",
+		"kind": "choice",
+		"question": "In the main butyrate-forming pathway of colonic Bacillota, how is butyryl-CoA assembled?",
+		"options": [
+			"By carboxylation of propionyl-CoA",
+			"By reduction of succinyl-CoA through 4-hydroxybutyryl-CoA",
+			"By β-oxidation of dietary long-chain fatty acids",
+			"By condensation of two acetyl-CoA, then reduction through acetoacetyl-CoA, β-hydroxybutyryl-CoA and crotonyl-CoA"
+		],
+		"answer": 3,
+		"explain": "The dominant route runs from two acetyl-CoA through a thiolase, a dehydrogenase, crotonase and butyryl-CoA dehydrogenase, which is the reverse of β-oxidation chemistry. Butyrate is then released by the CoA-transferase or the butyrate kinase step."
+	},
+	{
+		"id": "gut3-029",
+		"topic": "gut",
+		"level": "hard",
+		"kind": "choice",
+		"question": "What does the butyryl-CoA dehydrogenase and electron-transferring flavoprotein complex of butyrate producers do with electrons from NADH?",
+		"options": [
+			"It couples the favourable reduction of crotonyl-CoA by NADH to the unfavourable reduction of ferredoxin, which the cell then uses to build an ion gradient",
+			"It passes them to oxygen as the final acceptor",
+			"It passes them to sulfate, giving sulfide",
+			"It uses them to reduce carbon dioxide to formate"
+		],
+		"answer": 0,
+		"explain": "The complex is a flavin-based electron-bifurcating enzyme: the energy released as crotonyl-CoA is reduced drives reduction of ferredoxin by a second NADH. Reduced ferredoxin then feeds an Rnf complex or a hydrogenase, so the cell conserves energy beyond substrate-level phosphorylation."
+	},
+	{
+		"id": "gut3-030",
+		"topic": "gut",
+		"level": "hard",
+		"kind": "choice",
+		"question": "Gut Bacteroides strains from some seaweed-eating populations carry porphyran- and agarose-degrading genes whose closest relatives sit in marine bacteria. What does this most likely reflect?",
+		"options": [
+			"Convergent evolution of near-identical sequences in the gut",
+			"Horizontal gene transfer from marine bacteria arriving on dietary seaweed",
+			"Contamination of the sequencing libraries with seawater DNA",
+			"Transfer of host genes into the bacterial genome"
+		],
+		"answer": 1,
+		"explain": "The loci sit on mobile elements and are closely similar to genes of marine Bacteroidota, which points to acquisition from bacteria carried in on seaweed. Comparable loci have since been reported in gut Bacteroides from populations that eat little seaweed, so what the sequence similarity shows is the transfer itself."
+	},
+	{
+		"id": "gut3-031",
+		"topic": "gut",
+		"level": "hard",
+		"kind": "choice",
+		"question": "In the starch utilisation system of Bacteroides thetaiotaomicron, where is the imported maltooligosaccharide taken down to glucose?",
+		"options": [
+			"Outside the cell, by surface enzymes before import",
+			"Inside the outer-membrane channel, during import",
+			"In the periplasm, by an α-glucosidase together with a neopullulanase",
+			"In the cytoplasm, by the same enzyme that cuts starch at the surface"
+		],
+		"answer": 2,
+		"explain": "SusG cuts starch at the cell surface and SusC with SusD import the oligosaccharides, which the periplasmic enzymes SusB (α-glucosidase) and SusA (neopullulanase) then reduce to glucose before uptake into the cytoplasm. Keeping the final steps in the periplasm limits the loss of sugars to neighbours."
+	},
+	{
+		"id": "gut3-032",
+		"topic": "gut",
+		"level": "hard",
+		"kind": "choice",
+		"question": "Some gut Bacteroidota release succinate rather than propionate when their medium holds no vitamin B12. Which step accounts for this?",
+		"options": [
+			"Succinate dehydrogenase needs B12 to oxidise succinate",
+			"Phosphoenolpyruvate carboxykinase needs B12 to fix carbon dioxide",
+			"Fumarate reductase needs B12 to reduce fumarate",
+			"Methylmalonyl-CoA mutase needs adenosylcobalamin to rearrange succinyl-CoA"
+		],
+		"answer": 3,
+		"explain": "The succinate route to propionate passes through methylmalonyl-CoA, and the mutase that forms it is adenosylcobalamin-dependent. Without the cofactor the pathway stalls and succinate leaves the cell as the end product."
+	},
+	{
+		"id": "gut3-033",
+		"topic": "gut",
+		"level": "hard",
+		"kind": "truefalse",
+		"statement": "Reductive acetogens and hydrogenotrophic methanogens compete for the same hydrogen, and the acetogens need a higher hydrogen concentration than the methanogens to keep growing.",
+		"answer": true,
+		"explain": "Reducing carbon dioxide to acetate yields less energy per hydrogen than reducing it to methane, so acetogens have the higher hydrogen threshold. Where methanogens are abundant they take much of the hydrogen, and acetogenesis matters more where they are sparse."
+	},
+	{
+		"id": "gut3-034",
+		"topic": "gut",
+		"level": "hard",
+		"kind": "truefalse",
+		"statement": "Deoxycholic acid and lithocholic acid are formed in the liver by conjugating the primary bile acids with taurine.",
+		"answer": false,
+		"explain": "Conjugation with taurine or glycine happens in the liver and leaves the ring hydroxyls untouched. Deoxycholic and lithocholic acids arise in the colon, where bacteria deconjugate the bile acids and then remove the 7α-hydroxyl group."
+	},
+	{
+		"id": "gut3-035",
+		"topic": "gut",
+		"level": "hard",
+		"kind": "match",
+		"question": "Match each step in bile acid handling with what it does.",
+		"pairs": [
+			{
+				"left": "Conjugation in the liver",
+				"right": "Joins glycine or taurine to the bile acid, raising its solubility"
+			},
+			{
+				"left": "Bile salt hydrolase",
+				"right": "Frees the bile acid from its amino acid conjugate"
+			},
+			{
+				"left": "7α-dehydroxylation by the bai genes",
+				"right": "Turns cholic acid into deoxycholic acid"
+			},
+			{
+				"left": "Bacterial hydroxysteroid dehydrogenases",
+				"right": "Oxidise and epimerise ring hydroxyls, as on the route to ursodeoxycholic acid"
+			},
+			{
+				"left": "The ileal transporter ASBT",
+				"right": "Takes conjugated bile acids back up for return to the liver"
+			}
+		],
+		"explain": "The bile acid pool is shaped in turn by the liver, by the ileal transporter that recycles it, and by bacterial deconjugation, dehydroxylation and epimerisation in the colon."
+	},
+	{
+		"id": "gut3-036",
+		"topic": "gut",
+		"level": "hard",
+		"kind": "match",
+		"question": "Match each enzyme of the butyrate pathway with the step it catalyses.",
+		"pairs": [
+			{
+				"left": "Acetyl-CoA acetyltransferase (thiolase)",
+				"right": "Joins two acetyl-CoA into acetoacetyl-CoA"
+			},
+			{ "left": "β-Hydroxybutyryl-CoA dehydrogenase", "right": "Reduces acetoacetyl-CoA with NADH" },
+			{ "left": "Crotonase", "right": "Removes water, giving crotonyl-CoA" },
+			{ "left": "Butyryl-CoA dehydrogenase complex", "right": "Reduces crotonyl-CoA to butyryl-CoA" },
+			{
+				"left": "Butyryl-CoA:acetate CoA-transferase",
+				"right": "Releases butyrate while activating acetate to acetyl-CoA"
+			}
+		],
+		"explain": "Four steps build butyryl-CoA from two acetyl-CoA, and the last enzyme decides how butyrate leaves the cell. The CoA-transferase ending ties butyrate output to the acetate pool of the community."
+	},
+	{
+		"id": "gut3-037",
+		"topic": "gut",
+		"level": "hard",
+		"kind": "match",
+		"question": "Match each gene or gene set with the gut function it marks in a metagenome.",
+		"pairs": [
+			{
+				"left": "but, the butyryl-CoA:acetate CoA-transferase gene",
+				"right": "Butyrate formation coupled to uptake of external acetate"
+			},
+			{
+				"left": "fhs, formyltetrahydrofolate synthetase",
+				"right": "The Wood-Ljungdahl route of reductive acetogenesis"
+			},
+			{ "left": "The bai operon", "right": "Conversion of primary bile acids into secondary ones" },
+			{
+				"left": "bsh",
+				"right": "Release of free bile acids from their glycine or taurine conjugates"
+			},
+			{ "left": "nanH-type sialidase genes", "right": "Release of sialic acid from mucin glycans" }
+		],
+		"explain": "Functional markers let a metagenome be read for processes rather than taxa, since the gene for a step can be counted whatever carries it. A marker is read with its limits in mind: fhs sits in folate C1 metabolism outside the acetogens too, so its count is weighed against the other genes of the pathway."
+	},
+	{
+		"id": "gut3-038",
+		"topic": "gut",
+		"level": "hard",
+		"kind": "case",
+		"scenario": "A faecal community that produces methane is grown in two continuous cultures on the same fibre mixture. Sulfate is added to one vessel. In that vessel methane output falls, sulfide appears, and hydrogen stays low.",
+		"parts": [
+			{
+				"question": "What accounts for the fall in methane?",
+				"options": [
+					"Sulfate inhibits the fibre-degrading enzymes, so less substrate reaches the archaea",
+					"Sulfate reducers take the hydrogen, leaving the methanogens short of their electron donor",
+					"Sulfide is oxidised back to sulfate by the methanogens",
+					"Methane dissolves in the sulfate solution and escapes detection"
+				],
+				"answer": 1,
+				"explain": "Sulfate reduction is the more favourable sink and draws hydrogen to a lower concentration than hydrogenotrophic methanogens can use, so methanogenesis is outcompeted while sulfide accumulates."
+			},
+			{
+				"question": "Hydrogen stays low in both vessels. What does that tell you about them?",
+				"options": [
+					"Hydrogen is not produced once sulfate is present",
+					"The primary fermenters have switched to using sulfate themselves",
+					"A hydrogen sink is at work in each vessel, so reoxidation of NADH by forming hydrogen stays favourable",
+					"Hydrogen leaked from both vessels before it could be measured"
+				],
+				"answer": 2,
+				"explain": "Each vessel has a consumer drawing hydrogen off, methanogens in one and sulfate reducers in the other, which keeps the partial pressure low enough for the fermenters to go on releasing hydrogen."
+			},
+			{
+				"question": "Which measurement would show whether the extent of fermentation itself differed between the vessels?",
+				"options": [
+					"The ratio of methane to sulfide",
+					"The number of 16S reads assigned to sulfate reducers",
+					"The sulfate concentration left in the medium",
+					"Total short-chain fatty acid output together with the carbohydrate left unfermented"
+				],
+				"answer": 3,
+				"explain": "The identity of the hydrogen sink says nothing about how much fibre was degraded. Acid output with residual carbohydrate measures the extent of fermentation directly."
+			}
+		],
+		"explain": "Hydrogen sinks compete for one pool of electrons, so adding sulfate rearranges the disposal route while leaving the fermenters supplied with a sink either way."
+	},
+	{
+		"id": "gut3-039",
+		"topic": "gut",
+		"level": "hard",
+		"kind": "case",
+		"scenario": "A faecal community is incubated with inulin labelled with carbon-13. After six hours DNA is extracted and separated on a density gradient, and the heavy fractions are sequenced. The short-chain fatty acids are collected and their carbon-13 content is measured.",
+		"parts": [
+			{
+				"question": "What does a taxon's appearance in the heavy fractions show?",
+				"options": [
+					"It took carbon from the labelled inulin into newly made DNA",
+					"It was the most abundant taxon in the inoculum",
+					"Its genome has an unusually high GC content",
+					"It stayed metabolically inactive through the incubation"
+				],
+				"answer": 0,
+				"explain": "Carbon-13 built into new DNA raises its buoyant density, so heavy-fraction membership marks active use of the labelled substrate rather than abundance. A GC control is needed, since GC content also shifts density."
+			},
+			{
+				"question": "Butyrate carries label although the taxa in the heavy fractions are poor butyrate producers. What does this suggest?",
+				"options": [
+					"The label moved into butyrate by chemical exchange in the medium",
+					"Label reached butyrate producers through cross-feeding on the products of the primary degraders",
+					"The inoculum already held labelled butyrate",
+					"The density separation failed"
+				],
+				"answer": 1,
+				"explain": "Labelled carbon passes from the inulin degraders into their fermentation products, and butyrate producers growing on that acetate, lactate or oligosaccharide carry the label into butyrate."
+			},
+			{
+				"question": "Which follow-up would place the butyrate producers among the active members?",
+				"options": [
+					"Sequencing the light fractions more deeply",
+					"Measuring the final pH of the incubation",
+					"Sampling heavy fractions at later time points, or probing labelled RNA instead of DNA",
+					"Repeating the run with unlabelled inulin"
+				],
+				"answer": 2,
+				"explain": "Label reaches secondary users later than primary degraders, so a later sampling point catches them. RNA labels faster than DNA and needs no cell division, which makes RNA-based probing more sensitive to short incubations."
+			}
+		],
+		"explain": "Stable isotope probing separates the members that use a substrate from those that merely sit in the sample, and the timing of labelling distinguishes primary degraders from cross-feeders."
+	},
+	{
+		"id": "gut3-040",
+		"topic": "gut",
+		"level": "hard",
+		"kind": "case",
+		"scenario": "A metagenome-assembled genome from a human faecal sample falls in Bacillota (Firmicutes). It holds GH5, GH9 and GH48 genes, several of them carrying dockerin modules, plus a large gene with repeated cohesin modules and one carbohydrate-binding module of family 3a. No susC/susD-like pair is present.",
+		"parts": [
+			{
+				"question": "What does this gene set point to?",
+				"options": [
+					"An amylosome aimed at starch granules",
+					"A utilisation locus for xylan",
+					"A system for stripping sulfate from mucin glycans",
+					"A cellulosome aimed at plant cell wall cellulose"
+				],
+				"answer": 3,
+				"explain": "GH48 together with GH9 and dockerin-bearing GH5 enzymes, assembled on a cohesin-bearing scaffoldin with a family 3a binding module, is the signature of a cellulosome. A starch-directed amylosome would show GH13 enzymes instead."
+			},
+			{
+				"question": "What is the job of the family 3a carbohydrate-binding module on the scaffoldin?",
+				"options": [
+					"It holds the complex on the surface of crystalline cellulose",
+					"It cuts cellulose chains into cellobiose",
+					"It imports cellodextrins into the cytoplasm",
+					"It links the scaffoldin to the peptidoglycan"
+				],
+				"answer": 0,
+				"explain": "A family 3a module binds the crystalline cellulose surface, which anchors the whole complex at its substrate and keeps the enzymes acting on neighbouring chains. Separate anchoring modules attach the scaffoldin to the cell wall."
+			}
+		],
+		"explain": "Enzyme families read together with the modules around them say both what a genome degrades and how it organises the attack: a cohesin-bearing scaffoldin with dockerin-tagged cellulases is a surface complex, not a Bacteroidota-style import locus."
+	}
+]

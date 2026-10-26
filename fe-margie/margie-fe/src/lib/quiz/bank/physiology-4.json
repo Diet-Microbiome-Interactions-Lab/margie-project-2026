@@ -1,0 +1,872 @@
+[
+	{
+		"id": "phys4-001",
+		"topic": "physiology",
+		"level": "easy",
+		"kind": "choice",
+		"question": "In bacterial peptidoglycan, which sugar carries the short peptide stem that takes part in cross-links?",
+		"options": [
+			"N-acetylglucosamine",
+			"N-acetylmuramic acid",
+			"N-acetyltalosaminuronic acid",
+			"Glucuronic acid"
+		],
+		"answer": 1,
+		"explain": "Peptidoglycan's glycan strands alternate N-acetylglucosamine and N-acetylmuramic acid joined by β-1,4 bonds, and each peptide stem is attached to the lactyl group of an N-acetylmuramic acid. N-acetyltalosaminuronic acid takes the place of N-acetylmuramic acid in the pseudomurein of some methanogens."
+	},
+	{
+		"id": "phys4-002",
+		"topic": "physiology",
+		"level": "easy",
+		"kind": "choice",
+		"question": "A culture is diluted 10⁻⁶, and 0.1 millilitre of the dilution spread on an agar plate gives 150 colonies. How many colony-forming units per millilitre did the culture hold?",
+		"options": [
+			"1.5 × 10⁷",
+			"1.5 × 10⁸",
+			"1.5 × 10⁹",
+			"1.5 × 10¹⁰"
+		],
+		"answer": 2,
+		"explain": "Divide the colony count by the volume plated and by the dilution: 150 ÷ (0.1 × 10⁻⁶) = 1.5 × 10⁹ per millilitre. Leaving out the 0.1 millilitre gives the tenfold-too-low 1.5 × 10⁸."
+	},
+	{
+		"id": "phys4-003",
+		"topic": "physiology",
+		"level": "easy",
+		"kind": "choice",
+		"question": "In a typical bacterial two-component system, which amino acids carry the phosphoryl group, in order?",
+		"options": [
+			"A histidine on the sensor kinase, then an aspartate on the response regulator",
+			"A serine on the sensor kinase, then a threonine on the response regulator",
+			"An aspartate on the sensor kinase, then a histidine on the response regulator",
+			"A tyrosine on the sensor kinase, then a cysteine on the response regulator"
+		],
+		"answer": 0,
+		"explain": "When the sensor kinase detects its signal, it autophosphorylates a conserved histidine using ATP and passes the phosphoryl group to an aspartate in the receiver domain of its response regulator. The phosphorylated regulator, often a DNA-binding protein, then changes gene expression."
+	},
+	{
+		"id": "phys4-004",
+		"topic": "physiology",
+		"level": "easy",
+		"kind": "choice",
+		"question": "Why do many bacteria living in oxic, near-neutral surroundings make and release siderophores?",
+		"options": [
+			"To store surplus iron inside the cell until growth calls for it",
+			"To pump excess iron out before it can catalyse oxidative damage",
+			"To acidify their surroundings and so free bound phosphate for uptake",
+			"To capture Fe³⁺, which is nearly insoluble under these conditions"
+		],
+		"answer": 3,
+		"explain": "In oxic water and soil at neutral pH, iron is Fe³⁺ that forms insoluble hydroxides, and animal hosts hold their iron in proteins such as transferrin. Siderophores bind Fe³⁺ very tightly, and the cell takes the iron–siderophore complex back up through specific receptors."
+	},
+	{
+		"id": "phys4-005",
+		"topic": "physiology",
+		"level": "easy",
+		"kind": "choice",
+		"question": "In the Ziehl–Neelsen acid-fast stain, why do Mycobacterium cells stay red after the acid-alcohol rinse?",
+		"options": [
+			"Their outer membrane is rich in lipopolysaccharide, which binds the dye",
+			"Their walls carry thick layers of teichoic acid, which bind the dye",
+			"Their envelope is rich in waxy mycolic acids, which hold the dye",
+			"Their S-layer seals the dye inside the cell"
+		],
+		"answer": 2,
+		"explain": "Long-chain mycolic acids make the mycobacterial envelope waxy and poorly permeable, so once heating drives the carbolfuchsin in, acid-alcohol cannot wash it out. Most other bacteria lose the red dye and take up the blue counterstain."
+	},
+	{
+		"id": "phys4-006",
+		"topic": "physiology",
+		"level": "easy",
+		"kind": "truefalse",
+		"statement": "Adding salt or sugar to a food raises its water activity, which is why salting and sugaring help to preserve food.",
+		"answer": false,
+		"explain": "Dissolved solutes lower water activity, the vapour pressure of a solution relative to that of pure water. Most bacteria need a water activity above about 0.9, so salted and sugared foods resist spoilage, although halotolerant and osmotolerant microbes can still grow on them."
+	},
+	{
+		"id": "phys4-007",
+		"topic": "physiology",
+		"level": "easy",
+		"kind": "truefalse",
+		"statement": "Cells in a biofilm are often far more tolerant of antibiotics than planktonic (free-floating) cells of the same strain.",
+		"answer": true,
+		"explain": "The matrix slows the entry of some drugs, and cells deep in a biofilm grow slowly in zones short of nutrients and oxygen, which weakens many antibiotics. This tolerance needs no resistance mutation, and cells dispersed from the biofilm usually regain their sensitivity."
+	},
+	{
+		"id": "phys4-008",
+		"topic": "physiology",
+		"level": "easy",
+		"kind": "truefalse",
+		"statement": "A bacterial flagellum lengthens by adding new flagellin subunits at its base, so the older part of the filament is pushed outward.",
+		"answer": false,
+		"explain": "Flagellin subunits are exported by the flagellum's own type III export apparatus, travel up the hollow core of the filament and are added at its distal tip beneath a cap of FliD. The filament therefore grows at its tip, away from the cell."
+	},
+	{
+		"id": "phys4-009",
+		"topic": "physiology",
+		"level": "easy",
+		"kind": "match",
+		"question": "Match each arrangement of flagella to its description.",
+		"pairs": [
+			{
+				"left": "Monotrichous",
+				"right": "A single flagellum at one pole"
+			},
+			{
+				"left": "Amphitrichous",
+				"right": "A flagellum at each of the two poles"
+			},
+			{
+				"left": "Lophotrichous",
+				"right": "A tuft of flagella at one pole"
+			},
+			{
+				"left": "Peritrichous",
+				"right": "Many flagella spread over the cell surface, as in Escherichia coli"
+			},
+			{
+				"left": "Periplasmic flagella",
+				"right": "Internal flagella wound around the cell beneath the outer membrane, as in spirochaetes"
+			}
+		],
+		"explain": "The arrangement of flagella is one of the traits used to identify bacteria. Spirochaetes keep theirs in the periplasm, beneath the outer membrane, where their rotation makes the cell body turn like a corkscrew."
+	},
+	{
+		"id": "phys4-010",
+		"topic": "physiology",
+		"level": "easy",
+		"kind": "match",
+		"question": "Match each oxygen class to where it grows in a tube of thioglycolate broth, which stays oxic only near the surface.",
+		"pairs": [
+			{
+				"left": "Obligate aerobe",
+				"right": "Only in a thin layer at the top"
+			},
+			{
+				"left": "Obligate anaerobe",
+				"right": "Only towards the bottom, away from oxygen"
+			},
+			{
+				"left": "Facultative anaerobe",
+				"right": "Throughout the tube, densest near the top"
+			},
+			{
+				"left": "Microaerophile",
+				"right": "In a band a little below the surface"
+			},
+			{
+				"left": "Aerotolerant anaerobe",
+				"right": "Evenly throughout the tube"
+			}
+		],
+		"explain": "Thioglycolate removes dissolved oxygen, so only the top of the tube is oxic. Facultative anaerobes grow best near the top, where respiration yields more ATP, whereas aerotolerant anaerobes ferment whether or not oxygen is present and so grow evenly."
+	},
+	{
+		"id": "phys4-011",
+		"topic": "physiology",
+		"level": "easy",
+		"kind": "case",
+		"scenario": "A culture of Escherichia coli growing exponentially holds 2.0 × 10⁵ cells per millilitre and has a generation time of 25 minutes.",
+		"parts": [
+			{
+				"question": "How long will it take to reach 1.6 × 10⁶ cells per millilitre?",
+				"options": [
+					"50 minutes",
+					"75 minutes",
+					"100 minutes",
+					"200 minutes"
+				],
+				"answer": 1,
+				"explain": "The count must rise 1.6 × 10⁶ ÷ 2.0 × 10⁵ = 8-fold, and 8 = 2³, so 3 generations are needed: 3 × 25 = 75 minutes."
+			},
+			{
+				"question": "If growth stays exponential, what will the count be 150 minutes after the start?",
+				"options": [
+					"1.2 × 10⁶ per millilitre",
+					"3.2 × 10⁶ per millilitre",
+					"1.28 × 10⁷ per millilitre",
+					"2.56 × 10⁷ per millilitre"
+				],
+				"answer": 2,
+				"explain": "150 minutes is 150 ÷ 25 = 6 generations, so the count rises 2⁶ = 64-fold: 2.0 × 10⁵ × 64 = 1.28 × 10⁷ per millilitre. Multiplying by 6 in place of 2⁶ gives the linear-growth error of 1.2 × 10⁶."
+			}
+		],
+		"explain": "In exponential growth N = N₀ × 2ⁿ, where n is the elapsed time divided by the generation time, so the count rises by powers of 2 rather than by equal steps."
+	},
+	{
+		"id": "phys4-012",
+		"topic": "physiology",
+		"level": "easy",
+		"kind": "case",
+		"scenario": "A food laboratory identifies an isolate as Escherichia coli O157:H7 by testing it with antisera. The 'O' and 'H' parts of the name record which antibodies react with two of its surface structures, and like most Gram-negative bacteria it carries lipopolysaccharide (LPS) in its outer membrane.",
+		"parts": [
+			{
+				"question": "What does 'O157' refer to?",
+				"options": [
+					"The O-antigen, the outer polysaccharide chain of its LPS",
+					"Its flagellin, the protein that makes up the flagellar filament",
+					"Its capsule, a loose layer outside the outer membrane",
+					"Its porins, the channel proteins of the outer membrane"
+				],
+				"answer": 0,
+				"explain": "O antigens are the repeating sugar chains at the outer end of LPS, which vary widely between strains and are used for serotyping. H antigens such as H7 are types of flagellin, and K antigens are capsules."
+			},
+			{
+				"question": "Which part of LPS anchors it in the membrane and accounts for its endotoxin activity?",
+				"options": [
+					"The O-antigen",
+					"The core oligosaccharide",
+					"Braun's lipoprotein",
+					"Lipid A"
+				],
+				"answer": 3,
+				"explain": "Lipid A, a phosphorylated glucosamine disaccharide carrying several fatty acid chains, is the membrane anchor of LPS. When released, it is detected by the host's TLR4 receptor complex and sets off fever and inflammation."
+			},
+			{
+				"question": "Where in the outer membrane does LPS sit?",
+				"options": [
+					"In the inner leaflet, facing the periplasm and peptidoglycan",
+					"In the outer leaflet, over an inner leaflet of phospholipid",
+					"In both leaflets, in roughly equal amounts",
+					"In neither, as LPS floats free in the periplasmic space"
+				],
+				"answer": 1,
+				"explain": "The outer membrane is asymmetric, with LPS in its outer leaflet and phospholipids in its inner leaflet. Divalent cations bridge the negatively charged LPS molecules, making the membrane a strong barrier to hydrophobic compounds and detergents."
+			}
+		],
+		"explain": "The LPS of strains such as O157:H7 has three parts: lipid A in the outer leaflet of the outer membrane, a core oligosaccharide and the variable O-antigen. With the flagellar H antigen, the O-antigen gives serotypes such as O157:H7."
+	},
+	{
+		"id": "phys4-013",
+		"topic": "physiology",
+		"level": "easy",
+		"kind": "case",
+		"scenario": "A drop of 3% hydrogen peroxide is placed on colonies of two bacteria. Colonies of Staphylococcus aureus bubble at once, while colonies of Lactococcus lactis, a lactic acid bacterium, do not.",
+		"parts": [
+			{
+				"question": "What makes the bubbles on the S. aureus colonies?",
+				"options": [
+					"Superoxide dismutase, which splits water into hydrogen and oxygen gas",
+					"Fermentation, which releases carbon dioxide gas from the colony",
+					"Catalase, which breaks hydrogen peroxide down to water and oxygen",
+					"Peroxidase, which turns hydrogen peroxide into hydrogen gas"
+				],
+				"answer": 2,
+				"explain": "Catalase converts 2 H₂O₂ into 2 H₂O and O₂, and the oxygen forms the bubbles. Lactococcus lactis lacks catalase, so this quick test separates staphylococci from lactococci and streptococci."
+			},
+			{
+				"question": "Many oxygen-tolerant bacteria also make superoxide dismutase. Which reaction does it catalyse?",
+				"options": [
+					"2 O₂⁻ + 2 H⁺ → H₂O₂ + O₂",
+					"2 H₂O₂ → 2 H₂O + O₂",
+					"H₂O₂ + NADH + H⁺ → 2 H₂O + NAD⁺",
+					"O₂ + 4 e⁻ + 4 H⁺ → 2 H₂O"
+				],
+				"answer": 0,
+				"explain": "Superoxide dismutase turns superoxide into hydrogen peroxide and oxygen, and catalase or peroxidases then remove the hydrogen peroxide. Together these enzymes clear reactive oxygen species that form as oxygen is reduced inside the cell."
+			}
+		],
+		"explain": "Superoxide and hydrogen peroxide arise as side products when cells reduce oxygen. Superoxide dismutase and catalase detoxify them, and the catalase test shows the second enzyme in seconds."
+	},
+	{
+		"id": "phys4-014",
+		"topic": "physiology",
+		"level": "intermediate",
+		"kind": "choice",
+		"question": "How do the Min proteins help Escherichia coli place its Z ring at midcell?",
+		"options": [
+			"MinC binds along the chromosome and blocks FtsZ wherever the DNA lies in the cell",
+			"MinD builds a fixed ring at midcell that recruits FtsZ and the later division proteins",
+			"MinE breaks down FtsZ near the poles, so that only the pool at midcell can polymerise",
+			"MinC, an FtsZ inhibitor, oscillates with MinD and MinE and is scarcest at midcell"
+		],
+		"answer": 3,
+		"explain": "MinD binds the membrane with ATP and recruits the FtsZ inhibitor MinC, while MinE triggers ATP hydrolysis by MinD and releases it, so MinD and MinC oscillate from pole to pole. Averaged over time, MinC is most concentrated near the poles and least at midcell, so the Z ring forms there, while the DNA-bound protein SlmA separately keeps rings off the nucleoid."
+	},
+	{
+		"id": "phys4-015",
+		"topic": "physiology",
+		"level": "intermediate",
+		"kind": "choice",
+		"question": "In Staphylococcus aureus peptidoglycan, how are neighbouring peptide stems cross-linked?",
+		"options": [
+			"Through a pentaglycine bridge from L-lysine of one stem to D-alanine of the next",
+			"Directly, from meso-diaminopimelic acid on one stem to the D-alanine of the next stem",
+			"Through disulfide bonds between cysteines placed in the two stems",
+			"Through wall teichoic acid chains that join the two stems"
+		],
+		"answer": 0,
+		"explain": "S. aureus has L-lysine at position 3 of its stem, and a bridge of five glycines joins this lysine to the D-alanine at position 4 of a neighbouring stem. Escherichia coli instead links most of its stems directly, from meso-diaminopimelic acid to D-alanine, with no bridge."
+	},
+	{
+		"id": "phys4-016",
+		"topic": "physiology",
+		"level": "intermediate",
+		"kind": "choice",
+		"question": "Pseudomonas aeruginosa can creep across a moist surface in short, jerky steps without using its flagellum. What drives this twitching motility?",
+		"options": [
+			"Rotation of flagella that lie in the periplasm and twist the cell body",
+			"Type IV pili that grip the surface and are retracted by the ATPase PilT",
+			"Release of slime from pores at the rear of the cell, which pushes it ahead",
+			"Treadmilling of FtsZ filaments under the membrane at the leading pole"
+		],
+		"answer": 1,
+		"explain": "Type IV pili grow out from a cell pole, bind the surface and are then retracted as the PilT ATPase pulls pilin subunits back into the membrane, which drags the cell forward. The cycle uses ATP and works only on surfaces, with no part played by the flagellum."
+	},
+	{
+		"id": "phys4-017",
+		"topic": "physiology",
+		"level": "intermediate",
+		"kind": "choice",
+		"question": "When thiamine pyrophosphate (TPP) is plentiful, many bacteria switch off their thiamine synthesis genes through a TPP riboswitch. What senses the TPP?",
+		"options": [
+			"A repressor protein that binds TPP and then binds the operator DNA",
+			"The ribosome, which stalls in a leader peptide when TPP runs short",
+			"A folded region in the 5′ leader of the mRNA, which binds TPP directly",
+			"A sigma factor that TPP releases from its membrane-bound anti-sigma factor"
+		],
+		"answer": 2,
+		"explain": "A riboswitch is a stretch of mRNA, usually in the 5′ untranslated leader, that binds a metabolite or an ion with no protein needed. Binding TPP changes how the leader folds, so it forms a transcription terminator or hides the ribosome-binding site, depending on the gene."
+	},
+	{
+		"id": "phys4-018",
+		"topic": "physiology",
+		"level": "intermediate",
+		"kind": "choice",
+		"question": "Staphylococcus aureus adds D-alanine esters to its teichoic acids, using the products of the dlt genes. What does this do?",
+		"options": [
+			"It anchors the teichoic acids to an outer membrane around the wall",
+			"It adds negative charge to the wall, so that it binds more Mg²⁺ and Ca²⁺",
+			"It supplies the D-alanine ends that transpeptidases use to cross-link peptidoglycan",
+			"It offsets negative charge, so cationic antimicrobial peptides bind less"
+		],
+		"answer": 3,
+		"explain": "In S. aureus, wall teichoic acids are chains of ribitol phosphate and lipoteichoic acids chains of glycerol phosphate, and both carry many negative charges. D-Alanine esters add positive amino groups that offset some of this charge, and dlt mutants bind cationic peptides such as defensins more strongly and are killed more readily."
+	},
+	{
+		"id": "phys4-019",
+		"topic": "physiology",
+		"level": "intermediate",
+		"kind": "choice",
+		"question": "A Gram-negative protein crosses the cytoplasmic membrane through Sec. Its C-terminal domain then folds into a β-barrel in the outer membrane, and its N-terminal domain passes through to the cell surface. Which secretion system is this?",
+		"options": [
+			"Type I secretion, by an ABC transporter",
+			"Type V secretion, by an autotransporter",
+			"Type III secretion, by an injectisome",
+			"Type VI secretion, by a contractile sheath"
+		],
+		"answer": 1,
+		"explain": "An autotransporter carries its own outer membrane translocator: after Sec export, its C-terminal β-barrel is inserted with help from the BAM complex, and the passenger domain reaches the surface. Type I, III and VI systems move their substrates straight from the cytoplasm without Sec."
+	},
+	{
+		"id": "phys4-020",
+		"topic": "physiology",
+		"level": "intermediate",
+		"kind": "truefalse",
+		"statement": "A bacterium that grows slowly in a refrigerator at 4 °C but fastest at 30 °C is psychrotolerant rather than psychrophilic.",
+		"answer": true,
+		"explain": "Psychrophiles grow best at 15 °C or below and have a maximum growth temperature of about 20 °C, while psychrotolerant organisms can grow at 0 °C but have optima of 20–40 °C. Psychrotolerant bacteria are common spoilers of refrigerated food."
+	},
+	{
+		"id": "phys4-021",
+		"topic": "physiology",
+		"level": "intermediate",
+		"kind": "truefalse",
+		"statement": "Peptidoglycan cross-links form outside the cytoplasmic membrane, powered by ATP that is hydrolysed there.",
+		"answer": false,
+		"explain": "The cell keeps its ATP in the cytoplasm, and the wall has no ATP supply to draw on. Transpeptidases take the energy for each cross-link from the peptide bond between the two terminal D-alanines of a donor stem: the enzyme breaks this bond, releasing the terminal D-alanine, and joins the stem to a neighbouring acceptor stem."
+	},
+	{
+		"id": "phys4-022",
+		"topic": "physiology",
+		"level": "intermediate",
+		"kind": "match",
+		"question": "Match each part of the Escherichia coli flagellar motor to its role.",
+		"pairs": [
+			{
+				"left": "MotA and MotB",
+				"right": "Stator units that conduct protons and push on the rotor"
+			},
+			{
+				"left": "FliG, FliM and FliN",
+				"right": "C ring, the rotor's switch, to which CheY-P binds"
+			},
+			{
+				"left": "FliF",
+				"right": "MS ring in the cytoplasmic membrane, the base of the rotor"
+			},
+			{
+				"left": "Hook",
+				"right": "Curved, flexible joint between the rod and the filament"
+			},
+			{
+				"left": "L and P rings",
+				"right": "Bushings in the outer membrane and peptidoglycan, around the turning rod"
+			}
+		],
+		"explain": "Protons flowing through the MotA–MotB stators drive the rotor by acting on FliG, and CheY-P binding to FliM and FliN favours clockwise rotation. Torque passes up the rod, which turns inside the L and P rings, and through the hook to the filament."
+	},
+	{
+		"id": "phys4-023",
+		"topic": "physiology",
+		"level": "intermediate",
+		"kind": "match",
+		"question": "Match each Escherichia coli protein to its role in cell division.",
+		"pairs": [
+			{
+				"left": "FtsA",
+				"right": "Actin-like protein that tethers FtsZ filaments to the membrane"
+			},
+			{
+				"left": "SlmA",
+				"right": "DNA-bound protein that stops Z rings forming over the nucleoid"
+			},
+			{
+				"left": "FtsI (PBP3)",
+				"right": "Transpeptidase that cross-links new peptidoglycan in the septum"
+			},
+			{
+				"left": "FtsK",
+				"right": "DNA translocase that pumps chromosomes clear of the closing septum"
+			},
+			{
+				"left": "XerC and XerD",
+				"right": "Recombinases that resolve chromosome dimers at the dif site"
+			}
+		],
+		"explain": "FtsZ and its membrane anchors FtsA and ZipA start the divisome, which then recruits later proteins such as FtsK and the septal wall synthases FtsW and FtsI. FtsK also activates XerC and XerD at dif, so that each daughter cell gets its own chromosome."
+	},
+	{
+		"id": "phys4-024",
+		"topic": "physiology",
+		"level": "intermediate",
+		"kind": "match",
+		"question": "Match each organism to the resting cell it forms.",
+		"pairs": [
+			{
+				"left": "Bacillus subtilis",
+				"right": "Endospore, made inside a mother cell and highly resistant to heat"
+			},
+			{
+				"left": "Azotobacter vinelandii",
+				"right": "Cyst, a thick-walled cell that resists drying but not strong heat"
+			},
+			{
+				"left": "Myxococcus xanthus",
+				"right": "Myxospore, formed by cells gathered in a fruiting body"
+			},
+			{
+				"left": "Anabaena",
+				"right": "Akinete, an enlarged thick-walled cell within a filament"
+			},
+			{
+				"left": "Streptomyces",
+				"right": "Chains of spores at the tips of aerial hyphae"
+			}
+		],
+		"explain": "Each resting cell forms when growth conditions worsen and germinates when they improve. Only endospores, made by Bacillus, Clostridium and their relatives, reach extreme heat resistance; the others mainly help cells survive drying or starvation."
+	},
+	{
+		"id": "phys4-025",
+		"topic": "physiology",
+		"level": "intermediate",
+		"kind": "case",
+		"scenario": "Escherichia coli growing in minimal medium is moved suddenly into the same medium with 0.5 M NaCl added. Water flows out, the cells shrink and growth stops. The cells then recover their volume, and growth resumes after a lag that is shorter if glycine betaine is in the medium.",
+		"parts": [
+			{
+				"question": "What does the cell take up first, within about a minute, to begin restoring its turgor?",
+				"options": [
+					"K⁺, balanced by glutamate that the cell makes",
+					"Na⁺, taken in from the added NaCl to match the outside",
+					"Glucose, taken in through the PTS as an osmolyte",
+					"Water, pumped in against the gradient by aquaporins"
+				],
+				"answer": 0,
+				"explain": "The first response to an osmotic upshift is fast K⁺ uptake, chiefly through the Trk transporters (and Kdp when K⁺ is scarce), with glutamate made as the counter-ion. E. coli keeps its cytoplasmic Na⁺ low, and aquaporins only let water move passively."
+			},
+			{
+				"question": "Why does glycine betaine in the medium speed recovery?",
+				"options": [
+					"It is oxidised to give the ATP needed for pumping NaCl back out",
+					"It binds Na⁺ outside the cell and so lowers the external osmolarity",
+					"It seals the porins so that water stays inside the shrunken cell",
+					"It is a compatible solute, safe for enzymes even at high levels"
+				],
+				"answer": 3,
+				"explain": "Glycine betaine taken up through ProP and ProU replaces much of the K⁺ glutamate, which disturbs proteins at high levels. Compatible solutes raise the internal osmolarity while leaving enzymes working."
+			},
+			{
+				"question": "The adapted cells are then put suddenly into distilled water. What lets them shed solutes within seconds and avoid bursting?",
+				"options": [
+					"Porins in the outer membrane close so that water cannot enter",
+					"MscS and MscL, channels that open as the membrane stretches",
+					"Teichoic acids in the wall soak up the incoming water",
+					"Aquaporins pump the incoming water back out of the cell"
+				],
+				"answer": 1,
+				"explain": "As water rushes in, the stretched membrane opens MscS and MscL, large and poorly selective channels that release small solutes and ions. Mutants lacking both channels lyse after a severe downshock."
+			}
+		],
+		"explain": "E. coli adjusts to an osmotic upshift in stages, first with K⁺ glutamate and then with compatible solutes, and survives a downshift by releasing solutes through mechanosensitive channels."
+	},
+	{
+		"id": "phys4-026",
+		"topic": "physiology",
+		"level": "intermediate",
+		"kind": "case",
+		"scenario": "A Pseudomonas aeruginosa mutant lacking one of its phosphodiesterases has several times the wild-type level of the second messenger cyclic di-GMP (c-di-GMP). It forms wrinkled colonies, sticks heavily to glass and spreads poorly through soft agar.",
+		"parts": [
+			{
+				"question": "Which enzymes make c-di-GMP from two molecules of GTP?",
+				"options": [
+					"Phosphodiesterases with an EAL domain",
+					"Adenylate cyclases such as CyaA, as for cAMP",
+					"Diguanylate cyclases with a GGDEF domain",
+					"RelA–SpoT homologues, as for (p)ppGpp"
+				],
+				"answer": 2,
+				"explain": "GGDEF-domain diguanylate cyclases make c-di-GMP, and phosphodiesterases with EAL or HD-GYP domains break it down. P. aeruginosa carries dozens of these enzymes, which respond to different signals."
+			},
+			{
+				"question": "Why does the mutant spread poorly through soft agar?",
+				"options": [
+					"High c-di-GMP turns flagellar motility down and matrix production up",
+					"High c-di-GMP collapses the proton motive force that drives the flagellar motor",
+					"Making c-di-GMP uses up the GTP needed for protein synthesis",
+					"c-di-GMP binds flagellin and dissolves the flagellar filament"
+				],
+				"answer": 0,
+				"explain": "c-di-GMP acts through effectors such as PilZ-domain proteins and transcription factors to reduce motility and raise production of adhesins and matrix polysaccharides. High levels favour a sessile, biofilm lifestyle."
+			},
+			{
+				"question": "What would you expect if a diguanylate cyclase were overproduced in wild-type cells?",
+				"options": [
+					"Less biofilm and faster swimming",
+					"No change, as c-di-GMP serves only as a DNA precursor",
+					"Lysis, as c-di-GMP breaks down peptidoglycan",
+					"More biofilm and slower swimming, as in the mutant"
+				],
+				"answer": 3,
+				"explain": "Making more c-di-GMP raises its level just as failing to break it down does. Low c-di-GMP, by contrast, favours motile single cells and dispersal from biofilms."
+			}
+		],
+		"explain": "c-di-GMP sets the choice between motile and biofilm lifestyles: diguanylate cyclases raise it and favour attachment and matrix, while phosphodiesterases lower it and favour motility."
+	},
+	{
+		"id": "phys4-027",
+		"topic": "physiology",
+		"level": "intermediate",
+		"kind": "case",
+		"scenario": "A chemostat has a 2-litre culture vessel fed with medium holding 2 g of glucose per litre, the only limiting nutrient. The bacterium's maximum specific growth rate on glucose is 0.9 per hour. With fresh medium flowing in at 0.6 litre per hour, the culture is at steady state.",
+		"parts": [
+			{
+				"question": "The glucose in the incoming medium is raised to 4 g per litre, with the flow unchanged. What is seen at the new steady state?",
+				"options": [
+					"The growth rate doubles, while the cell density stays the same as before",
+					"The cell density about doubles, and the growth rate stays at 0.3 per hour",
+					"Both the growth rate and the cell density double, as more food arrives",
+					"The cells wash out, as they cannot keep pace with the richer feed"
+				],
+				"answer": 1,
+				"explain": "At steady state the growth rate equals the dilution rate, 0.6 ÷ 2 = 0.3 per hour, whatever the feed. The cell density is set by the concentration of the limiting nutrient in the feed, so doubling the glucose roughly doubles the cells."
+			},
+			{
+				"question": "The flow is then raised to 2.0 litres per hour. What happens?",
+				"options": [
+					"The growth rate rises to 1.0 per hour to keep pace with the new flow",
+					"The cell density rises, as more glucose arrives each hour",
+					"Nothing changes, as the glucose supply sets the growth rate",
+					"The cells wash out, as dilution now outpaces their fastest growth"
+				],
+				"answer": 3,
+				"explain": "The dilution rate becomes 2.0 ÷ 2 = 1.0 per hour, above the maximum growth rate of 0.9 per hour. Cells are removed faster than they can divide, so their density falls towards zero."
+			},
+			{
+				"question": "Starting again from the original steady state (2 g of glucose per litre, 0.6 litre per hour), the flow is raised to 1.0 litre per hour, a dilution rate of 0.5 per hour and still below washout. How does the glucose left in the vessel change at the new steady state?",
+				"options": [
+					"It rises, as faster growth needs a higher glucose level",
+					"It falls to zero, as the faster-growing cells use it up",
+					"It stays the same, as the feed concentration is unchanged",
+					"It rises to match the feed, at 2 g per litre"
+				],
+				"answer": 0,
+				"explain": "The growth rate must rise from 0.3 to 0.5 per hour to match the new dilution rate, and by the Monod relation faster growth needs a higher concentration of the limiting nutrient. So more glucose is left unused in the vessel at the faster flow."
+			}
+		],
+		"explain": "In a chemostat the dilution rate sets the growth rate, the concentration of the limiting nutrient in the feed sets the cell density, and a dilution rate above the maximum growth rate washes the culture out."
+	},
+	{
+		"id": "phys4-028",
+		"topic": "physiology",
+		"level": "hard",
+		"kind": "choice",
+		"question": "When Escherichia coli is shifted from 30 °C to 42 °C, the activity of σ32 (RpoH) rises within minutes. Which mechanism contributes to this rise?",
+		"options": [
+			"Unfolded proteins tie up DnaK and DnaJ, which otherwise target σ32 to FtsH",
+			"Heat activates a membrane histidine kinase that then phosphorylates σ32",
+			"Heat sets off cleavage of LexA, the repressor that keeps rpoH switched off",
+			"Heat releases σ32 from an anti-sigma factor that holds it in the outer membrane"
+		],
+		"answer": 0,
+		"explain": "DnaK and DnaJ bind σ32 and help the FtsH protease destroy it, so σ32 is short-lived at a steady temperature. After a shift up, unfolded proteins tie up these chaperones and σ32 escapes, while the rpoH mRNA also melts open and is translated more; as chaperone levels rise, σ32 activity falls back."
+	},
+	{
+		"id": "phys4-029",
+		"topic": "physiology",
+		"level": "hard",
+		"kind": "choice",
+		"question": "Unfolded outer membrane proteins build up in the periplasm of Escherichia coli. How does this free σE (RpoE) to switch on its regulon?",
+		"options": [
+			"A membrane histidine kinase senses them and phosphorylates σE, which then binds RNA polymerase",
+			"The unfolded proteins are pulled back into the cytoplasm, where they bind σE and activate it",
+			"σE is released from the inner membrane once the unfolded proteins jam the Sec translocon there",
+			"Their C-terminal ends activate DegS, which begins destroying RseA, the anti-sigma factor of σE"
+		],
+		"answer": 3,
+		"explain": "RseA spans the inner membrane and holds σE at its cytoplasmic face. DegS, activated by the C-terminal peptides of unfolded outer membrane proteins, cuts RseA on the periplasmic side, then RseP cuts it within the membrane and ClpXP degrades the rest, freeing σE to transcribe genes for folding and building the outer membrane."
+	},
+	{
+		"id": "phys4-030",
+		"topic": "physiology",
+		"level": "hard",
+		"kind": "choice",
+		"question": "In Escherichia coli, how is a protein of the inner (cytoplasmic) membrane with several hydrophobic transmembrane segments usually brought to the SecYEG translocon?",
+		"options": [
+			"SecB holds the finished chain unfolded until SecA pushes it across the membrane",
+			"It folds fully in the cytoplasm and is then carried across by the Tat pathway",
+			"The signal recognition particle catches it as it emerges from the ribosome",
+			"The BAM complex takes it from the ribosome and threads it into the membrane"
+		],
+		"answer": 2,
+		"explain": "The signal recognition particle, made of the protein Ffh and 4.5S RNA, binds strongly hydrophobic segments as they emerge from the ribosome and delivers the ribosome to its receptor FtsY at SecYEG, often with help from YidC. SecB and SecA mainly handle periplasmic and outer membrane proteins, largely after translation, and BAM inserts β-barrel proteins into the outer membrane."
+	},
+	{
+		"id": "phys4-031",
+		"topic": "physiology",
+		"level": "hard",
+		"kind": "choice",
+		"question": "Membranes of many thermoacidophilic archaea are rich in glycerol dibiphytanyl glycerol tetraethers (GDGTs). How do these lipids suit life in hot acid?",
+		"options": [
+			"Their ester bonds resist acid hydrolysis better than ether bonds do",
+			"Each spans the membrane, making a heat-stable monolayer that leaks few protons",
+			"Their many unsaturated fatty acids keep the membrane fluid and sealed in the heat",
+			"They form two stacked bilayers that trap an insulating layer of water between them"
+		],
+		"answer": 1,
+		"explain": "A tetraether joins two glycerols through two C40 isoprenoid chains, so each molecule spans the membrane and its two halves cannot peel apart at high temperature. These monolayers are also very poorly permeable to protons, which helps cells in acid keep their cytoplasm far less acidic than the medium, and their ether bonds resist hydrolysis."
+	},
+	{
+		"id": "phys4-032",
+		"topic": "physiology",
+		"level": "hard",
+		"kind": "choice",
+		"question": "In Escherichia coli, AraC activates the araBAD operon when arabinose is present. How does AraC keep the operon off when arabinose is absent?",
+		"options": [
+			"It binds araO₂ and araI₁, far apart, and loops the DNA to block the promoter",
+			"It binds an operator between the promoter and araB, as the lac repressor does at lac",
+			"It is degraded without arabinose, so the operon simply lacks its activator",
+			"It phosphorylates σ70 so that RNA polymerase passes over the ara promoter"
+		],
+		"answer": 0,
+		"explain": "Without arabinose, an AraC dimer binds araO₂ and araI₁, about 210 base pairs apart, and bends the DNA into a loop that blocks transcription. Arabinose shifts AraC onto the neighbouring araI₁ and araI₂ sites, where, with cAMP-CRP, it helps RNA polymerase start at the promoter."
+	},
+	{
+		"id": "phys4-033",
+		"topic": "physiology",
+		"level": "hard",
+		"kind": "truefalse",
+		"statement": "Sulfolobus acidocaldarius divides without FtsZ, using a ring of proteins related to the eukaryotic ESCRT-III machinery.",
+		"answer": true,
+		"explain": "Sulfolobus and related crenarchaea lack FtsZ and instead assemble CdvA and ESCRT-III homologues (the CdvB proteins) at midcell, which the Vps4-like ATPase CdvC helps remodel as the cell splits. Many euryarchaea, by contrast, divide with FtsZ, as bacteria do."
+	},
+	{
+		"id": "phys4-034",
+		"topic": "physiology",
+		"level": "hard",
+		"kind": "truefalse",
+		"statement": "In pseudomurein, the wall polymer of some methanogens, the sugars of the glycan strands are joined by β-1,3 bonds, and the peptides contain only L-amino acids.",
+		"answer": true,
+		"explain": "Bacterial peptidoglycan joins N-acetylglucosamine and N-acetylmuramic acid by β-1,4 bonds and includes D-amino acids such as D-glutamate and D-alanine. Pseudomurein instead pairs N-acetylglucosamine or N-acetylgalactosamine with N-acetyltalosaminuronic acid through β-1,3 bonds, and its peptides use L-amino acids only."
+	},
+	{
+		"id": "phys4-035",
+		"topic": "physiology",
+		"level": "hard",
+		"kind": "truefalse",
+		"statement": "Escherichia coli finds the direction of a chemical gradient by comparing how many of its receptors are occupied at its front and rear ends at the same moment.",
+		"answer": false,
+		"explain": "A cell about 2 µm long is too short to detect a reliable difference in concentration along its body. E. coli instead compares the present concentration with that of the last few seconds, a memory kept by receptor methylation, and suppresses tumbles while conditions improve."
+	},
+	{
+		"id": "phys4-036",
+		"topic": "physiology",
+		"level": "hard",
+		"kind": "match",
+		"question": "Match each antibiotic to the step of peptidoglycan synthesis it blocks.",
+		"pairs": [
+			{
+				"left": "Fosfomycin",
+				"right": "MurA, the first committed step, which adds enolpyruvate to UDP-N-acetylglucosamine"
+			},
+			{
+				"left": "D-Cycloserine",
+				"right": "Alanine racemase and D-alanine–D-alanine ligase, which make the D-Ala–D-Ala dipeptide"
+			},
+			{
+				"left": "Bacitracin",
+				"right": "Recycling of the lipid carrier, by binding undecaprenyl pyrophosphate"
+			},
+			{
+				"left": "Vancomycin",
+				"right": "Use of lipid II for wall growth, by binding the D-Ala–D-Ala end of its stem peptide"
+			},
+			{
+				"left": "Penicillin",
+				"right": "Cross-linking of stems by transpeptidases, the penicillin-binding proteins"
+			}
+		],
+		"explain": "MurA and the enzymes that make D-Ala–D-Ala act in the cytoplasm; lipid II, built on the undecaprenyl carrier, is then flipped across the membrane, and the carrier must be recycled after each use. Vancomycin binds the substrate rather than an enzyme, while penicillin mimics D-Ala–D-Ala and acylates the transpeptidase active site."
+	},
+	{
+		"id": "phys4-037",
+		"topic": "physiology",
+		"level": "hard",
+		"kind": "match",
+		"question": "Match each Escherichia coli two-component system to the condition it responds to.",
+		"pairs": [
+			{
+				"left": "EnvZ–OmpR",
+				"right": "Osmolarity of the medium, shifting the balance of the porins OmpF and OmpC"
+			},
+			{
+				"left": "PhoR–PhoB",
+				"right": "Shortage of inorganic phosphate"
+			},
+			{
+				"left": "NarX–NarL",
+				"right": "Nitrate, for switching to nitrate respiration"
+			},
+			{
+				"left": "KdpD–KdpE",
+				"right": "Shortage of K⁺ for keeping turgor"
+			},
+			{
+				"left": "CpxA–CpxR",
+				"right": "Misfolded proteins in the cell envelope"
+			}
+		],
+		"explain": "Each sensor kinase detects its own signal and phosphorylates its partner response regulator, which then controls the matching genes. At high osmolarity, for example, more OmpR-P favours the smaller-pored porin OmpC over OmpF."
+	},
+	{
+		"id": "phys4-038",
+		"topic": "physiology",
+		"level": "hard",
+		"kind": "match",
+		"question": "Match each Escherichia coli regulator to the signal it senses.",
+		"pairs": [
+			{
+				"left": "OxyR",
+				"right": "Hydrogen peroxide, which forms a disulfide bond in the protein"
+			},
+			{
+				"left": "SoxR",
+				"right": "Redox-cycling compounds such as paraquat, which oxidise its [2Fe-2S] clusters"
+			},
+			{
+				"left": "FNR",
+				"right": "Oxygen, which breaks down its [4Fe-4S] cluster"
+			},
+			{
+				"left": "ArcB–ArcA",
+				"right": "The redox state of the quinone pool"
+			}
+		],
+		"explain": "OxyR switches on catalase and peroxidase genes, and SoxR turns on soxS, whose product raises superoxide dismutase and other defences. FNR and ArcA act when oxygen is scarce, turning on anaerobic pathways and turning down aerobic ones."
+	},
+	{
+		"id": "phys4-039",
+		"topic": "physiology",
+		"level": "hard",
+		"kind": "case",
+		"scenario": "Escherichia coli secretes the siderophore enterobactin when iron is scarce. It can also use ferrichrome, a siderophore made by fungi, which it takes up but does not make. A researcher tests mutants on iron-poor medium given either ferric enterobactin or ferrichrome.",
+		"parts": [
+			{
+				"question": "A fepA mutant grows with ferrichrome but not with ferric enterobactin. What does fepA most likely encode?",
+				"options": [
+					"An enzyme in the pathway that makes enterobactin",
+					"The TonB protein that energises iron uptake at the outer membrane",
+					"The outer membrane receptor for ferric enterobactin",
+					"A cytoplasmic protein that stores iron until it is needed"
+				],
+				"answer": 2,
+				"explain": "A synthesis mutant would grow once ferric enterobactin is supplied, so the block lies in uptake of that complex alone. FepA is the outer membrane receptor for ferric enterobactin, while ferrichrome enters through a different receptor, FhuA."
+			},
+			{
+				"question": "A tonB mutant grows with neither siderophore. What does this show?",
+				"options": [
+					"TonB is the periplasmic binding protein for both iron complexes",
+					"Both receptors draw energy from the same TonB complex",
+					"TonB is the enzyme that makes both siderophores",
+					"TonB is a porin through which both complexes diffuse"
+				],
+				"answer": 1,
+				"explain": "FepA and FhuA are TonB-dependent receptors: the TonB–ExbB–ExbD complex in the cytoplasmic membrane passes energy to them, as the outer membrane has no ATP or ion gradient of its own. Loss of TonB therefore blocks both routes."
+			},
+			{
+				"question": "A fur mutant makes enterobactin even in iron-rich medium. What does Fur normally do?",
+				"options": [
+					"It activates the enterobactin genes when iron is scarce",
+					"It pumps newly made enterobactin out of the cell",
+					"It imports ferric enterobactin into the cytoplasm",
+					"With Fe²⁺ bound, it represses the iron uptake genes"
+				],
+				"answer": 3,
+				"explain": "Fur bound to Fe²⁺ binds sites called Fur boxes at the promoters of iron uptake genes and represses them. When iron runs short, Fur loses its Fe²⁺ and lets go, so a fur mutant expresses these genes whatever the iron level."
+			}
+		],
+		"explain": "In E. coli, ferric siderophores enter through outer membrane receptors specific to each kind, powered through the shared TonB system, and Fur holds the uptake genes off when iron is plentiful."
+	},
+	{
+		"id": "phys4-040",
+		"topic": "physiology",
+		"level": "hard",
+		"kind": "case",
+		"scenario": "In Escherichia coli, the sigma factor σS (RpoS) is scarce during fast growth and builds up as cells enter stationary phase or meet stresses such as high osmolarity. A researcher measures RpoS protein in mutants during exponential growth and on entry into stationary phase.",
+		"parts": [
+			{
+				"question": "In an rssB mutant, RpoS is plentiful even during exponential growth, and its half-life is long. What does RssB normally do?",
+				"options": [
+					"It is an adaptor that delivers RpoS to the ClpXP protease",
+					"It is a repressor that blocks transcription of the rpoS gene",
+					"It is a small RNA that blocks rpoS translation",
+					"It is a kinase that phosphorylates RpoS to switch it off"
+				],
+				"answer": 0,
+				"explain": "During exponential growth RssB binds RpoS and hands it to ClpXP, giving RpoS a half-life of only a minute or two. Under several stresses, anti-adaptor proteins bind RssB and block it, so RpoS is stabilised and builds up."
+			},
+			{
+				"question": "An hfq mutant makes little RpoS on entry into stationary phase, though its rpoS mRNA is present. Why?",
+				"options": [
+					"Hfq is the activator protein that switches on transcription from the rpoS promoter",
+					"Hfq binds the RpoS protein and shields it from attack by the ClpXP protease",
+					"Hfq lets small RNAs pair with the rpoS leader and open its ribosome-binding site",
+					"Hfq is the kinase that adds the phosphate converting RpoS into its active form"
+				],
+				"answer": 2,
+				"explain": "The rpoS mRNA folds so that its own leader hides the ribosome-binding site. With Hfq as chaperone, small RNAs such as DsrA, RprA and ArcZ, made under particular stresses, pair with this leader, open the site and so raise RpoS translation."
+			},
+			{
+				"question": "What phenotype is expected of an rpoS null mutant?",
+				"options": [
+					"It cannot grow exponentially, even in rich medium",
+					"It withstands starvation and stress less well",
+					"It can no longer build flagella, so it cannot swim",
+					"It loses the SOS response that follows DNA damage"
+				],
+				"answer": 1,
+				"explain": "RpoS directs RNA polymerase to many genes for stationary-phase survival, such as katE for the catalase HPII and otsBA for trehalose synthesis. rpoS mutants grow normally but lose much of their resistance to starvation and stress."
+			}
+		],
+		"explain": "Much of RpoS control acts after transcription: small RNAs with Hfq raise its translation, and RssB-directed proteolysis by ClpXP keeps the protein scarce until stress or starvation stabilises it."
+	}
+]

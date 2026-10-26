@@ -1,0 +1,846 @@
+[
+	{
+		"id": "meta4-001",
+		"topic": "metabolism",
+		"level": "easy",
+		"kind": "choice",
+		"question": "Which pair of enzymes does the glyoxylate shunt add to the TCA cycle?",
+		"options": [
+			"Citrate synthase and aconitase",
+			"Isocitrate dehydrogenase and 2-oxoglutarate dehydrogenase",
+			"Isocitrate lyase and malate synthase",
+			"Succinate dehydrogenase and fumarase"
+		],
+		"answer": 2,
+		"explain": "Isocitrate lyase splits isocitrate into succinate and glyoxylate, and malate synthase then joins glyoxylate to acetyl-CoA to give malate. The shunt skips the two decarboxylation steps of the TCA cycle, so growth on acetate yields a net gain of four-carbon compounds."
+	},
+	{
+		"id": "meta4-002",
+		"topic": "metabolism",
+		"level": "easy",
+		"kind": "choice",
+		"question": "In the Calvin cycle, RubisCO adds CO2 to which acceptor?",
+		"options": [
+			"Ribulose 1,5-bisphosphate",
+			"Ribose 5-phosphate",
+			"Phosphoenolpyruvate",
+			"Acetyl-CoA"
+		],
+		"answer": 0,
+		"explain": "RubisCO carboxylates ribulose 1,5-bisphosphate, and the six-carbon product splits at once into two molecules of 3-phosphoglycerate. Phosphoribulokinase spends ATP to regenerate the acceptor from ribulose 5-phosphate. Because the cycle reduces 3-phosphoglycerate and rebuilds a pentose phosphate, it is also called the reductive pentose phosphate cycle."
+	},
+	{
+		"id": "meta4-003",
+		"topic": "metabolism",
+		"level": "easy",
+		"kind": "choice",
+		"question": "Which metals sit in the cofactor at the active site of the most widespread nitrogenase?",
+		"options": [
+			"Copper and zinc",
+			"Iron and molybdenum",
+			"Nickel and iron",
+			"Manganese and calcium"
+		],
+		"answer": 1,
+		"explain": "The dinitrogenase (MoFe) protein holds the iron–molybdenum cofactor where N2 is reduced, while the smaller iron protein delivers electrons at the cost of ATP. Alternative nitrogenases put vanadium or a further iron in place of the molybdenum, and the enzyme reduces protons to H2 alongside N2."
+	},
+	{
+		"id": "meta4-004",
+		"topic": "metabolism",
+		"level": "easy",
+		"kind": "truefalse",
+		"statement": "In anaerobic respiration, electrons travel along a membrane chain to an acceptor other than O2, such as nitrate or fumarate, and the proton motive force built in the process drives ATP synthesis.",
+		"answer": true,
+		"explain": "Anaerobic respiration differs from aerobic respiration in its terminal acceptor rather than in its mechanism: the chain still translocates ions and ATP synthase still makes the ATP. Fermentation, by contrast, relies mainly on substrate-level phosphorylation."
+	},
+	{
+		"id": "meta4-005",
+		"topic": "metabolism",
+		"level": "easy",
+		"kind": "truefalse",
+		"statement": "Substrate-level phosphorylation draws its energy from the proton motive force, so it stops once the cytoplasmic membrane is disrupted.",
+		"answer": false,
+		"explain": "In substrate-level phosphorylation the phosphoryl group comes from an energy-rich intermediate such as acetyl phosphate or phosphoenolpyruvate, and soluble enzymes do the work. Cell-free extracts with broken membranes still carry out these steps, whereas oxidative phosphorylation needs a sealed membrane."
+	},
+	{
+		"id": "meta4-006",
+		"topic": "metabolism",
+		"level": "easy",
+		"kind": "match",
+		"question": "Match each storage compound with what the cell keeps in it.",
+		"pairs": [
+			{
+				"left": "Glycogen",
+				"right": "A branched glucan held as a carbon and energy reserve"
+			},
+			{
+				"left": "Poly-β-hydroxybutyrate",
+				"right": "A polyester of hydroxybutyrate units stored in lipid granules"
+			},
+			{
+				"left": "Polyphosphate",
+				"right": "Granules of linked phosphate groups, a phosphate and energy reserve"
+			},
+			{
+				"left": "Cyanophycin",
+				"right": "A polymer of aspartate and arginine, a nitrogen reserve best known from cyanobacteria"
+			},
+			{
+				"left": "Sulfur globules",
+				"right": "Elemental sulfur kept by sulfide oxidisers for later oxidation"
+			}
+		],
+		"explain": "A reserve lets the cell take up a nutrient while it is plentiful and draw on it later. Glycogen and poly-β-hydroxybutyrate hold carbon and energy, polyphosphate holds phosphate, cyanophycin holds nitrogen, and sulfur globules hold an electron donor."
+	},
+	{
+		"id": "meta4-007",
+		"topic": "metabolism",
+		"level": "easy",
+		"kind": "match",
+		"question": "Match each inorganic electron donor with the oxidised product a chemolithotroph forms from it.",
+		"pairs": [
+			{
+				"left": "Hydrogen (H2)",
+				"right": "Protons, with the electrons handed to the respiratory chain"
+			},
+			{
+				"left": "Hydrogen sulfide",
+				"right": "Sulfate, often by way of elemental sulfur"
+			},
+			{
+				"left": "Ferrous iron, Fe(II)",
+				"right": "Ferric iron, which settles out as rust-coloured oxides at near-neutral pH"
+			},
+			{
+				"left": "Carbon monoxide",
+				"right": "CO2, released after oxidation by CO dehydrogenase"
+			}
+		],
+		"explain": "A chemolithotroph takes electrons from an inorganic donor and feeds them into an electron transport chain, leaving the donor in a more oxidised form. The products differ in solubility: protons and sulfate stay in solution, whereas ferric iron precipitates as oxides and hydroxides unless the water is strongly acidic."
+	},
+	{
+		"id": "meta4-008",
+		"topic": "metabolism",
+		"level": "easy",
+		"kind": "case",
+		"scenario": "Zymomonas mobilis ferments glucose anaerobically to ethanol and CO2, and is used in some fuel-ethanol processes. Its genome holds no phosphofructokinase gene, and it runs the Entner–Doudoroff pathway instead.",
+		"parts": [
+			{
+				"question": "Which products does it form from each glucose?",
+				"options": [
+					"Two lactate",
+					"Two ethanol and two CO2",
+					"One ethanol, one lactate and one CO2",
+					"Two acetate and two formate"
+				],
+				"answer": 1,
+				"explain": "Each glucose gives two pyruvate, and each pyruvate loses CO2 to give acetaldehyde, which is reduced to ethanol, so the products are two ethanol and two CO2. The reduced cofactors made in the pathway are reoxidised by alcohol dehydrogenase, which balances the fermentation."
+			},
+			{
+				"question": "Which pair of enzymes takes pyruvate to ethanol in this fermentation?",
+				"options": [
+					"Pyruvate formate-lyase, then alcohol dehydrogenase",
+					"Lactate dehydrogenase, then alcohol dehydrogenase",
+					"Pyruvate dehydrogenase, then acetate kinase",
+					"Pyruvate decarboxylase, then alcohol dehydrogenase"
+				],
+				"answer": 3,
+				"explain": "Pyruvate decarboxylase removes CO2 to give acetaldehyde, which alcohol dehydrogenase reduces to ethanol. E. coli reaches ethanol by another route, splitting pyruvate with pyruvate formate-lyase and reducing the acetyl-CoA with a bifunctional aldehyde–alcohol dehydrogenase."
+			},
+			{
+				"question": "Which cofactor does the decarboxylating step need?",
+				"options": [
+					"Thiamine diphosphate",
+					"Pyridoxal phosphate",
+					"Biotin",
+					"Tetrahydrofolate"
+				],
+				"answer": 0,
+				"explain": "Pyruvate decarboxylase is a thiamine diphosphate enzyme: the thiazolium ring attacks the keto group and stabilises the carbanion left behind as CO2 leaves. Pyridoxal phosphate serves transaminations, biotin carboxylations and tetrahydrofolate one-carbon transfers."
+			}
+		],
+		"explain": "Zymomonas mobilis couples the Entner–Doudoroff pathway to a short route from pyruvate to ethanol. Pyruvate decarboxylase, a thiamine diphosphate enzyme, releases the CO2, and alcohol dehydrogenase reoxidises the reduced cofactors."
+	},
+	{
+		"id": "meta4-009",
+		"topic": "metabolism",
+		"level": "easy",
+		"kind": "truefalse",
+		"statement": "Purple sulfur bacteria release O2 as they oxidise sulfide in the light.",
+		"answer": false,
+		"explain": "Their photosynthesis is anoxygenic: electrons come from donors such as sulfide, elemental sulfur or H2, and sulfide is oxidised to sulfur or sulfate. Water is not split, so no O2 appears, and the cells grow in illuminated anoxic water layers."
+	},
+	{
+		"id": "meta4-010",
+		"topic": "metabolism",
+		"level": "easy",
+		"kind": "choice",
+		"question": "Which step of the TCA cycle makes a nucleoside triphosphate directly by substrate-level phosphorylation?",
+		"options": [
+			"Citrate synthase",
+			"Isocitrate dehydrogenase",
+			"Malate dehydrogenase",
+			"Succinyl-CoA synthetase"
+		],
+		"answer": 3,
+		"explain": "The thioester bond of succinyl-CoA holds enough energy for succinyl-CoA synthetase to phosphorylate a nucleoside diphosphate, giving GTP in some organisms and ATP in others. The dehydrogenase steps conserve energy as NAD(P)H or as reduced quinone instead, and citrate synthase spends the thioester energy of acetyl-CoA on forming citrate."
+	},
+	{
+		"id": "meta4-011",
+		"topic": "metabolism",
+		"level": "easy",
+		"kind": "choice",
+		"question": "Which substrate supports methylotrophic methanogenesis?",
+		"options": [
+			"Formate",
+			"Acetate",
+			"Glucose",
+			"Methanol"
+		],
+		"answer": 3,
+		"explain": "Methanol, methylamines and methyl sulfides are typical methylotrophic substrates: methyltransferases move the methyl group, by way of a corrinoid protein, onto coenzyme M, from which it is reduced to methane. Formate feeds the CO2-reducing route and acetate the acetoclastic route, while sugars lie outside the narrow substrate range of methanogens."
+	},
+	{
+		"id": "meta4-012",
+		"topic": "metabolism",
+		"level": "easy",
+		"kind": "match",
+		"question": "Match each terminal electron acceptor of anaerobic respiration with the product formed from it.",
+		"pairs": [
+			{
+				"left": "Fumarate",
+				"right": "Succinate"
+			},
+			{
+				"left": "Sulfate",
+				"right": "Hydrogen sulfide"
+			},
+			{
+				"left": "Ferric iron, Fe(III)",
+				"right": "Ferrous iron, Fe(II)"
+			},
+			{
+				"left": "Trimethylamine N-oxide (TMAO)",
+				"right": "Trimethylamine"
+			},
+			{
+				"left": "Dimethyl sulfoxide (DMSO)",
+				"right": "Dimethyl sulfide"
+			}
+		],
+		"explain": "Each acceptor takes electrons from the chain and is released in a more reduced form. The couples sit at different potentials, so the energy conserved per electron differs: fumarate, TMAO and DMSO lie close to the quinone pool, whereas the sulfate/sulfide couple lies lower, at about −0.22 V."
+	},
+	{
+		"id": "meta4-013",
+		"topic": "metabolism",
+		"level": "easy",
+		"kind": "case",
+		"scenario": "A bacterium is grown in the dark in a mineral salts medium under a gas mixture of H2, CO2 and a little O2, with no organic compound added. The culture grows well, and the cells make a hydrogenase and RubisCO.",
+		"parts": [
+			{
+				"question": "Where does the energy for growth come from?",
+				"options": [
+					"Fermentation of the CO2 in the headspace",
+					"Light absorbed by bacteriochlorophyll",
+					"Electrons passing from H2 to O2 along a respiratory chain",
+					"Hydrolysis of the mineral salts in the medium"
+				],
+				"answer": 2,
+				"explain": "H2 is the electron donor and O2 the acceptor, and the chain between them builds a proton motive force for ATP synthase. Bacteria that live this way are known as knallgas bacteria."
+			},
+			{
+				"question": "What does the hydrogenase do?",
+				"options": [
+					"Splits H2 into protons and electrons that enter the chain",
+					"Adds H2 to CO2 to give methane",
+					"Reduces N2 to ammonia",
+					"Breaks hydrogen peroxide down to water and O2"
+				],
+				"answer": 0,
+				"explain": "The hydrogenases of these bacteria, usually nickel–iron enzymes, oxidise H2 and pass the electrons to quinone or, in some species, directly to NAD+. The 2 H+/H2 couple lies at −0.42 V, below NAD+/NADH, so NADH can be made without uphill electron flow."
+			},
+			{
+				"question": "What nutritional type is this?",
+				"options": [
+					"Photoheterotroph",
+					"Chemoorganoheterotroph",
+					"Photolithoautotroph",
+					"Chemolithoautotroph"
+				],
+				"answer": 3,
+				"explain": "Energy comes from oxidising an inorganic donor, which is chemolithotrophy, and carbon from CO2 through RubisCO and the Calvin cycle, which is autotrophy."
+			}
+		],
+		"explain": "Growth on H2, CO2 and O2 marks a chemolithoautotroph: hydrogenase feeds electrons from H2 into a respiratory chain, and the Calvin cycle supplies the carbon."
+	},
+	{
+		"id": "meta4-014",
+		"topic": "metabolism",
+		"level": "intermediate",
+		"kind": "choice",
+		"question": "In heterolactic fermentation of glucose by Leuconostoc, which uses the phosphoketolase pathway, what does one glucose yield?",
+		"options": [
+			"Two lactate, with a net 2 ATP",
+			"One lactate, one ethanol and one CO2, with a net 1 ATP",
+			"Two ethanol and two CO2, with a net 2 ATP",
+			"One lactate and one acetate, with a net 3 ATP"
+		],
+		"answer": 1,
+		"explain": "Phosphoketolase splits xylulose 5-phosphate into acetyl phosphate and glyceraldehyde 3-phosphate. The triose arm gives lactate and 2 ATP, one of which repays the phosphorylation of glucose, while the acetyl phosphate is reduced by way of acetyl-CoA and acetaldehyde to ethanol, reoxidising the NAD(P)H from the two oxidative steps. The CO2 comes from the decarboxylation of 6-phosphogluconate."
+	},
+	{
+		"id": "meta4-015",
+		"topic": "metabolism",
+		"level": "intermediate",
+		"kind": "choice",
+		"question": "Which enzymes rearrange sugar phosphates in the non-oxidative branch of the pentose phosphate pathway?",
+		"options": [
+			"Transketolase and transaldolase",
+			"Phosphoketolase and acetate kinase",
+			"Fructose-bisphosphate aldolase and triose phosphate isomerase",
+			"Glucose-6-phosphate dehydrogenase and 6-phosphogluconate dehydrogenase"
+		],
+		"answer": 0,
+		"explain": "Transketolase moves two-carbon units and transaldolase three-carbon units, interconverting triose, tetrose, pentose, hexose and heptose phosphates. The two dehydrogenases belong to the oxidative branch, which makes NADPH and releases CO2."
+	},
+	{
+		"id": "meta4-016",
+		"topic": "metabolism",
+		"level": "intermediate",
+		"kind": "truefalse",
+		"statement": "Some anaerobes lack 2-oxoglutarate dehydrogenase and run the citric acid cycle as two branches: an oxidative branch to 2-oxoglutarate and a reductive branch to succinyl-CoA, supplying precursors rather than completing a cycle.",
+		"answer": true,
+		"explain": "This branched, horseshoe arrangement yields 2-oxoglutarate for glutamate and succinyl-CoA for biosynthesis, for example of lysine and methionine, without the oxidative step that the missing enzyme would catalyse. The reductive branch runs from oxaloacetate through malate, fumarate and succinate."
+	},
+	{
+		"id": "meta4-017",
+		"topic": "metabolism",
+		"level": "intermediate",
+		"kind": "choice",
+		"question": "In denitrification, which enzyme forms the nitrogen–nitrogen bond?",
+		"options": [
+			"Nitrate reductase",
+			"Nitrite reductase",
+			"Nitric oxide reductase",
+			"Nitrous oxide reductase"
+		],
+		"answer": 2,
+		"explain": "Nitric oxide reductase joins two molecules of NO into N2O, the step at which the N–N bond appears. Nitrous oxide reductase then reduces N2O to N2, so a strain without it releases N2O, a potent greenhouse gas."
+	},
+	{
+		"id": "meta4-018",
+		"topic": "metabolism",
+		"level": "intermediate",
+		"kind": "truefalse",
+		"statement": "Sulfate has to be activated with ATP to adenosine 5′-phosphosulfate before it can be reduced, so a sulfate reducer spends energy on sulfate before it gains any.",
+		"answer": true,
+		"explain": "ATP sulfurylase makes APS and pyrophosphate, and hydrolysis of the pyrophosphate puts the cost at about two ATP equivalents per sulfate in most sulfate reducers. APS reductase then gives sulfite, which dissimilatory sulfite reductase takes to sulfide."
+	},
+	{
+		"id": "meta4-019",
+		"topic": "metabolism",
+		"level": "intermediate",
+		"kind": "match",
+		"question": "Match each electron carrier with the description that fits it.",
+		"pairs": [
+			{
+				"left": "NAD+/NADH",
+				"right": "Hydride carrier that takes electrons from catabolic oxidations to the respiratory chain, at about −0.32 V"
+			},
+			{
+				"left": "NADP+/NADPH",
+				"right": "Supplies reducing power for biosynthesis rather than for respiration"
+			},
+			{
+				"left": "Ferredoxin",
+				"right": "Iron–sulfur protein that transfers single electrons at a low potential"
+			},
+			{
+				"left": "Quinone",
+				"right": "Lipid-soluble carrier that moves two electrons and two protons within the membrane"
+			},
+			{
+				"left": "Cytochrome c",
+				"right": "Haem protein that carries one electron, often on the periplasmic side"
+			}
+		],
+		"explain": "Catabolism and biosynthesis draw on separate pyridine nucleotide pools, and ferredoxin serves reactions that need a potential below that of NADH. The quinone pool links membrane dehydrogenases to terminal oxidases and reductases, with haem and iron–sulfur carriers passing single electrons between complexes."
+	},
+	{
+		"id": "meta4-020",
+		"topic": "metabolism",
+		"level": "intermediate",
+		"kind": "match",
+		"question": "Match each amino acid with the central metabolite its carbon skeleton comes from.",
+		"pairs": [
+			{
+				"left": "Glutamate",
+				"right": "2-Oxoglutarate"
+			},
+			{
+				"left": "Aspartate",
+				"right": "Oxaloacetate"
+			},
+			{
+				"left": "Alanine",
+				"right": "Pyruvate"
+			},
+			{
+				"left": "Serine",
+				"right": "3-Phosphoglycerate"
+			},
+			{
+				"left": "Histidine",
+				"right": "Ribose 5-phosphate, by way of PRPP"
+			}
+		],
+		"explain": "Amino acids fall into families that share a precursor: 2-oxoglutarate gives the glutamate family, oxaloacetate the aspartate family, and pyruvate alanine, valine and leucine. Serine comes from 3-phosphoglycerate, and the histidine skeleton from PRPP, which links it to nucleotide metabolism."
+	},
+	{
+		"id": "meta4-021",
+		"topic": "metabolism",
+		"level": "intermediate",
+		"kind": "case",
+		"scenario": "In a sulfidic spring a dense white layer of colourless sulfur bacteria grows in a narrow band where sulfide diffusing up meets O2 diffusing down. Under the microscope the cells hold bright refractile globules.",
+		"parts": [
+			{
+				"question": "What are the globules most likely to be?",
+				"options": [
+					"Glycogen granules",
+					"Poly-β-hydroxybutyrate granules",
+					"Gas vesicles",
+					"Elemental sulfur from partial oxidation of sulfide"
+				],
+				"answer": 3,
+				"explain": "Sulfide oxidisers often stop at elemental sulfur and deposit it in the periplasm or outside the cell. The deposits scatter light strongly, which is why such layers look white."
+			},
+			{
+				"question": "What becomes of the stored sulfur when sulfide runs short while O2 is still present?",
+				"options": [
+					"It is reduced back to sulfide with NADH",
+					"It is oxidised to sulfate, which yields further electrons",
+					"It stays inert until the cell divides",
+					"It is released as H2S gas"
+				],
+				"answer": 1,
+				"explain": "Sulfur is an intermediate rather than an end product: oxidation continues through sulfite to sulfate. Drawing on the store lets the cell keep respiring while external sulfide is scarce."
+			},
+			{
+				"question": "Why does the layer sit at this depth rather than higher or lower?",
+				"options": [
+					"Sulfide is toxic only in the dark, so the cells avoid the surface",
+					"Sulfate is plentiful only at that depth",
+					"The cells need sulfide from below and an electron acceptor from above",
+					"Their enzymes work only at the pressure found there"
+				],
+				"answer": 2,
+				"explain": "A chemolithotroph oxidising sulfide with O2 needs both reactants, and each is consumed where the two meet. Gradient organisms therefore form thin bands at oxic–anoxic interfaces, and some glide to track the gradient as it shifts."
+			}
+		],
+		"explain": "Sulfide oxidisers store elemental sulfur as an intermediate and oxidise it on to sulfate when sulfide runs low. Needing a reduced donor and an oxidant at once confines them to the interface where the two gradients overlap."
+	},
+	{
+		"id": "meta4-022",
+		"topic": "metabolism",
+		"level": "intermediate",
+		"kind": "case",
+		"scenario": "Two enteric isolates are grown on glucose in buffered broth. Isolate A ends below pH 4.4 and turns the methyl red test red, while isolate B stays nearer neutral, is methyl red negative, and gives a positive Voges–Proskauer test.",
+		"parts": [
+			{
+				"question": "Which fermentation does isolate B run?",
+				"options": [
+					"The 2,3-butanediol fermentation",
+					"A homolactic fermentation",
+					"A propionic acid fermentation",
+					"A butyrate fermentation"
+				],
+				"answer": 0,
+				"explain": "The Voges–Proskauer test detects acetoin, the intermediate that is reduced to 2,3-butanediol, so a positive result marks the butanediol fermentation of enterics such as Klebsiella. Isolate A, with its strongly acid end point, runs the mixed-acid fermentation typical of E. coli."
+			},
+			{
+				"question": "Why does isolate B leave its medium less acidic?",
+				"options": [
+					"It makes no ATP, so it uses less glucose",
+					"It respires the glucose, with O2 as the acceptor",
+					"Much of its carbon leaves as neutral butanediol and as CO2 rather than as acids",
+					"It pumps protons inwards to neutralise the acid it makes"
+				],
+				"answer": 2,
+				"explain": "Two pyruvate are joined and decarboxylated to acetoin, which is reduced to 2,3-butanediol, so a large share of each glucose ends up as a neutral product and CO2 rather than as formate, acetate, lactate and succinate. Butanediol fermenters therefore release more gas and fewer acids than mixed-acid fermenters."
+			}
+		],
+		"explain": "Methyl red and Voges–Proskauer separate two enteric fermentations: a strongly acid end point marks the mixed-acid route, while acetoin and neutral 2,3-butanediol mark the butanediol route."
+	},
+	{
+		"id": "meta4-023",
+		"topic": "metabolism",
+		"level": "intermediate",
+		"kind": "choice",
+		"question": "A bacterium oxidises propionate to acetate, CO2 and H2, and grows only alongside a hydrogen-consuming partner. Why?",
+		"options": [
+			"It needs acetate from the partner as its carbon source",
+			"The partner supplies the ATP it cannot make itself",
+			"H2 blocks its propionate transporter directly",
+			"Propionate oxidation is endergonic under standard conditions and turns exergonic only while the partner holds H2 very low"
+		],
+		"answer": 3,
+		"explain": "Oxidising propionate to acetate, bicarbonate and 3 H2 has a ΔG0′ of about +76 kJ per mol, so it proceeds only when the H2 partial pressure is held in the pascal range. A methanogen or sulfate reducer provides that sink, which is why syntrophic propionate oxidisers are difficult to grow in pure culture."
+	},
+	{
+		"id": "meta4-024",
+		"topic": "metabolism",
+		"level": "intermediate",
+		"kind": "truefalse",
+		"statement": "Anammox runs through hydrazine as an intermediate, made by hydrazine synthase inside a membrane-bound compartment called the anammoxosome.",
+		"answer": true,
+		"explain": "In the best-studied species, hydrazine synthase combines ammonium with nitric oxide made from nitrite, and hydrazine dehydrogenase then oxidises the hydrazine to N2. The reactions sit in the anammoxosome, whose ladderane lipid membrane carries the proton gradient used for ATP synthesis."
+	},
+	{
+		"id": "meta4-025",
+		"topic": "metabolism",
+		"level": "intermediate",
+		"kind": "choice",
+		"question": "What marks out a comammox organism from a canonical ammonia oxidiser?",
+		"options": [
+			"It holds ammonia monooxygenase and nitrite oxidoreductase, so one cell takes ammonia through to nitrate",
+			"It oxidises ammonia with nitrite in place of O2",
+			"It fixes N2 as well as oxidising ammonia",
+			"It oxidises ammonia only in the light"
+		],
+		"answer": 0,
+		"explain": "Complete ammonia oxidisers, found among Nitrospira, carry the gene sets of both nitrification steps and release nitrate rather than nitrite. Canonical ammonia oxidisers stop at nitrite, which separate nitrite oxidisers take on to nitrate, while oxidising ammonium with nitrite is anammox."
+	},
+	{
+		"id": "meta4-026",
+		"topic": "metabolism",
+		"level": "intermediate",
+		"kind": "choice",
+		"question": "Textbooks give the ATP yield per glucose in aerobic respiration as a range rather than one figure. Which reason accounts for this?",
+		"options": [
+			"The EMP pathway yields a different amount of ATP in each cell",
+			"ATP is counted in different units by different authors",
+			"The protons translocated per NADH and the protons needed per ATP differ between organisms and conditions, so the yield is not a fixed whole number",
+			"The TCA cycle sometimes runs backwards, cancelling part of the yield"
+		],
+		"answer": 2,
+		"explain": "How much ATP a respiring cell gains depends on which dehydrogenases and oxidases it uses, how many protons each translocates, and the c-ring size of its ATP synthase. Since these vary, textbooks quote a range for ATP per glucose rather than a single value."
+	},
+	{
+		"id": "meta4-027",
+		"topic": "metabolism",
+		"level": "intermediate",
+		"kind": "case",
+		"scenario": "E. coli is grown anaerobically on glycerol with fumarate as the electron acceptor. It grows, but more slowly and to fewer cells per gram of glycerol than the same medium gives in air, and succinate accumulates.",
+		"parts": [
+			{
+				"question": "Why is the cell yield lower than in air?",
+				"options": [
+					"Glycerol cannot be phosphorylated without O2",
+					"The fumarate/succinate couple lies near +0.03 V, so much less free energy is released than with O2 at +0.82 V",
+					"Fumarate respiration conserves energy by substrate-level phosphorylation alone",
+					"Succinate uncouples the membrane as it accumulates"
+				],
+				"answer": 1,
+				"explain": "The energy available is set by the gap in potential between donor and acceptor, and fumarate sits only a little above the quinone pool. Less energy per electron means fewer protons translocated per electron, and so fewer ATP from each glycerol oxidised."
+			},
+			{
+				"question": "Which quinone works with the fumarate reductase of E. coli?",
+				"options": [
+					"Ubiquinone, as in its aerobic chain",
+					"Plastoquinone, as in photosystem II",
+					"Phylloquinone, as in photosystem I",
+					"Menaquinone, whose potential is lower than that of ubiquinone"
+				],
+				"answer": 3,
+				"explain": "Reducing fumarate needs electrons at a low potential, which menaquinol provides and ubiquinol, at about +0.11 V, does not. E. coli raises its menaquinone content when O2 is absent, and menaquinone also serves its DMSO and TMAO reductases."
+			}
+		],
+		"explain": "Fumarate respiration conserves energy chemiosmotically but across a small span of potential, so the yield is low. E. coli couples it to menaquinone rather than to the ubiquinone of its aerobic chain."
+	},
+	{
+		"id": "meta4-028",
+		"topic": "metabolism",
+		"level": "hard",
+		"kind": "choice",
+		"question": "Why does the cytochrome bc1 complex translocate more protons than a straight transfer of electrons from quinol to cytochrome c would?",
+		"options": [
+			"It pumps protons with a rotary mechanism, as ATP synthase does",
+			"Its bifurcated path sends one electron of each quinol back to reduce quinone, so two quinols are oxidised at the outer site for each pair of electrons that reaches cytochrome c",
+			"It oxidises NADH as well as quinol",
+			"It opens a proton channel whenever O2 binds to it"
+		],
+		"answer": 1,
+		"explain": "In the Q cycle each quinol oxidised at the outer site releases two protons outwards and splits its electrons: one goes through the Rieske iron–sulfur protein to cytochrome c, the other through the two b haems to the inner site. Two such electrons reduce a quinone there, taking up two protons from the cytoplasm, so for each pair of electrons delivered two quinols are oxidised, one is remade, and four protons rather than two are released outwards."
+	},
+	{
+		"id": "meta4-029",
+		"topic": "metabolism",
+		"level": "hard",
+		"kind": "truefalse",
+		"statement": "During fermentation the F1Fo ATP synthase of E. coli sits idle, since a fermenting cell builds no proton motive force.",
+		"answer": false,
+		"explain": "Fermenting cells run the enzyme in reverse: it hydrolyses part of the ATP made by substrate-level phosphorylation and pumps protons out, which keeps up the proton motive force needed for transport and flagellar rotation."
+	},
+	{
+		"id": "meta4-030",
+		"topic": "metabolism",
+		"level": "hard",
+		"kind": "case",
+		"scenario": "A sediment isolate of Geobacter grows anaerobically with acetate as its electron donor and insoluble ferric oxide as its acceptor. The orange mineral disappears from the culture and dissolved Fe(II) appears.",
+		"parts": [
+			{
+				"question": "Why can a cytoplasmic reductase not do this job?",
+				"options": [
+					"Ferric oxide is volatile and leaves the culture",
+					"The cell holds no enzyme able to reduce Fe(III)",
+					"The mineral is insoluble, so it stays outside the cell and the electrons have to travel to it",
+					"Fe(III) destroys the cytoplasmic membrane on contact"
+				],
+				"answer": 2,
+				"explain": "Ferric oxides are solids at neutral pH and cannot be taken up, so respiring on them means moving electrons from the inner membrane across the periplasm to the cell surface."
+			},
+			{
+				"question": "Which route carries the electrons to the mineral surface?",
+				"options": [
+					"c-type cytochromes in the outer membrane, with conductive filaments reaching further out",
+					"Porins that let Fe(III) diffuse into the periplasm",
+					"ATP synthase running in reverse",
+					"Diffusion of NADH out of the cell"
+				],
+				"answer": 0,
+				"explain": "Geobacter passes electrons along a chain of multihaem c-type cytochromes that ends at the outer surface, and conductive filaments extend the reach to minerals at a distance. Shewanella, another metal reducer, also secretes flavins that help carry electrons to the mineral."
+			},
+			{
+				"question": "In a microbial fuel cell the same organism grows on acetate with a graphite anode and no soluble acceptor. What does the anode do?",
+				"options": [
+					"It supplies carbon for growth",
+					"It serves as the terminal electron acceptor in place of Fe(III)",
+					"It makes O2 by electrolysis for the cells to respire",
+					"It holds the cells in place without taking part in their metabolism"
+				],
+				"answer": 1,
+				"explain": "The anode accepts the electrons that would otherwise reach a mineral, so the current in the external circuit tracks respiration. Electrode-respiring biofilms of this kind are the basis of microbial fuel cells."
+			}
+		],
+		"explain": "Respiring on an insoluble mineral calls for extracellular electron transfer through outer-membrane cytochromes and conductive filaments. An electrode can stand in for the mineral, which is how microbial fuel cells work."
+	},
+	{
+		"id": "meta4-031",
+		"topic": "metabolism",
+		"level": "hard",
+		"kind": "match",
+		"question": "Match each enzyme with the reaction it catalyses in a chemolithotroph.",
+		"pairs": [
+			{
+				"left": "Ammonia monooxygenase",
+				"right": "Oxidises ammonia to hydroxylamine with O2, consuming two electrons in the process"
+			},
+			{
+				"left": "Hydroxylamine oxidoreductase",
+				"right": "Oxidises hydroxylamine, the step that yields the electrons for growth"
+			},
+			{
+				"left": "Nitrite oxidoreductase",
+				"right": "Oxidises nitrite to nitrate, taking the added oxygen atom from water"
+			},
+			{
+				"left": "Sulfide:quinone oxidoreductase",
+				"right": "Oxidises sulfide to elemental sulfur and reduces a quinone"
+			},
+			{
+				"left": "Sox system with SoxCD",
+				"right": "Oxidises thiosulfate through to sulfate, leaving no sulfur deposit"
+			}
+		],
+		"explain": "Most of these reactions feed electrons into the quinone and cytochrome pools. Ammonia monooxygenase instead consumes two electrons before any are gained, and nitrifiers spend further energy on reverse electron flow to make NAD(P)H, which together keep their cell yields low. Sox systems without SoxCD leave sulfur globules instead."
+	},
+	{
+		"id": "meta4-032",
+		"topic": "metabolism",
+		"level": "hard",
+		"kind": "truefalse",
+		"statement": "In Methanosarcina growing on H2 and CO2, the ion-translocating step of the electron transport chain is methyl-coenzyme M reductase, while heterodisulfide reductase translocates none.",
+		"answer": false,
+		"explain": "Methyl-coenzyme M reductase forms methane but translocates no ions. In methanogens with cytochromes the membrane-bound heterodisulfide reductase, working with methanophenazine, is coupled to proton translocation, and the methyltransferase Mtr adds a Na+ gradient."
+	},
+	{
+		"id": "meta4-033",
+		"topic": "metabolism",
+		"level": "hard",
+		"kind": "choice",
+		"question": "Methanogens divide into those with cytochromes and methanophenazine, such as Methanosarcina, and those without, such as Methanothermobacter. Which comparison holds for growth on H2 and CO2?",
+		"options": [
+			"Those without cytochromes conserve more energy per methane and need a higher H2 pressure",
+			"Those with cytochromes form methane without coenzyme M",
+			"Those without cytochromes are the ones that also use acetate and methanol",
+			"Those with cytochromes conserve more energy per methane, but need a higher H2 pressure to grow"
+		],
+		"answer": 3,
+		"explain": "Extra ion-translocating steps in the chain of cytochrome-containing methanogens raise the ATP gained per methane. The same chain works only above a higher H2 threshold, so cytochrome-free methanogens hold the advantage where a partner keeps H2 very low."
+	},
+	{
+		"id": "meta4-034",
+		"topic": "metabolism",
+		"level": "hard",
+		"kind": "case",
+		"scenario": "Halobacterium salinarum is suspended under nitrogen gas in a salt solution with no electron donor or acceptor added, held in the dark, then illuminated. On illumination the solution outside the cells becomes more acidic and ATP is made.",
+		"parts": [
+			{
+				"question": "What is the light doing?",
+				"options": [
+					"Driving electrons from water to NADP+, as in cyanobacteria",
+					"Splitting ATP, which the cells then rejoin",
+					"Warming the suspension, and the heat drives ATP synthase",
+					"Letting bacteriorhodopsin pump protons out of the cell, which builds a proton motive force"
+				],
+				"answer": 3,
+				"explain": "Bacteriorhodopsin, a retinal protein of the purple membrane, moves a proton outwards during each photocycle, so the medium acidifies and a proton motive force builds. ATP synthase then uses that gradient."
+			},
+			{
+				"question": "How does this differ from photosynthesis in a purple bacterium?",
+				"options": [
+					"It needs bacteriochlorophyll in a reaction centre",
+					"It makes NADH straight from light",
+					"It builds an ion gradient with a retinal pump, with no reaction centre or electron transport chain",
+					"It releases O2 from water"
+				],
+				"answer": 2,
+				"explain": "A photochemical reaction centre separates charge and sends electrons through a chain, whereas bacteriorhodopsin simply pumps a proton as its retinal isomerises. Halobacterium salinarum therefore gains ATP from light while taking its carbon from organic compounds."
+			}
+		],
+		"explain": "Light-driven proton pumping by bacteriorhodopsin turns photons into a proton motive force without any electron transport chain. It supports ATP synthesis but no CO2 fixation, so the cells stay heterotrophic."
+	},
+	{
+		"id": "meta4-035",
+		"topic": "metabolism",
+		"level": "hard",
+		"kind": "choice",
+		"question": "In de novo purine synthesis, which is the first nucleotide with a complete purine ring, from which the AMP and GMP branches start?",
+		"options": [
+			"XMP",
+			"IMP",
+			"AMP",
+			"GMP"
+		],
+		"answer": 1,
+		"explain": "The purine ring is assembled step by step on PRPP, and the first complete nucleotide is inosine 5′-monophosphate, from which one branch leads to AMP and the other through XMP to GMP. Pyrimidines are built the other way round: the ring is completed as orotate and then joined to PRPP."
+	},
+	{
+		"id": "meta4-036",
+		"topic": "metabolism",
+		"level": "hard",
+		"kind": "match",
+		"question": "Match each cofactor with the kind of reaction it serves.",
+		"pairs": [
+			{
+				"left": "Biotin",
+				"right": "Carries CO2 in carboxylation reactions"
+			},
+			{
+				"left": "Thiamine diphosphate",
+				"right": "Its thiazolium ring decarboxylates 2-oxo acids, as in pyruvate decarboxylase"
+			},
+			{
+				"left": "Pyridoxal phosphate",
+				"right": "Moves amino groups in transamination"
+			},
+			{
+				"left": "Tetrahydrofolate",
+				"right": "Carries one-carbon units at the formyl, methylene and methyl levels"
+			},
+			{
+				"left": "Lipoamide",
+				"right": "Swings acyl groups between the active sites of a 2-oxo acid dehydrogenase complex"
+			}
+		],
+		"explain": "Each cofactor brings a characteristic kind of chemistry, so its presence hints at the reaction type. Biotin serves carboxylases, thiamine diphosphate the decarboxylation of 2-oxo acids, pyridoxal phosphate amino group transfer, tetrahydrofolate one-carbon metabolism, and lipoamide the swinging arm of the pyruvate and 2-oxoglutarate dehydrogenase complexes."
+	},
+	{
+		"id": "meta4-037",
+		"topic": "metabolism",
+		"level": "hard",
+		"kind": "match",
+		"question": "Match each part of a respiratory chain with what it does.",
+		"pairs": [
+			{
+				"left": "Complex I (NADH:quinone oxidoreductase)",
+				"right": "Oxidises NADH and translocates protons as it reduces quinone"
+			},
+			{
+				"left": "Succinate dehydrogenase",
+				"right": "Feeds electrons from succinate into the quinone pool without translocating protons"
+			},
+			{
+				"left": "Cytochrome bc1 complex",
+				"right": "Oxidises quinol by the Q cycle and reduces cytochrome c"
+			},
+			{
+				"left": "Cytochrome c oxidase",
+				"right": "Reduces O2 to water at the end of the chain"
+			}
+		],
+		"explain": "Dehydrogenases differ in whether they conserve energy: complex I translocates protons while succinate dehydrogenase does not, so succinate oxidation yields less ATP than NADH oxidation. The bc1 complex and the terminal oxidase add further proton translocation downstream."
+	},
+	{
+		"id": "meta4-038",
+		"topic": "metabolism",
+		"level": "hard",
+		"kind": "case",
+		"scenario": "A wastewater plant removes ammonium in two stages. In the first, aeration is limited so that part of the ammonium is oxidised; in the second, anammox bacteria take over. Little organic carbon is dosed, and a small amount of nitrate leaves with the effluent.",
+		"parts": [
+			{
+				"question": "What does the first stage have to supply for the anammox stage?",
+				"options": [
+					"Nitrite, the partner of ammonium in the anammox reaction",
+					"Nitrate, which the anammox bacteria reduce to nitrite",
+					"Acetate as an electron donor for the anammox cells",
+					"Sulfate as the terminal electron acceptor"
+				],
+				"answer": 0,
+				"explain": "Anammox bacteria combine ammonium with nitrite, about 1.1 to 1.3 nitrite per ammonium in published stoichiometries, so a little over half the ammonium is oxidised to nitrite first while the rest is left untouched. Limiting aeration helps keep nitrite oxidisers from carrying the nitrite on to nitrate."
+			},
+			{
+				"question": "Where does the small amount of nitrate in the effluent come from?",
+				"options": [
+					"Denitrification stopping short and turning N2 back to nitrate",
+					"Oxidation of part of the nitrite to nitrate by the anammox cells, which use the electrons released to reduce CO2",
+					"Hydrazine breaking down to nitrate",
+					"Chemical oxidation of ammonium by O2 carried over from the first stage"
+				],
+				"answer": 1,
+				"explain": "Published stoichiometries give about 0.16 to 0.26 mol nitrate per mol ammonium consumed: nitrite oxidoreductase oxidises some nitrite to nitrate, and the electrons released go into fixing CO2 for biomass. Nitrate at about this level is expected from anammox growth itself, whereas markedly more points to nitrite oxidisers escaping suppression."
+			}
+		],
+		"explain": "Partial nitritation supplies the nitrite that anammox needs, so the process runs on less aeration and no added organic carbon, unlike nitrification followed by denitrification. A little nitrate is expected from the anammox cells' own CO2 fixation."
+	},
+	{
+		"id": "meta4-039",
+		"topic": "metabolism",
+		"level": "hard",
+		"kind": "choice",
+		"question": "When E. coli switches from glucose to acetate as its carbon source, how is carbon directed into the glyoxylate shunt?",
+		"options": [
+			"Isocitrate dehydrogenase is partly inactivated by phosphorylation, so isocitrate builds up for isocitrate lyase",
+			"Isocitrate lyase is switched on by binding NADH",
+			"Citrate synthase is lost from the genome during the switch",
+			"The TCA cycle stops, and the shunt runs in its place"
+		],
+		"answer": 0,
+		"explain": "Acetate induces the aceBAK operon, which encodes isocitrate lyase, malate synthase and a bifunctional kinase/phosphatase. The kinase phosphorylates part of the isocitrate dehydrogenase and lowers its activity, so isocitrate accumulates to levels that isocitrate lyase, which binds it far more weakly, can use. Flux then divides between the shunt, which yields four-carbon compounds, and the rest of the cycle, which conserves energy."
+	},
+	{
+		"id": "meta4-040",
+		"topic": "metabolism",
+		"level": "hard",
+		"kind": "choice",
+		"question": "What do the Wood–Ljungdahl pathway and the 3-hydroxypropionate bi-cycle share, in contrast with the Calvin cycle?",
+		"options": [
+			"Both regenerate ribulose 1,5-bisphosphate as their CO2 acceptor",
+			"Both depend on an oxygen-sensitive CO dehydrogenase/acetyl-CoA synthase",
+			"Neither uses RubisCO: one builds acetyl-CoA from two CO2, the other carboxylates acetyl-CoA and propionyl-CoA",
+			"Both are found among archaea only"
+		],
+		"answer": 2,
+		"explain": "The Wood–Ljungdahl pathway reduces one CO2 to a methyl group and another to carbon monoxide, which acetyl-CoA synthase joins with coenzyme A to make acetyl-CoA, while the 3-hydroxypropionate bi-cycle carboxylates acetyl-CoA and propionyl-CoA with biotin-dependent carboxylases. Only the Wood–Ljungdahl pathway needs CO dehydrogenase, and neither regenerates a sugar bisphosphate, so a genome without RubisCO may still fix carbon by one of these or other routes."
+	}
+]
