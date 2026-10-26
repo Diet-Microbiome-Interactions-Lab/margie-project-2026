@@ -91,6 +91,18 @@ export interface OrganismResult {
 	files?: Record<string, { name: string; size: number }[]>;
 }
 
+/** One run folder's genome results, for the run picker on Results. */
+export interface ResultRun {
+	dir: string;
+	/** The folder's name: when the run started (2026-10-26-2014). */
+	name: string;
+	organisms: OrganismResult[];
+}
+
+/** Where a genome's report numbers are kept: under its name for its latest result, or under its name and
+ * folder for one run's. */
+export const summaryKey = (genome: string, folder = '') => (folder ? `${genome}\t${folder}` : genome);
+
 /** A genome file in a folder inside the genomes folder, where runs do not look. */
 export interface NestedGenome {
 	rel: string;
@@ -254,6 +266,8 @@ class Workspace {
 	checking = $state(false);
 	runs = $state<Run[]>([]);
 	results = $state<OrganismResult[]>([]);
+	/** Each of the latest runs' genome results, newest run first. */
+	resultRuns = $state<ResultRun[]>([]);
 	/** The results folder (per-tool output) and the per-genome results folder inside it. */
 	resultRoots = $state({ outputRoot: '', genomesDir: '' });
 	settings = $state<Setting[]>([]);
@@ -567,8 +581,9 @@ class Workspace {
 
 	/** `fresh` drops the cached report numbers: a run has just rewritten the tables. */
 	async loadResults(fresh = true) {
-		const d = await api<{ outputRoot: string; genomesDir: string; organisms: OrganismResult[] }>('/results');
+		const d = await api<{ outputRoot: string; genomesDir: string; organisms: OrganismResult[]; runs?: ResultRun[] }>('/results');
 		this.results = d.organisms;
+		this.resultRuns = d.runs ?? [];
 		this.resultRoots = { outputRoot: d.outputRoot, genomesDir: d.genomesDir };
 		if (fresh) {
 			this.summaries = {};
@@ -583,18 +598,19 @@ class Workspace {
 	 * while a request is on its way shares it; a failure is remembered until
 	 * the next reload, so it is not asked for again on every refresh.
 	 */
-	loadSummary(genome: string): Promise<GenomeSummary | null> {
-		const known = untrack(() => this.summaries[genome]);
+	loadSummary(genome: string, folder = ''): Promise<GenomeSummary | null> {
+		const key = summaryKey(genome, folder);
+		const known = untrack(() => this.summaries[key]);
 		if (known) return Promise.resolve(known);
-		let request = this.#summaryRequests.get(genome);
+		let request = this.#summaryRequests.get(key);
 		if (!request) {
-			request = api<GenomeSummary>(`/results/${encodeURIComponent(genome)}`)
+			request = api<GenomeSummary>(`/results/${encodeURIComponent(genome)}${folder ? `?folder=${encodeURIComponent(folder)}` : ''}`)
 				.then((s) => {
-					this.summaries[genome] = s;
+					this.summaries[key] = s;
 					return s;
 				})
 				.catch(() => null);
-			this.#summaryRequests.set(genome, request);
+			this.#summaryRequests.set(key, request);
 		}
 		return request;
 	}

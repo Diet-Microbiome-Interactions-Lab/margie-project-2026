@@ -18,7 +18,8 @@
 	 * the first question). The conversation is kept per genome and can be saved.
 	 */
 	/** `context`: what is open in Results now (tab, filter, the viewer's selection), sent with a question unless left out. */
-	let { genome, context = '', onclose }: { genome: string; context?: string; onclose: () => void } = $props();
+	/** folder: the run's genome folder being read, when Results shows one run's; else its latest result. */
+	let { genome, folder = '', context = '', onclose }: { genome: string; folder?: string; context?: string; onclose: () => void } = $props();
 	let useContext = $state(true);
 
 	type Provider = 'anthropic' | 'openai' | 'gemini' | 'custom' | 'builtin';
@@ -191,7 +192,7 @@
 		turns = [...turns, { role: 'user', text: q, at: new Date().toISOString(), ...(ctx ? { context: ctx } : {}) }];
 		await scrollDown();
 		try {
-			const d = await chatAsk<{ answer: Turn }>(genome, q, ctx);
+			const d = await chatAsk<{ answer: Turn }>(genome, q, ctx, folder);
 			turns = [...turns, d.answer];
 		} catch (e) {
 			askError = e instanceof Error ? e.message : String(e);
