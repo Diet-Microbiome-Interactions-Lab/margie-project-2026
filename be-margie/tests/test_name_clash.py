@@ -68,5 +68,7 @@ def test_a_name_that_already_carries_its_hash_keeps_it(tmp_path):
     coli = _fasta(tmp_path, "coli", "TTGA" * 50)
     named = name_with_hash("coli", coli)
     assert name_with_hash(named, coli) == named
-    # Another genome's hash on the name is replaced by this genome's.
+    # Another genome's hash on the name is replaced by this genome's, in either form.
     assert name_with_hash("coli--0000aaaa", coli) == named
+    assert name_with_hash("coli--fa1:0000", coli) == named
+    assert named.startswith("coli--fa1:")

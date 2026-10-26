@@ -89,8 +89,9 @@ def name_clashes(db_path: str, genome_files: dict[str, str]) -> list[str]:
 
 
 # A genome's name in a run and its results: its file's name, two dashes and the first 8 characters
-# of its genome hash (coli--a1b2c3d4), so genomes that share a file name stay apart everywhere.
-NAMED_WITH_HASH = re.compile(r'--[0-9a-f]{8}$')
+# of its genome hash (coli--fa1:a1b2; coli--a1b2c3d4 from older runs), so genomes that share a file
+# name stay apart everywhere.
+NAMED_WITH_HASH = re.compile(r'--(fa1:[0-9a-f]{4}|[0-9a-f]{8})$')
 
 
 def name_with_hash(name: str, path: str) -> str:

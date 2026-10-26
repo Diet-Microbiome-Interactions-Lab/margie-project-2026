@@ -249,7 +249,11 @@
 						<dt>Results file</dt>
 						<dd class="pop-file">{#if c.store.file}<span class="mg-mono">{c.store.file.name}</span>, {formatBytes(c.store.file.size)}{:else}being written{/if}</dd>
 						<dt>In the database</dt>
-						<dd class:pop-yes={c.store.loaded}>{c.store.loaded ? 'yes, loaded into the MARGIE database (SQLite)' : 'waiting to be loaded'}</dd>
+						{#if c.store.kept}
+							<dd>no: its tables stay in the results folder, and the step runs again on each run</dd>
+						{:else}
+							<dd class:pop-yes={c.store.loaded}>{c.store.loaded ? 'yes, loaded into the MARGIE database (SQLite)' : 'waiting to be loaded'}</dd>
+						{/if}
 					{/if}
 					{#if c.src && c.src.source !== 'not run'}
 						<dt>Results</dt>

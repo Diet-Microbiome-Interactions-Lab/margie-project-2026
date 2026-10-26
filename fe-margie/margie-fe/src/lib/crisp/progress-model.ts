@@ -34,7 +34,12 @@ export interface Cell {
 export interface Store {
 	file?: { name: string; size: number };
 	loaded: boolean;
+	/** Its tables stay in the results folder: the step runs again on each run, so they are not loaded. */
+	kept?: boolean;
 }
+
+/** Steps whose tables stay in the results folder; their *_db.tkn marks the step done. */
+const KEPT_IN_FOLDER = new Set(['consolidation', 'labeling', 'scoring', 'fingerprint']);
 
 /** jobs: the SLURM jobs that ran the step for this genome (or for the whole run, a batch). */
 export type GridCell = Cell & { t: string; href?: string; src?: SourceRow; store?: Store; jobs?: ToolJob[] };
@@ -280,7 +285,7 @@ export function buildProgress(i: ProgressInput): Progress {
 		if (!list?.length) return undefined;
 		const data = list.filter((f) => !f.name.endsWith('.tkn') && !/\.(log|err)$/.test(f.name));
 		const file = data.find((f) => f.name === `${col}_results.tsv` || f.name === 'rast.tsv') ?? [...data].sort((a, b) => b.size - a.size)[0];
-		return { file, loaded: list.some((f) => f.name.endsWith('_db.tkn')) };
+		return { file, loaded: list.some((f) => f.name.endsWith('_db.tkn')), kept: KEPT_IN_FOLDER.has(col) };
 	}
 
 	function hrefOf(col: string, genome: string, c: Cell): string | undefined {

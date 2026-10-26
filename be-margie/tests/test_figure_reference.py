@@ -61,3 +61,25 @@ def test_a_missing_reference_is_named_and_the_fingerprint_genomes_are_the_pool(t
     text = L.provenance_text(len(pool), None, leave_one_out=True, missing=missing)
     assert 'operon reference not found' in text and '3 genomes of the operon fingerprint database' in text
     assert L.comparison_pool('', _operon_db(tmp_path))[1] == '(not given)'
+
+
+def test_the_figures_leave_out_the_reference_name_scoring_left_out(tmp_path):
+    import json
+    import pickle
+    L = _lib()
+    ref = tmp_path / 'u-occ_reference-v1.pkl'
+    # An earlier run added the genome as g1; this run names it g1--fa1:abcd.
+    ref.write_bytes(pickle.dumps({'organisms_added': {'g1', 'g2', 'g3'}}))
+    (tmp_path / 'g1--fa1:abcd' / 'scoring').mkdir(parents=True)
+    (tmp_path / 'g1--fa1:abcd' / 'scoring' / 'scored-against.json').write_text(
+        json.dumps({'genomes': 2, 'left_out_self': True, 'left_out_as': 'g1'}))
+    name = L.left_out_as(tmp_path, 'g1--fa1:abcd')
+    assert name == 'g1'
+    assert L.comparison_pool(str(ref), _operon_db(tmp_path), leave_out=name)[0] == {'g2', 'g3'}
+    # Without a record, the genome's own name.
+    assert L.left_out_as(tmp_path, 'g2') == 'g2'
+
+
+def test_the_organism_figures_use_the_name_scoring_left_out():
+    for script in ('make_organism_report.py', 'make_complete_operon_diagrams.py'):
+        assert 'leave_out=L.left_out_as(run_root, args.organism)' in (FIGURES / script).read_text(), script
