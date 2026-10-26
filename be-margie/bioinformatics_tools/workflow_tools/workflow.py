@@ -22,8 +22,8 @@ from bioinformatics_tools.workflow_tools.bapptainer import (
     CacheSifError, cache_sif_files, locate_local_sif_files)
 from bioinformatics_tools.workflow_tools.models import WorkflowKey
 from bioinformatics_tools.workflow_tools.output_cache import (
-    cached_tools, cached_when, current_rast_genome_id, log_workflow_run, realign_rast_genome_id,
-    restore, restore_all, store, store_all,
+    cached_tools, cached_when, current_rast_genome_id, gene_calls_match, log_workflow_run, rast_genome_ids,
+    realign_rast_genome_id, restore, restore_all, store, store_all,
 )
 from bioinformatics_tools.workflow_tools.load_to_db import is_already_processed, PIPELINE_VERSION, fasta_hashes
 from bioinformatics_tools.workflow_tools import cache_report, protein_cache
@@ -1060,6 +1060,33 @@ class WorkflowBase(ProgramBase):
                                           db_path, genome_files[genome], tools_map) or {}
                 if genome_restored is _FAILED:
                     genome_restored = {}
+                # Gene-call guard: cached tables name genes by number under the RASTtk id they were
+                # made with. A table under another id moves onto this run's id only when the cached
+                # gene calls under that id hold the same protein under each number as this run's;
+                # otherwise it is dropped and its tool runs (the protein cache still serves the
+                # proteins it holds).
+                prefix = get_workflow_prefix_for(genome, smk_config)
+                current_id = current_rast_genome_id(f"{prefix}rasttk/rast.gff")
+                if current_id and genome_restored:
+                    verdict: dict = {}
+                    dropped: list[str] = []
+                    for tool, hit in list(genome_restored.items()):
+                        made_with = rast_genome_ids(tools_map.get(tool, [])) - {current_id} if hit else set()
+                        if not made_with:
+                            continue
+                        old = next(iter(made_with))
+                        if len(made_with) == 1 and old not in verdict:
+                            verdict[old] = _safely(f'Comparing the gene calls of {genome} with those under {old}', gene_calls_match,
+                                                   db_path, genome_files[genome], f"{prefix}rasttk/rast.faa", old)
+                        if len(made_with) == 1 and verdict[old] is True:
+                            continue
+                        for path in tools_map.get(tool, []):
+                            Path(path).unlink(missing_ok=True)
+                        genome_restored[tool] = False
+                        dropped.append(tool)
+                    if dropped:
+                        LOGGER.warning('The gene calls of %s differ from those its cached %s were made with (RASTtk %s); '
+                                       'those tools run on this run\'s genes', genome, ', '.join(dropped), ', '.join(sorted(verdict)))
                 # Consolidation and labeling: only a merge of exactly the tables now in the folder.
                 merged_fp = merged_inputs_fingerprint(get_workflow_prefix_for(genome, smk_config))
                 merged_back = _safely(f'Restoring {genome} merged tables from the cache', restore_all,

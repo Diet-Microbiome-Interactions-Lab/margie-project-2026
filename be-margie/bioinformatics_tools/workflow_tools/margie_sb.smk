@@ -1617,7 +1617,7 @@ rule load_quast_to_db:
         script=LOAD_SCRIPT
     shell:
         """
-        {LOADER_PYTHON} {params.script} tsv {input.results} {params.db} quast --token {output.tkn}
+        {LOADER_PYTHON} {params.script} tsv {input.results} {params.db} quast --token {output.tkn} --delete-organism {wildcards.genome}
         """
 
 
@@ -1802,7 +1802,7 @@ rule load_gtdbtk_to_db:
         script=LOAD_SCRIPT
     shell:
         """
-        {LOADER_PYTHON} {params.script} tsv {input.results} {params.db} gtdbtk --token {output.tkn}
+        {LOADER_PYTHON} {params.script} tsv {input.results} {params.db} gtdbtk --token {output.tkn} --delete-organism {wildcards.genome}
         """
 
 
@@ -1999,7 +1999,7 @@ rule load_rasttk_to_db:
         script=LOAD_SCRIPT
     shell:
         """
-        {LOADER_PYTHON} {params.script} tsv {input.results} {params.db} rasttk --token {output.tkn}
+        {LOADER_PYTHON} {params.script} tsv {input.results} {params.db} rasttk --token {output.tkn} --delete-organism {wildcards.genome}
         """
 
 
@@ -2055,7 +2055,7 @@ rule load_cog_to_db:
         script=LOAD_SCRIPT
     shell:
         """
-        {LOADER_PYTHON} {params.script} tsv {input.results} {params.db} cog --token {output.tkn}
+        {LOADER_PYTHON} {params.script} tsv {input.results} {params.db} cog --token {output.tkn} --delete-organism {wildcards.genome}
         """
 
 
@@ -2109,7 +2109,7 @@ rule load_pfam_to_db:
         script=LOAD_SCRIPT
     shell:
         """
-        {LOADER_PYTHON} {params.script} tsv {input.results} {params.db} pfam --token {output.tkn}
+        {LOADER_PYTHON} {params.script} tsv {input.results} {params.db} pfam --token {output.tkn} --delete-organism {wildcards.genome}
         """
 
 
@@ -2164,7 +2164,7 @@ rule load_tigrfam_to_db:
         script=LOAD_SCRIPT
     shell:
         """
-        {LOADER_PYTHON} {params.script} tsv {input.results} {params.db} tigrfam --token {output.tkn}
+        {LOADER_PYTHON} {params.script} tsv {input.results} {params.db} tigrfam --token {output.tkn} --delete-organism {wildcards.genome}
         """
 
 
@@ -2218,7 +2218,7 @@ rule load_merops_to_db:
         script=LOAD_SCRIPT
     shell:
         """
-        {LOADER_PYTHON} {params.script} tsv {input.results} {params.db} merops --token {output.tkn}
+        {LOADER_PYTHON} {params.script} tsv {input.results} {params.db} merops --token {output.tkn} --delete-organism {wildcards.genome}
         """
 
 
@@ -2273,7 +2273,7 @@ rule load_tcdb_to_db:
         script=LOAD_SCRIPT
     shell:
         """
-        {LOADER_PYTHON} {params.script} tsv {input.results} {params.db} tcdb --token {output.tkn}
+        {LOADER_PYTHON} {params.script} tsv {input.results} {params.db} tcdb --token {output.tkn} --delete-organism {wildcards.genome}
         """
 
 
@@ -2328,7 +2328,7 @@ rule load_uniprot_to_db:
         script=LOAD_SCRIPT
     shell:
         """
-        {LOADER_PYTHON} {params.script} tsv {input.results} {params.db} uniprot --token {output.tkn}
+        {LOADER_PYTHON} {params.script} tsv {input.results} {params.db} uniprot --token {output.tkn} --delete-organism {wildcards.genome}
         """
 
 
@@ -2381,7 +2381,7 @@ rule load_kegg_to_db:
         script=LOAD_SCRIPT
     shell:
         """
-        {LOADER_PYTHON} {params.script} tsv {input.results} {params.db} kegg --token {output.tkn}
+        {LOADER_PYTHON} {params.script} tsv {input.results} {params.db} kegg --token {output.tkn} --delete-organism {wildcards.genome}
         """
 
 
@@ -2434,7 +2434,7 @@ rule load_eggnog_to_db:
         script=LOAD_SCRIPT
     shell:
         """
-        {LOADER_PYTHON} {params.script} tsv {input.results} {params.db} eggnog --token {output.tkn}
+        {LOADER_PYTHON} {params.script} tsv {input.results} {params.db} eggnog --token {output.tkn} --delete-organism {wildcards.genome}
         """
 
 
@@ -2488,7 +2488,7 @@ rule load_dbcan_to_db:
         script=LOAD_SCRIPT
     shell:
         """
-        {LOADER_PYTHON} {params.script} tsv {input.results} {params.db} dbcan --token {output.tkn}
+        {LOADER_PYTHON} {params.script} tsv {input.results} {params.db} dbcan --token {output.tkn} --delete-organism {wildcards.genome}
         """
 
 
@@ -2541,7 +2541,7 @@ rule load_pgap_to_db:
         script=LOAD_SCRIPT
     shell:
         """
-        {LOADER_PYTHON} {params.script} tsv {input.results} {params.db} pgap --token {output.tkn}
+        {LOADER_PYTHON} {params.script} tsv {input.results} {params.db} pgap --token {output.tkn} --delete-organism {wildcards.genome}
         """
 
 
@@ -2604,7 +2604,7 @@ rule load_interpro_to_db:
         script=LOAD_SCRIPT
     shell:
         """
-        {LOADER_PYTHON} {params.script} tsv {input.results} {params.db} interpro --token {output.tkn}
+        {LOADER_PYTHON} {params.script} tsv {input.results} {params.db} interpro --token {output.tkn} --delete-organism {wildcards.genome}
         """
 
 
@@ -2627,7 +2627,7 @@ rule load_interpro_perdb_to_db:
         table_name=lambda wildcards: f"interpro_{wildcards.db}"
     shell:
         """
-        {LOADER_PYTHON} {params.script} tsv {input.results} {params.db_file} {params.table_name} --token {output.tkn}
+        {LOADER_PYTHON} {params.script} tsv {input.results} {params.db_file} {params.table_name} --token {output.tkn} --delete-organism {wildcards.genome}
         """
 
 
@@ -2675,7 +2675,7 @@ rule load_geneprop_to_db:
         script=LOAD_SCRIPT
     shell:
         """
-        {LOADER_PYTHON} {params.script} tsv {input.results} {params.db} geneprop --token {output.tkn}
+        {LOADER_PYTHON} {params.script} tsv {input.results} {params.db} geneprop --token {output.tkn} --delete-organism {wildcards.genome}
         """
 
 
@@ -2720,7 +2720,7 @@ rule load_operon_to_db:
         script=LOAD_SCRIPT
     shell:
         """
-        {LOADER_PYTHON} {params.script} tsv {input.results} {params.db} operon --token {output.tkn}
+        {LOADER_PYTHON} {params.script} tsv {input.results} {params.db} operon --token {output.tkn} --delete-organism {wildcards.genome}
         """
 
 
@@ -2771,7 +2771,7 @@ rule load_phobius_to_db:
         script=LOAD_SCRIPT
     shell:
         """
-        {LOADER_PYTHON} {params.script} tsv {input.results} {params.db} phobius --token {output.tkn}
+        {LOADER_PYTHON} {params.script} tsv {input.results} {params.db} phobius --token {output.tkn} --delete-organism {wildcards.genome}
         """
 
 
@@ -2831,7 +2831,7 @@ rule load_tmbed_to_db:
         script=LOAD_SCRIPT
     shell:
         """
-        {LOADER_PYTHON} {params.script} tsv {input.results} {params.db} tmbed --token {output.tkn}
+        {LOADER_PYTHON} {params.script} tsv {input.results} {params.db} tmbed --token {output.tkn} --delete-organism {wildcards.genome}
         """
 
 
@@ -2896,7 +2896,7 @@ rule load_signalp6_to_db:
         script=LOAD_SCRIPT
     shell:
         """
-        {LOADER_PYTHON} {params.script} tsv {input.results} {params.db} signalp6 --token {output.tkn}
+        {LOADER_PYTHON} {params.script} tsv {input.results} {params.db} signalp6 --token {output.tkn} --delete-organism {wildcards.genome}
         """
 
 
@@ -2946,7 +2946,7 @@ rule load_envelope_to_db:
         script=LOAD_SCRIPT
     shell:
         """
-        {LOADER_PYTHON} {params.script} tsv {input.results} {params.db} envelope --token {output.tkn}
+        {LOADER_PYTHON} {params.script} tsv {input.results} {params.db} envelope --token {output.tkn} --delete-organism {wildcards.genome}
         """
 
 
@@ -3001,7 +3001,7 @@ rule load_deepsig_to_db:
     shell:
         """
         {LOADER_PYTHON} {params.enrich_script} --input {input.results} --envelope-summary {input.envelope_summary} --output {input.results}
-        {LOADER_PYTHON} {params.script} tsv {input.results} {params.db} deepsig --token {output.tkn}
+        {LOADER_PYTHON} {params.script} tsv {input.results} {params.db} deepsig --token {output.tkn} --delete-organism {wildcards.genome}
         """
 
 
@@ -3056,7 +3056,7 @@ rule load_psortb_to_db:
     shell:
         """
         {LOADER_PYTHON} {params.enrich_script} --input {input.results} --envelope-summary {input.envelope_summary} --output {input.results}
-        {LOADER_PYTHON} {params.script} tsv {input.results} {params.db} psortb --token {output.tkn}
+        {LOADER_PYTHON} {params.script} tsv {input.results} {params.db} psortb --token {output.tkn} --delete-organism {wildcards.genome}
         """
 
 
@@ -3126,7 +3126,7 @@ rule load_signalp4_to_db:
     shell:
         """
         {LOADER_PYTHON} {params.enrich_script} --input {input.results} --envelope-summary {input.envelope_summary} --output {input.results}
-        {LOADER_PYTHON} {params.script} tsv {input.results} {params.db} signalp4 --token {output.tkn}
+        {LOADER_PYTHON} {params.script} tsv {input.results} {params.db} signalp4 --token {output.tkn} --delete-organism {wildcards.genome}
         """
 
 
