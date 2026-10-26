@@ -71,3 +71,29 @@ def test_a_rule_runs_to_the_next_rule(client):
                                          ('genome_identity.py', 'no_such_name')])
 def test_a_snippet_comes_only_from_quoted_files(client, path, symbol):
     assert client.get('/v1/code/snippet', params={'path': path, 'symbol': symbol}).status_code == 404
+
+
+# ---- the code password: the text comes only with it, where the server sets one ----
+
+def test_with_a_code_password_the_text_needs_it(client, monkeypatch):
+    import hashlib
+
+    from bioinformatics_tools.api.routers import code
+    monkeypatch.setenv(code.CODE_ENV, hashlib.sha256(b"open sesame").hexdigest())
+    monkeypatch.setattr(code.time, "sleep", lambda s: None)
+    path = 'genome_identity.py'
+    assert client.get('/v1/code/file', params={'path': path}).status_code == 403
+    assert client.post('/v1/code/file', json={'path': path, 'password': 'wrong'}).json()['detail'].startswith('code-locked')
+    assert client.post('/v1/code/file', json={'path': path, 'password': 'open sesame'}).json()['path'] == path
+    assert client.post('/v1/code/snippet', json={'path': path, 'symbol': 'genome_hash'}).status_code == 403
+    assert client.post('/v1/code/snippet', json={'path': path, 'symbol': 'genome_hash', 'password': 'open sesame'}).status_code == 200
+    assert client.post('/v1/code/unlock', json={'password': 'open sesame'}).json() == {'open': True}
+    assert client.post('/v1/code/unlock', json={'password': 'nope'}).status_code == 403
+    # The list of steps stays open: it names the scripts, not their text.
+    assert client.get('/v1/code').status_code == 200
+
+
+def test_without_a_code_password_the_code_is_open(client, monkeypatch):
+    from bioinformatics_tools.api.routers import code
+    monkeypatch.delenv(code.CODE_ENV, raising=False)
+    assert client.post('/v1/code/file', json={'path': 'genome_identity.py'}).status_code == 200

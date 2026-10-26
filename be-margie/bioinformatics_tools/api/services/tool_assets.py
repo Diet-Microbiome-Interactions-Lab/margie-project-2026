@@ -7,9 +7,11 @@ as the user_stores SLURM copy job.
 
 from __future__ import annotations
 
+import io
 import os
 import posixpath
 import shlex
+import tarfile
 
 from bioinformatics_tools.api.services import user_stores
 from bioinformatics_tools.api.services.user_stores import StoreError, _cfg_get, _run
@@ -20,12 +22,16 @@ WORKFLOW = 'margie_sb'
 SHARED_SIF = SHARED_FOLDER_DEFAULTS.get('sif_path') or WORKFLOW_PATH_DEFAULTS[WORKFLOW]['sif_path']
 SHARED_DB = SHARED_FOLDER_DEFAULTS.get('db_root') or WORKFLOW_PATH_DEFAULTS[WORKFLOW]['db_root']
 
-# Folders under the user's scratch root for what cannot go where the config points.
-SIF_SUB = 'sif'
-DB_SUB = 'reference-databases'
+# Folders in the working folder for what cannot go where the config points.
+SIF_SUB = user_stores.TOOL_FOLDERS['sif_path']
+DB_SUB = user_stores.TOOL_FOLDERS['db_root']
 
-# Heavy tools run only when chosen, so their absence never blocks other runs.
-OPTIONAL = {'gtdbtk', 'llm'}
+# The tools after scoring (comparisons with other genomes, synteny, the LLM layer) are set up only
+# when asked; the evidence report, which runs write, is not one of them.
+SCORING_PHASE = next(t['phase'] for t in MARGIE_SB_PHASED_TOOLS if t['key'] == 'scoring_heuristic')
+AFTER_SCORING = {t['key'] for t in MARGIE_SB_PHASED_TOOLS if t['phase'] > SCORING_PHASE and t['key'] != 'evidence'}
+# Heavy tools and those after scoring run only when chosen, so their absence blocks no other run.
+OPTIONAL = {'gtdbtk', 'llm'} | AFTER_SCORING
 # Databases a run uses when present: RASTtk's SEED files add subsystem details to its gene table,
 # and their download needs SEED access, so setup leaves them out unless asked.
 OPTIONAL_DATABASES = {'rasttk'}
@@ -38,6 +44,13 @@ BUILD_FOLDER = f'{user_stores.DEPOT}/margie-build'
 CLONE_NAME = 'margie-build'
 # Clone source when neither location has margie-build (MARGIE_BUILD_REPO on the server); empty: asked for.
 BUILD_REPO = os.environ.get('MARGIE_BUILD_REPO', '').strip()
+# A copy of margie-build that comes with this server (MARGIE_BUILD_BUNDLE, a folder in its image), put
+# in the account's home when the cluster has none; empty: none.
+BUILD_BUNDLE = os.environ.get('MARGIE_BUILD_BUNDLE', '').strip()
+# Left out of that copy: its history, and the notes written for the lab that keeps it.
+BUNDLE_SKIP = {'.git', 'README.md', '.build-config.sh.example'}
+# The mark MARGIE leaves in the copy it puts there, so a later copy may replace it (and nothing else).
+BUNDLE_MARK = '.margie-bundle'
 # What margie-build (build.sh) can make.
 BUILDABLE_IMAGES = {'quast', 'gtdbtk', 'prodigal', 'rasttk', 'cog', 'dbcan', 'eggnog', 'geneprop', 'interpro', 'kegg',
                     'merops', 'pfam', 'pgap', 'tcdb', 'tigrfam', 'uniprot', 'operon', 'phobius', 'tmbed', 'envelope',
@@ -62,8 +75,10 @@ def _expand(path: str, home: str) -> str:
 
 
 def _in_lab(path: str) -> bool:
-    """Returns True for paths under the lab's depot folder, which setup only reads."""
-    return path == user_stores.DEPOT or path.startswith(user_stores.DEPOT + '/')
+    """Returns True for paths under the lab's depot folder, which setup only reads (none when the
+    server names no group folder)."""
+    d = user_stores.DEPOT
+    return bool(d) and (path == d or path.startswith(d + '/'))
 
 
 def _join(folder: str, name: str) -> str:
@@ -126,7 +141,59 @@ def build_recipes(conn, cfg: dict, home: str) -> dict:
     code, out = _run(conn, '; '.join(f'test -r {q(p)}/build.sh && echo {i}' for i, (_, p) in enumerate(places)))
     found = [int(x) for x in out.split() if x.isdigit()]
     source, path = places[found[0]] if found else (None, None)
-    return {'path': path, 'source': source, 'clone_to': clone_to, 'url': BUILD_REPO}
+    return {'path': path, 'source': source, 'clone_to': clone_to, 'url': BUILD_REPO, 'bundled': bundled()}
+
+
+def bundled() -> bool:
+    """Whether this server has its own copy of margie-build to put on the cluster."""
+    return bool(BUILD_BUNDLE) and os.path.isfile(os.path.join(BUILD_BUNDLE, 'build.sh'))
+
+
+def _bundle_tar() -> bytes:
+    """The server's margie-build as a .tar.gz, without BUNDLE_SKIP."""
+    def keep(info: tarfile.TarInfo):
+        return None if set(info.name.split('/')) & BUNDLE_SKIP else info
+    buf = io.BytesIO()
+    with tarfile.open(fileobj=buf, mode='w:gz') as tar:
+        tar.add(BUILD_BUNDLE, arcname='margie-build', filter=keep)
+    return buf.getvalue()
+
+
+def install_bundle(conn, cfg: dict, home: str) -> dict:
+    """Puts this server's margie-build in ~/margie-build on the cluster (replacing a copy MARGIE put
+    there before, never a folder of the user's own) and points margie_sb.build_repo at it. The caller
+    saves the config."""
+    if not bundled():
+        raise StoreError('This server has no copy of margie-build to put on the cluster.', 409)
+    dest = f"{home.rstrip('/')}/{CLONE_NAME}"
+    q = shlex.quote
+    code, out = _run(conn, f'[ ! -e {q(dest)} ] || [ -f {q(dest)}/{BUNDLE_MARK} ]')
+    if code != 0:
+        raise StoreError(f"{dest} is there already and MARGIE did not make it: give margie-build's folder in "
+                         'Settings → Folders, or move that folder away.', 409)
+    tmp = f'{dest}.upload.tar.gz'
+    sftp = conn.connect().open_sftp()
+    try:
+        sftp.putfo(io.BytesIO(_bundle_tar()), tmp)
+    finally:
+        sftp.close()
+    code, out = _run(conn, f'rm -rf {q(dest)}.new && mkdir -p {q(dest)}.new && tar -xzf {q(tmp)} -C {q(dest)}.new '
+                           f'--strip-components=1 && touch {q(dest)}.new/{BUNDLE_MARK} && rm -rf {q(dest)} && '
+                           f'mv {q(dest)}.new {q(dest)}; s=$?; rm -f {q(tmp)}; exit $s', timeout=300)
+    if code != 0:
+        raise StoreError(f'Could not put margie-build in {dest}: {out.strip() or "tar failed"}', 502)
+    user_stores._cfg_set(cfg, f'{WORKFLOW}.build_repo', dest)
+    return build_recipes(conn, cfg, home)
+
+
+def build_env(conn, cfg: dict) -> list[list]:
+    """margie-build's settings for an account outside the group (the lab's are its defaults): the
+    licence records in the working folder, the user as the operator, and the user's own group."""
+    if user_stores.reads_group(conn):
+        return []
+    working = user_stores.working_folder(conn, cfg)
+    return [['env', 'MARGIE_RECORDS_DIR', f'{working}/licensing-records'], ['env', 'MARGIE_OPERATOR', '@user'],
+            ['env', 'MARGIE_SHARED_GROUP', '@group']]
 
 
 def clone_recipes(conn, cfg: dict, home: str, url: str | None = None) -> dict:
@@ -173,6 +240,9 @@ def status(conn, cfg: dict, home: str) -> dict:
         r['status'] = got[0] if got[0] in ('ok', 'missing', 'unknown') else 'unknown'
         shared_ok = len(got) > 1 and got[1] == 'ok'
         r['writable'] = len(got) > 2 and got[2] == 'w' and not _in_lab(r['path'])
+        # The group's copy is named only where this account reads it.
+        if not shared_ok and r['shared'] != r['path'] and _in_lab(r['shared']):
+            r['shared'] = ''
         stem = r['name'][:-4] if r['name'].endswith('.sif') else r['name']
         r['source'] = None
         r['url'] = ''
@@ -265,13 +335,14 @@ def _target(conn, path: str, home: str) -> str:
 def plan(conn, cfg: dict, home: str, include_builds: bool = True, accept: set[str] | None = None,
          include_optional: bool = False, sif_to: str | None = None, db_to: str | None = None) -> dict:
     """Returns the setup plan: items to fetch, skipped rows with reasons, and config changes.
-    Targets are sif_to/db_to if given, else the configured folder if writable, else scratch.
+    Targets are sif_to/db_to if given, else the configured folder if writable, else sif and reference-databases/db in the working folder.
     Optional tools are included only with include_optional."""
     accept = accept or set()
     sif_choice = _target(conn, sif_to, home) if sif_to and sif_to.strip() else None
     db_choice = _target(conn, db_to, home) if db_to and db_to.strip() else None
     st = status(conn, cfg, home)
     root = user_stores.scratch_root(conn, cfg)
+    working = user_stores.working_folder(conn, cfg)
     recipes = build_recipes(conn, cfg, home)
     rows = st['rows']
     todo = [r for r in rows if r['status'] != 'ok']
@@ -307,7 +378,7 @@ def plan(conn, cfg: dict, home: str, include_builds: bool = True, accept: set[st
     if images and sif_choice:
         sif_target = sif_choice
     elif images and not st['sif_dir_writable']:
-        sif_target = f'{root}/{SIF_SUB}'
+        sif_target = f'{working}/{SIF_SUB}'
     if images and sif_target != st['sif_dir']:
         config[f'{WORKFLOW}.sif_path'] = sif_target
         fetching = {r['id'] for r in images}
@@ -316,8 +387,8 @@ def plan(conn, cfg: dict, home: str, include_builds: bool = True, accept: set[st
         items.append({**_item(r), 'dst': f"{sif_target}/{r['name']}"})
     ready_images = {r['tool'] for r in rows if r['kind'] == 'image' and r['status'] == 'ok'} | {r['tool'] for r in images}
 
-    # Databases go to the chosen folder, configured path or scratch; db.<tool> follows.
-    db_home = db_choice or f'{root}/{DB_SUB}'
+    # Databases go to the chosen folder, configured path or reference-databases/db in the working folder; db.<tool> follows.
+    db_home = db_choice or f'{working}/{DB_SUB}'
     for r in todo:
         if r['kind'] != 'database' or not usable(r):
             continue
@@ -341,6 +412,7 @@ def plan(conn, cfg: dict, home: str, include_builds: bool = True, accept: set[st
     free = user_stores.depot_free(conn, root) if items else None
     return {
         'root': root,
+        'working': working,
         'sif_dir': sif_target,
         # Where newly set-up databases go.
         'db_dir': db_choice or (db_home if any(k.startswith('db.') for k in config) else st['db_root']),
@@ -389,6 +461,7 @@ def start(conn, cfg: dict, home: str, include_builds: bool = True, accept: set[s
         steps.append(['link', link['src'], link['dst']])
     if p['builds']:
         steps.append(['repo', p['recipes']['path']])
+        steps.extend(build_env(conn, cfg))
     for i in p['items']:
         what = 'container' if i['kind'] == 'image' else 'database'
         if i['action'] == 'copy':
@@ -400,7 +473,7 @@ def start(conn, cfg: dict, home: str, include_builds: bool = True, accept: set[s
             name = i['dst'].rsplit('/', 1)[-1]
             tool = name[:-4] if i['kind'] == 'image' else i['tool']
             steps.append(['build', f"Building the {i['label']} {what}", mode, tool, p['sif_dir'],
-                          posixpath.dirname(i['dst']) if i['kind'] == 'database' else f"{p['root']}/{DB_SUB}",
+                          posixpath.dirname(i['dst']) if i['kind'] == 'database' else f"{p['working']}/{DB_SUB}",
                           LICENCE_STATEMENT if i['gated'] else ''])
     # Builds download and index databases, so they get more time and memory.
     heavy = p['builds'] > 0

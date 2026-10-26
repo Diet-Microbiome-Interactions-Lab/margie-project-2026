@@ -2,6 +2,8 @@
 	import { ChevronRight, ExternalLink } from 'lucide-svelte';
 	import { api } from '$lib/api';
 	import CodeBlock from './CodeBlock.svelte';
+	import CodeUnlock from './CodeUnlock.svelte';
+	import { isCodeLocked } from '$lib/cluster/code-key';
 	import type { FaqCode } from './faq';
 
 	/**
@@ -25,15 +27,20 @@
 	let open = $state(false);
 	let snippet = $state<Snippet | null>(null);
 	let error = $state('');
+	/** The server keeps the code behind its password, and this visit has not given it yet. */
+	let locked = $state(false);
+
+	function load() {
+		locked = false;
+		api<Snippet>(`/code/snippet?path=${encodeURIComponent(code.path)}&symbol=${encodeURIComponent(code.symbol)}`).then(
+			(r) => (snippet = r),
+			(e) => (isCodeLocked(e) ? (locked = true) : (error = e?.message ?? 'The code could not be read here.'))
+		);
+	}
 
 	function toggle() {
 		open = !open;
-		if (open && !snippet && !error) {
-			api<Snippet>(`/code/snippet?path=${encodeURIComponent(code.path)}&symbol=${encodeURIComponent(code.symbol)}`).then(
-				(r) => (snippet = r),
-				(e) => (error = e?.message ?? 'The code could not be read here.')
-			);
-		}
+		if (open && !snippet && !error) load();
 	}
 </script>
 
@@ -56,6 +63,8 @@
 					{#if snippet.listed}| <a class="mg-link" href="/code?file={encodeURIComponent(code.path)}">the whole file</a>{/if}
 					| <a class="mg-link" href={BLOB + code.path} target="_blank" rel="noreferrer">on GitHub <ExternalLink size={12} /></a>
 				</p>
+			{:else if locked}
+				<CodeUnlock onopen={load} />
 			{:else if error}
 				<p class="fc-links">{error} <a class="mg-link" href={BLOB + code.path} target="_blank" rel="noreferrer">{code.path} on GitHub</a>.</p>
 			{:else}

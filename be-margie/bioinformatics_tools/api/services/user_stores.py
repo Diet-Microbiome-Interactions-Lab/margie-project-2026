@@ -25,6 +25,9 @@ LOGGER = logging.getLogger(__name__)
 DEPOT = os.environ.get('MARGIE_SHARED_ROOT', '').rstrip('/')
 # Base copies, one folder per database; each user's backups go beside them.
 GENERATED = f'{DEPOT}/databases/margie-generated-databases' if DEPOT else ''
+# A group folder to suggest from the SLURM account, where the server names a pattern
+# (MARGIE_GROUP_FOLDER_PATTERN, with {account} in it); shown in Settings, not written.
+GROUP_PATTERN = os.environ.get('MARGIE_GROUP_FOLDER_PATTERN', '').strip()
 
 
 def depot(cfg: dict | None) -> str:
@@ -77,6 +80,9 @@ OUTPUT_NAME = 'margie-output'
 DEFAULT_FOLDERS = {'margie_sb.input_path': INPUT_NAME, 'margie_sb.output_path': OUTPUT_NAME}
 # The folder those (and the databases folder) go in when left empty: /scratch/<cluster>/<user>/margie.
 WORKING_KEY = 'margie_sb.working_folder'
+# The containers and reference databases folders a config leaves empty: the group's where the
+# account reads them (SHARED_FOLDER_DEFAULTS), else these folders in the working folder.
+TOOL_FOLDERS = {'sif_path': 'sif', 'db_root': 'reference-databases/db'}
 # Bookkeeping folder inside it: the store manifest and the copy under way.
 STATE_DIR = '.margie'
 
@@ -241,26 +247,66 @@ def scratch_root(conn, cfg: dict) -> str:
     return f'{working_folder(conn, cfg)}/{ROOT_NAME}'
 
 
+def readable(conn, paths: list[str]) -> set[str]:
+    """The folders among paths that the account can open and read."""
+    q = shlex.quote
+    if not paths:
+        return set()
+    _, out = _run(conn, '; '.join(f'[ -r {q(p)} ] && [ -x {q(p)} ] && echo {i}' for i, p in enumerate(paths)) + '; true')
+    hits = {int(x) for x in out.split() if x.isdigit()}
+    return {p for i, p in enumerate(paths) if i in hits}
+
+
+def in_group(path: str) -> bool:
+    """Whether path is the group's shared folder (DEPOT) or under it."""
+    return bool(DEPOT) and (path == DEPOT or path.startswith(DEPOT + '/'))
+
+
+def reads_group(conn) -> bool:
+    """Whether the account can read the group's shared folder (a member of the group can)."""
+    return bool(DEPOT) and DEPOT in readable(conn, [DEPOT])
+
+
+def suggested_group(cfg: dict | None) -> str:
+    """The group folder GROUP_PATTERN gives for the config's SLURM account; '' without either."""
+    account = str(_cfg_get(cfg or {}, 'compute.cluster_default.account') or '').strip()
+    if not GROUP_PATTERN or not account or not all(c.isalnum() or c in '._-' for c in account):
+        return ''
+    return GROUP_PATTERN.replace('{account}', account).rstrip('/')
+
+
+def tool_folder(conn, name: str, working: str, seen: set[str] | None = None) -> str:
+    """Where an empty containers (sif_path) or reference databases (db_root) setting points: the
+    group's folder when the account reads it, else sif or reference-databases/db in the working folder."""
+    group = SHARED_FOLDER_DEFAULTS.get(name, '')
+    if group and group in (seen if seen is not None else readable(conn, [group])):
+        return group
+    return f'{working}/{TOOL_FOLDERS[name]}'
+
+
 def fill_default_folders(conn, cfg: dict) -> bool:
-    """Sets the folders a config leaves empty: the containers and reference databases to the
-    group's (SHARED_FOLDER_DEFAULTS), the working folder to margie in <scratch>, and the genomes
-    and results folders to margie-input and margie-output in it, made (with the databases folder)
-    so files can go straight in. A folder chosen in Settings is kept. Returns True when the config
+    """Sets the folders a config leaves empty: the working folder to margie in <scratch>; the
+    genomes and results folders to margie-input and margie-output in it; and the containers and
+    reference databases to the group's where the account reads them, else sif and reference-databases/db in the
+    working folder. The folders in the working folder are made (with the databases folder) so
+    files can go straight in. A folder chosen in Settings is kept. Returns True when the config
     changed."""
     unset = lambda key: not str(_cfg_get(cfg, key) or '').strip()  # noqa: E731
-    changed = False
-    for name, path in SHARED_FOLDER_DEFAULTS.items():
-        if unset(f'margie_sb.{name}'):
-            _cfg_set(cfg, f'margie_sb.{name}', path)
-            changed = True
+    tools = [n for n in TOOL_FOLDERS if unset(f'margie_sb.{n}')]
     empty = [k for k in DEFAULT_FOLDERS if unset(k)]
-    if not empty and not unset(WORKING_KEY):
-        return changed
+    if not tools and not empty and not unset(WORKING_KEY):
+        return False
     working = working_folder(conn, cfg)
     _cfg_set(cfg, WORKING_KEY, working)
     made = [f'{working}/{DEFAULT_FOLDERS[k]}' for k in empty]
     for k, path in zip(empty, made):
         _cfg_set(cfg, k, path)
+    seen = readable(conn, [SHARED_FOLDER_DEFAULTS[n] for n in tools if SHARED_FOLDER_DEFAULTS.get(n)])
+    for n in tools:
+        path = tool_folder(conn, n, working, seen)
+        _cfg_set(cfg, f'margie_sb.{n}', path)
+        if path.startswith(f'{working}/'):
+            made.append(path)
     made.append(scratch_root(conn, cfg))
     _run(conn, 'mkdir -p -- ' + ' '.join(shlex.quote(p) for p in made))
     return True
@@ -662,6 +708,14 @@ while IFS=$'\t' read -r kind a b c d e f; do
     repo)
       repo_url="$a"
       ;;
+    env)
+      # margie-build's settings for an account outside the group: these three only.
+      case "$a" in MARGIE_RECORDS_DIR|MARGIE_OPERATOR|MARGIE_SHARED_GROUP) ;; *) fail "$a" "margie-build takes no setting $a" ;; esac
+      v="$b"
+      [ "$v" = "@user" ] && v="$USER"
+      [ "$v" = "@group" ] && v="$(id -gn)"
+      export "$a=$v"
+      ;;
     build)
       label="$a"; mode="$b"; tool="$c"; sifdir="$d"; dbdir="$e"; statement="$f"
       say running "$label" 0 ""
@@ -775,6 +829,21 @@ def _config_paths(store: dict, target: str) -> dict:
     """Returns the config values for a store whose working copy is at target."""
     return {key: (posixpath.join(target, inner) if inner else target) if store['kind'] == 'dir' else target
             for key, inner in store['config'].items()}
+
+
+def default_paths(root: str, user: str) -> dict:
+    """The settings of the databases folder as a first setup in root makes them: each store's first
+    working copy, and the run archives (OUTPUT_DIRS), for Settings to show while unset."""
+    out: dict = {}
+    for st in STORES:
+        out.update(_config_paths(st, working_path(st, root, user, 1)))
+    out.update({key: f'{root}/{sub}' for key, sub in OUTPUT_DIRS.items()})
+    return out
+
+
+def database_folders(root: str) -> list[str]:
+    """The folders in the databases folder that a first setup fills (each store's and the archives')."""
+    return sorted({f"{root}/{st['sub']}" for st in STORES} | {f'{root}/{sub}' for sub in OUTPUT_DIRS.values()})
 
 
 def status(conn, cfg: dict, user: str) -> dict:

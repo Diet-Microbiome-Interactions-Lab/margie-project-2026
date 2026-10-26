@@ -5,19 +5,20 @@
 	import { tick, untrack } from 'svelte';
 	import { beforeNavigate } from '$app/navigation';
 	import { page } from '$app/state';
-	import { Bot, ChevronRight, ChevronsDownUp, ChevronsUpDown, CircleHelp, Cpu, FileCode, Database, Folder, FolderOpen, Folders, HardDrive, Layers, ListChecks, Lock, LockOpen, MemoryStick, RotateCcw, ScrollText, Server, SlidersHorizontal, Wrench } from 'lucide-svelte';
+	import { Bot, Check, ChevronRight, ChevronsDownUp, ChevronsUpDown, CircleHelp, Cpu, FileCode, Database, Folder, FolderOpen, HardDrive, Layers, ListChecks, Lock, LockOpen, MemoryStick, RotateCcw, ScrollText, Server, SlidersHorizontal, Wrench, X } from 'lucide-svelte';
 	import { api, formatBytes, post } from '$lib/api';
 	import { LICENCE_LEGAL_NOTICE, LICENCE_STATEMENT, statementMatches } from '$lib/licence';
 	import Switch from '$lib/workspace/Switch.svelte';
 	import FolderPick from '$lib/workspace/FolderPick.svelte';
 	import { advanced } from '$lib/workspace/advanced-lock.svelte';
-	import { ws, type Setting } from '$lib/workspace/data.svelte';
+	import { ws, type CheckRow, type Setting } from '$lib/workspace/data.svelte';
 	import { ui } from '$lib/workspace/ui.svelte';
 	import { CONFIRMED, GUARDED, isConfirmed, isGuarded, unlocks } from '$lib/workspace/guarded';
 	import DatabasesPanel from '$lib/workspace/DatabasesPanel.svelte';
 	import FreshDatabases from './FreshDatabases.svelte';
-	import { DB_BACKUPS, DB_PARTS } from '$lib/cluster/backend';
+	import { DB_BACKUPS, DB_PARTS, FOLDER_ORDER } from '$lib/cluster/backend';
 	import { NOT_YET } from '$lib/license';
+	import WorkingFolderSetup from './WorkingFolderSetup.svelte';
 	import { backend } from '$lib/workspace/backend.svelte';
 	import { uiBase } from '$lib/workspace/base.svelte';
 	import { rangeOf } from './settingRange';
@@ -36,15 +37,14 @@
 		// A cluster's: the SLURM account and limits, and its job history.
 		{ id: 'cluster', title: 'Cluster', icon: Server, match: (s) => s.group === 'Cluster' },
 		{ id: 'runtime', title: 'Running', icon: Cpu, match: (s) => s.group === 'Runtime' },
-		{ id: 'folders', title: 'Folders', icon: FolderOpen, match: (s) => s.group === 'Folders' || s.group === 'Setup' },
+		// Folders, with any folder setting of no other part (Per tool has each tool's database).
+		{ id: 'folders', title: 'Folders', icon: FolderOpen, match: (s) => s.group === 'Folders' || s.group === 'Setup' || s.group === 'Other folders' },
 		{ id: 'tools', title: 'Tool options', icon: Wrench, match: (s) => s.group === 'Tools' && s.type !== 'flag' },
 		// A cluster's: resources shared by every tool, per phase, and per tool.
 		{ id: 'phases', title: 'Phases', icon: Layers, match: (s) => s.group === 'Phases', wide: true },
 		{ id: 'per-tool', title: 'Per tool', icon: SlidersHorizontal, match: (s) => s.group === 'Per tool', closed: true, wide: true },
 		// A cluster's: the databases a run reads and grows (your working copies) and where a first run copies them from.
 		{ id: 'databases', title: 'Databases', icon: Database, match: (s) => s.group === 'Databases' },
-		// Derived from the folders above; rarely changed.
-		{ id: 'other-folders', title: 'Other folders', icon: Folders, match: (s) => s.group === 'Other folders' },
 		// The built-in model for Chat with the genome.
 		{ id: 'llm', title: 'Built-in model', icon: Bot, match: (s) => s.group === 'LLM' }
 	];
@@ -61,10 +61,29 @@
 		const k = DB_PARTS.findIndex((p) => s.label.startsWith(`${p}: `));
 		return k < 0 ? DB_PARTS.length : k;
 	};
+	/** The tools after scoring (comparisons with other genomes, synteny, the LLM layer): left out of Per
+	 *  tool, as setup leaves them out; the evidence report stays. */
+	const afterScoring = $derived.by(() => {
+		// Each tool's phase, from its settings ("Phase 15: threads for LLM").
+		const phase = new Map<string, number>();
+		for (const s of ws.settings) {
+			const m = s.description.match(/^Phase\s+(\d+)/i);
+			if (m && s.key.startsWith('margie_sb.')) phase.set(s.key.split('.')[1], Number(m[1]));
+		}
+		const scoring = phase.get('scoring_heuristic') ?? 11;
+		return new Set([...phase].filter(([t, n]) => n > scoring && t !== 'evidence').map(([t]) => t));
+	});
 	const groups = $derived(
 		GROUPS.map((g) => {
-			const items = ws.settings.filter((s) => g.match(s) && applies(s));
-			return { ...g, items: g.id === 'databases' ? [...items].sort((a, b) => partRank(a) - partRank(b)) : items };
+			const items = ws.settings.filter((s) => g.match(s) && applies(s) && !(g.id === 'per-tool' && afterScoring.has(s.key.split('.')[1])));
+			const folderRank = (s: Setting) => (FOLDER_ORDER.includes(s.key) ? FOLDER_ORDER.indexOf(s.key) : FOLDER_ORDER.length);
+			const sorted =
+				g.id === 'databases'
+					? [...items].sort((a, b) => partRank(a) - partRank(b))
+					: g.id === 'folders'
+						? [...items].sort((a, b) => folderRank(a) - folderRank(b))
+						: items;
+			return { ...g, items: sorted };
 		}).filter((g) => g.items.length)
 	);
 
@@ -186,6 +205,7 @@
 			const same = rows.find((r) => r.head === c.head);
 			if (same) {
 				for (const it of c.items) same.at.set(it.label, it);
+				if (perTool && same.phase === null) same.phase = phaseOf(c.items[0].s);
 				continue;
 			}
 			rows.push({
@@ -206,6 +226,13 @@
 		cols.sort((a, b) => Number(b === 'Partition') - Number(a === 'Partition'));
 		return { rows, cols, rest: all.filter((c) => !c.cells || !c.head) };
 	}
+
+	/** A Per tool row's tool: the key its settings carry (margie_sb.<tool>.threads, db.<tool>). */
+	const toolOf = (row: Row) => [...row.at.values()][0]?.s.key.split('.')[1] ?? '';
+	const imageOf = (tool: string) => ws.images.find((r) => r.name === tool);
+	const databaseOf = (tool: string) => ws.databases.find((r) => r.name === tool);
+	/** What the chosen tools need that is not there yet (Install sets it up). */
+	const notFound = $derived(backend.cluster && ws.needs.known ? [...ws.needs.images.map((n) => `${n}.sif`), ...ws.needs.databases.map((n) => `${n} database`)] : []);
 
 	/**
 	 * The narrow cards dealt into equal columns, as many as the width holds:
@@ -310,14 +337,6 @@
 		} finally {
 			restoring = false;
 		}
-	}
-
-	// ------------------------------------------------ a cluster account without config.yaml
-	let creating = $state(false);
-	async function createConfig() {
-		creating = true;
-		await ws.createDefaultConfig();
-		creating = false;
 	}
 
 	// ------------------------------------------------ edits, saved per section
@@ -573,7 +592,7 @@
 				step={s.type === 'int' ? r.step : undefined}
 				aria-label={s.label}
 				title={s.type === 'int' ? `${r.min} to ${r.max}${r.unit ? ` ${r.unit}` : ''}` : undefined}
-				placeholder={s.default}
+				placeholder={s.placeholder || s.default}
 				spellcheck="false"
 				bind:value={draft[s.key]}
 				onkeydown={(e) => e.key === 'Enter' && e.currentTarget.blur()}
@@ -592,7 +611,7 @@
 					class="mg-input mg-mono sb-path-area"
 					rows="1"
 					aria-label={s.label}
-					placeholder={s.default}
+					placeholder={s.placeholder || s.default}
 					spellcheck="false"
 					bind:value={draft[s.key]}
 					use:pathComplete
@@ -608,7 +627,7 @@
 				<input
 					class="mg-input mg-mono"
 					aria-label={s.label}
-					placeholder={s.default}
+					placeholder={s.placeholder || s.default}
 					spellcheck="false"
 					bind:value={draft[s.key]}
 					use:pathComplete
@@ -623,11 +642,26 @@
 			type={s.type === 'int' ? 'number' : 'text'}
 			min={s.type === 'int' ? 1 : undefined}
 			aria-label={s.label}
-			placeholder={s.default}
+			placeholder={s.placeholder || s.default}
 			spellcheck="false"
 			bind:value={draft[s.key]}
 			onkeydown={(e) => e.key === 'Enter' && e.currentTarget.blur()}
 		/>
+	{/if}
+{/snippet}
+
+<!-- Whether a container or database is where a run looks for it: found, not found, or not readable. -->
+{#snippet mark(r: CheckRow | undefined)}
+	{#if r}
+		{#if r.status === 'ok'}
+			<span class="sb-mark ok" title="Found" aria-label="Found"><Check size={13} /></span>
+		{:else if r.status === 'missing'}
+			<span class="sb-mark no" title="Not found: set it up on Install" aria-label="Not found"><X size={13} /></span>
+		{:else if r.status === 'optional'}
+			<span class="sb-mark opt" title="Not found; needed only when the tool is chosen" aria-label="Not found"><X size={13} /></span>
+		{:else}
+			<span class="sb-mark unk" title={r.detail} aria-label="Cannot be read">?</span>
+		{/if}
 	{/if}
 {/snippet}
 
@@ -746,11 +780,23 @@
 										{@const it = row.at.get(col)}
 										{#if it}
 											<div class="sb-tf" class:path={paths.has(col)} id={it.s.key} title={it.s.description}>
-												<span class="sb-tf-lbl"><span>{col}</span>{@render dot(it.s)}<span class="mg-grow"></span>{@render undo(it.s)}</span>
+												<span class="sb-tf-lbl"
+													><span>{col}</span>{#if tools && col === 'Database'}{@render mark(databaseOf(toolOf(row)))}{/if}{@render dot(it.s)}<span class="mg-grow"></span>{@render undo(it.s)}</span
+												>
 												<div class="sb-field">{@render control(it.s, true)}</div>
 											</div>
 										{/if}
 									{/each}
+									{#if tools && backend.cluster}
+										{@const img = imageOf(toolOf(row))}
+										{#if img}
+											<!-- Where a run looks for the tool's container: <containers folder>/<tool>.sif, set under Folders. -->
+											<div class="sb-tf path sb-tf-ro" aria-label="{row.head}: container">
+												<span class="sb-tf-lbl"><span>Container</span>{@render mark(img)}</span>
+												<span class="mg-mono sb-ro" title="{img.detail} (the Containers folder is set under Folders)">{img.detail}</span>
+											</div>
+										{/if}
+									{/if}
 								</div>
 								{/if}
 							</article>
@@ -818,9 +864,15 @@
 							<ul class="sb-cells" use:even={[300, 2]}>
 								{#each c.items as { s } (s.key)}
 									{@const flag = s.type === 'flag' && !locked(s)}
-									<li class="sb-cell" id={s.key}>
+									{@const own = g.id === 'folders' && !!s.description && !ui.explain}
+									<li class="sb-cell" id={s.key} data-help={own && help[s.key] ? 'on' : undefined}>
 										<div class="sb-cell-top">
 											<span class="sb-lbl">{s.label}</span>{@render dot(s)}
+											{#if own}
+												<button type="button" class="sb-q" aria-pressed={!!help[s.key]} aria-label="What is this folder?" title="What is this folder?" onclick={() => (help[s.key] = !help[s.key])}
+													><CircleHelp size={13} /></button
+												>
+											{/if}
 											<span class="mg-grow"></span>
 											{#if flag}{@render control(s)}{:else}{@render reset(s)}{/if}
 										</div>
@@ -848,11 +900,19 @@
 {/snippet}
 
 <div class="sb">
+	{#if notFound.length && !ws.configMissing}
+		<p class="sb-need" role="status">
+			<span
+				><b>Some containers and reference databases your runs need were not found</b>: {notFound.slice(0, 8).join(' | ')}{notFound.length > 8
+					? ` | and ${notFound.length - 8} more`
+					: ''}.</span
+			>
+			<a class="mg-link" href={uiBase.to('/install')}>Set them up on Install</a>
+		</p>
+	{/if}
 	{#if backend.cluster && ws.configMissing}
-		<div class="sb-missing" role="status">
-			<span><b>No configuration on the cluster yet.</b> MARGIE reads her folders, databases and SLURM account from a config.yaml in your home folder; write the default one, then set your SLURM account under Cluster.</span>
-			<button type="button" class="mg-btn small primary" disabled={creating} onclick={createConfig}>{creating ? 'Writing…' : 'Write the default configuration'}</button>
-		</div>
+		<!-- No config.yaml yet: the working folder first; setting it up writes the default config, then set your SLURM account under Cluster. -->
+		<WorkingFolderSetup headingLevel={2} />
 	{/if}
 	<nav class="sb-nav" aria-label="Settings groups" use:even={118}>
 		{#each groups as g (g.id)}
@@ -1033,21 +1093,55 @@
 		gap: var(--cr-stack, 16px);
 		color: var(--mg-text);
 	}
-	.sb-missing {
+	.sb-need {
 		display: flex;
 		flex-wrap: wrap;
-		align-items: center;
-		gap: 10px 16px;
-		padding: 12px 16px;
+		align-items: baseline;
+		gap: 6px 14px;
+		margin: 0;
+		padding: 10px 14px;
 		border: 1px solid color-mix(in srgb, var(--mg-warn) 45%, var(--mg-border));
 		border-radius: var(--mg-r);
-		background: color-mix(in srgb, var(--mg-warn) 7%, var(--cr-card, var(--mg-surface)));
+		background: var(--mg-surface);
 		font-size: var(--mg-fs-sm);
 	}
-	.sb-missing span {
-		flex: 1 1 380px;
+	.sb-mark {
+		display: inline-grid;
+		place-items: center;
+		width: 16px;
+		height: 16px;
+		font-size: 11px;
+		font-weight: 700;
 	}
-
+	.sb-mark.ok {
+		color: var(--mg-ok);
+	}
+	.sb-mark.no {
+		color: var(--mg-danger);
+	}
+	.sb-mark.opt,
+	.sb-mark.unk {
+		color: var(--mg-text-3);
+	}
+	.sb-ro {
+		font-size: var(--mg-fs-xs);
+		color: var(--mg-text-2);
+		overflow-wrap: anywhere;
+	}
+	.sb-q {
+		display: inline-grid;
+		place-items: center;
+		padding: 2px;
+		border: 0;
+		border-radius: 50%;
+		background: none;
+		color: var(--mg-text-3);
+		cursor: pointer;
+	}
+	.sb-q:hover,
+	.sb-q[aria-pressed='true'] {
+		color: var(--mg-accent-ink, var(--mg-accent));
+	}
 	/* ---- the chips along the top ---- */
 	/* The chips share the width evenly, the tally of changes as the last one. */
 	/* Where MARGIE runs: one line of this computer's resources, one of folders to jump to. */
