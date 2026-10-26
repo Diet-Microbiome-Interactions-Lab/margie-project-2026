@@ -136,7 +136,7 @@
 	.analyze {
 		display: flex;
 		flex-direction: column;
-		gap: var(--cr-gutter, 16px);
+		gap: var(--cr-stack, 16px);
 	}
 	.card {
 		border: 1px solid var(--mg-border);
@@ -266,7 +266,7 @@
 		display: flex;
 		flex-direction: column;
 		gap: 10px;
-		padding: var(--mg-pad) calc(var(--mg-pad) * 1.2);
+		padding: var(--cr-box-pad, 16px 18px);
 	}
 	.acts {
 		display: flex;

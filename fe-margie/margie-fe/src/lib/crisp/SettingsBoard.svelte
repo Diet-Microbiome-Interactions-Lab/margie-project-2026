@@ -1030,7 +1030,7 @@
 	.sb {
 		display: flex;
 		flex-direction: column;
-		gap: var(--mg-pad);
+		gap: var(--cr-stack, 16px);
 		color: var(--mg-text);
 	}
 	.sb-missing {
@@ -1055,8 +1055,7 @@
 		display: flex;
 		flex-direction: column;
 		gap: 8px;
-		margin-bottom: 12px;
-		padding: 10px 14px;
+		padding: var(--cr-note-pad, 10px 18px);
 		border: 1px solid var(--mg-border);
 		border-radius: var(--mg-r);
 		background: var(--cr-card, var(--mg-surface));
@@ -1213,7 +1212,7 @@
 		align-items: center;
 		gap: 10px;
 		margin-top: 2px;
-		padding: 4px var(--mg-pad) 14px;
+		padding: 4px var(--cr-box-x, 18px) 14px;
 	}
 	@media (min-width: 1000px) {
 		.sb > .sb-card .sb-sub.sb-sub-fold {
@@ -1229,7 +1228,7 @@
 	.sb-cols {
 		display: grid;
 		grid-template-columns: repeat(var(--n, 1), minmax(0, 1fr));
-		gap: var(--mg-pad);
+		gap: var(--cr-stack, 16px);
 		align-items: stretch;
 	}
 	.sb-col {
@@ -1260,7 +1259,7 @@
 		display: flex;
 		align-items: center;
 		gap: 10px;
-		padding: 12px var(--mg-pad);
+		padding: 12px var(--cr-box-x, 18px);
 	}
 	.sb-ico {
 		display: grid;
@@ -1361,7 +1360,7 @@
 
 	/* ---- a phase's settings, side by side ---- */
 	.sb-sub {
-		padding: 12px var(--mg-pad) 14px;
+		padding: 12px var(--cr-box-x, 18px) 14px;
 	}
 	/* Databases → Backups: folded until opened. */
 	.sb-backups > summary {
@@ -1581,7 +1580,7 @@
 		display: grid;
 		grid-template-columns: repeat(auto-fill, minmax(min(100%, 290px), 1fr));
 		gap: 10px;
-		padding: 14px var(--mg-pad) 16px;
+		padding: 14px var(--cr-box-x, 18px) 16px;
 	}
 	.sb-grid.cards {
 		grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -1847,7 +1846,7 @@
 		display: grid;
 		grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
 		gap: 10px;
-		padding: 14px var(--mg-pad) var(--mg-pad);
+		padding: 14px var(--cr-box-x, 18px) var(--mg-pad);
 		border-top: 1px solid var(--mg-border);
 	}
 	.sb-tile-name {
@@ -1867,7 +1866,7 @@
 		display: flex;
 		flex-direction: column;
 		gap: 16px;
-		padding: 14px var(--mg-pad) var(--mg-pad);
+		padding: 14px var(--cr-box-x, 18px) var(--mg-pad);
 		border-top: 1px solid var(--mg-border);
 	}
 	.sb-use {

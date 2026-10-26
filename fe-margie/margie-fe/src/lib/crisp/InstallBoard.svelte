@@ -195,7 +195,7 @@
 	.ib-pair {
 		display: grid;
 		grid-template-columns: repeat(2, minmax(0, 1fr));
-		gap: var(--cr-gutter, 16px);
+		gap: var(--cr-stack, 16px);
 		align-items: stretch;
 		color: var(--mg-text);
 	}
@@ -204,7 +204,7 @@
 		flex-direction: column;
 		gap: 12px;
 		min-width: 0;
-		padding: 16px 18px;
+		padding: var(--cr-box-pad, 16px 18px);
 		border: 1px solid var(--cr-card-edge, var(--mg-border));
 		border-radius: var(--mg-r);
 		background: var(--cr-card, var(--mg-surface));

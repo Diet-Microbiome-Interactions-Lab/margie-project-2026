@@ -10,18 +10,18 @@
 	-webkit-font-smoothing: auto;
 }
 
-/* A page's title as on Dane's pages: large, bold, in the primary colour; what the page
-   is for underneath it, and the page's buttons at the right. */
+/* A page's title as on Dane's pages: large, bold, in the primary colour; on its line at the
+   right, the page's count or state and its buttons; what the page is for underneath. */
 .crisp .cr-page {
 	padding-top: 22px;
-	gap: 16px;
+	gap: var(--cr-stack, 16px);
 }
 .crisp .cr-head {
-	grid-template-columns: minmax(0, 1fr) auto;
+	grid-template-columns: minmax(0, 1fr) auto auto;
 	grid-template-areas:
-		'title acts'
-		'lede meta';
-	align-items: end;
+		'title meta acts'
+		'lede lede lede';
+	align-items: center;
 	gap: 6px 18px;
 }
 .crisp .cr-title {
@@ -40,10 +40,22 @@
 	color: var(--mg-text-2);
 }
 .crisp .cr-meta {
-	align-self: end;
+	align-self: center;
 }
 .crisp .cr-head-acts {
-	align-self: end;
+	align-self: center;
+}
+@media (max-width: 700px) {
+	.crisp .cr-head {
+		grid-template-columns: minmax(0, 1fr) auto;
+		grid-template-areas:
+			'title acts'
+			'meta meta'
+			'lede lede';
+	}
+	.crisp .cr-meta {
+		justify-self: start;
+	}
 }
 
 /* ---------------------------------------------------------------- blocks */

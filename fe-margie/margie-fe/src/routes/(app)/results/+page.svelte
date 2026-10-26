@@ -47,7 +47,7 @@
 <style>
 	.res-beta {
 		margin: 0;
-		padding: 9px 14px;
+		padding: var(--cr-note-pad, 10px 18px);
 		border: 1px solid var(--mg-border);
 		border-left: 3px solid var(--mg-accent);
 		border-radius: var(--mg-r-sm);
