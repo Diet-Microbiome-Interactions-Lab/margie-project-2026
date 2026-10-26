@@ -40,9 +40,12 @@ def test_the_copy_script_knows_the_empty_reference_step():
     assert "c3_occ.new_reference()" in user_stores.COPY_SCRIPT
 
 
-def test_fresh_needs_the_build_password(authed_client):  # noqa: F811
-    r = authed_client.post("/v1/ssh/stores/setup", json={"fresh": True, "build_password": "wrong"})
-    assert r.status_code == 403
+def test_fresh_databases_need_no_password(authed_client):  # noqa: F811
+    ssh = "bioinformatics_tools.api.routers.ssh"
+    with patch(f"{ssh}._build_connection"), patch(f"{ssh}._stores_user_config", return_value={}), \
+         patch(f"{ssh}._stores_settle"), patch(f"{ssh}.user_stores.start_setup", return_value={"op": None}) as start:
+        r = authed_client.post("/v1/ssh/stores/setup", json={"fresh": True})
+    assert r.status_code == 200 and start.call_args.args[-1] is True
 
 
 def test_a_first_run_without_a_base_it_reads_starts_new_ones():

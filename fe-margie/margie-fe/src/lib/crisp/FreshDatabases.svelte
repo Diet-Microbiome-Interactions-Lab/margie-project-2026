@@ -1,15 +1,14 @@
 <script lang="ts">
 	import { onMount } from 'svelte';
-	import { Database, Lock, LockOpen } from 'lucide-svelte';
+	import { Database, Sparkles } from 'lucide-svelte';
 	import { uiBase } from '$lib/workspace/base.svelte';
 	import { ws } from '$lib/workspace/data.svelte';
-	import { unlocks } from '$lib/workspace/guarded';
 
 	/**
 	 * Settings → Databases: what a working folder starts from. By default the lab's prebuilt
 	 * databases, copied from the group folder (they are never written to: runs grow the copies);
-	 * or, for a new lab, every database made fresh and empty (locked behind the build password,
-	 * which the API checks too). Either way each lands in its own folder of the working folder:
+	 * or, for a new lab, every database made fresh and empty, after a yes. Either way each lands in
+	 * its own folder of the working folder:
 	 * sqlite/, operon-database/, fingerprint-database/, genome-pool/.
 	 */
 	onMount(() => {
@@ -28,28 +27,12 @@
 	});
 	const ready = $derived(!!ws.stores?.ready);
 
-	let open = $state(false);
-	let asking = $state(false);
-	let phrase = $state('');
-	let password = $state('');
-	let wrong = $state(false);
 	let busy = $state(false);
-
-	async function unlock(e: SubmitEvent) {
-		e.preventDefault();
-		if (await unlocks(phrase)) {
-			password = phrase.trim();
-			open = true;
-			asking = false;
-			wrong = false;
-			phrase = '';
-		} else wrong = true;
-	}
 
 	async function run(fresh: boolean) {
 		busy = true;
-		// Its progress shows under Backups (Your databases); the paths here follow once it is done.
-		await ws.setupStores(fresh ? { password } : undefined);
+		// Asks first (setupStores); its progress shows under Backups (Your databases), and the paths here follow once it is done.
+		await ws.setupStores(fresh);
 		busy = false;
 	}
 </script>
@@ -76,32 +59,16 @@
 
 		<!-- For a new lab: everything empty, built up from its own genomes. -->
 		<div class="box fresh">
-			<header>
-				<span class="ic warn" aria-hidden="true">{#if open}<LockOpen size={15} />{:else}<Lock size={15} />{/if}</span>
-				<b>Fresh databases, for a new lab</b>
-				<span class="mg-grow"></span>
-				{#if !open && !asking}<button type="button" class="mg-btn small" onclick={() => (asking = true)}>Unlock</button>{/if}
-			</header>
+			<header><span class="ic" aria-hidden="true"><Sparkles size={15} /></span><b>Fresh databases, for a new lab</b></header>
 			<p class="mg-note">
 				Every database starts new and empty: the MARGIE database, the operon reference, the fingerprint databases and the genome pool.
 				Runs build them up from your own genomes. Your current copies stay where they are.
 			</p>
-			{#if asking && !open}
-				<form class="go" onsubmit={unlock}>
-					<input class="mg-input" type="password" autocomplete="off" placeholder="Password" aria-label="Password" bind:value={phrase} />
-					<button type="submit" class="mg-btn small primary" disabled={!phrase.trim()}>Unlock</button>
-					<button type="button" class="mg-link quiet" onclick={() => ((asking = false), (phrase = ''), (wrong = false))}>Cancel</button>
-					{#if wrong}<span class="bad">That is not the password.</span>{/if}
-				</form>
-			{/if}
-			{#if open}
-				<div class="go">
-					<button type="button" class="mg-btn small primary" disabled={busy || ws.storesBusy} onclick={() => run(true)}>
-						{ws.storesBusy ? 'A copy is under way…' : busy ? 'Starting…' : 'Create fresh databases'}
-					</button>
-					<button type="button" class="mg-link quiet" onclick={() => ((open = false), (password = ''))}>Lock again</button>
-				</div>
-			{/if}
+			<div class="go">
+				<button type="button" class="mg-btn small" disabled={busy || ws.storesBusy} onclick={() => run(true)}>
+					{ws.storesBusy ? 'A copy is under way…' : busy ? 'Starting…' : 'Create fresh databases'}
+				</button>
+			</div>
 		</div>
 	</div>
 </section>
@@ -159,9 +126,6 @@
 		display: inline-flex;
 		color: var(--mg-accent-ink, var(--mg-accent));
 	}
-	.ic.warn {
-		color: var(--mg-warn);
-	}
 	.tag {
 		padding: 1px 7px;
 		border-radius: var(--mg-r-sm);
@@ -186,14 +150,6 @@
 		align-items: center;
 		gap: 8px;
 		margin-top: auto;
-	}
-	.go input {
-		width: min(220px, 100%);
-		height: 30px;
-	}
-	.bad {
-		font-size: var(--mg-fs-xs);
-		color: var(--mg-danger);
 	}
 	@media (max-width: 900px) {
 		.pair {

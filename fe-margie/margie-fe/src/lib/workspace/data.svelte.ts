@@ -789,8 +789,8 @@ class Workspace {
 	}
 
 	/** Copies whichever databases are missing on scratch (from your newest backup, else the base). */
-	/** fresh (with the build password): every database starts empty, as a new lab's own, instead of copies. */
-	async setupStores(fresh?: { password: string }) {
+	/** fresh: every database starts empty, as a new lab's own, instead of copies (after a yes). */
+	async setupStores(fresh = false) {
 		// The install statement, the first time for this place (installLock).
 		if (!(await installLock.confirm('Set up your databases'))) {
 			this.#runAfterSetup = null;
@@ -824,7 +824,7 @@ class Workspace {
 			}
 		}
 		try {
-			this.stores = await post<StoresStatus>('/stores/setup', fresh ? { fresh: true, build_password: fresh.password } : {});
+			this.stores = await post<StoresStatus>('/stores/setup', fresh ? { fresh: true } : {});
 			this.storesOp = this.stores.op;
 			this.#watchStores();
 		} catch (e) {
