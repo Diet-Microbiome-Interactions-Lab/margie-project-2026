@@ -173,7 +173,10 @@ def genome_calls(genomes: dict[str, str], config) -> dict[str, dict[str, str]]:
             by_key.setdefault(genome_stem(str(key)), row)
     out = {}
     for genome, fasta in genomes.items():
-        row = by_key.get(Path(fasta).name) or by_key.get(genome) or {}
+        # A genome renamed apart for this run (<name>--<hash>, a link) keeps its file's settings.
+        original = Path(fasta).resolve().name
+        row = (by_key.get(Path(fasta).name) or by_key.get(genome) or by_key.get(original)
+               or by_key.get(genome_stem(original)) or {})
         raw = str(row.get('domain') or '').strip().lower()
         domain = 'Bacteria' if raw.startswith('b') else 'Archaea' if raw.startswith('a') else ''
         code = str(row.get('genetic_code') or '').strip()

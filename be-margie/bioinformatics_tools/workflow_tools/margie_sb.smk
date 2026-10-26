@@ -1371,7 +1371,8 @@ rule load_fingerprint_to_db:
         label_pattern=FINGERPRINT_LABEL_PATTERN,
         full=FINGERPRINT_FULL,
         full_with_scores=FINGERPRINT_FULL_WITH_SCORES,
-        compute_tkn=FINGERPRINT_COMPUTE_TOKEN
+        compute_tkn=FINGERPRINT_COMPUTE_TOKEN,
+        fasta=lambda wildcards: GENOMES[wildcards.genome]
     output:
         tkn=FINGERPRINT_TOKEN
     retries: LOAD_RETRIES
@@ -1383,11 +1384,11 @@ rule load_fingerprint_to_db:
         script=LOAD_SCRIPT
     shell:
         """
-        {LOADER_PYTHON} {params.script} tsv {input.hash_pattern} {params.db} fingerprint_hash_pattern --delete-organism {wildcards.genome}
-        {LOADER_PYTHON} {params.script} tsv {input.hash_label} {params.db} fingerprint_hash_label --delete-organism {wildcards.genome}
-        {LOADER_PYTHON} {params.script} tsv {input.label_pattern} {params.db} fingerprint_label_pattern --delete-organism {wildcards.genome}
-        {LOADER_PYTHON} {params.script} tsv {input.full} {params.db} fingerprint_full --delete-organism {wildcards.genome}
-        {LOADER_PYTHON} {params.script} tsv {input.full_with_scores} {params.db} fingerprint_full_with_scores --delete-organism {wildcards.genome} --force
+        {LOADER_PYTHON} {params.script} tsv {input.hash_pattern} {params.db} fingerprint_hash_pattern --fasta {input.fasta} --delete-organism {wildcards.genome}
+        {LOADER_PYTHON} {params.script} tsv {input.hash_label} {params.db} fingerprint_hash_label --fasta {input.fasta} --delete-organism {wildcards.genome}
+        {LOADER_PYTHON} {params.script} tsv {input.label_pattern} {params.db} fingerprint_label_pattern --fasta {input.fasta} --delete-organism {wildcards.genome}
+        {LOADER_PYTHON} {params.script} tsv {input.full} {params.db} fingerprint_full --fasta {input.fasta} --delete-organism {wildcards.genome}
+        {LOADER_PYTHON} {params.script} tsv {input.full_with_scores} {params.db} fingerprint_full_with_scores --fasta {input.fasta} --delete-organism {wildcards.genome} --force
         echo "fingerprint loaded for {wildcards.genome}" > {output.tkn}
         """
 
@@ -1604,7 +1605,8 @@ rule run_quast:
 rule load_quast_to_db:
     """Loads QUAST results into main_database."""
     input:
-        results=QUAST_RESULTS
+        results=QUAST_RESULTS,
+        fasta=lambda wildcards: GENOMES[wildcards.genome]
     output:
         tkn=QUAST_TOKEN
     group: "quast"
@@ -1617,7 +1619,7 @@ rule load_quast_to_db:
         script=LOAD_SCRIPT
     shell:
         """
-        {LOADER_PYTHON} {params.script} tsv {input.results} {params.db} quast --token {output.tkn} --delete-organism {wildcards.genome}
+        {LOADER_PYTHON} {params.script} tsv {input.results} {params.db} quast --token {output.tkn} --fasta {input.fasta} --delete-organism {wildcards.genome}
         """
 
 
@@ -1790,7 +1792,8 @@ localrules: gtdbtk_from_cache
 rule load_gtdbtk_to_db:
     """Loads GTDB-Tk results into main_database, in a group of its own (GTDB-Tk runs on highmem)."""
     input:
-        results=GTDBTK_RESULTS
+        results=GTDBTK_RESULTS,
+        fasta=lambda wildcards: GENOMES[wildcards.genome]
     output:
         tkn=GTDBTK_TOKEN
     retries: LOAD_RETRIES
@@ -1802,7 +1805,7 @@ rule load_gtdbtk_to_db:
         script=LOAD_SCRIPT
     shell:
         """
-        {LOADER_PYTHON} {params.script} tsv {input.results} {params.db} gtdbtk --token {output.tkn} --delete-organism {wildcards.genome}
+        {LOADER_PYTHON} {params.script} tsv {input.results} {params.db} gtdbtk --token {output.tkn} --fasta {input.fasta} --delete-organism {wildcards.genome}
         """
 
 
@@ -1987,7 +1990,8 @@ localrules: rasttk_from_cache
 rule load_rasttk_to_db:
     """Loads RASTtk results into main_database."""
     input:
-        results=RASTTK_RESULTS
+        results=RASTTK_RESULTS,
+        fasta=lambda wildcards: GENOMES[wildcards.genome]
     output:
         tkn=RASTTK_TOKEN
     retries: LOAD_RETRIES
@@ -1999,7 +2003,7 @@ rule load_rasttk_to_db:
         script=LOAD_SCRIPT
     shell:
         """
-        {LOADER_PYTHON} {params.script} tsv {input.results} {params.db} rasttk --token {output.tkn} --delete-organism {wildcards.genome}
+        {LOADER_PYTHON} {params.script} tsv {input.results} {params.db} rasttk --token {output.tkn} --fasta {input.fasta} --delete-organism {wildcards.genome}
         """
 
 
@@ -2043,7 +2047,8 @@ rule run_cog:
 rule load_cog_to_db:
     """Loads COG results into main_database."""
     input:
-        results=PHASE4_RESULTS['cog']
+        results=PHASE4_RESULTS['cog'],
+        fasta=lambda wildcards: GENOMES[wildcards.genome]
     output:
         tkn=PHASE4_TOKENS['cog']
     retries: LOAD_RETRIES
@@ -2055,7 +2060,7 @@ rule load_cog_to_db:
         script=LOAD_SCRIPT
     shell:
         """
-        {LOADER_PYTHON} {params.script} tsv {input.results} {params.db} cog --token {output.tkn} --delete-organism {wildcards.genome}
+        {LOADER_PYTHON} {params.script} tsv {input.results} {params.db} cog --token {output.tkn} --fasta {input.fasta} --delete-organism {wildcards.genome}
         """
 
 
@@ -2097,7 +2102,8 @@ rule run_pfam:
 rule load_pfam_to_db:
     """Loads Pfam results into main_database."""
     input:
-        results=PHASE4_RESULTS['pfam']
+        results=PHASE4_RESULTS['pfam'],
+        fasta=lambda wildcards: GENOMES[wildcards.genome]
     output:
         tkn=PHASE4_TOKENS['pfam']
     retries: LOAD_RETRIES
@@ -2109,7 +2115,7 @@ rule load_pfam_to_db:
         script=LOAD_SCRIPT
     shell:
         """
-        {LOADER_PYTHON} {params.script} tsv {input.results} {params.db} pfam --token {output.tkn} --delete-organism {wildcards.genome}
+        {LOADER_PYTHON} {params.script} tsv {input.results} {params.db} pfam --token {output.tkn} --fasta {input.fasta} --delete-organism {wildcards.genome}
         """
 
 
@@ -2152,7 +2158,8 @@ rule run_tigrfam:
 rule load_tigrfam_to_db:
     """Loads TIGRFAMs results into main_database."""
     input:
-        results=PHASE4_RESULTS['tigrfam']
+        results=PHASE4_RESULTS['tigrfam'],
+        fasta=lambda wildcards: GENOMES[wildcards.genome]
     output:
         tkn=PHASE4_TOKENS['tigrfam']
     retries: LOAD_RETRIES
@@ -2164,7 +2171,7 @@ rule load_tigrfam_to_db:
         script=LOAD_SCRIPT
     shell:
         """
-        {LOADER_PYTHON} {params.script} tsv {input.results} {params.db} tigrfam --token {output.tkn} --delete-organism {wildcards.genome}
+        {LOADER_PYTHON} {params.script} tsv {input.results} {params.db} tigrfam --token {output.tkn} --fasta {input.fasta} --delete-organism {wildcards.genome}
         """
 
 
@@ -2206,7 +2213,8 @@ rule run_merops:
 rule load_merops_to_db:
     """Loads MEROPS results into main_database."""
     input:
-        results=PHASE4_RESULTS['merops']
+        results=PHASE4_RESULTS['merops'],
+        fasta=lambda wildcards: GENOMES[wildcards.genome]
     output:
         tkn=PHASE4_TOKENS['merops']
     retries: LOAD_RETRIES
@@ -2218,7 +2226,7 @@ rule load_merops_to_db:
         script=LOAD_SCRIPT
     shell:
         """
-        {LOADER_PYTHON} {params.script} tsv {input.results} {params.db} merops --token {output.tkn} --delete-organism {wildcards.genome}
+        {LOADER_PYTHON} {params.script} tsv {input.results} {params.db} merops --token {output.tkn} --fasta {input.fasta} --delete-organism {wildcards.genome}
         """
 
 
@@ -2261,7 +2269,8 @@ rule run_tcdb:
 rule load_tcdb_to_db:
     """Loads TCDB results into main_database."""
     input:
-        results=PHASE4_RESULTS['tcdb']
+        results=PHASE4_RESULTS['tcdb'],
+        fasta=lambda wildcards: GENOMES[wildcards.genome]
     output:
         tkn=PHASE4_TOKENS['tcdb']
     retries: LOAD_RETRIES
@@ -2273,7 +2282,7 @@ rule load_tcdb_to_db:
         script=LOAD_SCRIPT
     shell:
         """
-        {LOADER_PYTHON} {params.script} tsv {input.results} {params.db} tcdb --token {output.tkn} --delete-organism {wildcards.genome}
+        {LOADER_PYTHON} {params.script} tsv {input.results} {params.db} tcdb --token {output.tkn} --fasta {input.fasta} --delete-organism {wildcards.genome}
         """
 
 
@@ -2316,7 +2325,8 @@ rule run_uniprot:
 rule load_uniprot_to_db:
     """Loads UniProt results into main_database."""
     input:
-        results=PHASE4_RESULTS['uniprot']
+        results=PHASE4_RESULTS['uniprot'],
+        fasta=lambda wildcards: GENOMES[wildcards.genome]
     output:
         tkn=PHASE4_TOKENS['uniprot']
     retries: LOAD_RETRIES
@@ -2328,7 +2338,7 @@ rule load_uniprot_to_db:
         script=LOAD_SCRIPT
     shell:
         """
-        {LOADER_PYTHON} {params.script} tsv {input.results} {params.db} uniprot --token {output.tkn} --delete-organism {wildcards.genome}
+        {LOADER_PYTHON} {params.script} tsv {input.results} {params.db} uniprot --token {output.tkn} --fasta {input.fasta} --delete-organism {wildcards.genome}
         """
 
 
@@ -2369,7 +2379,8 @@ rule run_kegg:
 rule load_kegg_to_db:
     """Loads KEGG results into main_database."""
     input:
-        results=PHASE4_RESULTS['kegg']
+        results=PHASE4_RESULTS['kegg'],
+        fasta=lambda wildcards: GENOMES[wildcards.genome]
     output:
         tkn=PHASE4_TOKENS['kegg']
     retries: LOAD_RETRIES
@@ -2381,7 +2392,7 @@ rule load_kegg_to_db:
         script=LOAD_SCRIPT
     shell:
         """
-        {LOADER_PYTHON} {params.script} tsv {input.results} {params.db} kegg --token {output.tkn} --delete-organism {wildcards.genome}
+        {LOADER_PYTHON} {params.script} tsv {input.results} {params.db} kegg --token {output.tkn} --fasta {input.fasta} --delete-organism {wildcards.genome}
         """
 
 
@@ -2422,7 +2433,8 @@ rule run_eggnog:
 rule load_eggnog_to_db:
     """Loads eggNOG results into main_database."""
     input:
-        results=PHASE4_RESULTS['eggnog']
+        results=PHASE4_RESULTS['eggnog'],
+        fasta=lambda wildcards: GENOMES[wildcards.genome]
     output:
         tkn=PHASE4_TOKENS['eggnog']
     retries: LOAD_RETRIES
@@ -2434,7 +2446,7 @@ rule load_eggnog_to_db:
         script=LOAD_SCRIPT
     shell:
         """
-        {LOADER_PYTHON} {params.script} tsv {input.results} {params.db} eggnog --token {output.tkn} --delete-organism {wildcards.genome}
+        {LOADER_PYTHON} {params.script} tsv {input.results} {params.db} eggnog --token {output.tkn} --fasta {input.fasta} --delete-organism {wildcards.genome}
         """
 
 
@@ -2476,7 +2488,8 @@ rule run_dbcan:
 rule load_dbcan_to_db:
     """Loads dbCAN results into main_database."""
     input:
-        results=PHASE4_RESULTS['dbcan']
+        results=PHASE4_RESULTS['dbcan'],
+        fasta=lambda wildcards: GENOMES[wildcards.genome]
     output:
         tkn=PHASE4_TOKENS['dbcan']
     retries: LOAD_RETRIES
@@ -2488,7 +2501,7 @@ rule load_dbcan_to_db:
         script=LOAD_SCRIPT
     shell:
         """
-        {LOADER_PYTHON} {params.script} tsv {input.results} {params.db} dbcan --token {output.tkn} --delete-organism {wildcards.genome}
+        {LOADER_PYTHON} {params.script} tsv {input.results} {params.db} dbcan --token {output.tkn} --fasta {input.fasta} --delete-organism {wildcards.genome}
         """
 
 
@@ -2529,7 +2542,8 @@ rule run_pgap:
 rule load_pgap_to_db:
     """Loads PGAP results into main_database."""
     input:
-        results=PHASE4_RESULTS['pgap']
+        results=PHASE4_RESULTS['pgap'],
+        fasta=lambda wildcards: GENOMES[wildcards.genome]
     output:
         tkn=PHASE4_TOKENS['pgap']
     retries: LOAD_RETRIES
@@ -2541,7 +2555,7 @@ rule load_pgap_to_db:
         script=LOAD_SCRIPT
     shell:
         """
-        {LOADER_PYTHON} {params.script} tsv {input.results} {params.db} pgap --token {output.tkn} --delete-organism {wildcards.genome}
+        {LOADER_PYTHON} {params.script} tsv {input.results} {params.db} pgap --token {output.tkn} --fasta {input.fasta} --delete-organism {wildcards.genome}
         """
 
 
@@ -2591,7 +2605,8 @@ rule run_interpro:
 rule load_interpro_to_db:
     """Loads the unified InterProScan table into main_database."""
     input:
-        results=PHASE4_RESULTS['interpro']
+        results=PHASE4_RESULTS['interpro'],
+        fasta=lambda wildcards: GENOMES[wildcards.genome]
     output:
         tkn=PHASE4_TOKENS['interpro']
     retries: LOAD_RETRIES
@@ -2604,14 +2619,15 @@ rule load_interpro_to_db:
         script=LOAD_SCRIPT
     shell:
         """
-        {LOADER_PYTHON} {params.script} tsv {input.results} {params.db} interpro --token {output.tkn} --delete-organism {wildcards.genome}
+        {LOADER_PYTHON} {params.script} tsv {input.results} {params.db} interpro --token {output.tkn} --fasta {input.fasta} --delete-organism {wildcards.genome}
         """
 
 
 rule load_interpro_perdb_to_db:
     """Loads one InterProScan per-database TSV into its own table (interpro_{db})."""
     input:
-        results=lambda wildcards: INTERPRO_PERDB_RESULTS[wildcards.db].format(genome=wildcards.genome)
+        results=lambda wildcards: INTERPRO_PERDB_RESULTS[wildcards.db].format(genome=wildcards.genome),
+        fasta=lambda wildcards: GENOMES[wildcards.genome]
     output:
         tkn=INTERPRO_PERDB_TOKEN_PATTERN
     wildcard_constraints:
@@ -2627,7 +2643,7 @@ rule load_interpro_perdb_to_db:
         table_name=lambda wildcards: f"interpro_{wildcards.db}"
     shell:
         """
-        {LOADER_PYTHON} {params.script} tsv {input.results} {params.db_file} {params.table_name} --token {output.tkn} --delete-organism {wildcards.genome}
+        {LOADER_PYTHON} {params.script} tsv {input.results} {params.db_file} {params.table_name} --token {output.tkn} --fasta {input.fasta} --delete-organism {wildcards.genome}
         """
 
 
@@ -2663,7 +2679,8 @@ rule run_geneprop:
 rule load_geneprop_to_db:
     """Loads Genome Properties results into main_database."""
     input:
-        results=PHASE4_RESULTS['geneprop']
+        results=PHASE4_RESULTS['geneprop'],
+        fasta=lambda wildcards: GENOMES[wildcards.genome]
     output:
         tkn=PHASE4_TOKENS['geneprop']
     retries: LOAD_RETRIES
@@ -2675,7 +2692,7 @@ rule load_geneprop_to_db:
         script=LOAD_SCRIPT
     shell:
         """
-        {LOADER_PYTHON} {params.script} tsv {input.results} {params.db} geneprop --token {output.tkn} --delete-organism {wildcards.genome}
+        {LOADER_PYTHON} {params.script} tsv {input.results} {params.db} geneprop --token {output.tkn} --fasta {input.fasta} --delete-organism {wildcards.genome}
         """
 
 
@@ -2708,7 +2725,8 @@ rule run_operon:
 rule load_operon_to_db:
     """Loads operon results into main_database."""
     input:
-        results=OPERON_RESULTS
+        results=OPERON_RESULTS,
+        fasta=lambda wildcards: GENOMES[wildcards.genome]
     output:
         tkn=OPERON_TOKEN
     retries: LOAD_RETRIES
@@ -2720,7 +2738,7 @@ rule load_operon_to_db:
         script=LOAD_SCRIPT
     shell:
         """
-        {LOADER_PYTHON} {params.script} tsv {input.results} {params.db} operon --token {output.tkn} --delete-organism {wildcards.genome}
+        {LOADER_PYTHON} {params.script} tsv {input.results} {params.db} operon --token {output.tkn} --fasta {input.fasta} --delete-organism {wildcards.genome}
         """
 
 
@@ -2759,7 +2777,8 @@ rule run_phobius:
 rule load_phobius_to_db:
     """Loads Phobius results into main_database."""
     input:
-        results=PHOBIUS_RESULTS
+        results=PHOBIUS_RESULTS,
+        fasta=lambda wildcards: GENOMES[wildcards.genome]
     output:
         tkn=PHOBIUS_TOKEN
     retries: LOAD_RETRIES
@@ -2771,7 +2790,7 @@ rule load_phobius_to_db:
         script=LOAD_SCRIPT
     shell:
         """
-        {LOADER_PYTHON} {params.script} tsv {input.results} {params.db} phobius --token {output.tkn} --delete-organism {wildcards.genome}
+        {LOADER_PYTHON} {params.script} tsv {input.results} {params.db} phobius --token {output.tkn} --fasta {input.fasta} --delete-organism {wildcards.genome}
         """
 
 
@@ -2819,7 +2838,8 @@ rule run_tmbed:
 rule load_tmbed_to_db:
     """Loads TMbed results into main_database."""
     input:
-        results=TMBED_RESULTS
+        results=TMBED_RESULTS,
+        fasta=lambda wildcards: GENOMES[wildcards.genome]
     output:
         tkn=TMBED_TOKEN
     retries: LOAD_RETRIES
@@ -2831,7 +2851,7 @@ rule load_tmbed_to_db:
         script=LOAD_SCRIPT
     shell:
         """
-        {LOADER_PYTHON} {params.script} tsv {input.results} {params.db} tmbed --token {output.tkn} --delete-organism {wildcards.genome}
+        {LOADER_PYTHON} {params.script} tsv {input.results} {params.db} tmbed --token {output.tkn} --fasta {input.fasta} --delete-organism {wildcards.genome}
         """
 
 
@@ -2884,7 +2904,8 @@ rule run_signalp6:
 rule load_signalp6_to_db:
     """Loads SignalP6 results into main_database."""
     input:
-        results=SIGNALP6_RESULTS
+        results=SIGNALP6_RESULTS,
+        fasta=lambda wildcards: GENOMES[wildcards.genome]
     output:
         tkn=SIGNALP6_TOKEN
     retries: LOAD_RETRIES
@@ -2896,7 +2917,7 @@ rule load_signalp6_to_db:
         script=LOAD_SCRIPT
     shell:
         """
-        {LOADER_PYTHON} {params.script} tsv {input.results} {params.db} signalp6 --token {output.tkn} --delete-organism {wildcards.genome}
+        {LOADER_PYTHON} {params.script} tsv {input.results} {params.db} signalp6 --token {output.tkn} --fasta {input.fasta} --delete-organism {wildcards.genome}
         """
 
 
@@ -2934,7 +2955,8 @@ rule run_envelope:
 rule load_envelope_to_db:
     """Loads envelope results into main_database."""
     input:
-        results=ENVELOPE_RESULTS
+        results=ENVELOPE_RESULTS,
+        fasta=lambda wildcards: GENOMES[wildcards.genome]
     output:
         tkn=ENVELOPE_TOKEN
     retries: LOAD_RETRIES
@@ -2946,7 +2968,7 @@ rule load_envelope_to_db:
         script=LOAD_SCRIPT
     shell:
         """
-        {LOADER_PYTHON} {params.script} tsv {input.results} {params.db} envelope --token {output.tkn} --delete-organism {wildcards.genome}
+        {LOADER_PYTHON} {params.script} tsv {input.results} {params.db} envelope --token {output.tkn} --fasta {input.fasta} --delete-organism {wildcards.genome}
         """
 
 
@@ -2987,7 +3009,8 @@ rule load_deepsig_to_db:
     """Adds the ENVELOPE_* columns to DeepSig results on the host, then loads them."""
     input:
         results=DEEPSIG_RESULTS,
-        envelope_summary=ENVELOPE_SUMMARY
+        envelope_summary=ENVELOPE_SUMMARY,
+        fasta=lambda wildcards: GENOMES[wildcards.genome]
     output:
         tkn=DEEPSIG_TOKEN
     retries: LOAD_RETRIES
@@ -3001,7 +3024,7 @@ rule load_deepsig_to_db:
     shell:
         """
         {LOADER_PYTHON} {params.enrich_script} --input {input.results} --envelope-summary {input.envelope_summary} --output {input.results}
-        {LOADER_PYTHON} {params.script} tsv {input.results} {params.db} deepsig --token {output.tkn} --delete-organism {wildcards.genome}
+        {LOADER_PYTHON} {params.script} tsv {input.results} {params.db} deepsig --token {output.tkn} --fasta {input.fasta} --delete-organism {wildcards.genome}
         """
 
 
@@ -3042,7 +3065,8 @@ rule load_psortb_to_db:
     """Adds the ENVELOPE_* columns to PSORTb results on the host, then loads them."""
     input:
         results=PSORTB_RESULTS,
-        envelope_summary=ENVELOPE_SUMMARY
+        envelope_summary=ENVELOPE_SUMMARY,
+        fasta=lambda wildcards: GENOMES[wildcards.genome]
     output:
         tkn=PSORTB_TOKEN
     retries: LOAD_RETRIES
@@ -3056,7 +3080,7 @@ rule load_psortb_to_db:
     shell:
         """
         {LOADER_PYTHON} {params.enrich_script} --input {input.results} --envelope-summary {input.envelope_summary} --output {input.results}
-        {LOADER_PYTHON} {params.script} tsv {input.results} {params.db} psortb --token {output.tkn} --delete-organism {wildcards.genome}
+        {LOADER_PYTHON} {params.script} tsv {input.results} {params.db} psortb --token {output.tkn} --fasta {input.fasta} --delete-organism {wildcards.genome}
         """
 
 
@@ -3112,7 +3136,8 @@ rule load_signalp4_to_db:
     """Adds the ENVELOPE_* columns to SignalP4 results on the host, then loads them."""
     input:
         results=SIGNALP4_RESULTS,
-        envelope_summary=ENVELOPE_SUMMARY
+        envelope_summary=ENVELOPE_SUMMARY,
+        fasta=lambda wildcards: GENOMES[wildcards.genome]
     output:
         tkn=SIGNALP4_TOKEN
     retries: LOAD_RETRIES
@@ -3126,7 +3151,7 @@ rule load_signalp4_to_db:
     shell:
         """
         {LOADER_PYTHON} {params.enrich_script} --input {input.results} --envelope-summary {input.envelope_summary} --output {input.results}
-        {LOADER_PYTHON} {params.script} tsv {input.results} {params.db} signalp4 --token {output.tkn} --delete-organism {wildcards.genome}
+        {LOADER_PYTHON} {params.script} tsv {input.results} {params.db} signalp4 --token {output.tkn} --fasta {input.fasta} --delete-organism {wildcards.genome}
         """
 
 

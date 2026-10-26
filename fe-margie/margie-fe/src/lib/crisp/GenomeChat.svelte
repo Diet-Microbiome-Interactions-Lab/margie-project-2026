@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { baseOf } from '$lib/crisp/genomes';
 	import { tick } from 'svelte';
 	import { marked } from 'marked';
 	import DOMPurify from 'dompurify';
@@ -282,7 +283,7 @@
 		<span class="gc-ic" aria-hidden="true"><Bot size={17} /></span>
 		<div class="gc-title">
 			<b>Chat with the genome</b>
-			<span>{genome}{s && view === 'chat' ? ` | ${info?.providers[p].label ?? ''}${s.model ? `, ${s.model}` : ''}` : ''}</span>
+			<span title={genome}>{baseOf(genome)}{s && view === 'chat' ? ` | ${info?.providers[p].label ?? ''}${s.model ? `, ${s.model}` : ''}` : ''}</span>
 		</div>
 		<span class="gc-grow"></span>
 		{#if turns.length && view === 'chat'}

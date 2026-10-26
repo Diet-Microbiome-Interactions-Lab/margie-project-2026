@@ -31,7 +31,7 @@ from bioinformatics_tools.workflow_tools.load_to_db import is_already_processed,
 from bioinformatics_tools.workflow_tools import cache_report, protein_cache
 from bioinformatics_tools.workflow_tools.programs import ProgramBase
 from bioinformatics_tools.workflow_tools.workflow_helpers import (
-    discover_genomes, get_workflow_prefix_for, WORKFLOW_PATH_DEFAULTS, genome_calls)
+    discover_genomes, genome_stem, get_workflow_prefix_for, WORKFLOW_PATH_DEFAULTS, genome_calls)
 from bioinformatics_tools.workflow_tools.workflow_registry import (
     MARGIE_SB_PHASED_TOOLS,
     MARGIE_SB_REQUIRED_TOOLS,
@@ -80,9 +80,8 @@ def _consolidation_shared():
 
 
 def name_clashes(db_path: str, genome_files: dict[str, str]) -> list[str]:
-    """Genome names this run shares with another genome (other DNA) in the database: a genome's name
-    stands for it in the database's tables, so the two would mix. A name counts when none of the
-    genomes recorded under it (run_log, genome_proteomes) has this genome's hash."""
+    """Genome names this run shares with another genome (other DNA) in the database. A name counts
+    when none of the genomes recorded under it (run_log, genome_proteomes) has this genome's hash."""
     if not Path(db_path).exists():
         return []
     conn = sqlite3.connect(f'file:{db_path}?mode=ro', uri=True, timeout=60)
@@ -99,8 +98,35 @@ def name_clashes(db_path: str, genome_files: dict[str, str]) -> list[str]:
                     known.setdefault(name, set()).add(h)
     finally:
         conn.close()
-    return [f'{name} ({Path(path).name})' for name, path in sorted(genome_files.items())
+    return [name for name, path in sorted(genome_files.items())
             if name in known and not known[name] & set(fasta_hashes(path))]
+
+
+# A genome's name in a run and its results: its file's name, two dashes and the first 8 characters
+# of its genome hash (coli--a1b2c3d4), so genomes that share a file name stay apart everywhere.
+NAMED_WITH_HASH = re.compile(r'--[0-9a-f]{8}$')
+
+
+def name_with_hash(name: str, path: str) -> str:
+    """<name>--<the first 8 characters of the genome's hash>; a name that already ends in its own is kept."""
+    short = fasta_hashes(path)[0][:8]
+    return name if name.endswith(f'--{short}') else f'{NAMED_WITH_HASH.sub("", name)}--{short}'
+
+
+def named_with_hash(genome_files: dict[str, str], folder: str) -> str:
+    """A folder of links, one a genome, named <name>--<its hash>: the run reads its genomes from it,
+    so Snakemake and the run's own steps see the same names. The files stay as they are. Returns
+    the folder."""
+    links = Path(folder)
+    links.mkdir(parents=True, exist_ok=True)
+    for old in links.iterdir():
+        if old.is_symlink():
+            old.unlink()
+    for name, path in genome_files.items():
+        source = Path(path).resolve()
+        suffix = source.name[len(genome_stem(source.name)):]
+        (links / f'{name_with_hash(name, path)}{suffix}').symlink_to(source)
+    return str(links)
 
 
 def merged_inputs_fingerprint(genome_dir: str) -> str:
@@ -886,7 +912,7 @@ class WorkflowBase(ProgramBase):
             clashes = _safely('Checking the genome names against the database', name_clashes, db_path, genome_files)
             if isinstance(clashes, list) and clashes:
                 msg = ('Your MARGIE database already has a different genome (other DNA) under '
-                       + ('this name' if len(clashes) == 1 else 'these names') + ': ' + '; '.join(clashes)
+                       + ('this name' if len(clashes) == 1 else 'these names') + ': ' + ', '.join(clashes)
                        + '. Rename the file (for example coli_strainB.fna) and start the run again.')
                 LOGGER.error(msg)
                 self.failed(msg)
@@ -1788,6 +1814,14 @@ class WorkflowBase(ProgramBase):
         output_dir = (self.conf.get('output_dir', None)
                       or self.conf.get('margie_sb', {}).get('output_path', None)
                       or WORKFLOW_PATH_DEFAULTS.get('margie_sb', {}).get('output_path', ''))
+
+        # Right after the genome hash check, before GTDB-Tk: each genome runs as <name>--<its hash>
+        # (coli--a1b2c3d4), so genomes that share a file name stay apart in every table, result and
+        # in scoring's operon reference. The run reads a folder of links under those names.
+        if output_dir:
+            input_path_value = named_with_hash(genomes, f"{output_dir.rstrip('/')}/.margie-input")
+            genomes = discover_genomes(input_path_value)
+            LOGGER.info('Genomes, named with their hashes: %s', ', '.join(genomes))
 
         config_overrides = {
             'input_fasta': input_path_value,
