@@ -80,6 +80,12 @@ export function crispVars(p: UiPrefs, dark: boolean): Record<string, string> {
 			? (p.density === 'compact' ? '12px' : '16px')
 			: p.density === 'compact' ? 'clamp(12px, 1.4vw, 22px)' : 'clamp(14px, 1.8vw, 30px)',
 		'--cr-pad': p.density === 'compact' ? '8px 12px' : '10px 14px',
+		// One space between a page's blocks, and one inset inside each box and note, so their
+		// edges and their text line up from page to page.
+		'--cr-stack': p.density === 'compact' ? '12px' : '16px',
+		'--cr-box-x': p.density === 'compact' ? '14px' : '18px',
+		'--cr-box-pad': p.density === 'compact' ? '12px 14px' : '16px 18px',
+		'--cr-note-pad': p.density === 'compact' ? '8px 14px' : '10px 18px',
 		'--cr-width': WIDTH[p.pageWidth] ?? WIDTH.wide,
 		// The hairline between rows: the Lines colour (Customize → Colours), #F5F8FF unless changed.
 		'--cr-rule': dark ? `color-mix(in srgb, ${base['--mg-border']} 80%, ${base['--mg-surface']})` : (white['--mg-border'] ?? base['--mg-border']),
