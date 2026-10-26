@@ -1,0 +1,188 @@
+[
+	{
+		"id": "bioi-001",
+		"topic": "bioinformatics",
+		"level": "easy",
+		"kind": "choice",
+		"question": "A BLASTP hit has an E-value of 1e-50. What does this number mean?",
+		"options": [
+			"The query and the hit share 50 percent identical residues across the alignment",
+			"About 1e-50 hits this good would be expected by chance in a database of this size",
+			"The alignment between query and hit spans 50 residues of the query sequence",
+			"There is a 1e-50 probability that the query and the hit share the same function"
+		],
+		"answer": 1,
+		"explain": "The E-value is the number of hits with an equal or better score expected by chance in a search of that database. A tiny value makes chance an unlikely explanation and supports homology, but it does not by itself show that the two proteins do the same job."
+	},
+	{
+		"id": "bioi-002",
+		"topic": "bioinformatics",
+		"level": "easy",
+		"kind": "truefalse",
+		"statement": "A genome assembly with a higher N50 is certain to contain fewer assembly errors.",
+		"answer": false,
+		"explain": "N50 measures contiguity, not correctness. Joining contigs wrongly across repeats raises N50 while adding errors, which is why QUAST also counts misassemblies against a reference genome."
+	},
+	{
+		"id": "bioi-003",
+		"topic": "bioinformatics",
+		"level": "easy",
+		"kind": "match",
+		"question": "Match each database to what it classifies.",
+		"pairs": [
+			{
+				"left": "MEROPS",
+				"right": "Peptidases and their protein inhibitors"
+			},
+			{
+				"left": "TCDB",
+				"right": "Membrane transport proteins"
+			},
+			{
+				"left": "KEGG",
+				"right": "Metabolic and signalling pathways, with genes linked through K numbers"
+			},
+			{
+				"left": "CAZy",
+				"right": "Enzymes that build, modify or break down carbohydrates"
+			},
+			{
+				"left": "InterPro",
+				"right": "Protein families and domains, merged from several signature databases"
+			}
+		],
+		"explain": "Each resource answers a different question: MEROPS covers proteolysis, TCDB transport, KEGG pathways, CAZy carbohydrate enzymes and InterPro protein families and domains. Picking the database that matches your question gives more specific annotations than a general search."
+	},
+	{
+		"id": "bioi-004",
+		"topic": "bioinformatics",
+		"level": "intermediate",
+		"kind": "choice",
+		"question": "A BLASTP hit has 95% identity but covers only 60 residues of a 600-residue query. What is the best reading of this result?",
+		"options": [
+			"The query and the hit are the same protein, because identity above 90% settles it",
+			"The hit is a chance match, because only full-length alignments can be significant",
+			"The query is a gene fragment, because a real protein would match along its length",
+			"The two share one short region, perhaps a domain, so the query's full function is unclear"
+		],
+		"answer": 3,
+		"explain": "Percent identity describes only the aligned part. Here 90% of the query is unmatched, so the proteins may share a single domain while differing elsewhere, and the hit's name should not be transferred as a whole."
+	},
+	{
+		"id": "bioi-005",
+		"topic": "bioinformatics",
+		"level": "intermediate",
+		"kind": "truefalse",
+		"statement": "In translation table 11, a protein-coding gene that starts with a GTG codon begins its protein with valine.",
+		"answer": false,
+		"explain": "At the start position, GTG and TTG are read by the initiator tRNA, which carries formyl-methionine. Inside a gene, GTG codes for valine as usual."
+	},
+	{
+		"id": "bioi-006",
+		"topic": "bioinformatics",
+		"level": "intermediate",
+		"kind": "match",
+		"question": "Match each genome comparison or quality check to the threshold commonly used with it.",
+		"pairs": [
+			{
+				"left": "ANI between two genomes of one species",
+				"right": "About 95% or higher"
+			},
+			{
+				"left": "Digital DNA–DNA hybridisation for one species",
+				"right": "70% or higher"
+			},
+			{
+				"left": "16S rRNA identity below which strains are usually separate species",
+				"right": "About 98.7%"
+			},
+			{
+				"left": "Contamination limit for a MIMAG high-quality draft",
+				"right": "Under 5%"
+			}
+		],
+		"explain": "The ANI cutoff of about 95% was calibrated against the older 70% DNA–DNA hybridisation species standard. The 16S cutoff is only a screen, since separate species can share very similar 16S genes, and MIMAG pairs its contamination limit with more than 90% completeness."
+	},
+	{
+		"id": "bioi-007",
+		"topic": "bioinformatics",
+		"level": "hard",
+		"kind": "choice",
+		"question": "A protein's best BLAST hit, at 45% identity over the full length, is an unreviewed entry named 'L-lactate dehydrogenase' that was itself annotated by similarity. Pfam places the protein in the lactate/malate dehydrogenase family. What is the soundest annotation?",
+		"options": [
+			"L-lactate dehydrogenase, since the best BLAST hit carries that name",
+			"Malate dehydrogenase, since the Pfam family name includes malate",
+			"Lactate/malate dehydrogenase family protein, with its substrate left open",
+			"Hypothetical protein, since the best hit comes from an unreviewed entry"
+		],
+		"answer": 2,
+		"explain": "Lactate and malate dehydrogenases belong to one family, and a few residue changes can switch substrate, so copying the name of a hit annotated only by similarity can spread an error. A family-level label, refined later with reviewed homologs, key residues or assays, avoids passing it on."
+	},
+	{
+		"id": "bioi-008",
+		"topic": "bioinformatics",
+		"level": "hard",
+		"kind": "choice",
+		"question": "Which command counts the CDS features on each contig in a GFF3 file named genome.gff?",
+		"options": [
+			"awk -F'\\t' '$3==\"CDS\" {print $1}' genome.gff | sort | uniq -c",
+			"grep -c CDS genome.gff",
+			"cut -f3 genome.gff | sort | uniq -c",
+			"awk -F'\\t' '{print $1}' genome.gff | sort | uniq -c"
+		],
+		"answer": 0,
+		"explain": "The awk filter keeps rows whose third column, the feature type, is CDS and prints the first column, the contig name, so uniq -c counts CDS lines per contig. grep -c gives a single total, cut -f3 counts feature types, and the last command counts features of any type per contig."
+	},
+	{
+		"id": "bioi-009",
+		"topic": "bioinformatics",
+		"level": "hard",
+		"kind": "truefalse",
+		"statement": "Two bacterial genomes with 99% ANI can still differ by hundreds of genes.",
+		"answer": true,
+		"explain": "ANI is calculated over the regions the two genomes share, so genes present in only one genome do not lower it. Strains of one species often differ in accessory genes carried on prophages, plasmids and genomic islands."
+	},
+	{
+		"id": "bioi-010",
+		"topic": "bioinformatics",
+		"level": "hard",
+		"kind": "case",
+		"scenario": "A protein from a soil isolate is labelled 'hypothetical protein' by the annotation pipeline. eggNOG-mapper places it in COG category S, InterProScan finds a domain of unknown function (DUF) along most of its length, and SignalP predicts a Tat signal peptide. In many related genomes its gene sits in a conserved cluster with genes for a periplasmic nitrate reductase.",
+		"parts": [
+			{
+				"question": "What do the COG S category and the DUF hit tell you?",
+				"options": [
+					"The protein is a pseudogene product that should be removed",
+					"The protein is a known catalytic subunit of nitrate reductase",
+					"The protein is a contaminant from another genome in the assembly",
+					"The protein belongs to a conserved family whose function is not yet known"
+				],
+				"answer": 3,
+				"explain": "COG category S and DUF families both mark conserved proteins without an assigned function. Conservation across genomes suggests the protein matters, even though its role is unknown."
+			},
+			{
+				"question": "What does the conserved gene neighbourhood add?",
+				"options": [
+					"A testable hypothesis that the protein works in nitrate reduction",
+					"Proof that the protein is the catalytic subunit of nitrate reductase",
+					"Evidence that the protein stays in the cytoplasm after translation",
+					"No information, since gene order is unrelated to function in bacteria"
+				],
+				"answer": 0,
+				"explain": "Genes kept together across many genomes often work in the same process, so the neighbourhood suggests a role. It is a lead to test, for example with a knockout mutant, not proof of a specific activity."
+			},
+			{
+				"question": "Given the Tat signal peptide, where is the mature protein most likely to act?",
+				"options": [
+					"In the cytoplasm, bound to ribosomes during translation",
+					"Outside the cytoplasm, such as in the periplasm, after export folded",
+					"Within the inner membrane, as a bundle of several helices",
+					"In the nucleoid, bound to the chromosome near its own gene"
+				],
+				"answer": 1,
+				"explain": "The Tat pathway exports folded proteins across the cytoplasmic membrane, so the protein probably works in the periplasm or beyond. That fits a role alongside periplasmic nitrate reductase, whose catalytic subunit is itself a Tat substrate."
+			}
+		],
+		"explain": "A hypothetical protein can be placed in context by combining family, neighbourhood and localisation evidence. The result is a hypothesis to test, and the annotation should word it that way."
+	}
+]

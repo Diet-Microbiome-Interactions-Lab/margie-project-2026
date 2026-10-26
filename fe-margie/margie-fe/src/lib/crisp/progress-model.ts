@@ -108,7 +108,7 @@ export interface ProgressInput {
 /* Every step a genome goes through, by phase. Steps this setup does not run are shown
    blank, so the whole pipeline stays in view. */
 const FUNCTION = ['kegg', 'cog', 'pfam', 'pgap', 'tigrfam', 'dbcan', 'eggnog', 'merops', 'tcdb', 'uniprot', 'interpro', 'geneprop'];
-const LOCATION = ['tmbed', 'phobius', 'envelope', 'psortb', 'deepsig', 'signalp4', 'signalp6'];
+const LOCATION = ['tmbed', 'phobius', 'envelope', 'psortb', 'deepsig', 'signalp6'];
 const CALLERS = ['rasttk', 'prodigal'];
 /** Parts of the scoring and fingerprint stages, listed as tools: their stage's column stands for them. */
 const PARTS = new Set(['scoring_heuristic', 'fingerprint_database']);

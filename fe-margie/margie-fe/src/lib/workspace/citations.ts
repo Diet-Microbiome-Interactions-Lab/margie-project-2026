@@ -32,7 +32,6 @@ const NAMES: Record<string, string> = {
 	geneprop: 'Genome Properties',
 	kegg: 'KEGG',
 	pgap: 'PGAP',
-	signalp4: 'SignalP 4',
 	signalp6: 'SignalP 6',
 	quast: 'QUAST'
 };

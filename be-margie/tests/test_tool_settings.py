@@ -18,6 +18,10 @@ def test_a_tool_has_database_and_container_settings_only_when_the_workflow_uses_
     params = {p['param'] for p in reg._margie_sb_tool_params()}
     for tool in reg.MARGIE_SB_PHASED_TOOLS:
         key = tool['key']
+        # A hidden tool (SignalP 4) has no settings on the website.
+        if tool.get('hidden'):
+            assert not any(p.startswith(f'margie_sb.{key}.') for p in params), key
+            continue
         assert (f'margie_sb.{key}.db' in params) == (key in dbs), key
         assert (f'margie_sb.{key}.sif' in params) == (tool['sif'] in sifs), key
         assert f'margie_sb.{key}.threads' in params and f'margie_sb.{key}.partition' in params, key
