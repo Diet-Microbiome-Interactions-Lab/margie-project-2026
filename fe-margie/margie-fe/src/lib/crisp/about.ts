@@ -182,7 +182,7 @@ export const FUNDING: { funder: string; award: string; title: string; url: strin
 /** How AI was used in building MARGIE: the same text as the READMEs' "AI usage in the project". */
 export const AI_USAGE = {
 	paragraphs: [
-		"MARGIE's platform orchestration, the engine, API and interface MARGIE runs on, was developed by Dane Deemer (Deemer, 2020; Deemer, 2025). The methods and the host scripts of the pipeline were developed by Sajal Bhattarai, who designed and implemented the phase 9 to 12 scripts (consolidation, labeling, scoring and fingerprinting) and defined their core ideas, architecture and intended behaviour. Sajal Bhattarai also improved MARGIE's graphical interface, building on Dane Deemer's architecture.",
+		"MARGIE's platform orchestration, the engine, API and interface she runs on, was developed by Dane Deemer (Deemer, 2020; Deemer, 2025). The methods and the host scripts of the pipeline were developed by Sajal Bhattarai, who designed and implemented the phase 9 to 12 scripts (consolidation, labeling, scoring and fingerprinting) and defined their core ideas, architecture and intended behaviour. Sajal Bhattarai also improved MARGIE's graphical interface, building on Dane Deemer's architecture.",
 		'Claude models (Anthropic, Inc.) were used interactively during development to debug the code and scripts, to improve their robustness, and to help refine the visualizations: the circular operon diagrams and the interactive genome map pages. Sajal Bhattarai checked the code, scripts and visualizations repeatedly and validated that they run as intended.'
 	],
 	reference: { apa: 'Anthropic. (2026). Claude [Large language model].', url: 'https://www.anthropic.com/claude' }
@@ -193,7 +193,7 @@ export const DATABASES = {
 	lede: 'The databases MARGIE builds from the genomes she annotates.',
 	soon: 'MARGIE-specific databases will be released soon. Stay tuned!',
 	about:
-		'Once MARGIE has annotated thousands of genomes, the first release will be here as one zip file: a folder named margie-databases holding the databases MARGIE generates.',
+		'Once MARGIE has annotated thousands of genomes, the first release will be here as one zip file: a folder named margie-databases holding the databases she generates.',
 	holds: [
 		'the operon reference (the operon .pkl file) that C3 scores against',
 		'the gene and operon fingerprint databases',
@@ -267,7 +267,7 @@ export const SOFTWARE: {
 		items: [
 			{ name: 'BSP documentation', what: "Dane Deemer's documentation of the Bioinformatics Supercomputing Platform", href: 'https://bioinformatics-tools.readthedocs.io/en/latest/' },
 			{ name: 'MkDocs and Material for MkDocs', what: 'build the BSP documentation', href: 'https://squidfunk.github.io/mkdocs-material/' },
-			{ name: 'Read the Docs', what: 'hosts the BSP documentation', href: 'https://readthedocs.org' }
+			{ name: 'Read the Docs', what: 'hosts the BSP documentation', href: 'https://bioinformatics-tools.readthedocs.io/en/latest/' }
 		]
 	}
 ];

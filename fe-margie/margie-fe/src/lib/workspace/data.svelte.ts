@@ -170,7 +170,7 @@ export interface StoreInfo {
 	/** The copy every user starts from. */
 	base: string;
 	/** A copy already in the working folder (put there by hand), used as is by the next setup once ready. */
-	found: { path: string; how: 'named' | 'base' | 'flat'; version: number; ready: boolean; note: string; bytes?: number } | null;
+	found: { path: string; how: 'named' | 'base' | 'ext' | 'flat'; version: number; ready: boolean; note: string; bytes?: number } | null;
 	backup: { version: number; path: string } | null;
 	backups: number;
 }

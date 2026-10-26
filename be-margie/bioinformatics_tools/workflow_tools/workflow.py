@@ -33,6 +33,7 @@ from bioinformatics_tools.workflow_tools.programs import ProgramBase
 from bioinformatics_tools.workflow_tools.workflow_helpers import (
     discover_genomes, genome_stem, get_workflow_prefix_for, WORKFLOW_PATH_DEFAULTS, genome_calls, gene_call_files)
 from bioinformatics_tools.workflow_tools.workflow_registry import (
+    HIDDEN_TOOLS,
     MARGIE_SB_PHASED_TOOLS,
     MARGIE_SB_REQUIRED_TOOLS,
     QUAST_AT_ONCE,
@@ -1869,7 +1870,8 @@ class WorkflowBase(ProgramBase):
         )
         sif_files_override = None
         if selected_tools_raw:
-            selected_tool_keys = {t.strip() for t in selected_tools_raw.split(',') if t.strip()}
+            # A hidden tool in an older saved choice is left out.
+            selected_tool_keys = {t.strip() for t in selected_tools_raw.split(',') if t.strip()} - HIDDEN_TOOLS
             # The tools every run needs come with any choice.
             selected_tool_keys |= MARGIE_SB_REQUIRED_TOOLS
             for tool in MARGIE_SB_PHASED_TOOLS:
@@ -1880,6 +1882,10 @@ class WorkflowBase(ProgramBase):
                 config_overrides['run_operon_fingerprint'] = True
             sif_files_override = margie_sb_sif_files(selected_tool_keys | {'rasttk'} | (
                 {'gtdbtk'} if config_overrides.get('run_gtdbtk', True) else set()))
+
+        # Hidden tools (workflow_registry.HIDDEN_TOOLS) are off in each run.
+        for key in HIDDEN_TOOLS:
+            config_overrides[_tool_to_run_flag.get(key, f'run_{key}')] = False
 
         # ---- Licensing gate: accepted terms required, unlicensed tools disabled ----
         from bioinformatics_tools.workflow_tools.env_keys import ensure_api_keys

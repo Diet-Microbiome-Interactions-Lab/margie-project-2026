@@ -98,7 +98,7 @@ _LISTED = {f for step in STEPS for f in step["files"]}
 SNIPPET_FILES = _LISTED | {
     "margie_sb.smk", "workflow_registry.py", "workflow_helpers.py", "genome_identity.py",
     "protein_cache.py", "output_cache.py", "cache_report.py", "load_to_db.py", "license_gate.py",
-    "reorganize_outputs.py", "enrich_with_envelope.py", "process_signalp4.py", "process_signalp6.py",
+    "reorganize_outputs.py", "enrich_with_envelope.py", "process_signalp6.py",
 }
 _RULE_START = re.compile(r"^(?:rule|checkpoint) (\w+):")
 

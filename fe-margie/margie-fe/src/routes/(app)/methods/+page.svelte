@@ -55,7 +55,7 @@
 					does: 'Infers the cell envelope type (monoderm or diderm) from marker annotations in TIGRFAM, PGAP, Pfam and UniProt, and sets the model the localisation tools run with.',
 					more: { href: '/faq#envelope', label: 'How the envelope is inferred' }
 				},
-				{ n: '8', step: 'Localisation', tools: ['PSORTb', 'DeepSig', 'SignalP 4'], does: 'Subcellular location and signal peptides, run with the inferred envelope type. SignalP 4 runs once the user records a licence for it.' }
+				{ n: '8', step: 'Localisation', tools: ['PSORTb', 'DeepSig'], does: 'Subcellular location and signal peptides, run with the inferred envelope type.' }
 			]
 		},
 		{

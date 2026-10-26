@@ -560,7 +560,8 @@ def _phase4_8_targets_for_genome(genome):
         targets.append(DEEPSIG_TOKEN.format(genome=genome))
     if rc_bool('run_psortb', True, config=config):
         targets.append(PSORTB_TOKEN.format(genome=genome))
-    if rc_bool('run_signalp4', True, config=config):
+    # SignalP 4 is hidden (workflow_registry.HIDDEN_TOOLS): it runs only when run_signalp4 is set.
+    if rc_bool('run_signalp4', False, config=config):
         targets.append(SIGNALP4_TOKEN.format(genome=genome))
     return targets
 

@@ -40,7 +40,7 @@
 		<h2>Cite MARGIE</h2>
 		<div class="rp-row">
 			<button type="button" class="mg-btn primary small" onclick={downloadBibtex}><Download size={14} /> Download the citations (BibTeX)</button>
-			<span class="rp-note">MARGIE, the thesis, the base architecture, the research computing and the {citedPapers().length} papers of the tools and software MARGIE runs.</span>
+			<span class="rp-note">MARGIE, the thesis, the base architecture, the research computing and the {citedPapers().length} papers of the tools and software she runs.</span>
 		</div>
 		<h3>This pipeline</h3>
 		<p class="rp-cite">{CITATION}</p>

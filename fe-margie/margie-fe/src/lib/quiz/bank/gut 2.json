@@ -1,0 +1,865 @@
+[
+	{
+		"id": "gut-001",
+		"topic": "gut",
+		"level": "easy",
+		"kind": "choice",
+		"question": "Which dietary fibre is an insoluble β-1,4-linked glucose polymer that most human gut bacteria ferment poorly?",
+		"options": ["Cellulose", "Inulin", "Pectin", "Resistant starch"],
+		"answer": 0,
+		"explain": "Cellulose chains hydrogen-bond into crystalline insoluble microfibrils, and few human colonic bacteria carry enzymes able to open them, so much of it passes through and adds bulk."
+	},
+	{
+		"id": "gut-002",
+		"topic": "gut",
+		"level": "easy",
+		"kind": "choice",
+		"question": "Inulin and shorter fructo-oligosaccharides are chains of which sugar?",
+		"options": [
+			"Glucose joined by α-1,4 bonds",
+			"Fructose joined by β-2,1 bonds",
+			"Xylose joined by β-1,4 bonds",
+			"Galacturonic acid joined by α-1,4 bonds"
+		],
+		"answer": 1,
+		"explain": "Inulin-type fructans are β-2,1-linked fructose chains, usually with a terminal glucose. Chain length varies between preparations, and that length shapes which bacteria can use them."
+	},
+	{
+		"id": "gut-003",
+		"topic": "gut",
+		"level": "easy",
+		"kind": "choice",
+		"question": "Which short-chain fatty acid is the preferred oxidative fuel of colonocytes?",
+		"options": ["Acetate", "Propionate", "Butyrate", "Formate"],
+		"answer": 2,
+		"explain": "Colonocytes take up butyrate and oxidise it for much of their energy, so a large share of colonic butyrate is consumed by the epithelium rather than reaching the blood."
+	},
+	{
+		"id": "gut-004",
+		"topic": "gut",
+		"level": "easy",
+		"kind": "choice",
+		"question": "What is the backbone of cereal arabinoxylan?",
+		"options": [
+			"α-1,4-linked glucose with arabinose branches",
+			"β-1,3-linked glucose with galactose branches",
+			"β-1,4-linked mannose with glucose branches",
+			"β-1,4-linked xylose with arabinose side chains"
+		],
+		"answer": 3,
+		"explain": "Arabinoxylan is a β-1,4-xylan decorated with arabinose, plus ferulic acid and acetyl groups, so degraders need xylanases together with enzymes that strip the side chains."
+	},
+	{
+		"id": "gut-005",
+		"topic": "gut",
+		"level": "easy",
+		"kind": "choice",
+		"question": "In the CAZy classification, which class of carbohydrate-active enzymes forms glycosidic bonds rather than breaking them?",
+		"options": [
+			"Glycosyltransferases (GT)",
+			"Glycoside hydrolases (GH)",
+			"Polysaccharide lyases (PL)",
+			"Carbohydrate esterases (CE)"
+		],
+		"answer": 0,
+		"explain": "GTs transfer sugars from activated donors to build glycans. GHs, PLs and CEs act on existing polysaccharides, which is why fibre degradation studies focus on those three."
+	},
+	{
+		"id": "gut-006",
+		"topic": "gut",
+		"level": "easy",
+		"kind": "choice",
+		"question": "Akkermansia muciniphila occupies which nutrient niche in the colon?",
+		"options": [
+			"Dietary resistant starch granules",
+			"Host mucin O-glycans",
+			"Plant cellulose microfibrils",
+			"Primary bile acids"
+		],
+		"answer": 1,
+		"explain": "A. muciniphila grows on the sugars of host mucin glycoproteins, which places it at the mucus layer rather than in the bulk lumen."
+	},
+	{
+		"id": "gut-007",
+		"topic": "gut",
+		"level": "easy",
+		"kind": "choice",
+		"question": "In Bacteroides polysaccharide utilisation loci, which protein pair takes up glycan fragments at the outer membrane?",
+		"options": ["OmpF and OmpC", "SecA and SecY", "SusC and SusD", "TonB and ExbD"],
+		"answer": 2,
+		"explain": "SusC is a TonB-dependent transporter and SusD a surface glycan-binding lipoprotein. The two sit together and import the oligosaccharides released by surface enzymes."
+	},
+	{
+		"id": "gut-008",
+		"topic": "gut",
+		"level": "easy",
+		"kind": "choice",
+		"question": "Which cereal fibre is soluble, forms viscous solutions, and is abundant in oats and barley?",
+		"options": ["Crystalline cellulose", "Lignin", "Chitin", "Mixed-linkage β-glucan"],
+		"answer": 3,
+		"explain": "Cereal β-glucan mixes β-1,3 and β-1,4 links, which stops tight chain packing and keeps the polymer soluble and viscous. It is readily fermented in the colon."
+	},
+	{
+		"id": "gut-009",
+		"topic": "gut",
+		"level": "easy",
+		"kind": "truefalse",
+		"statement": "Resistant starch escapes digestion in the small intestine and reaches the colon, where bacteria can ferment it.",
+		"answer": true,
+		"explain": "Granule structure, retrogradation on cooling, or chemical modification keeps resistant starch out of reach of host amylases, so it arrives in the colon as a fermentable substrate."
+	},
+	{
+		"id": "gut-010",
+		"topic": "gut",
+		"level": "easy",
+		"kind": "truefalse",
+		"statement": "Cellulose is a soluble fibre that dissolves in water to form a viscous gel.",
+		"answer": false,
+		"explain": "Cellulose is insoluble, because its β-1,4 chains pack into crystalline fibrils. Pectin and cereal β-glucan are the soluble, viscous fibres."
+	},
+	{
+		"id": "gut-011",
+		"topic": "gut",
+		"level": "easy",
+		"kind": "truefalse",
+		"statement": "Acetate, propionate and butyrate are the main short-chain fatty acids produced by fermentation in the human colon.",
+		"answer": true,
+		"explain": "These three dominate, with acetate usually the most abundant. Lactate and succinate appear as intermediates that other community members take up."
+	},
+	{
+		"id": "gut-012",
+		"topic": "gut",
+		"level": "easy",
+		"kind": "truefalse",
+		"statement": "The backbone of pectin is built from glucose units.",
+		"answer": false,
+		"explain": "Pectin's main backbone, homogalacturonan, is α-1,4-linked galacturonic acid that is often methyl-esterified, alongside rhamnogalacturonan regions with their own side chains."
+	},
+	{
+		"id": "gut-013",
+		"topic": "gut",
+		"level": "easy",
+		"kind": "truefalse",
+		"statement": "The colonic mucus layer is made mainly of cellulose secreted by the host.",
+		"answer": false,
+		"explain": "Mucus is built from host mucin glycoproteins such as MUC2, whose O-glycans carry sugars that some gut bacteria can use as a nutrient source."
+	},
+	{
+		"id": "gut-014",
+		"topic": "gut",
+		"level": "easy",
+		"kind": "match",
+		"question": "Match each dietary fibre with a food in which it is abundant.",
+		"pairs": [
+			{ "left": "Inulin", "right": "Chicory root" },
+			{ "left": "Mixed-linkage β-glucan", "right": "Oat bran" },
+			{ "left": "Arabinoxylan", "right": "Wheat bran" },
+			{ "left": "Pectin", "right": "Citrus peel" },
+			{ "left": "Resistant starch", "right": "Cooked and cooled potato" }
+		],
+		"explain": "Fibre type follows plant tissue: cereal cell walls supply arabinoxylan and β-glucan, fruit supplies pectin, chicory stores fructans, and starch retrogrades into a resistant form on cooling."
+	},
+	{
+		"id": "gut-015",
+		"topic": "gut",
+		"level": "easy",
+		"kind": "match",
+		"question": "Match each fermentation acid with the fate or feature described.",
+		"pairs": [
+			{ "left": "Acetate", "right": "Usually the most abundant short-chain fatty acid in the colon" },
+			{ "left": "Propionate", "right": "Taken up largely by the liver, where it can feed gluconeogenesis" },
+			{ "left": "Butyrate", "right": "Oxidised by colonocytes as their main fuel" },
+			{ "left": "Lactate", "right": "An intermediate that other gut bacteria convert further" }
+		],
+		"explain": "The three main short-chain fatty acids have different fates, and intermediates such as lactate rarely build up because cross-feeding partners consume them."
+	},
+	{
+		"id": "gut-016",
+		"topic": "gut",
+		"level": "easy",
+		"kind": "match",
+		"question": "Match each term from carbohydrate-active enzyme work with its meaning.",
+		"pairs": [
+			{ "left": "CAZyme", "right": "An enzyme or module that acts on carbohydrates" },
+			{ "left": "GH family", "right": "A group of hydrolases that share sequence and fold" },
+			{ "left": "PL family", "right": "Lyases that cleave uronic-acid-containing polymers" },
+			{ "left": "PUL", "right": "A co-regulated gene cluster aimed at one glycan" },
+			{ "left": "SusD", "right": "A surface lipoprotein that binds glycan before import" }
+		],
+		"explain": "CAZy sorts carbohydrate-active enzymes into sequence-based families, while PUL describes how Bacteroidetes bundle those enzymes with binding and transport proteins."
+	},
+	{
+		"id": "gut-017",
+		"topic": "gut",
+		"level": "easy",
+		"kind": "case",
+		"scenario": "A teaching lab sets up two anaerobic bottles of the same faecal slurry in buffered medium. One bottle receives inulin, the other receives no added carbohydrate. Students track gas, pH and short-chain fatty acids over 24 hours.",
+		"parts": [
+			{
+				"question": "Which result would you expect from the inulin bottle compared with the bottle with no added carbohydrate?",
+				"options": [
+					"More gas and a higher total short-chain fatty acid concentration",
+					"Less gas and no change in short-chain fatty acids",
+					"More gas but a fall in total short-chain fatty acids",
+					"No gas and a rise in pH"
+				],
+				"answer": 0,
+				"explain": "A fermentable fibre gives the community carbon and energy, so gas and short-chain fatty acids accumulate in that bottle."
+			},
+			{
+				"question": "The pH in the inulin bottle falls during the incubation. What drives this?",
+				"options": [
+					"Loss of dissolved carbon dioxide from the headspace",
+					"Accumulation of short-chain fatty acids and lactate",
+					"Hydrolysis of inulin into neutral fructose",
+					"Growth of methanogens that consume hydrogen"
+				],
+				"answer": 1,
+				"explain": "Fermentation acids build up faster than the buffer can take them up. In the colon, absorption and mucosal buffering limit the drop."
+			}
+		],
+		"explain": "A batch fermentation shows the core link between a fermentable substrate, acid production and a falling pH, with no host present to absorb the products."
+	},
+	{
+		"id": "gut-018",
+		"topic": "gut",
+		"level": "intermediate",
+		"kind": "choice",
+		"question": "Volunteers switch to a diet high in resistant starch. Which organism is most likely to rise as a primary degrader of the starch granules?",
+		"options": [
+			"Ruminococcus bromii",
+			"Akkermansia muciniphila",
+			"Desulfovibrio piger",
+			"Methanobrevibacter smithii"
+		],
+		"answer": 0,
+		"explain": "R. bromii attaches to starch granules and opens them, and dietary studies report it increasing with resistant starch. The others use mucin glycans, sulfate or hydrogen instead."
+	},
+	{
+		"id": "gut-019",
+		"topic": "gut",
+		"level": "intermediate",
+		"kind": "choice",
+		"question": "In an in vitro fermentation of inulin, acetate rises during the first hours, then butyrate rises while acetate partly falls. Which explanation fits best?",
+		"options": [
+			"Inulin becomes insoluble once it is partly hydrolysed",
+			"Butyrate producers take up acetate while forming butyrate",
+			"Acetate is converted to methane by methanogens",
+			"The falling pH blocks further acetate production"
+		],
+		"answer": 1,
+		"explain": "Many colonic butyrate producers use butyryl-CoA:acetate CoA-transferase, which consumes external acetate, so acetate from the early fermenters is cross-fed into butyrate."
+	},
+	{
+		"id": "gut-020",
+		"topic": "gut",
+		"level": "intermediate",
+		"kind": "choice",
+		"question": "Which short-chain fatty acid is cleared largely by the liver and can serve there as a gluconeogenic substrate?",
+		"options": ["Butyrate", "Formate", "Propionate", "Succinate"],
+		"answer": 2,
+		"explain": "Propionate reaching the portal vein is taken up mainly by the liver, where it can enter gluconeogenesis. Butyrate is used first by the colonic epithelium."
+	},
+	{
+		"id": "gut-021",
+		"topic": "gut",
+		"level": "intermediate",
+		"kind": "choice",
+		"question": "A strain grows on fructo-oligosaccharides but not on long-chain inulin, and in co-culture it grows once a partner releases oligosaccharides. What role does it play?",
+		"options": [
+			"Primary degrader of inulin",
+			"Keystone degrader of inulin",
+			"Hydrogen-consuming acetogen",
+			"Secondary degrader that cross-feeds on released oligosaccharides"
+		],
+		"answer": 3,
+		"explain": "Secondary degraders lack the enzymes to open the intact polymer and depend on fragments released by a primary degrader, which is a common form of cross-feeding."
+	},
+	{
+		"id": "gut-022",
+		"topic": "gut",
+		"level": "intermediate",
+		"kind": "choice",
+		"question": "Continuous cultures of the same faecal community on the same mixed-fibre medium are held at pH 5.5 and at pH 6.5. What has been reported for the more acidic vessel?",
+		"options": [
+			"Firmicutes such as Roseburia dominate and butyrate output is higher",
+			"Bacteroides dominate and butyrate output is higher",
+			"Methanogens dominate and acetate output is higher",
+			"Composition is unchanged and total acid output falls"
+		],
+		"answer": 0,
+		"explain": "In pH-controlled fermentor work, mildly acidic conditions favoured butyrate-producing Firmicutes, while Bacteroides competed better nearer neutral pH."
+	},
+	{
+		"id": "gut-023",
+		"topic": "gut",
+		"level": "intermediate",
+		"kind": "choice",
+		"question": "Two arabinoxylan preparations from the same cereal differ in their degree of arabinose substitution, and in faecal fermentations they enrich different species. What does this illustrate?",
+		"options": [
+			"Fibre dose sets the response, not fibre structure",
+			"Fine structure decides which enzyme sets can act, so it selects the responders",
+			"Soluble fibres select the same taxa whatever their linkages",
+			"Side chains stop the backbone from being fermented"
+		],
+		"answer": 1,
+		"explain": "Degraders need enzymes matched to the side chains and decorations, so a small structural difference changes which members can use the fibre and therefore which ones increase."
+	},
+	{
+		"id": "gut-024",
+		"topic": "gut",
+		"level": "intermediate",
+		"kind": "truefalse",
+		"statement": "Faecalibacterium prausnitzii and Roseburia species are among the butyrate producers of the human colon.",
+		"answer": true,
+		"explain": "Both are abundant colonic Firmicutes that form butyrate, and both can take up acetate released by other fermenters while doing so."
+	},
+	{
+		"id": "gut-025",
+		"topic": "gut",
+		"level": "intermediate",
+		"kind": "truefalse",
+		"statement": "A drop in a single bacterial genus is enough to show that a gut community is dysbiotic.",
+		"answer": false,
+		"explain": "Dysbiosis is a loose, context-dependent label for a community that departs from a healthy reference, and healthy communities vary widely, so one genus shifting says little on its own."
+	},
+	{
+		"id": "gut-026",
+		"topic": "gut",
+		"level": "intermediate",
+		"kind": "truefalse",
+		"statement": "Many Bacteroides genomes carry dozens of polysaccharide utilisation loci, letting one strain switch between glycans as the diet changes.",
+		"answer": true,
+		"explain": "Each locus is induced by its own glycan, so a single strain can track whichever substrate is available, including host mucin glycans when dietary fibre is scarce."
+	},
+	{
+		"id": "gut-027",
+		"topic": "gut",
+		"level": "intermediate",
+		"kind": "truefalse",
+		"statement": "16S rRNA gene amplicon surveys measure the CAZyme gene content of a community directly.",
+		"answer": false,
+		"explain": "Amplicons report marker-gene taxonomy, and gene content is only inferred from relatives. Shotgun metagenomics recovers the CAZyme genes themselves."
+	},
+	{
+		"id": "gut-028",
+		"topic": "gut",
+		"level": "intermediate",
+		"kind": "match",
+		"question": "Match each backbone linkage with the polysaccharide it defines.",
+		"pairs": [
+			{ "left": "α-1,4-linked glucose with α-1,6 branch points", "right": "Starch" },
+			{ "left": "β-1,4-linked glucose", "right": "Cellulose" },
+			{ "left": "β-1,4-linked xylose", "right": "Xylan" },
+			{ "left": "α-1,4-linked galacturonic acid", "right": "Homogalacturonan" },
+			{ "left": "β-2,1-linked fructose", "right": "Inulin" }
+		],
+		"explain": "Sugar identity and linkage set the shape and solubility of a fibre, and they decide which glycoside hydrolase or lyase families can cut it."
+	},
+	{
+		"id": "gut-029",
+		"topic": "gut",
+		"level": "intermediate",
+		"kind": "match",
+		"question": "Match each gut organism with the role described for it.",
+		"pairs": [
+			{
+				"left": "Ruminococcus bromii",
+				"right": "Primary degrader that colonises resistant starch granules"
+			},
+			{ "left": "Akkermansia muciniphila", "right": "Grows on host mucin glycans at the mucus layer" },
+			{
+				"left": "Bacteroides thetaiotaomicron",
+				"right": "Carries many utilisation loci for plant and host glycans"
+			},
+			{
+				"left": "Eubacterium rectale",
+				"right": "Butyrate producer that cross-feeds on starch fragments and acetate"
+			},
+			{ "left": "Methanobrevibacter smithii", "right": "Removes hydrogen by forming methane" }
+		],
+		"explain": "Degradation in the colon is divided up: some members open polymers, some use the fragments, some work on host glycans, and others drain the hydrogen that fermentation produces."
+	},
+	{
+		"id": "gut-030",
+		"topic": "gut",
+		"level": "intermediate",
+		"kind": "match",
+		"question": "Match each method with what it reports about a gut community.",
+		"pairs": [
+			{
+				"left": "16S rRNA amplicon sequencing",
+				"right": "Which taxa are present, cheaply and at coarse resolution"
+			},
+			{ "left": "Shotgun metagenomics", "right": "Gene content, including CAZyme repertoires" },
+			{ "left": "Metatranscriptomics", "right": "Which genes the community is expressing" },
+			{ "left": "Gnotobiotic mice", "right": "A defined community inside a living host" },
+			{
+				"left": "In vitro batch fermentation",
+				"right": "Gas and acid kinetics with no host absorption"
+			}
+		],
+		"explain": "Each approach answers a different question, so a claim about degradation potential, activity or host response should rest on the method that measures it."
+	},
+	{
+		"id": "gut-031",
+		"topic": "gut",
+		"level": "intermediate",
+		"kind": "match",
+		"question": "Match each term from fibre degradation ecology with its meaning.",
+		"pairs": [
+			{ "left": "Primary degrader", "right": "Opens the intact polysaccharide" },
+			{ "left": "Secondary degrader", "right": "Uses oligosaccharides and sugars released by others" },
+			{ "left": "Cross-feeding", "right": "One member's product becomes another member's substrate" },
+			{ "left": "Keystone degrader", "right": "Its removal leaves the substrate largely unfermented" },
+			{
+				"left": "Hydrogen sink",
+				"right": "Consumes hydrogen and keeps fermentation thermodynamically favourable"
+			}
+		],
+		"explain": "Fibre breakdown is a food chain: a few members open the polymer, others live on the products, and hydrogen consumers keep the chain running."
+	},
+	{
+		"id": "gut-032",
+		"topic": "gut",
+		"level": "intermediate",
+		"kind": "case",
+		"scenario": "A lab runs a controlled feeding study in which volunteers move from a low-fibre habitual diet to a diet rich in wheat bran arabinoxylan for three weeks. Faecal samples are profiled by 16S rRNA amplicon sequencing before and after. Short-chain fatty acids are measured in the same samples.",
+		"parts": [
+			{
+				"question": "Which community change best fits the switch to arabinoxylan?",
+				"options": [
+					"A rise in mucin-degrading taxa and a fall in fibre degraders",
+					"A loss of diversity with no change in fermentation products",
+					"Enrichment of xylan-degrading taxa such as some Bacteroides and Roseburia",
+					"Replacement of bacteria by archaea across the community"
+				],
+				"answer": 2,
+				"explain": "Substrate supply selects members whose enzymes match it, so xylanase-carrying degraders and their cross-feeding partners tend to gain ground."
+			},
+			{
+				"question": "Faecal short-chain fatty acids rise only slightly, although fermentation clearly increased. What is the most likely reason?",
+				"options": [
+					"Short-chain fatty acids are not made from arabinoxylan",
+					"The amplicon method destroys short-chain fatty acids",
+					"Short-chain fatty acids are volatile and leave the sample during storage",
+					"The colon absorbs most of what it produces, so faecal levels track production poorly"
+				],
+				"answer": 3,
+				"explain": "Absorption takes up the bulk of the acids formed, so faecal concentrations reflect the leftovers rather than the rate of production."
+			},
+			{
+				"question": "The team wants to know which degradation enzymes the responders carry. What is the better next step?",
+				"options": [
+					"Shotgun metagenomics of the same samples to recover CAZyme genes",
+					"Deeper sequencing of the same 16S amplicon region",
+					"qPCR of the 16S gene to estimate total bacterial load",
+					"Repeating the diet period for a further three weeks"
+				],
+				"answer": 0,
+				"explain": "Enzyme repertoires are read from gene content, which shotgun metagenomics gives directly. More amplicon depth adds taxonomic detail, not genes."
+			}
+		],
+		"explain": "A diet switch selects degraders matched to the fibre's structure, faecal acid levels understate production because of absorption, and gene-level questions need gene-level data."
+	},
+	{
+		"id": "gut-033",
+		"topic": "gut",
+		"level": "intermediate",
+		"kind": "case",
+		"scenario": "Gnotobiotic mice are colonised with a defined community of human gut strains that includes one mucin-degrading species. One group receives a fibre-rich diet and the other a fibre-free diet of matched energy content. The team measures community composition and colonic mucus thickness.",
+		"parts": [
+			{
+				"question": "Based on published gnotobiotic work, what is the expected result in the fibre-free group?",
+				"options": [
+					"The mucin degrader disappears while the mucus layer thickens",
+					"The mucin degrader increases in relative abundance and the mucus layer is thinner",
+					"Composition is unchanged and the mucus layer thickens",
+					"Fibre degraders increase while the mucus layer thins"
+				],
+				"answer": 1,
+				"explain": "Without dietary glycans, members able to use host mucin have the substrate that remains, and mouse studies report a thinner mucus layer under fibre deprivation."
+			},
+			{
+				"question": "How should this finding be stated for a general audience?",
+				"options": [
+					"Fibre-free diets cure gut disease in people",
+					"Mucin-degrading bacteria are harmful members of the human gut",
+					"In these mouse experiments, fibre deprivation shifted bacteria towards mucin use and was associated with a thinner mucus layer",
+					"Human mucus thickness can be read off a faecal sample"
+				],
+				"answer": 2,
+				"explain": "Gnotobiotic results are evidence about that model under those diets. Naming the setting and using associative wording keeps the claim inside the data."
+			}
+		],
+		"explain": "Fibre deprivation shifts a defined community towards host mucin as a substrate, and careful wording keeps a mouse finding from turning into a human health claim."
+	},
+	{
+		"id": "gut-034",
+		"topic": "gut",
+		"level": "hard",
+		"kind": "choice",
+		"question": "What defines a polysaccharide utilisation locus in a Bacteroides genome?",
+		"options": [
+			"Any cluster of glycoside hydrolase genes anywhere in the genome",
+			"A plasmid that carries sugar transport genes",
+			"A co-regulated cluster with a susC/susD-like pair, CAZymes and a regulator, aimed at one glycan",
+			"A set of unlinked genes induced together by any carbohydrate"
+		],
+		"answer": 2,
+		"explain": "The susC/susD-like pair is the signature of the locus, and the surrounding CAZymes, binding proteins and sensor make it a self-contained system for one class of glycan."
+	},
+	{
+		"id": "gut-035",
+		"topic": "gut",
+		"level": "hard",
+		"kind": "choice",
+		"question": "Why can shotgun metagenomics reveal degradation potential that an amplicon survey cannot?",
+		"options": [
+			"It sequences a longer stretch of the 16S rRNA gene",
+			"It counts cells rather than genes",
+			"It is free of DNA extraction bias",
+			"It recovers the CAZyme genes themselves instead of inferring them from taxonomy"
+		],
+		"answer": 3,
+		"explain": "Amplicons place organisms on a tree, while metagenomes carry the enzyme genes. Closely related strains can differ widely in which CAZymes they hold, so inference from taxonomy is weak."
+	},
+	{
+		"id": "gut-036",
+		"topic": "gut",
+		"level": "hard",
+		"kind": "choice",
+		"question": "In the dominant butyrate-forming route among human colonic Firmicutes, which enzyme releases butyrate from butyryl-CoA?",
+		"options": [
+			"Butyryl-CoA:acetate CoA-transferase",
+			"Butyrate kinase acting on butyryl phosphate",
+			"Acetate kinase",
+			"Pyruvate formate-lyase"
+		],
+		"answer": 0,
+		"explain": "Gene surveys of colonic communities find the CoA-transferase route far more common than the butyrate kinase route, and it couples butyrate formation to uptake of external acetate."
+	},
+	{
+		"id": "gut-037",
+		"topic": "gut",
+		"level": "hard",
+		"kind": "choice",
+		"question": "Which route to propionate is characteristic of gut Bacteroidetes?",
+		"options": [
+			"The acrylate pathway from lactate",
+			"The succinate pathway through methylmalonyl-CoA",
+			"The propanediol pathway from fucose and rhamnose",
+			"The Wood-Ljungdahl pathway from hydrogen and carbon dioxide"
+		],
+		"answer": 1,
+		"explain": "Bacteroidetes form propionate through succinate and decarboxylation of methylmalonyl-CoA. The propanediol route belongs to users of deoxy sugars, and the acrylate route to some lactate utilisers."
+	},
+	{
+		"id": "gut-038",
+		"topic": "gut",
+		"level": "hard",
+		"kind": "choice",
+		"question": "Colonocytes oxidise butyrate and consume oxygen in doing so. In mouse and cell studies, what has this been linked to?",
+		"options": [
+			"A rise in luminal oxygen that favours aerobes",
+			"Loss of the mucus layer",
+			"Epithelial hypoxia that helps keep the lumen suited to obligate anaerobes",
+			"Direct inhibition of bacterial glycoside hydrolases"
+		],
+		"answer": 2,
+		"explain": "Butyrate-driven oxygen consumption at the epithelium is associated with stabilised HIF signalling and low oxygen at the surface, which fits the steep gradient into the anoxic lumen."
+	},
+	{
+		"id": "gut-039",
+		"topic": "gut",
+		"level": "hard",
+		"kind": "choice",
+		"question": "A continuous culture community is deprived of dietary glycans and given purified mucin instead. Which shift in gene expression would you predict?",
+		"options": [
+			"Induction of loci for starch and fructan use",
+			"Loss of carbohydrate-active enzyme expression",
+			"Induction of cellulase genes",
+			"Induction of sialidases, fucosidases and sulfatases"
+		],
+		"answer": 3,
+		"explain": "Mucin O-glycans are capped with sialic acid and fucose and carry sulfate groups, so those residues have to be removed before the core sugars can be reached."
+	},
+	{
+		"id": "gut-040",
+		"topic": "gut",
+		"level": "hard",
+		"kind": "truefalse",
+		"statement": "Ruminococcus bromii is described as a keystone degrader of resistant starch because removing it from mixed cultures left much of the starch unfermented.",
+		"answer": true,
+		"explain": "In vitro work with faecal communities found resistant starch poorly used without R. bromii, while adding it back restored fermentation, including by partners unable to open the granules."
+	},
+	{
+		"id": "gut-041",
+		"topic": "gut",
+		"level": "hard",
+		"kind": "truefalse",
+		"statement": "Polysaccharide lyases cleave glycosidic bonds by adding water, in the same way glycoside hydrolases do.",
+		"answer": false,
+		"explain": "Lyases use a beta-elimination mechanism, which requires a uronic acid next to the bond. That is why they act on pectin and alginate-type polymers rather than on starch or cellulose."
+	},
+	{
+		"id": "gut-042",
+		"topic": "gut",
+		"level": "hard",
+		"kind": "truefalse",
+		"statement": "Starch-degrading Gram-positive gut bacteria such as Ruminococcus bromii assemble cell-surface enzyme complexes, called amylosomes, using cohesin and dockerin modules.",
+		"answer": true,
+		"explain": "Cohesin-dockerin pairs, familiar from cellulosomes, hold amylases and carbohydrate-binding modules together on the cell surface, which concentrates activity on the starch granule."
+	},
+	{
+		"id": "gut-043",
+		"topic": "gut",
+		"level": "hard",
+		"kind": "match",
+		"question": "Match each fermentation pathway with the product and feature described.",
+		"pairs": [
+			{ "left": "Wood-Ljungdahl pathway", "right": "Acetate from hydrogen and carbon dioxide" },
+			{ "left": "Succinate pathway", "right": "Propionate in Bacteroidetes" },
+			{ "left": "Propanediol pathway", "right": "Propionate from fucose and rhamnose" },
+			{ "left": "Acrylate pathway", "right": "Propionate from lactate" },
+			{
+				"left": "Butyryl-CoA:acetate CoA-transferase route",
+				"right": "Butyrate formed with uptake of external acetate"
+			}
+		],
+		"explain": "The same acid can come from different routes with different substrates, so the pathway present in a genome says more about a strain's niche than the end product alone."
+	},
+	{
+		"id": "gut-044",
+		"topic": "gut",
+		"level": "hard",
+		"kind": "match",
+		"question": "Match each feature of the colonic environment with the description that fits it.",
+		"pairs": [
+			{ "left": "Proximal colon", "right": "Largest carbohydrate supply and the lowest luminal pH" },
+			{
+				"left": "Distal colon",
+				"right": "Less carbohydrate left, more protein fermentation, pH nearer neutral"
+			},
+			{ "left": "Layer next to the epithelium", "right": "Some oxygen diffusing from the mucosa" },
+			{ "left": "Centre of the lumen", "right": "Effectively anoxic" },
+			{
+				"left": "Transit time",
+				"right": "Sets how long the community has to work on a substrate"
+			}
+		],
+		"explain": "Fermentable substrate runs down along the colon while pH rises, and oxygen falls steeply from the mucosa into the lumen, so position and transit shape what an organism can do."
+	},
+	{
+		"id": "gut-045",
+		"topic": "gut",
+		"level": "hard",
+		"kind": "match",
+		"question": "Match each host protein with the relation to short-chain fatty acids described.",
+		"pairs": [
+			{ "left": "FFAR2 (GPR43)", "right": "Receptor responding most strongly to acetate and propionate" },
+			{
+				"left": "FFAR3 (GPR41)",
+				"right": "Receptor responding most strongly to propionate and butyrate"
+			},
+			{ "left": "GPR109A (HCAR2)", "right": "Butyrate receptor that also senses niacin" },
+			{
+				"left": "MCT1 (SLC16A1)",
+				"right": "Proton-coupled carrier bringing butyrate into colonocytes"
+			},
+			{
+				"left": "HIF-1α",
+				"right": "Transcription factor stabilised as colonocytes consume oxygen"
+			}
+		],
+		"explain": "Short-chain fatty acids reach the epithelium as both fuel and signal, through transporters and receptors with different preferences. In cell and mouse studies these routes are linked to barrier function."
+	},
+	{
+		"id": "gut-046",
+		"topic": "gut",
+		"level": "hard",
+		"kind": "case",
+		"scenario": "A new Bacteroides isolate grows on wheat arabinoxylan as its only carbohydrate. RNA-seq during growth on arabinoxylan shows one gene cluster strongly induced relative to growth on glucose. The cluster holds a susC/susD-like pair, a hybrid two-component sensor and several carbohydrate-active enzyme genes.",
+		"parts": [
+			{
+				"question": "Which enzyme set would you expect the induced cluster to encode?",
+				"options": [
+					"Alpha-amylase and pullulanase",
+					"Endoglucanase and cellobiohydrolase",
+					"Pectate lyase and rhamnogalacturonase",
+					"Endo-xylanase with arabinofuranosidase and feruloyl esterase"
+				],
+				"answer": 3,
+				"explain": "Arabinoxylan needs backbone cleavage plus removal of arabinose side chains and ferulate esters, so those activities should sit together in the locus."
+			},
+			{
+				"question": "What is the expected consequence of deleting the susC-like gene?",
+				"options": [
+					"Growth on arabinoxylan is lost while growth on glucose continues",
+					"Growth on glucose is lost while arabinoxylan use continues",
+					"The cluster becomes constitutively expressed",
+					"The surface enzymes are secreted into the medium"
+				],
+				"answer": 0,
+				"explain": "The SusC-like transporter imports the oligosaccharides released at the surface. Without it those fragments cannot be taken up, while glucose uptake does not depend on this locus."
+			},
+			{
+				"question": "The sensor gene is deleted and the cluster is no longer induced by arabinoxylan. What does this support?",
+				"options": [
+					"The locus is transcribed from a plasmid",
+					"The sensor detects an arabinoxylan fragment and switches the locus on",
+					"The enzymes are active only at low pH",
+					"Arabinoxylan is imported intact"
+				],
+				"answer": 1,
+				"explain": "Hybrid two-component sensors in these loci bind oligosaccharide signals and control transcription, which keeps the system switched off until its substrate appears."
+			}
+		],
+		"explain": "A polysaccharide utilisation locus bundles sensing, surface cleavage and import for one glycan, and targeted deletions separate those three jobs."
+	},
+	{
+		"id": "gut-047",
+		"topic": "gut",
+		"level": "hard",
+		"kind": "case",
+		"scenario": "In an anaerobic co-culture experiment, Ruminococcus bromii grows well on resistant starch granules. Eubacterium rectale alone shows little growth on the same granules. In co-culture both strains grow, the starch is consumed and butyrate accumulates.",
+		"parts": [
+			{
+				"question": "What is the simplest interpretation?",
+				"options": [
+					"E. rectale degrades the granules once the pH falls",
+					"R. bromii supplies a growth factor that E. rectale cannot make",
+					"R. bromii opens the granules and releases fragments that E. rectale uses",
+					"Both strains need traces of oxygen that only the co-culture provides"
+				],
+				"answer": 2,
+				"explain": "R. bromii acts as the primary degrader, and the released malto-oligosaccharides and sugars support the secondary degrader. This is textbook cross-feeding."
+			},
+			{
+				"question": "Butyrate rises in co-culture while acetate stays lower than in the R. bromii monoculture. What accounts for this?",
+				"options": [
+					"Acetate is lost to the gas phase",
+					"Starch is converted to butyrate with no intermediates",
+					"R. bromii stops producing acetate in co-culture",
+					"E. rectale takes up acetate while forming butyrate"
+				],
+				"answer": 3,
+				"explain": "The butyryl-CoA:acetate CoA-transferase route consumes external acetate, so the partner's acetate is drawn into butyrate instead of accumulating."
+			},
+			{
+				"question": "Which experiment would test the acetate route most directly?",
+				"options": [
+					"Add carbon-13 labelled acetate to the co-culture and follow the label into butyrate",
+					"Measure the final pH of each culture",
+					"Count cells by microscopy at the end point",
+					"Sequence the 16S rRNA gene of both strains"
+				],
+				"answer": 0,
+				"explain": "Isotope labelling follows the carbon itself, so label appearing in butyrate shows that acetate was used rather than merely disappearing."
+			}
+		],
+		"explain": "Primary and secondary degraders split the work on resistant starch, and a labelled substrate turns a pattern in the acid profile into evidence for cross-feeding."
+	},
+	{
+		"id": "gut-048",
+		"topic": "gut",
+		"level": "hard",
+		"kind": "case",
+		"scenario": "Two pH-controlled fermentors are inoculated with the same faecal community and fed the same mixture of plant fibres. One is held at pH 5.5 and the other at pH 6.5. Once both reach steady state, the team compares community profiles and acid output.",
+		"parts": [
+			{
+				"question": "Which pattern matches published fermentor work?",
+				"options": [
+					"The two vessels converge on the same community",
+					"Bacteroides-related sequences are relatively higher at pH 6.5 and butyrate output is higher at pH 5.5",
+					"Bacteroides-related sequences are relatively higher at pH 5.5 and butyrate output is higher at pH 6.5",
+					"Acid output is similar and composition differs at random"
+				],
+				"answer": 1,
+				"explain": "Mildly acidic conditions favoured butyrate-producing Firmicutes, while Bacteroides competed better nearer neutral pH, with the acid profile following the shift in membership."
+			},
+			{
+				"question": "How does this relate to the intact colon?",
+				"options": [
+					"The colon holds one pH along its length, so the result does not apply",
+					"Colonic pH is set by gastric acid that reaches the colon",
+					"Fast fermentation in the proximal colon lowers pH there, while the distal colon sits nearer neutral",
+					"The distal colon is the more acidic region because protein fermentation makes acid"
+				],
+				"answer": 2,
+				"explain": "Carbohydrate is used up proximally, so acid production and the pH drop are greatest there. pH then rises distally as fermentable substrate runs low while absorption continues."
+			}
+		],
+		"explain": "pH acts as a selective force in the colon, so one community fed one fibre mixture can settle into different memberships and different acid profiles depending on where it sits."
+	},
+	{
+		"id": "gut-049",
+		"topic": "gut",
+		"level": "hard",
+		"kind": "case",
+		"scenario": "A lab compares short-chain fructo-oligosaccharides with long-chain inulin in parallel faecal batch fermentations at matched carbohydrate load. The short-chain substrate ferments quickly with an early bifidobacterial rise. The long-chain substrate ferments more slowly and enriches a partly different set of taxa.",
+		"parts": [
+			{
+				"question": "What explains the different responders?",
+				"options": [
+					"Only the short-chain substrate is a fructan",
+					"Long-chain inulin is not fermentable",
+					"The two differ in energy content per gram",
+					"Chain length changes which transporters and enzymes can act, so a different set of members gains access"
+				],
+				"answer": 3,
+				"explain": "Short fructo-oligosaccharides can be imported and cleaved inside the cell by many strains, while long chains call for extracellular endo-inulinase activity, so the accessible set of organisms differs."
+			},
+			{
+				"question": "What does the slower fermentation of long-chain inulin suggest about its fate in the colon?",
+				"options": [
+					"It would be fermented further along the colon than the short-chain form",
+					"It would be absorbed in the small intestine",
+					"It would leave the colon unfermented",
+					"It would raise the pH of the proximal colon"
+				],
+				"answer": 0,
+				"explain": "Slower breakdown means substrate persists while transit carries it onward, so fermentation extends into more distal regions of the colon."
+			}
+		],
+		"explain": "Fine structure, chain length included, sets both which members can use a fibre and where along the colon it is used."
+	},
+	{
+		"id": "gut-050",
+		"topic": "gut",
+		"level": "hard",
+		"kind": "case",
+		"scenario": "A student annotates two gut bacterial genomes in MARGIE and compares the carbohydrate-active enzyme calls. Genome A, a Bacteroides, holds many GH families together with repeated susC/susD-like pairs. Genome B, a Gram-positive Firmicute, holds several GH13 genes along with cohesin and dockerin modules, and no susC/susD-like pair.",
+		"parts": [
+			{
+				"question": "What does the GH13 content of genome B point to?",
+				"options": [
+					"Pectin degradation",
+					"Starch and related α-glucan degradation",
+					"Xylan degradation",
+					"Removal of sulfate from mucin"
+				],
+				"answer": 1,
+				"explain": "GH13 is the main α-amylase family, so a genome rich in GH13 is equipped for α-1,4-glucans such as starch and its breakdown products."
+			},
+			{
+				"question": "Why does genome B lack susC/susD-like pairs?",
+				"options": [
+					"It does not degrade polysaccharides",
+					"Its enzymes work only inside the cell",
+					"That import system belongs to Bacteroidetes, while this organism anchors enzyme complexes on its surface",
+					"It imports polysaccharides intact through porins"
+				],
+				"answer": 2,
+				"explain": "SusC/SusD systems sit in the Bacteroidetes outer membrane. Gram-positive degraders instead build surface complexes held together by cohesin-dockerin pairs and import the fragments with ABC transporters."
+			},
+			{
+				"question": "Genome A also carries PL1 and GH28 genes. Which substrate does that pair suggest?",
+				"options": ["Cellulose", "Cereal β-glucan", "Resistant starch", "Pectin"],
+				"answer": 3,
+				"explain": "PL1 pectate lyases and GH28 polygalacturonases act on galacturonan backbones, so finding both points to pectin."
+			}
+		],
+		"explain": "Enzyme families and transport systems read together say both what a genome can degrade and how it brings the fragments inside."
+	}
+]

@@ -14,6 +14,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 
 from bioinformatics_tools.api.database import get_db
+from bioinformatics_tools.workflow_tools.workflow_registry import HIDDEN_TOOLS
 
 _HERE = Path(__file__).resolve().parent
 _TERMS_PATH = _HERE / "terms.md"
@@ -167,7 +168,8 @@ def build_terms_payload() -> dict:
     """Builds the payload the frontend uses to render the license gate."""
     terms = load_terms()
     catalog = load_catalog()
-    tools = catalog.get("tools", [])
+    # Tools the website leaves out (workflow_registry.HIDDEN_TOOLS) are not listed to accept.
+    tools = [t for t in catalog.get("tools", []) if t.get("id") not in HIDDEN_TOOLS]
     gated = [t for t in tools if t.get("tier") in ("blocked", "commercial_restricted")]
     return {
         "terms_version": terms["version"],
