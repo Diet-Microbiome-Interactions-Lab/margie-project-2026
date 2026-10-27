@@ -372,6 +372,10 @@ def main() -> None:
     ref = c3_occ.load_reference(Path(args.occ_reference))
     if not ref.get("finalized"):
         c3_occ.finalize_reference(ref)
+    # The per-pair details use the reference C3 was scored against: this genome left out.
+    organism = next((str(r.get("organism_name") or "").strip() for r in labeled_by_fid.values()), "")
+    genes = L.load_organism(organism, Path(args.labeled_input), Path(args.operon_info_input), compute_hash=True)
+    ref, _, _ = C3S.leave_self_out(ref, Path(args.occ_reference), genes, organism, args.labeled_input)
     ref_organism_count = len(ref.get("organisms_added", []))
 
     pairwise = _pairwise_map(Path(args.operon_results_input))
