@@ -512,7 +512,11 @@ def load_csv_to_db(csv_path: str, db_path: str, table_name: str,
     """
     with open(csv_path, newline="") as fh:
         reader = csv.reader(fh, delimiter=delimiter)
-        headers = [h.strip() for h in next(reader)]
+        # An empty file (no header, as an InterProScan analysis with no hits can leave) loads no rows.
+        first = next(reader, None)
+        if first is None:
+            return 0
+        headers = [h.strip() for h in first]
         data_rows = list(reader)
     if genome_hash and "genome_hash" not in headers:
         n = len(headers)

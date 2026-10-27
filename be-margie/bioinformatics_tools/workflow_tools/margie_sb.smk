@@ -10,7 +10,7 @@ import sys
 
 # Add current directory to path to import workflow_helpers
 sys.path.insert(0, os.path.dirname(workflow.snakefile))
-from workflow_helpers import rc, rc_bool, fixed_path, sif_path, db_path, db_token, discover_genomes, genome_calls, default_store_root, get_workflow_prefix_for, get_container_outputs_prefix_for
+from workflow_helpers import TOOL_RESOURCES, GTDBTK_CLASSIFY_RESOURCES, TOOL_PARTITIONS, rc, rc_bool, fixed_path, sif_path, db_path, db_token, discover_genomes, genome_calls, default_store_root, get_workflow_prefix_for, get_container_outputs_prefix_for
 from load_to_db import PIPELINE_VERSION
 
 WORKFLOW_DIR = os.path.dirname(workflow.snakefile)
@@ -85,13 +85,57 @@ def runtime_min(key: str, default: int, config=None) -> int:
     return max(MIN_SLURM_RUNTIME_MINUTES, minutes)
 
 def tool_partition(tool: str, phase: int) -> str:
-    """Returns a tool's SLURM partition: margie_sb.<tool>.partition, else margie_sb.phase<N>.partition, else the run's default."""
-    for key in (f'margie_sb.{tool}.partition', f'margie_sb.phase{phase}.partition',
-                'compute.cluster_default.partition'):
+    """Returns a tool's SLURM partition: margie_sb.<tool>.partition, else the tool's own (TOOL_PARTITIONS),
+    else margie_sb.phase<N>.partition, else the run's default."""
+    saved = str(rc(f'margie_sb.{tool}.partition', '', config=config) or '').strip()
+    if saved:
+        return saved
+    if tool in TOOL_PARTITIONS:
+        return TOOL_PARTITIONS[tool]
+    for key in (f'margie_sb.phase{phase}.partition', 'compute.cluster_default.partition'):
         value = str(rc(key, '', config=config) or '').strip()
         if value:
             return value
     return 'cpu'
+
+
+# A compute rule that fails runs once more, with twice the memory and run time (an out-of-memory
+# kill or a time limit is the usual cause); defaults come from TOOL_RESOURCES.
+RUN_RETRIES = 1
+
+# RASTtk (BV-BRC) jobs at once for the account: margie_sb.phase3.max_parallel_genomes (three tested
+# together on 2026-10-26, each with one BV-BRC submission per genome).
+try:
+    RASTTK_AT_ONCE = max(1, int(rc('margie_sb.phase3.max_parallel_genomes', 3, config=config)))
+except (TypeError, ValueError):
+    RASTTK_AT_ONCE = 3
+
+
+def _tool_value(tool: str, leaf: str, index: int, legacy: str | None):
+    default = TOOL_RESOURCES[tool][index]
+    if legacy:
+        default = rc(f'{legacy}.{leaf}', default, config=config)
+    return rc(f'{tool}.{leaf}', default, config=config)
+
+
+def tool_threads(tool: str, legacy: str | None = None) -> int:
+    """A tool's threads: the saved setting, else TOOL_RESOURCES."""
+    return int(_tool_value(tool, 'threads', 0, legacy))
+
+
+def tool_mem(tool: str, legacy: str | None = None):
+    """A tool's memory in MB, doubled on each further attempt."""
+    base = int(_tool_value(tool, 'mem_mb', 1, legacy))
+    return lambda wildcards, attempt: base * 2 ** (attempt - 1)
+
+
+def tool_runtime(tool: str, legacy: str | None = None):
+    """A tool's run time in minutes (at least MIN_SLURM_RUNTIME_MINUTES), doubled on each further attempt."""
+    try:
+        base = max(MIN_SLURM_RUNTIME_MINUTES, int(_tool_value(tool, 'runtime', 2, legacy)))
+    except (TypeError, ValueError):
+        base = max(MIN_SLURM_RUNTIME_MINUTES, TOOL_RESOURCES[tool][2])
+    return lambda wildcards, attempt: base * 2 ** (attempt - 1)
 
 def _llm_mem_mb() -> int:
     """llm.mem_mb, or with 0 (the default) 80% of the smallest node memory in llm.partition."""
@@ -672,11 +716,12 @@ rule run_consolidation:
         manifest=CONSOLIDATION_MANIFEST,
         no_stat=CONSOLIDATION_NO_STAT,
         tkn=CONSOLIDATION_COMPUTE_TOKEN
-    threads: rc('consolidation.threads', 1, config=config)
+    threads: tool_threads('consolidation')
+    retries: RUN_RETRIES
     resources:
         slurm_partition=tool_partition('consolidation', 9),
-        mem_mb=rc('consolidation.mem_mb', 8000, config=config),
-        runtime=runtime_min('consolidation.runtime', 30, config=config)
+        mem_mb=tool_mem('consolidation'),
+        runtime=tool_runtime('consolidation')
     params:
         genome_dir=lambda wildcards: GENOME_PREFIX.format(genome=wildcards.genome).rstrip('/')
     shell:
@@ -711,11 +756,12 @@ rule run_labeling:
         operon_info=LABELING_OPERON_INFO,
         cluster_agreement=LABELING_CLUSTER_AGREEMENT,
         tkn=LABELING_COMPUTE_TOKEN
-    threads: rc('labeling.threads', 1, config=config)
+    threads: tool_threads('labeling')
+    retries: RUN_RETRIES
     resources:
         slurm_partition=tool_partition('labeling', 10),
-        mem_mb=rc('labeling.mem_mb', 8000, config=config),
-        runtime=runtime_min('labeling.runtime', 30, config=config)
+        mem_mb=tool_mem('labeling'),
+        runtime=tool_runtime('labeling')
     shell:
         """
         echo "=== MARGIE_SB PHASE 10: LABELING ({wildcards.genome}) ==="
@@ -785,11 +831,12 @@ rule run_scoring:
         confidence_final=SCORING_CONFIDENCE_FINAL,
         final_annotation_with_confidence=SCORING_FINAL_ANNOTATION_WITH_CONFIDENCE,
         tkn=SCORING_COMPUTE_TOKEN
-    threads: rc('scoring_heuristic.threads', rc('scoring.threads', 1, config=config), config=config)
+    threads: tool_threads('scoring_heuristic', legacy='scoring')
+    retries: RUN_RETRIES
     resources:
         slurm_partition=tool_partition('scoring_heuristic', 11),
-        mem_mb=rc('scoring_heuristic.mem_mb', rc('scoring.mem_mb', 8000, config=config), config=config),
-        runtime=runtime_min('scoring_heuristic.runtime', rc('scoring.runtime', 30, config=config), config=config)
+        mem_mb=tool_mem('scoring_heuristic', legacy='scoring'),
+        runtime=tool_runtime('scoring_heuristic', legacy='scoring')
     shell:
         """
         echo "=== MARGIE_SB PHASE 11: SCORING ({wildcards.genome}) ==="
@@ -853,11 +900,12 @@ rule run_fingerprint:
         full=FINGERPRINT_FULL,
         full_with_scores=FINGERPRINT_FULL_WITH_SCORES,
         tkn=FINGERPRINT_COMPUTE_TOKEN
-    threads: rc('fingerprint.threads', 1, config=config)
+    threads: tool_threads('fingerprint')
+    retries: RUN_RETRIES
     resources:
         slurm_partition=tool_partition('fingerprint', 12),
-        mem_mb=rc('fingerprint.mem_mb', 8000, config=config),
-        runtime=runtime_min('fingerprint.runtime', 30, config=config)
+        mem_mb=tool_mem('fingerprint'),
+        runtime=tool_runtime('fingerprint')
     shell:
         """
         echo "=== MARGIE_SB PHASE 12: FINGERPRINT ({wildcards.genome}) ==="
@@ -882,11 +930,12 @@ rule update_fingerprint_database:
         tkn=FINGERPRINT_DATABASE_UPDATED_TOKEN
     params:
         db=FINGERPRINT_DATABASE_PATH
-    threads: rc('fingerprint_database.threads', 1, config=config)
+    threads: tool_threads('fingerprint_database')
+    retries: RUN_RETRIES
     resources:
         slurm_partition=tool_partition('fingerprint_database', 13),
-        mem_mb=rc('fingerprint_database.mem_mb', 4000, config=config),
-        runtime=runtime_min('fingerprint_database.runtime', 15, config=config)
+        mem_mb=tool_mem('fingerprint_database'),
+        runtime=tool_runtime('fingerprint_database')
     shell:
         """
         {LOADER_PYTHON} {FINGERPRINT_SCRIPTS_DIR}/update-fingerprint-database.py \
@@ -916,11 +965,12 @@ rule run_operon_fingerprint:
         gene_fp_db=FINGERPRINT_DATABASE_PATH,
         operon_fp_db_label_ordered=OPERON_FINGERPRINT_DATABASE_LABEL_ORDERED,
         operon_fp_db_label_composition=OPERON_FINGERPRINT_DATABASE_LABEL_COMPOSITION
-    threads: rc('fingerprint.threads', rc('operon_fingerprint.threads', 1, config=config), config=config)
+    threads: tool_threads('fingerprint', legacy='operon_fingerprint')
+    retries: RUN_RETRIES
     resources:
         slurm_partition=tool_partition('fingerprint', 12),
-        mem_mb=rc('fingerprint.mem_mb', rc('operon_fingerprint.mem_mb', 4000, config=config), config=config),
-        runtime=runtime_min('fingerprint.runtime', rc('operon_fingerprint.runtime', 15, config=config), config=config)
+        mem_mb=tool_mem('fingerprint', legacy='operon_fingerprint'),
+        runtime=tool_runtime('fingerprint', legacy='operon_fingerprint')
     shell:
         """
         echo "=== MARGIE_SB PHASE 12: OPERON FINGERPRINT ({wildcards.genome}) ==="
@@ -958,11 +1008,12 @@ rule update_operon_fingerprint_database:
         evidence_composition=OPERON_FINGERPRINT_DATABASE_EVIDENCE_COMPOSITION,
         label_ordered=OPERON_FINGERPRINT_DATABASE_LABEL_ORDERED,
         label_composition=OPERON_FINGERPRINT_DATABASE_LABEL_COMPOSITION
-    threads: rc('fingerprint_database.threads', rc('operon_fingerprint_database.threads', 1, config=config), config=config)
+    threads: tool_threads('fingerprint_database', legacy='operon_fingerprint_database')
+    retries: RUN_RETRIES
     resources:
         slurm_partition=tool_partition('fingerprint_database', 13),
-        mem_mb=rc('fingerprint_database.mem_mb', rc('operon_fingerprint_database.mem_mb', 4000, config=config), config=config),
-        runtime=runtime_min('fingerprint_database.runtime', rc('operon_fingerprint_database.runtime', 15, config=config), config=config)
+        mem_mb=tool_mem('fingerprint_database', legacy='operon_fingerprint_database'),
+        runtime=tool_runtime('fingerprint_database', legacy='operon_fingerprint_database')
     shell:
         """
         {LOADER_PYTHON} {FINGERPRINT_SCRIPTS_DIR}/update-operon-fingerprint-database.py \
@@ -1575,11 +1626,12 @@ rule run_quast:
     output:
         results=QUAST_RESULTS
     group: "quast"
-    threads: rc('margie_sb.quast.threads', rc('quast.threads', 2, config=config), config=config)
+    threads: tool_threads('quast')
+    retries: RUN_RETRIES
     resources:
         slurm_partition=tool_partition('quast', 1),
-        mem_mb=rc('margie_sb.quast.mem_mb', rc('quast.mem_mb', 4000, config=config), config=config),
-        runtime=runtime_min('margie_sb.quast.runtime', rc('quast.runtime', 120, config=config), config=config)
+        mem_mb=tool_mem('quast'),
+        runtime=tool_runtime('quast')
     params:
         stage_dir=lambda wildcards: f"{QUAST_CONTAINER_PREFIX}/stage/{wildcards.genome}",
         output_dir=lambda wildcards: f"{QUAST_CONTAINER_PREFIX}/container_outputs/{wildcards.genome}"
@@ -1617,37 +1669,50 @@ rule load_quast_to_db:
         """
 
 
+# GTDB-Tk's first step (identify) gives each genome's domain and genetic code, which is what the run
+# reads from GTDB-Tk; margie_sb.gtdbtk.classify: true runs the full classification (taxonomy) as well.
+GTDBTK_CLASSIFY = rc_bool('margie_sb.gtdbtk.classify', False, config=config)
+
+
+def _gtdbtk_resource(leaf: str, index: int):
+    """GTDB-Tk's threads, memory or run time: the saved setting, else the step's own default."""
+    default = (GTDBTK_CLASSIFY_RESOURCES if GTDBTK_CLASSIFY else TOOL_RESOURCES['gtdbtk'])[index]
+    return rc(f'margie_sb.gtdbtk.{leaf}', rc(f'gtdbtk.{leaf}', default, config=config), config=config)
+
+
+def _gtdbtk_partition() -> str:
+    """The full classification needs a high-memory node; the identify step runs where the tools do."""
+    saved = str(rc('margie_sb.gtdbtk.partition', rc('gtdbtk.partition', '', config=config), config=config) or '').strip()
+    if saved:
+        return saved
+    return 'highmem' if GTDBTK_CLASSIFY else tool_partition('gtdbtk', 2)
+
+
 rule run_gtdbtk_batch:
-    """Phase2: GTDB-Tk classify_wf once over the genomes that need it (CACHED_GTDBTK come from the MARGIE database)."""
+    """Phase2: GTDB-Tk once over the genomes that need it (CACHED_GTDBTK come from the MARGIE database):
+    the identify step, or classify_wf with margie_sb.gtdbtk.classify."""
     input:
         [f for g, f in GENOMES.items() if g not in CACHED_GTDBTK]
     output:
         results=GTDBTK_BATCH_RESULTS,
         translation_table=GTDBTK_BATCH_TRANSLATION_TABLE,
         done=GTDBTK_BATCH_DONE
-    threads: rc('margie_sb.gtdbtk.threads', rc('gtdbtk.threads', 64, config=config), config=config)
+    threads: int(_gtdbtk_resource('threads', 0))
+    retries: RUN_RETRIES
     resources:
-        mem_mb=rc('margie_sb.gtdbtk.mem_mb',
-                  rc('gtdbtk.mem_mb', 460000, config=config),
-                  config=config),
-        runtime=runtime_min('margie_sb.gtdbtk.runtime',
-                   rc('gtdbtk.runtime', 240, config=config),
-                   config=config),
-        # Tool key, then phase2's partition, then the legacy key.
-        slurm_partition=rc('margie_sb.gtdbtk.partition',
-                   rc('margie_sb.phase2.partition',
-                      rc('gtdbtk.partition', 'highmem', config=config),
-                      config=config),
-                           config=config)
+        mem_mb=lambda wildcards, attempt: int(_gtdbtk_resource('mem_mb', 1)) * 2 ** (attempt - 1),
+        runtime=lambda wildcards, attempt: max(MIN_SLURM_RUNTIME_MINUTES, int(_gtdbtk_resource('runtime', 2))) * 2 ** (attempt - 1),
+        slurm_partition=_gtdbtk_partition()
     params:
         stage_dir=GTDBTK_BATCH_STAGE_DIR,
         output_dir=rc('gtdbtk.output_dir', GTDBTK_BATCH_OUTPUT_DIR, config=config),
         db=db_path('gtdbtk', config=config, workflow_id='margie_sb'),
-        genome_count=len(GENOMES) - len(CACHED_GTDBTK)
+        genome_count=len(GENOMES) - len(CACHED_GTDBTK),
+        mode='classify' if GTDBTK_CLASSIFY else 'identify'
     container: sif_path('gtdbtk.sif', config=config, workflow_id='margie_sb')
     shell:
         """
-        echo "=== MARGIE_SB PHASE 2: GTDBTK (batch {params.genome_count} genomes) ==="
+        echo "=== MARGIE_SB PHASE 2: GTDBTK {params.mode} (batch {params.genome_count} genomes) ==="
         rm -rf {params.stage_dir}
         mkdir -p {params.stage_dir}
 
@@ -1668,12 +1733,45 @@ rule run_gtdbtk_batch:
             i=$((i + 1))
         done
 
-        # Full species placement for all genomes, so each gets a translation table.
-        # GTDBTK_PPLACER_CPUS=16; check MaxRSS (seff) before raising it.
-        GTDBTK_PLACE_SPECIES=1 GTDBTK_PPLACER_CPUS=16 /usr/local/bin/run -i {params.stage_dir} -o {params.output_dir} -d {params.db} -t {threads} --collection-name margie_sb_batch
-
-        cp $(find {params.output_dir} -name "gtdbtk_results.tsv") {output.results}
-        cp $(find {params.output_dir} -name "gtdbtk.translation_table_summary.tsv") {output.translation_table}
+        if [[ "{params.mode}" == "classify" ]]; then
+            # Full species placement for all genomes, so each gets a translation table.
+            # GTDBTK_PPLACER_CPUS=16; check MaxRSS (seff) before raising it.
+            GTDBTK_PLACE_SPECIES=1 GTDBTK_PPLACER_CPUS=16 /usr/local/bin/run -i {params.stage_dir} -o {params.output_dir} -d {params.db} -t {threads} --collection-name margie_sb_batch
+            cp $(find {params.output_dir} -name "gtdbtk_results.tsv") {output.results}
+            cp $(find {params.output_dir} -name "gtdbtk.translation_table_summary.tsv") {output.translation_table}
+        else
+            # The identify step alone: genes and single-copy markers, and the translation table.
+            DATA="{params.db}"
+            if [[ -s "{params.db}/.gtdbtk_data_root" ]]; then
+                rel=$(head -n 1 "{params.db}/.gtdbtk_data_root")
+                [[ -n "$rel" && "$rel" != "." && -d "{params.db}/$rel" ]] && DATA="{params.db}/$rel"
+            fi
+            if [[ ! -s "$DATA/taxonomy/gtdb_taxonomy.tsv" ]]; then
+                tax=$(find "{params.db}" -maxdepth 4 -type f -path '*/taxonomy/gtdb_taxonomy.tsv' -print -quit 2>/dev/null || true)
+                [[ -n "$tax" ]] && DATA=$(dirname "$(dirname "$tax")")
+            fi
+            export GTDBTK_DATA_PATH="$DATA"
+            rm -rf {params.output_dir}
+            mkdir -p {params.output_dir}
+            if command -v micromamba >/dev/null 2>&1; then
+                micromamba run -n gtdbtk gtdbtk identify --genome_dir {params.stage_dir} --out_dir {params.output_dir} --extension fna --cpus {threads} --force
+            else
+                gtdbtk identify --genome_dir {params.stage_dir} --out_dir {params.output_dir} --extension fna --cpus {threads} --force
+            fi
+            ID={params.output_dir}/identify
+            cp "$ID/gtdbtk.translation_table_summary.tsv" {output.translation_table}
+            # The domain whose single-copy markers (unique plus identical multiple hits) are the larger
+            # share, ties to Bacteria, as GTDB-Tk decides it and workflow_helpers.identify_calls reads it.
+            awk -F'\\t' -v OFS='\\t' -v db="GTDB-Tk reference package | path: {params.db}" '
+                FNR == 1 {{ next }}
+                NF == 9 && FILENAME ~ /bac120/ {{ b[$1] = 100 * ($2 + $4) / 120; seen[$1] = 1 }}
+                NF == 9 && FILENAME ~ /ar53/   {{ a[$1] = 100 * ($2 + $4) / 53;  seen[$1] = 1 }}
+                END {{
+                    print "collection_name", "genome", "GTDBTK_domain", "GTDBTK_classification", "GTDBTK_classification_method", "GTDBTK_ani_reference", "GTDBTK_ani_value", "GTDBTK_ani_af", "GTDBTK_red_value", "GTDBTK_warnings", "GTDBTK_tool_used", "GTDBTK_database_used", "input_path", "output_path"
+                    for (g in seen) if ((g in b) && (g in a))
+                        print "margie_sb_batch", g, (b[g] >= a[g] ? "Bacteria" : "Archaea"), "", "identify step (domain from single-copy markers)", "", "", "", "", "", "GTDB-Tk 2.7.0 identify", db, "{params.stage_dir}", "{params.output_dir}"
+                }}' "$ID/gtdbtk.bac120.markers_summary.tsv" "$ID/gtdbtk.ar53.markers_summary.tsv" > {output.results}
+        fi
         touch {output.done}
         """
 
@@ -1853,7 +1951,7 @@ rule resolve_genome_info:
 
 
 rule run_rasttk:
-    """Phase3: RASTtk/BV-BRC gene calling with the genome's domain and genetic code, one BV-BRC job at a time."""
+    """Phase3: RASTtk/BV-BRC gene calling with the genome's domain and genetic code, up to RASTTK_AT_ONCE BV-BRC jobs at once."""
     input:
         fasta=lambda wildcards: GENOMES[wildcards.genome],
         gtdbtk_results=GENOME_INFO,
@@ -1866,17 +1964,20 @@ rule run_rasttk:
     # RASTtk genomes only; run_prodigal calls the others' genes in prodigal/.
     wildcard_constraints:
         genome=_one_of(RASTTK_GENOMES)
-    threads: rc('rasttk.threads', 8, config=config)
+    threads: tool_threads('rasttk')
+    retries: RUN_RETRIES
     resources:
         slurm_partition=tool_partition('rasttk', 3),
-        mem_mb=rc('rasttk.mem_mb', 8000, config=config),
-        runtime=runtime_min('rasttk.runtime', 120, config=config),
-        # One RASTtk job at a time within a run (workflow.py caps it at 1); the lock below spans runs.
+        mem_mb=tool_mem('rasttk'),
+        runtime=tool_runtime('rasttk'),
+        # RASTtk jobs at once within a run (workflow.py sets the cap, margie_sb.phase3.max_parallel_genomes);
+        # the lock slots below span the account's runs.
         margie_sb_bvbrc=1
     params:
         output_dir=lambda wildcards: rc('rasttk.output_dir', f"{CONTAINER_OUTPUTS_PREFIX}rasttk".format(genome=wildcards.genome), config=config),
         db=db_path('rasttk', config=config, workflow_id='margie_sb'),
-        lock=RASTTK_BVBRC_LOCK
+        lock=RASTTK_BVBRC_LOCK,
+        slots=RASTTK_AT_ONCE
     container: sif_path('rasttk.sif', config=config, workflow_id='margie_sb')
     shell:
         """
@@ -1889,23 +1990,27 @@ rule run_rasttk:
             exit 1
         fi
 
-        # The holder writes alive_at each minute; a lock silent for STALE_SECONDS is taken over.
+        # One of {params.slots} lock slots spans the account's runs: the holder writes alive_at each
+        # minute, and a slot silent for STALE_SECONDS is taken over.
         STALE_SECONDS=600
-        while ! mkdir "{params.lock}" 2>/dev/null; do
-            SEEN=$(cat "{params.lock}/alive_at" "{params.lock}/acquired_at" 2>/dev/null | sort -n | tail -1 || true)
-            [[ -n "$SEEN" ]] || SEEN=$(stat -c %Y "{params.lock}" 2>/dev/null || date +%s)
-            QUIET=$(( $(date +%s) - SEEN ))
-            if [[ $QUIET -gt $STALE_SECONDS ]]; then
-                echo "WARNING: RASTtk/BV-BRC lock quiet for ${{QUIET}}s -- its holder has stopped, taking over" >&2
-                rm -rf "{params.lock}"
-                continue
-            fi
-            sleep 10
+        SLOT=""
+        while [[ -z "$SLOT" ]]; do
+            for n in $(seq 1 {params.slots}); do
+                if mkdir "{params.lock}.$n" 2>/dev/null; then SLOT="{params.lock}.$n"; break; fi
+                SEEN=$(cat "{params.lock}.$n/alive_at" "{params.lock}.$n/acquired_at" 2>/dev/null | sort -n | tail -1 || true)
+                [[ -n "$SEEN" ]] || SEEN=$(stat -c %Y "{params.lock}.$n" 2>/dev/null || date +%s)
+                QUIET=$(( $(date +%s) - SEEN ))
+                if [[ $QUIET -gt $STALE_SECONDS ]]; then
+                    echo "WARNING: RASTtk/BV-BRC lock slot $n quiet for ${{QUIET}}s -- its holder has stopped, taking over" >&2
+                    rm -rf "{params.lock}.$n"
+                fi
+            done
+            [[ -n "$SLOT" ]] || sleep 10
         done
-        date +%s > "{params.lock}/acquired_at"
-        ( while sleep 60; do date +%s > "{params.lock}/alive_at" || exit 0; done ) >/dev/null 2>&1 &
+        date +%s > "$SLOT/acquired_at"
+        ( while sleep 60; do date +%s > "$SLOT/alive_at" || exit 0; done ) >/dev/null 2>&1 &
         HEARTBEAT=$!
-        trap 'kill $HEARTBEAT 2>/dev/null; rm -rf "{params.lock}"' EXIT
+        trap 'kill $HEARTBEAT 2>/dev/null; rm -rf "$SLOT"' EXIT
 
         # Each attempt starts from an empty folder: the container keeps a gene table it finds there,
         # and a table from an interrupted attempt carries another BV-BRC submission's gene ids.
@@ -1918,7 +2023,10 @@ rule run_rasttk:
             mkdir -p "$SEED_DB"
             echo "RASTtk SEED database not at {params.db}: the gene table is written without SEED enrichment" >&2
         fi
-        /usr/local/bin/run -i {input.fasta} -o {params.output_dir} -t {threads} -d "$SEED_DB" --scientific {wildcards.genome} --domain "$DOMAIN" --genetic-code "$GCODE"
+        # A gzipped genome is unpacked beside the outputs: the container reads plain FASTA.
+        FASTA={input.fasta}
+        case "$FASTA" in *.gz) zcat "$FASTA" > {params.output_dir}/genome-input.fna; FASTA={params.output_dir}/genome-input.fna ;; esac
+        /usr/local/bin/run -i "$FASTA" -o {params.output_dir} -t {threads} -d "$SEED_DB" --scientific {wildcards.genome} --domain "$DOMAIN" --genetic-code "$GCODE"
         cp $(find {params.output_dir} -path "*/processed/rast*.tsv") {output.results}
         cp $(find {params.output_dir} -name "genome.faa") {output.faa}
         cp $(find {params.output_dir} -name "genome.gff") {output.gff}
@@ -1948,11 +2056,12 @@ rule run_prodigal:
         tkn=PRODIGAL_COMPUTE_TOKEN
     wildcard_constraints:
         genome=_one_of(PRODIGAL_GENOMES)
-    threads: rc('prodigal.threads', 1, config=config)
+    threads: tool_threads('prodigal')
+    retries: RUN_RETRIES
     resources:
         slurm_partition=tool_partition('rasttk', 3),
-        mem_mb=rc('prodigal.mem_mb', 4000, config=config),
-        runtime=runtime_min('prodigal.runtime', 60, config=config)
+        mem_mb=tool_mem('prodigal'),
+        runtime=tool_runtime('prodigal')
     params:
         output_dir=lambda wildcards: PRODIGAL_CONTAINER_OUTPUTS.format(genome=wildcards.genome)
     container: sif_path('prodigal.sif', config=config, workflow_id='margie_sb')
@@ -1961,7 +2070,11 @@ rule run_prodigal:
         echo "=== MARGIE_SB PHASE 3: PRODIGAL ({wildcards.genome}) ==="
         DOMAIN=$(awk -F'\\t' 'NR==1{{for(i=1;i<=NF;i++) if($i=="GTDBTK_domain") c=i}} NR==2{{print $c}}' {input.info})
         GCODE=$(awk -F'\t' 'NR==1{{for(i=1;i<=NF;i++){{gsub(/\r/,"",$i); if($i=="translation_table") c=i}}}} NR>1{{gsub(/\r/,"",$c); if(c && $c!=""){{print $c; exit}}}}' {input.info})
-        /usr/local/bin/run -i {input.fasta} -o {params.output_dir} -g "${{GCODE:-11}}" --domain "${{DOMAIN:-Unknown}}" --organism-name {wildcards.genome} --force
+        # A gzipped genome is unpacked beside the outputs: the container reads plain FASTA.
+        mkdir -p {params.output_dir}
+        FASTA={input.fasta}
+        case "$FASTA" in *.gz) zcat "$FASTA" > {params.output_dir}/genome-input.fna; FASTA={params.output_dir}/genome-input.fna ;; esac
+        /usr/local/bin/run -i "$FASTA" -o {params.output_dir} -g "${{GCODE:-11}}" --domain "${{DOMAIN:-Unknown}}" --organism-name {wildcards.genome} --force
         cp {params.output_dir}/gene_calls/genome.faa {output.faa}
         cp {params.output_dir}/gene_calls/genome.gff {output.gff}
         cp {params.output_dir}/processed/prodigal_gene_calls.tsv {output.results}
@@ -2040,11 +2153,12 @@ rule run_cog:
         tkn=PHASE4_COMPUTE_TOKENS['cog']
     # Priority 1 keeps these rules from waiting on margie_sb_phase4_slot.
     priority: 1
-    threads: rc('cog.threads', 8, config=config)
+    threads: tool_threads('cog')
+    retries: RUN_RETRIES
     resources:
         slurm_partition=tool_partition('cog', 4),
-        mem_mb=rc('cog.mem_mb', 4000, config=config),
-        runtime=runtime_min('cog.runtime', 60, config=config),
+        mem_mb=tool_mem('cog'),
+        runtime=tool_runtime('cog'),
         margie_sb_phase4_slot=1
     params:
         pc=pc_dir('cog'),
@@ -2098,11 +2212,12 @@ rule run_pfam:
         results=PHASE4_RESULTS['pfam'],
         tkn=PHASE4_COMPUTE_TOKENS['pfam']
     priority: 1  # see run_cog
-    threads: rc('pfam.threads', 8, config=config)
+    threads: tool_threads('pfam')
+    retries: RUN_RETRIES
     resources:
         slurm_partition=tool_partition('pfam', 4),
-        mem_mb=rc('pfam.mem_mb', 8000, config=config),
-        runtime=runtime_min('pfam.runtime', 60, config=config),
+        mem_mb=tool_mem('pfam'),
+        runtime=tool_runtime('pfam'),
         margie_sb_phase4_slot=1
     params:
         pc=pc_dir('pfam'),
@@ -2155,11 +2270,12 @@ rule run_tigrfam:
         results=PHASE4_RESULTS['tigrfam'],
         domtbl=TIGRFAM_DOMTBL,
         tkn=PHASE4_COMPUTE_TOKENS['tigrfam']
-    threads: rc('tigrfam.threads', 8, config=config)
+    threads: tool_threads('tigrfam')
+    retries: RUN_RETRIES
     resources:
         slurm_partition=tool_partition('tigrfam', 4),
-        mem_mb=rc('tigrfam.mem_mb', 4000, config=config),
-        runtime=runtime_min('tigrfam.runtime', 60, config=config),
+        mem_mb=tool_mem('tigrfam'),
+        runtime=tool_runtime('tigrfam'),
         margie_sb_phase4_slot=1
     params:
         pc=pc_dir('tigrfam'),
@@ -2212,11 +2328,12 @@ rule run_merops:
     output:
         results=PHASE4_RESULTS['merops'],
         tkn=PHASE4_COMPUTE_TOKENS['merops']
-    threads: rc('merops.threads', 8, config=config)
+    threads: tool_threads('merops')
+    retries: RUN_RETRIES
     resources:
         slurm_partition=tool_partition('merops', 4),
-        mem_mb=rc('merops.mem_mb', 4000, config=config),
-        runtime=runtime_min('merops.runtime', 30, config=config),
+        mem_mb=tool_mem('merops'),
+        runtime=tool_runtime('merops'),
         margie_sb_phase4_slot=1
     params:
         pc=pc_dir('merops'),
@@ -2269,11 +2386,12 @@ rule run_tcdb:
     output:
         results=PHASE4_RESULTS['tcdb'],
         tkn=PHASE4_COMPUTE_TOKENS['tcdb']
-    threads: rc('tcdb.threads', 8, config=config)
+    threads: tool_threads('tcdb')
+    retries: RUN_RETRIES
     resources:
         slurm_partition=tool_partition('tcdb', 4),
-        mem_mb=rc('tcdb.mem_mb', 4000, config=config),
-        runtime=runtime_min('tcdb.runtime', 30, config=config),
+        mem_mb=tool_mem('tcdb'),
+        runtime=tool_runtime('tcdb'),
         margie_sb_phase4_slot=1
     params:
         pc=pc_dir('tcdb'),
@@ -2327,11 +2445,12 @@ rule run_uniprot:
     output:
         results=PHASE4_RESULTS['uniprot'],
         tkn=PHASE4_COMPUTE_TOKENS['uniprot']
-    threads: rc('uniprot.threads', 8, config=config)
+    threads: tool_threads('uniprot')
+    retries: RUN_RETRIES
     resources:
         slurm_partition=tool_partition('uniprot', 4),
-        mem_mb=rc('uniprot.mem_mb', 4000, config=config),
-        runtime=runtime_min('uniprot.runtime', 30, config=config),
+        mem_mb=tool_mem('uniprot'),
+        runtime=tool_runtime('uniprot'),
         margie_sb_phase4_slot=1
     params:
         pc=pc_dir('uniprot'),
@@ -2385,11 +2504,12 @@ rule run_kegg:
     output:
         results=PHASE4_RESULTS['kegg'],
         tkn=PHASE4_COMPUTE_TOKENS['kegg']
-    threads: rc('kegg.threads', 8, config=config)
+    threads: tool_threads('kegg')
+    retries: RUN_RETRIES
     resources:
         slurm_partition=tool_partition('kegg', 4),
-        mem_mb=rc('kegg.mem_mb', 16000, config=config),
-        runtime=runtime_min('kegg.runtime', 90, config=config),
+        mem_mb=tool_mem('kegg'),
+        runtime=tool_runtime('kegg'),
         margie_sb_phase4_slot=1
     params:
         pc=pc_dir('kegg'),
@@ -2441,11 +2561,12 @@ rule run_eggnog:
     output:
         results=PHASE4_RESULTS['eggnog'],
         tkn=PHASE4_COMPUTE_TOKENS['eggnog']
-    threads: rc('eggnog.threads', 8, config=config)
+    threads: tool_threads('eggnog')
+    retries: RUN_RETRIES
     resources:
         slurm_partition=tool_partition('eggnog', 4),
-        mem_mb=rc('eggnog.mem_mb', 64000, config=config),
-        runtime=runtime_min('eggnog.runtime', 90, config=config),
+        mem_mb=tool_mem('eggnog'),
+        runtime=tool_runtime('eggnog'),
         margie_sb_phase4_slot=1
     params:
         pc=pc_dir('eggnog'),
@@ -2498,11 +2619,12 @@ rule run_dbcan:
         results=PHASE4_RESULTS['dbcan'],
         tkn=PHASE4_COMPUTE_TOKENS['dbcan']
     priority: 1  # see run_cog
-    threads: rc('dbcan.threads', 8, config=config)
+    threads: tool_threads('dbcan')
+    retries: RUN_RETRIES
     resources:
         slurm_partition=tool_partition('dbcan', 4),
-        mem_mb=rc('dbcan.mem_mb', 16000, config=config),
-        runtime=runtime_min('dbcan.runtime', 60, config=config),
+        mem_mb=tool_mem('dbcan'),
+        runtime=tool_runtime('dbcan'),
         margie_sb_phase4_slot=1
     params:
         pc=pc_dir('dbcan'),
@@ -2554,11 +2676,12 @@ rule run_pgap:
     output:
         results=PHASE4_RESULTS['pgap'],
         tkn=PHASE4_COMPUTE_TOKENS['pgap']
-    threads: rc('pgap.threads', 8, config=config)
+    threads: tool_threads('pgap')
+    retries: RUN_RETRIES
     resources:
         slurm_partition=tool_partition('pgap', 4),
-        mem_mb=rc('pgap.mem_mb', 12000, config=config),
-        runtime=runtime_min('pgap.runtime', 60, config=config),
+        mem_mb=tool_mem('pgap'),
+        runtime=tool_runtime('pgap'),
         margie_sb_phase4_slot=1
     params:
         pc=pc_dir('pgap'),
@@ -2611,11 +2734,12 @@ rule run_interpro:
         results=PHASE4_RESULTS['interpro'],
         perdb=list(INTERPRO_PERDB_RESULTS.values()),
         tkn=PHASE4_COMPUTE_TOKENS['interpro']
-    threads: rc('interpro.threads', 32, config=config)
+    threads: tool_threads('interpro')
+    retries: RUN_RETRIES
     resources:
         slurm_partition=tool_partition('interpro', 4),
-        mem_mb=rc('interpro.mem_mb', 48000, config=config),
-        runtime=runtime_min('interpro.runtime', 300, config=config),
+        mem_mb=tool_mem('interpro'),
+        runtime=tool_runtime('interpro'),
         # The cpu partition (highmem needs 64+ cores); the group's mem_mb fits one node.
         margie_sb_phase4_slot=1
     params:
@@ -2703,11 +2827,12 @@ rule run_geneprop:
         results=PHASE4_RESULTS['geneprop'],
         tkn=PHASE4_COMPUTE_TOKENS['geneprop']
     priority: 1  # see run_cog
-    threads: rc('geneprop.threads', 4, config=config)
+    threads: tool_threads('geneprop')
+    retries: RUN_RETRIES
     resources:
         slurm_partition=tool_partition('geneprop', 4),
-        mem_mb=rc('geneprop.mem_mb', 2000, config=config),
-        runtime=runtime_min('geneprop.runtime', 30, config=config),
+        mem_mb=tool_mem('geneprop'),
+        runtime=tool_runtime('geneprop'),
         margie_sb_phase4_slot=1
     params:
         output_dir=lambda wildcards: rc('geneprop.output_dir', f"{CONTAINER_OUTPUTS_PREFIX}geneprop".format(genome=wildcards.genome), config=config),
@@ -2753,11 +2878,12 @@ rule run_operon:
     output:
         results=OPERON_RESULTS,
         tkn=OPERON_COMPUTE_TOKEN
-    threads: rc('operon.threads', 4, config=config)
+    threads: tool_threads('operon')
+    retries: RUN_RETRIES
     resources:
         slurm_partition=tool_partition('operon', 5),
-        mem_mb=rc('operon.mem_mb', 2000, config=config),
-        runtime=runtime_min('operon.runtime', 30, config=config)
+        mem_mb=tool_mem('operon'),
+        runtime=tool_runtime('operon')
     params:
         output_dir=lambda wildcards: rc('operon.output_dir', f"{CONTAINER_OUTPUTS_PREFIX}operon".format(genome=wildcards.genome), config=config)
     container: sif_path('operon.sif', config=config, workflow_id='margie_sb')
@@ -2765,6 +2891,9 @@ rule run_operon:
         """
         echo "=== MARGIE_SB PHASE 5: OPERON ({wildcards.genome}) ==="
         DOMAIN=$(awk -F'\\t' 'NR==1{{for(i=1;i<=NF;i++) if($i=="GTDBTK_domain") c=i}} NR==2{{print $c}}' {input.gtdbtk_results})
+        # Each attempt starts from an empty folder: the container reuses a UniOP input or result it
+        # finds there, which can carry an earlier gene calling's gene ids.
+        rm -rf {params.output_dir}/{wildcards.genome}
         /usr/local/bin/run -i {input.faa} -g {input.gff} -o {params.output_dir} -t {threads} --organism-name {wildcards.genome} --domain "$DOMAIN"
         cp {params.output_dir}/{wildcards.genome}/processed/operon_results.tsv {output.results}
         echo "operon complete for {wildcards.genome}" > {output.tkn}
@@ -2800,11 +2929,12 @@ rule run_phobius:
         results=PHOBIUS_RESULTS,
         top1=PHOBIUS_TOP1,
         tkn=PHOBIUS_COMPUTE_TOKEN
-    threads: rc('phobius.threads', 4, config=config)
+    threads: tool_threads('phobius')
+    retries: RUN_RETRIES
     resources:
         slurm_partition=tool_partition('phobius', 6),
-        mem_mb=rc('phobius.mem_mb', 2000, config=config),
-        runtime=runtime_min('phobius.runtime', 30, config=config)
+        mem_mb=tool_mem('phobius'),
+        runtime=tool_runtime('phobius')
     params:
         pc=pc_dir('phobius'),
         merge=PC_MERGE,
@@ -2853,11 +2983,12 @@ rule run_tmbed:
     output:
         results=TMBED_RESULTS,
         tkn=TMBED_COMPUTE_TOKEN
-    threads: rc('tmbed.threads', 4, config=config)
+    threads: tool_threads('tmbed')
+    retries: RUN_RETRIES
     resources:
         slurm_partition=tool_partition('tmbed', 6),
-        mem_mb=rc('margie_sb.tmbed.mem_mb', rc('tmbed.mem_mb', 32000, config=config), config=config),
-        runtime=runtime_min('margie_sb.tmbed.runtime', rc('tmbed.runtime', 240, config=config), config=config)
+        mem_mb=tool_mem('tmbed'),
+        runtime=tool_runtime('tmbed')
     params:
         pc=pc_dir('tmbed'),
         merge=PC_MERGE,
@@ -2916,11 +3047,12 @@ rule run_signalp6:
     output:
         results=SIGNALP6_RESULTS,
         tkn=SIGNALP6_COMPUTE_TOKEN
-    threads: rc('signalp6.threads', 8, config=config)
+    threads: tool_threads('signalp6')
+    retries: RUN_RETRIES
     resources:
         slurm_partition=tool_partition('signalp6', 6),
-        mem_mb=rc('signalp6.mem_mb', 5000, config=config),
-        runtime=runtime_min('signalp6.runtime', 15, config=config)
+        mem_mb=tool_mem('signalp6'),
+        runtime=tool_runtime('signalp6')
     params:
         pc=pc_dir('signalp6'),
         merge=PC_MERGE,
@@ -2989,11 +3121,12 @@ rule run_envelope:
         results=ENVELOPE_RESULTS,
         summary=ENVELOPE_SUMMARY,
         tkn=ENVELOPE_COMPUTE_TOKEN
-    threads: rc('envelope.threads', 1, config=config)
+    threads: tool_threads('envelope')
+    retries: RUN_RETRIES
     resources:
         slurm_partition=tool_partition('envelope', 7),
-        mem_mb=rc('envelope.mem_mb', 1000, config=config),
-        runtime=runtime_min('envelope.runtime', 15, config=config)
+        mem_mb=tool_mem('envelope'),
+        runtime=tool_runtime('envelope')
     params:
         input_dir=lambda wildcards: GENOME_PREFIX.format(genome=wildcards.genome).rstrip('/'),
         output_dir=lambda wildcards: rc('envelope.output_dir', f"{CONTAINER_OUTPUTS_PREFIX}envelope".format(genome=wildcards.genome), config=config)
@@ -3002,7 +3135,16 @@ rule run_envelope:
         """
         echo "=== MARGIE_SB PHASE 7: ENVELOPE ({wildcards.genome}) ==="
         DOMAIN=$(awk -F'\\t' 'NR==1{{for(i=1;i<=NF;i++) if($i=="GTDBTK_domain") c=i}} NR==2{{print $c}}' {input.gtdbtk_results})
-        /usr/local/bin/run -i {params.input_dir} -o {params.output_dir} -t {threads} --organism-name {wildcards.genome} --domain "$DOMAIN"
+        # The classifier reads each .tsv under <tool>/; it gets the four merged tables alone (a protein
+        # cache's own copy of cached rows sits there too, and would count those markers twice).
+        STAGE={params.output_dir}/input
+        rm -rf "$STAGE"
+        for tool in tigrfam pgap pfam uniprot; do mkdir -p "$STAGE/$tool"; done
+        cp {input.tigrfam} "$STAGE/tigrfam/"
+        cp {input.pgap} "$STAGE/pgap/"
+        cp {input.pfam} "$STAGE/pfam/"
+        cp {input.uniprot} "$STAGE/uniprot/"
+        /usr/local/bin/run -i "$STAGE" -o {params.output_dir} -t {threads} --organism-name {wildcards.genome} --domain "$DOMAIN"
         cp {params.output_dir}/processed/envelope_results.tsv {output.results}
         cp {params.output_dir}/processed/envelope_summary.tsv {output.summary}
         echo "envelope complete for {wildcards.genome}" > {output.tkn}
@@ -3038,11 +3180,12 @@ rule run_deepsig:
     output:
         results=DEEPSIG_RESULTS,
         tkn=DEEPSIG_COMPUTE_TOKEN
-    threads: rc('deepsig.threads', 4, config=config)
+    threads: tool_threads('deepsig')
+    retries: RUN_RETRIES
     resources:
         slurm_partition=tool_partition('deepsig', 8),
-        mem_mb=rc('deepsig.mem_mb', 2000, config=config),
-        runtime=runtime_min('deepsig.runtime', 30, config=config),
+        mem_mb=tool_mem('deepsig'),
+        runtime=tool_runtime('deepsig'),
         margie_sb_phase8_slot=1
     params:
         output_dir=lambda wildcards: rc('deepsig.output_dir', f"{CONTAINER_OUTPUTS_PREFIX}deepsig".format(genome=wildcards.genome), config=config)
@@ -3096,11 +3239,12 @@ rule run_psortb:
     output:
         results=PSORTB_RESULTS,
         tkn=PSORTB_COMPUTE_TOKEN
-    threads: rc('psortb.threads', 4, config=config)
+    threads: tool_threads('psortb')
+    retries: RUN_RETRIES
     resources:
         slurm_partition=tool_partition('psortb', 8),
-        mem_mb=rc('psortb.mem_mb', 2000, config=config),
-        runtime=runtime_min('psortb.runtime', 30, config=config),
+        mem_mb=tool_mem('psortb'),
+        runtime=tool_runtime('psortb'),
         margie_sb_phase8_slot=1
     params:
         output_dir=lambda wildcards: rc('psortb.output_dir', f"{CONTAINER_OUTPUTS_PREFIX}psortb".format(genome=wildcards.genome), config=config)

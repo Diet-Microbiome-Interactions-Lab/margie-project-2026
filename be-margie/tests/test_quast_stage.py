@@ -59,7 +59,9 @@ def test_quast_is_off_unless_picked(wf, tmp_path):  # noqa: F811
 def test_the_snakefile_runs_quast_per_genome_with_two_cores():
     smk = (WF / 'margie_sb.smk').read_text()
     rule = re.search(r"rule run_quast:.*?\nrule ", smk, re.S).group(0)
-    assert "GENOMES[wildcards.genome]" in rule and "rc('margie_sb.quast.threads', rc('quast.threads', 2" in rule
+    assert "GENOMES[wildcards.genome]" in rule and "tool_threads('quast')" in rule
+    from bioinformatics_tools.workflow_tools.workflow_helpers import TOOL_RESOURCES
+    assert TOOL_RESOURCES['quast'][0] == 2
     rasttk_all = re.search(r"rule rasttk_all:.*?\nrule ", smk, re.S).group(0)
     assert "QUAST_TOKEN" not in rasttk_all
     assert 'rule run_quast_batch' not in smk

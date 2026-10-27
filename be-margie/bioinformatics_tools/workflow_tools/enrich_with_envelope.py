@@ -30,7 +30,8 @@ def main() -> int:
 
     with open(args.input, newline="", encoding="utf-8") as f:
         reader = csv.DictReader(f, delimiter="\t")
-        fieldnames = list(reader.fieldnames) + list(extra.keys())
+        # A table enriched before (a retried load rewrites it in place) keeps one set of ENVELOPE_ columns.
+        fieldnames = [c for c in (reader.fieldnames or []) if c not in extra] + list(extra.keys())
         rows = list(reader)
 
     with open(args.output, "w", newline="", encoding="utf-8") as f:

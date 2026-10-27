@@ -76,19 +76,37 @@ def test_a_tool_new_to_a_protein_is_added_and_the_others_stay(tmp_path):
 
 
 def test_entries_under_earlier_keys_move_to_the_settings_key(tmp_path):
+    # Pfam's answer depends on no setting, so entries made under an earlier key (schema 1 named the
+    # container and database files) move under the current one, the newest first.
     db = str(tmp_path / "margie.db")
     faa, pre = _genome(tmp_path, "A", [("a1", "MKVLAAG")])
     h = protein_cache.protein_hash("MKVLAAG")
     conn = protein_cache._connect(db)
     with conn:
-        for key, at, hit in (("old-container", "2026-01-01", "COG0old"), ("newer-container", "2026-06-01", "COG0new")):
-            conn.execute("INSERT INTO protein_cache VALUES (?, 'cog', ?, 'cog_results.tsv', ?, ?, 'A')",
+        for key, at, hit in (("old-container", "2026-01-01", "PF0old"), ("newer-container", "2026-06-01", "PF0new")):
+            conn.execute("INSERT INTO protein_cache VALUES (?, 'pfam', ?, 'pfam_results.tsv', ?, ?, 'A')",
                          (h, key, f"A\ta1\t{hit}\tx\ty", at))
     conn.close()
     protein_cache._carried.clear()
-    assert protein_cache.split(db, faa, pre, "A", ["cog"], {}) == {"cog": (1, 0)}
+    assert protein_cache.split(db, faa, pre, "A", ["pfam"], {}) == {"pfam": (1, 0)}
     rows = sqlite3.connect(db).execute("SELECT tool_key, lines FROM protein_cache WHERE aa_hash = ?", (h,)).fetchall()
-    assert rows == [(protein_cache.tool_key("cog", {}), "A\ta1\tCOG0new\tx\ty")]
+    assert rows == [(protein_cache.tool_key("pfam", {}), "A\ta1\tPF0new\tx\ty")]
+
+
+def test_entries_under_other_settings_stay_apart(tmp_path):
+    # COG's answer depends on its E-value: entries made under another key are not reused.
+    db = str(tmp_path / "margie.db")
+    faa, pre = _genome(tmp_path, "A", [("a1", "MKVLAAG")])
+    h = protein_cache.protein_hash("MKVLAAG")
+    conn = protein_cache._connect(db)
+    with conn:
+        conn.execute("INSERT INTO protein_cache VALUES (?, 'cog', 'evalue-1e-5', 'cog_results.tsv', ?, '2026-06-01', 'A')",
+                     (h, "A\ta1\tCOG0old\tx\ty"))
+    conn.close()
+    protein_cache._carried.clear()
+    assert protein_cache.split(db, faa, pre, "A", ["cog"], {}) == {"cog": (0, 1)}
+    keys = [r[0] for r in sqlite3.connect(db).execute("SELECT tool_key FROM protein_cache WHERE aa_hash = ?", (h,))]
+    assert keys == ["evalue-1e-5"]
 
 
 def test_a_genomes_proteins_and_genes_are_linked_to_its_hash(tmp_path):

@@ -9,7 +9,8 @@ import logging
 import os
 
 from bioinformatics_tools.workflow_tools.models import WorkflowKey
-from bioinformatics_tools.workflow_tools.workflow_helpers import WORKFLOW_PATH_DEFAULTS
+from bioinformatics_tools.workflow_tools.workflow_helpers import (WORKFLOW_PATH_DEFAULTS, TOOL_RESOURCES,  # noqa: F401
+                                                              GTDBTK_CLASSIFY_RESOURCES, TOOL_PARTITIONS)
 
 LOGGER = logging.getLogger(__name__)
 
@@ -206,40 +207,24 @@ STAGE2_AT_ONCE = 3
 
 
 def _margie_sb_default_threads(tool_key: str) -> int:
-    if tool_key == 'gtdbtk':
-        return 64
-    if tool_key == 'quast':
-        return 2  # for information, so it takes little: see margie_sb.quast.at_once
-    if tool_key in {'kegg', 'eggnog'}:
-        return 16
+    if tool_key in TOOL_RESOURCES:
+        return TOOL_RESOURCES[tool_key][0]
     if tool_key == 'llm':
         return 10  # a GPU node's cores per GPU
     return 8
 
 
 def _margie_sb_default_mem_mb(tool_key: str) -> int:
+    if tool_key in TOOL_RESOURCES:
+        return TOOL_RESOURCES[tool_key][1]
     if tool_key == 'llm':
         return 0  # 80% of a GPU node's memory (margie_sb.smk, run_llm)
-    if tool_key == 'gtdbtk':
-        return 460000
-    if tool_key == 'interpro':
-        return 48000
-    if tool_key == 'eggnog':
-        return 64000
-    if tool_key == 'kegg':
-        return 16000
-    if tool_key == 'dbcan':
-        return 16000
-    if tool_key == 'pgap':
-        return 12000
-    if tool_key == 'tmbed':
-        return 32000
     return 4000
 
 
 def _margie_sb_default_runtime(tool_key: str) -> int:
-    if tool_key in {'interpro'}:
-        return 300
+    if tool_key in TOOL_RESOURCES:
+        return TOOL_RESOURCES[tool_key][2]
     return 240
 
 
@@ -305,7 +290,7 @@ def _margie_sb_tool_params() -> list[dict]:
             },
             {
                 'param': f'margie_sb.{key}.partition',
-                'default': {'gtdbtk': 'highmem', 'llm': 'gpu'}.get(key, 'cpu'),
+                'default': TOOL_PARTITIONS.get(key, 'cpu'),
                 'description': f'Phase {phase}: SLURM partition for {label}',
                 'type': 'string'
             },
@@ -687,8 +672,8 @@ WORKFLOWS: dict[str, WorkflowKey] = {
             },
             {
                 'param': 'margie_sb.phase3.max_parallel_genomes',
-                'default': 1,
-                'description': 'Max parallel phase3 RASTtk genomes (default 1 to protect BV-BRC service)',
+                'default': 3,
+                'description': 'RASTtk genomes at once for your account (BV-BRC submissions; 3 tested together)',
                 'type': 'int'
             },
             {
