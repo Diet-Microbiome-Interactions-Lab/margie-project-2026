@@ -449,7 +449,7 @@
 />
 
 <div class="rb" class:full bind:this={board}>
-	<aside class="rb-side" class:shut={listShut} style="--w: {listShut ? 44 : ui.size('app:results-list', 220)}px">
+	<aside class="rb-side" class:shut={listShut} style="--w: {listShut ? 44 : ui.size('app:results-list', 300)}px">
 		<div class="rb-side-head">
 			<span class="rb-side-title">Genomes <b>{rows.length}</b></span>
 			<button
@@ -489,12 +489,13 @@
 					data-sveltekit-replacestate
 					data-sveltekit-noscroll
 				>
+					<span class="rb-row-icon rb-row-dot" aria-hidden="true"></span>
 					<span class="rb-row-name" title={r.name}>{baseOf(r.name)}</span>
 					<span class="rb-row-sub">{sub(r.name, r.state)}</span>
 				</a>
 			{/each}
 		</nav>
-		{#if !listShut}<Resizer id="app:results-list" fallback={220} min={160} max={420} label="Resize the genome list" />{/if}
+		{#if !listShut}<Resizer id="app:results-list" fallback={300} min={200} max={520} label="Resize the genome list" />{/if}
 	</aside>
 
 	<section class="rb-report" aria-labelledby="rb-title">
@@ -586,22 +587,31 @@
 
 			<!-- which genes the map and the table show (the tabs it applies to) -->
 			{#if showApplies}
+				<!-- Two groups, each wrapping as one: all genes and the confidence tiers; then flagged and by operon. -->
+				{#snippet chip(s: (typeof SHOWS)[number])}
+					{@const n = showCount(s.id)}
+					{#if s.id === 'all' || n !== 0}
+						<button type="button" class="rb-chip" aria-pressed={show === s.id} onclick={() => setShow(s.id)}>
+							{#if s.tier !== undefined}<span class="rb-dot" style="background: var(--mg-tier-{s.tier})"></span>{/if}
+							{s.label}{#if n !== null}<i>{count(n)}</i>{/if}
+						</button>
+					{/if}
+				{/snippet}
 				<div class="rb-show" role="group" aria-label="Show genes">
 					<span class="rb-show-l">Show</span>
-					{#each SHOWS as s (s.id)}
-						{@const n = showCount(s.id)}
-						{#if s.id === 'all' || n !== 0}
-							<button type="button" class="rb-chip" aria-pressed={show === s.id} onclick={() => setShow(s.id)}>
-								{#if s.tier !== undefined}<span class="rb-dot" style="background: var(--mg-tier-{s.tier})"></span>{/if}
-								{s.label}{#if n !== null}<i>{count(n)}</i>{/if}
-							</button>
-						{/if}
-					{/each}
-					{#if tab === 'table' && show !== 'all'}
-						<button type="button" class="mg-btn small rb-show-save" disabled={!!rowsSaving} onclick={saveShownRows} title="The table's rows for this choice, as a TSV"
-							><Download size={14} /> {rowsSaving || `Download these genes (TSV)`}</button
-						>
-					{/if}
+					<div class="rb-show-groups">
+						<div class="rb-show-group">
+							{#each SHOWS.filter((s) => s.id === 'all' || s.tier !== undefined) as s (s.id)}{@render chip(s)}{/each}
+						</div>
+						<div class="rb-show-group">
+							{#each SHOWS.filter((s) => s.id !== 'all' && s.tier === undefined) as s (s.id)}{@render chip(s)}{/each}
+							{#if tab === 'table' && show !== 'all'}
+								<button type="button" class="mg-btn small rb-show-save" disabled={!!rowsSaving} onclick={saveShownRows} title="The table's rows for this choice, as a TSV"
+									><Download size={14} /> {rowsSaving || `Download these genes (TSV)`}</button
+								>
+							{/if}
+						</div>
+					</div>
 				</div>
 			{/if}
 
@@ -919,12 +929,14 @@
 		opacity: 0;
 		pointer-events: none;
 	}
-	/* One line a genome: its name, and its gene count or state on the right. */
+	/* Two lines a genome, as the job list has them: its name, then its gene count or state. */
 	.rb-row {
-		display: flex;
-		align-items: baseline;
-		gap: 8px;
-		padding: 4px 8px;
+		display: grid;
+		grid-template-columns: auto minmax(0, 1fr);
+		grid-template-areas: 'icon name' 'icon sub';
+		align-items: center;
+		gap: 2px 8px;
+		padding: 7px 10px;
 		border: 1px solid transparent;
 		border-radius: var(--mg-r-sm);
 		transition:
@@ -939,13 +951,33 @@
 		background: color-mix(in srgb, var(--mg-accent) 12%, var(--mg-surface-2));
 	}
 	.rb-row-icon {
+		grid-area: icon;
 		display: inline-flex;
 		flex-shrink: 0;
 		align-self: center;
 		color: var(--mg-accent-ink, var(--mg-accent));
 	}
+	/* A genome's state as a dot, coloured as the job list colours a job. */
+	.rb-row-dot {
+		width: 14px;
+		justify-content: center;
+	}
+	.rb-row-dot::before {
+		content: '';
+		width: 8px;
+		height: 8px;
+		border-radius: 50%;
+		background: var(--mg-text-3);
+	}
+	.rb-row.done .rb-row-dot::before {
+		background: var(--mg-ok);
+	}
+	.rb-row.running .rb-row-dot::before {
+		background: var(--mg-accent);
+		box-shadow: 0 0 0 3px color-mix(in srgb, var(--mg-accent) 22%, transparent);
+	}
 	.rb-row-name {
-		flex: 1;
+		grid-area: name;
 		min-width: 0;
 		overflow: hidden;
 		text-overflow: ellipsis;
@@ -955,18 +987,18 @@
 	.rb-row[aria-current='page'] .rb-row-name {
 		font-weight: 600;
 	}
-	/* The second column: one width for each row, set off by a faint rule. */
 	.rb-row-sub {
-		flex: 0 0 7.6em;
+		grid-area: sub;
+		min-width: 0;
 		overflow: hidden;
-		padding-left: 8px;
-		border-left: 1px solid color-mix(in srgb, var(--mg-text) 12%, transparent);
 		color: var(--mg-text-3);
 		font-size: var(--mg-fs-xs);
 		font-variant-numeric: tabular-nums;
-		text-align: right;
 		text-overflow: ellipsis;
 		white-space: nowrap;
+	}
+	.rb-row-sub:empty {
+		display: none;
 	}
 	.rb-row.running .rb-row-sub {
 		color: var(--mg-accent-ink, var(--mg-accent));
@@ -988,8 +1020,9 @@
 		padding: 10px var(--mg-pad);
 		border-bottom: 1px solid var(--mg-border);
 	}
+	/* The genome's name and facts at the left with its actions at the right, the tabs across under them. */
 	.rb-title {
-		flex-grow: 1;
+		flex: 1 1 280px;
 		display: flex;
 		flex-direction: column;
 		gap: 6px;
@@ -1040,8 +1073,10 @@
 		flex: 1 1 40ch;
 	}
 	.rb-downloads {
+		order: 2;
 		display: flex;
 		flex-wrap: wrap;
+		justify-content: flex-end;
 		gap: 8px;
 	}
 	/* Full screen: only the report (and the chat) on the whole display. */
@@ -1156,17 +1191,31 @@
 	/* The Show chips: one choice at a time, All by default. */
 	.rb-show {
 		display: flex;
-		align-items: center;
-		flex-wrap: wrap;
+		align-items: flex-start;
 		gap: 6px;
 		padding: 7px var(--mg-pad);
 		border-bottom: 1px solid var(--mg-border);
+	}
+	.rb-show-groups {
+		display: flex;
+		flex: 1 1 0;
+		flex-wrap: wrap;
+		gap: 6px 20px;
+		min-width: 0;
+	}
+	.rb-show-group {
+		display: flex;
+		flex-wrap: wrap;
+		align-items: center;
+		gap: 6px;
 	}
 	.rb-show-save {
 		margin-left: auto;
 	}
 	.rb-show-l {
+		flex: none;
 		margin-right: 4px;
+		line-height: 26px;
 		font-size: var(--mg-fs-xs);
 		letter-spacing: 0.04em;
 		text-transform: uppercase;
@@ -1395,15 +1444,15 @@
 	}
 
 	/* the tabs: a pill that slides (motion/thumb.ts) */
-	/* Across the whole report, each tab an equal share. */
-	/* In the head's row, between the name and the downloads. */
+	/* Across the whole report, on a row of their own, each tab an equal share. */
 	.rb-tabs {
-		flex: 0 1 auto;
+		order: 3;
+		flex: 1 1 100%;
 		display: grid;
 		grid-auto-flow: column;
 		grid-auto-columns: minmax(max-content, 1fr);
 		gap: 2px;
-		margin: 0 auto;
+		margin: 0;
 		padding: 4px;
 		border: 1px solid var(--mg-border);
 		border-radius: var(--mg-r-sm);

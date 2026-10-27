@@ -45,16 +45,22 @@
 .crisp .cr-head-acts {
 	align-self: center;
 }
+/* On a phone the head stacks: the title, what the page is for, its count, then its buttons from
+   the left, so a row of buttons does not squeeze the title. */
 @media (max-width: 700px) {
 	.crisp .cr-head {
-		grid-template-columns: minmax(0, 1fr) auto;
+		grid-template-columns: minmax(0, 1fr);
 		grid-template-areas:
-			'title acts'
-			'meta meta'
-			'lede lede';
+			'title'
+			'lede'
+			'meta'
+			'acts';
 	}
 	.crisp .cr-meta {
 		justify-self: start;
+	}
+	.crisp .cr-head-acts {
+		justify-content: flex-start;
 	}
 }
 

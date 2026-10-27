@@ -1,3 +1,6 @@
+@layer theme, base, components, utilities;
+/* The layer order, stated first as crisp.css states it: when a reading page is the first page opened,
+   this file is the first to name the layers, and Tailwind's base must still come before components. */
 /* The About pages (Methods, README, Contributors, Acknowledgements): boxes with a small label
    at the top, as Install, Settings and the User profile have. */
 @layer components {

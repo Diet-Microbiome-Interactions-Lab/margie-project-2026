@@ -48,21 +48,21 @@
 	width: 100%;
 	max-width: var(--cr-width);
 	margin: 0 auto;
-	padding: 14px var(--cr-gutter) calc(var(--cr-gutter) * 2);
+	padding: 24px var(--cr-gutter) calc(var(--cr-gutter) * 2);
 	display: flex;
 	flex-direction: column;
-	gap: 14px;
+	gap: var(--cr-stack);
 }
 
-/* A page's head on one line: title in the page's hue, a grey caption, and the
-   summary number and actions at the right. */
+/* A page's head: the title in the page's hue with the summary and actions at the right on
+   one row, and a grey caption under the title. */
 .cr-head {
 	display: grid;
-	grid-template-columns: auto minmax(0, 1fr) auto auto;
-	grid-template-areas: 'title lede meta acts';
+	grid-template-columns: minmax(0, 1fr) auto auto;
+	grid-template-areas: 'title meta acts' 'lede lede lede';
 	align-items: center;
-	gap: 4px 18px;
-	min-height: 34px;
+	gap: 6px 18px;
+	min-height: 40px;
 }
 /* A plain small label above a page title. */
 .cr-eyebrow {
@@ -79,10 +79,9 @@
 }
 .cr-lede {
 	grid-area: lede;
-	padding-left: 18px;
-	border-left: 1px solid var(--mg-border);
+	max-width: 110ch;
 	font-size: var(--cr-fs-meta);
-	line-height: 1.45;
+	line-height: 1.5;
 	color: var(--mg-text-3);
 }
 .cr-lede strong {
@@ -553,16 +552,12 @@
 
 @media (max-width: 720px) {
 	.cr-page {
-		padding: 16px 14px 48px;
+		padding: 18px 16px 48px;
 		gap: 16px;
 	}
 	.cr-head {
 		grid-template-columns: minmax(0, 1fr);
 		grid-template-areas: 'title' 'lede' 'meta' 'acts';
-	}
-	.cr-lede {
-		padding-left: 0;
-		border-left: none;
 	}
 	.cr-meta {
 		justify-self: start;
@@ -570,6 +565,14 @@
 	}
 	.cr-head-acts {
 		justify-content: flex-start;
+	}
+	/* A block's head puts its actions on a line of their own, from the left, so each block wraps alike. */
+	.crisp .mg-card-head {
+		flex-wrap: wrap;
+	}
+	.crisp .mg-card-head > .mg-grow {
+		flex-basis: 100%;
+		height: 0;
 	}
 	.cr-stats {
 		grid-template-columns: repeat(2, minmax(0, 1fr));

@@ -163,7 +163,7 @@ export const DEFAULT_PREFS: UiPrefs = {
 	columns: 3,
 	sidebar: 'full',
 	tint: 'soft',
-	pageWidth: 'full',
+	pageWidth: 'wide',
 	stripes: true,
 	shades: 'soft',
 	contrast: 'normal',
@@ -182,7 +182,7 @@ export const DEFAULT_PREFS: UiPrefs = {
 	board: BOARD,
 	step: 0,
 	quizOpen: false,
-	looks: 5
+	looks: 6
 };
 
 /** Keys "Set as default" keeps: the look, not folded sections, pane widths or panels. */
@@ -271,6 +271,9 @@ export function sanitizePrefs(raw: unknown, base: UiPrefs = DEFAULT_PREFS): UiPr
 	// From version 5 everyone starts on Modern with Crystal violet: a look saved before takes them.
 	const fromV5 = typeof r.looks === 'number' && r.looks >= 5;
 	if (!fromV5) accent = base.accent;
+	// From version 6 pages sit in a centred column: a look saved before on Full (then the default) takes Wide.
+	const fromV6 = typeof r.looks === 'number' && r.looks >= 6;
+	const pageWidth = oneOf(r.pageWidth, ['narrow', 'wide', 'full'] as const, base.pageWidth);
 	let panels = base.panels;
 	if (Array.isArray(r.panels) && r.board === BOARD) {
 		const seen = new Set<PanelId>();
@@ -313,7 +316,7 @@ export function sanitizePrefs(raw: unknown, base: UiPrefs = DEFAULT_PREFS): UiPr
 		columns: oneOf(r.columns, [2, 3] as const, base.columns),
 		sidebar: oneOf(r.sidebar, ['full', 'icons'] as const, base.sidebar),
 		tint: oneOf(r.tint, ['plain', 'soft', 'strong'] as const, base.tint),
-		pageWidth: oneOf(r.pageWidth, ['narrow', 'wide', 'full'] as const, base.pageWidth),
+		pageWidth: !fromV6 && pageWidth === 'full' ? 'wide' : pageWidth,
 		stripes: typeof r.stripes === 'boolean' ? r.stripes : base.stripes,
 		shades: oneOf(r.shades, ['off', 'trace', 'soft', 'medium', 'vivid', 'bold'] as const, base.shades),
 		contrast: oneOf(r.contrast, ['normal', 'more', 'high'] as const, base.contrast),
@@ -339,7 +342,7 @@ export function sanitizePrefs(raw: unknown, base: UiPrefs = DEFAULT_PREFS): UiPr
 		board: BOARD,
 		step: oneOf(r.step, [0, 1, 2, 3] as const, base.step),
 		quizOpen: typeof r.quizOpen === 'boolean' ? r.quizOpen : base.quizOpen,
-		looks: 5
+		looks: 6
 	};
 }
 

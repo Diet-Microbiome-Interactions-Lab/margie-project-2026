@@ -16,8 +16,9 @@ const TINT = {
 	strong: { head: 0.12, tag: 0.22 }
 };
 
-/* Wide and Full use the whole window (Full with a narrower gutter); Narrow keeps a reading width. */
-const WIDTH = { narrow: '1180px', wide: '100%', full: '100%' };
+/* Wide centres the page in a column with even margins on both sides; Full uses the whole window;
+   Narrow keeps a reading width. */
+const WIDTH = { narrow: '1180px', wide: '1440px', full: '100%' };
 
 export function crispVars(p: UiPrefs, dark: boolean): Record<string, string> {
 	const base = themeVars(p, dark, 'crisp');
@@ -77,15 +78,15 @@ export function crispVars(p: UiPrefs, dark: boolean): Record<string, string> {
 		// Headings are set in the same face as the text, just heavier.
 		'--cr-display': 'var(--mg-font)',
 		'--cr-gutter': p.pageWidth === 'full'
-			? (p.density === 'compact' ? '12px' : '16px')
-			: p.density === 'compact' ? 'clamp(12px, 1.4vw, 22px)' : 'clamp(14px, 1.8vw, 30px)',
-		'--cr-pad': p.density === 'compact' ? '8px 12px' : '10px 14px',
+			? (p.density === 'compact' ? '14px' : '20px')
+			: p.density === 'compact' ? 'clamp(14px, 1.6vw, 24px)' : 'clamp(20px, 2.4vw, 40px)',
+		'--cr-pad': p.density === 'compact' ? '8px 12px' : '12px 16px',
 		// One space between a page's blocks, and one inset inside each box and note, so their
 		// edges and their text line up from page to page.
-		'--cr-stack': p.density === 'compact' ? '12px' : '16px',
-		'--cr-box-x': p.density === 'compact' ? '14px' : '18px',
-		'--cr-box-pad': p.density === 'compact' ? '12px 14px' : '16px 18px',
-		'--cr-note-pad': p.density === 'compact' ? '8px 14px' : '10px 18px',
+		'--cr-stack': p.density === 'compact' ? '12px' : '20px',
+		'--cr-box-x': p.density === 'compact' ? '14px' : '22px',
+		'--cr-box-pad': p.density === 'compact' ? '12px 14px' : '18px 22px',
+		'--cr-note-pad': p.density === 'compact' ? '8px 14px' : '12px 22px',
 		'--cr-width': WIDTH[p.pageWidth] ?? WIDTH.wide,
 		// The hairline between rows: the Lines colour (Customize → Colours), #FFFFFF unless changed.
 		'--cr-rule': dark ? `color-mix(in srgb, ${base['--mg-border']} 80%, ${base['--mg-surface']})` : (white['--mg-border'] ?? base['--mg-border']),

@@ -485,10 +485,12 @@
 					>
 						<span class="dot" aria-hidden="true"></span>
 						<span class="r-name">{title(r)}</span>
-						<span class="sep" aria-hidden="true">|</span>
-						<span class="r-id mg-mono">{shortId(r.id)}</span>
-						<span class="sep" aria-hidden="true">|</span>
-						<span class="r-st">{statusWord(r)}</span>
+						<span class="r-sub">
+							<span class="r-st">{statusWord(r)}</span>
+							<span class="sep" aria-hidden="true">|</span>
+							<span class="r-id mg-mono">{shortId(r.id)}</span>
+							{#if r.started}<span class="sep" aria-hidden="true">|</span><span class="r-when">{ago(r.started)}</span>{/if}
+						</span>
 					</button>
 					<button
 						type="button"
@@ -880,15 +882,17 @@
 		opacity: 0.5;
 		cursor: not-allowed;
 	}
+	/* Two lines a job: its name, then its state, id and start, so a long name stays readable. */
 	.row {
-		display: flex;
+		display: grid;
+		grid-template-columns: 8px minmax(0, 1fr);
+		grid-template-areas: 'dot name' '. sub';
 		align-items: center;
-		gap: 6px;
+		gap: 3px 10px;
 		flex: 1 1 auto;
 		min-width: 0;
 		width: 100%;
-		height: 32px;
-		padding: 0 10px;
+		padding: 8px 10px;
 		border: none;
 		border-radius: var(--mg-r-sm);
 		background: none;
@@ -911,6 +915,7 @@
 		outline-offset: -2px;
 	}
 	.dot {
+		grid-area: dot;
 		flex: none;
 		width: 8px;
 		height: 8px;
@@ -928,12 +933,26 @@
 		background: var(--mg-danger);
 	}
 	.r-name {
-		flex: 1 1 auto;
+		grid-area: name;
 		min-width: 0;
 		overflow: hidden;
 		text-overflow: ellipsis;
 		font-weight: 600;
 		color: var(--mg-text);
+	}
+	.r-sub {
+		grid-area: sub;
+		display: flex;
+		align-items: center;
+		gap: 6px;
+		min-width: 0;
+		overflow: hidden;
+		font-size: var(--cr-fs-micro);
+		color: var(--mg-text-3);
+	}
+	.r-when {
+		overflow: hidden;
+		text-overflow: ellipsis;
 	}
 	.sep {
 		flex: none;
