@@ -388,15 +388,23 @@ def leave_self_out(ref, reference_path, genes, organism, genes_file):
     """Returns (reference without this genome, its name in the reference or None, 'fingerprint' or 'name').
 
     The genome is matched by content fingerprint through the reference's members.tsv, else by
-    name; a genome absent from the reference returns the reference unchanged.
+    name; a members.tsv name the reference no longer holds falls back to the name. A genome
+    absent from the reference returns the reference unchanged. Prints each fallback.
     """
     fp = L.genome_fingerprint(genes["aa_hash"])
     members = c3_occ.load_members(reference_path)
+    in_ref = ref.get("organisms_added", set())
     token = members.get(fp) if fp else None
     how = "fingerprint"
-    if token is None and organism in ref.get("organisms_added", set()):
+    if token is not None and token not in in_ref:
+        print(f"[c3-scorer] leave-one-out: members.tsv names this genome '{token}', which the "
+              f"reference does not hold; matching by name")
+        token = None
+    if token is None and organism in in_ref:
         token, how = organism, "name"
     if token is None:
+        print("[c3-scorer] leave-one-out: this genome is not in the reference by fingerprint or "
+              "name; scoring against the full reference")
         return ref, None, None
     run_root = Path(genes_file).resolve().parents[2]
     return c3_occ.leave_one_out(ref, genes, run_root, organism, token=token), token, how
@@ -479,9 +487,6 @@ def main():
                   f"(matched by {how} as '{token}') from the reference "
                   f"-> {n_before} - 1 = {len(ref['organisms_added'])} organisms, "
                   f"{len(ref['rho_adj'])} rho_adj entries")
-        else:
-            print("[c3-scorer] leave-one-out: this genome is not in the reference "
-                  "-> scoring against the full reference (already out-of-sample)")
 
     # What this genome was compared with, beside its scores: Results says when the reference has
     # grown since, so it can be scored again against the larger reference.
