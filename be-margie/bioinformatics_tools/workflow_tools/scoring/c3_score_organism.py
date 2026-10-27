@@ -384,6 +384,24 @@ def _breakdown_and_formula(info, raw_operon_id):
 SCORED_AGAINST = "scored-against.json"
 
 
+def leave_self_out(ref, reference_path, genes, organism, genes_file):
+    """Returns (reference without this genome, its name in the reference or None, 'fingerprint' or 'name').
+
+    The genome is matched by content fingerprint through the reference's members.tsv, else by
+    name; a genome absent from the reference returns the reference unchanged.
+    """
+    fp = L.genome_fingerprint(genes["aa_hash"])
+    members = c3_occ.load_members(reference_path)
+    token = members.get(fp) if fp else None
+    how = "fingerprint"
+    if token is None and organism in ref.get("organisms_added", set()):
+        token, how = organism, "name"
+    if token is None:
+        return ref, None, None
+    run_root = Path(genes_file).resolve().parents[2]
+    return c3_occ.leave_one_out(ref, genes, run_root, organism, token=token), token, how
+
+
 def write_scored_against(path, reference, compared, left_out_self, left_out_as=None):
     """Writes how many genomes of the OCC reference this genome was scored against (itself left out),
     and the reference's name for it (left_out_as), which the report figures leave out too."""
@@ -453,17 +471,10 @@ def main():
     left_out = False
     token = None
     if args.leave_one_out:
-        run_root = Path(args.genes_file).resolve().parents[2]
-        fp = L.genome_fingerprint(genes["aa_hash"])
-        members = c3_occ.load_members(args.reference)
-        token = members.get(fp) if fp else None
-        if token is None and organism in ref.get("organisms_added", set()):
-            token = organism  # fallback: matched by name
+        n_before = len(ref["organisms_added"])
+        ref, token, how = leave_self_out(ref, args.reference, genes, organism, args.genes_file)
         if token is not None:
-            n_before = len(ref["organisms_added"])
-            ref = c3_occ.leave_one_out(ref, genes, run_root, organism, token=token)
             left_out = True
-            how = "fingerprint" if (fp and members.get(fp) == token) else "name"
             print(f"[c3-scorer] leave-one-out: removed this genome "
                   f"(matched by {how} as '{token}') from the reference "
                   f"-> {n_before} - 1 = {len(ref['organisms_added'])} organisms, "

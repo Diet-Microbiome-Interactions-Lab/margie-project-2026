@@ -28,6 +28,10 @@ WORKFLOW_PATH_DEFAULTS: dict[str, dict[str, str]] = {
 }
 
 
+# A tool's resource settings, as Settings writes them under margie_sb.<tool>.
+_TOOL_RESOURCE_LEAVES = ('threads', 'mem_mb', 'runtime', 'partition')
+
+
 def rc(key: str, default:str|None = None, config=None):
     """
     Rule Config: Get config value using dot notation for nested keys.
@@ -43,6 +47,12 @@ def rc(key: str, default:str|None = None, config=None):
 
     # Split key by dots and traverse nested dict
     parts = key.split('.')
+    # Settings saves a tool's resources as margie_sb.<tool>.<leaf>; that value wins over <tool>.<leaf>.
+    if len(parts) == 2 and parts[1] in _TOOL_RESOURCE_LEAVES:
+        saved = config.get('margie_sb', {}) if isinstance(config, dict) else {}
+        saved = saved.get(parts[0]) if isinstance(saved, dict) else None
+        if isinstance(saved, dict) and saved.get(parts[1]) not in (None, ''):
+            return saved[parts[1]]
     value = config
 
     for part in parts:
