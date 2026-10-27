@@ -148,11 +148,16 @@ all_tier1_tools=(
     rasttk prodigal
     kegg cog pfam pgap tigrfam dbcan eggnog merops tcdb uniprot interpro geneprop
     envelope
-    psortb deepsig tmbed phobius
+    psortb deepsig
     operon
 )
 all_tier2_tools=()
 all_tools=( "${all_classify_tools[@]+"${all_classify_tools[@]}"}" "${all_tier1_tools[@]+"${all_tier1_tools[@]}"}" "${all_tier2_tools[@]+"${all_tier2_tools[@]}"}" )
+
+# Hidden tools: their licences (Phobius and SignalP: academic, no redistribution; TMbed: ProtT5
+# weights CC-BY-NC-SA) do not let MARGIE offer them freely. Their scripts stay; setup leaves them
+# out and each run switches them off.
+HIDDEN_TOOLS=(tmbed phobius signalp4 signalp6)
 
 # Comparative tools run once over the whole collection after per-genome
 # annotation, via run-individual-containers/run-{aai,ani,closest,synteny}.sh.
@@ -172,8 +177,6 @@ all_tools=( "${all_classify_tools[@]+"${all_classify_tools[@]}"}" "${all_tier1_t
 all_comparative_tools=( aai ani closest synteny )
 
 # Databases to download, fastest first (tools with built-in models are not listed).
-# tmbed's ProtT5 encoder (~1.4 GB) is fetched by the tmbed container, so its
-# image must exist first (./setup.sh does containers before databases).
 # llm needs a HuggingFace token and model approval, so it is run separately:
 #   ./setup.sh --databases-only --tool llm          (first download)
 #   ./setup.sh --databases-only --tool llm --redo   (re-download / update)
@@ -182,7 +185,6 @@ all_dbs=(
     eggnog
     interpro
     kegg
-    tmbed
     gtdbtk
     taxonomy
     type_strains
@@ -257,9 +259,7 @@ all_dbs=(
 # Full upstream licence links:
 #   MEROPS     https://www.ebi.ac.uk/merops/about/terms_of_use.shtml
 #   TCDB       https://www.tcdb.org/about.php
-#   TMbed      https://huggingface.co/Rostlab/prot_t5_xl_half_uniref50-enc  (CC-BY-NC-SA 4.0)
 #   InterPro   https://www.ebi.ac.uk/interpro/about/  (mixed member-DB terms; ProSite / SMART require commercial licences)
-#   Phobius    https://phobius.sbc.su.se/data.html
 #   PSORTb     https://psort.org/  (gated by this project)
 #
 # A SHORT, TRUTHFUL description of your intended use, logged verbatim with
@@ -272,13 +272,11 @@ all_dbs=(
 # terms your use meets. Each counts only with the two values above.
 : "${LICENCE_AGREED_MEROPS:=0}"
 : "${LICENCE_AGREED_TCDB:=0}"
-: "${LICENCE_AGREED_TMBED:=0}"
 : "${LICENCE_AGREED_INTERPRO:=0}"
-: "${LICENCE_AGREED_PHOBIUS:=0}"
 : "${LICENCE_AGREED_PSORTB:=0}"
 
 # Tools that need a recorded acceptance before they run.
-LICENCE_GATED_TOOLS=(merops tcdb tmbed interpro phobius psortb)
+LICENCE_GATED_TOOLS=(merops tcdb interpro psortb)
 
 # section 9 — SLURM cluster settings
 # Used to generate the *.slurm job scripts; regenerate after a change with

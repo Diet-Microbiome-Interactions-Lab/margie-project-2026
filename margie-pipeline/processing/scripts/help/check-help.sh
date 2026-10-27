@@ -22,7 +22,7 @@ print_help_check_main() {
     _help_h2 "SCOPE  (default: BOTH)"
     _help_label "--databases"       "report databases only"
     _help_label "--containers"      "report container images only"
-    _help_label "--tool <name>"     "restrict to one tool (e.g. ${C_GREEN}pfam${C_NC}, ${C_GREEN}tmbed${C_NC}, ${C_GREEN}llm${C_NC})"
+    _help_label "--tool <name>"     "restrict to one tool (e.g. ${C_GREEN}pfam${C_NC}, ${C_GREEN}kegg${C_NC}, ${C_GREEN}llm${C_NC})"
 
     _help_h2 "DEPTH"
     _help_label "--runtime"         "smoke-test each image's entrypoint  ${C_DIM}(slower)${C_NC}"
@@ -75,7 +75,6 @@ print_help_check_hf() {
     _help_h1 "TOPIC: HuggingFace status banner"
     printf "  ${C_GREEN}check.sh${C_NC} ${C_WHITE}prints a small banner describing the HuggingFace${C_NC}\n"
     printf "  ${C_WHITE}download environment used by ${C_GREEN}llm${C_NC} ${C_WHITE}model downloads.${C_NC}\n"
-    printf "  ${C_DIM}(tmbed does NOT need a token -- its model is public.)${C_NC}\n"
 
     _help_h2 "WHAT IT REPORTS"
     _help_kv "venv"   "is ${C_GREEN}processing/.hf-env/${C_NC} present and usable?"

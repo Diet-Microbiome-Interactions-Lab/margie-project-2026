@@ -7,7 +7,7 @@ import { spawnSync } from 'node:child_process';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { LICENCE_TOOLS, PIPELINE_ROOT, pipelineEnv } from './pipeline';
+import { HIDDEN_TOOLS, LICENCE_TOOLS, PIPELINE_ROOT, pipelineEnv } from './pipeline';
 
 export interface BuildItem {
 	name: string;
@@ -62,7 +62,8 @@ export function inspectSetupRepo(raw: string): SetupRepoInfo {
 		else if (line.startsWith('==>') || line.startsWith('[')) section = null;
 		else if (section) {
 			const m = line.match(/^\s{2}(\S+)\s+\S+(\s+\[licence-gated\])?\s*$/);
-			if (m) info[section].push({ name: m[1], gated: !!m[2] || LICENCE_TOOLS.includes(m[1]), buildGated: !!m[2] });
+			// The hidden tools are left out, whatever the setup repository holds.
+			if (m && !HIDDEN_TOOLS.includes(m[1])) info[section].push({ name: m[1], gated: !!m[2] || LICENCE_TOOLS.includes(m[1]), buildGated: !!m[2] });
 		}
 	}
 	if (info.containers.length === 0 && info.databases.length === 0) {

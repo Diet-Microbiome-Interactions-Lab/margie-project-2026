@@ -41,7 +41,11 @@ for arg in "$@"; do
     [ -n "$need" ] && {
         case "$need" in
             runtime)        RUNTIME="$arg" ;;
-            tool)           tools+=("$arg") ;;
+            tool)           [[ " ${HIDDEN_TOOLS[*]-} " == *" $arg "* ]] && {
+                                err "$arg is not offered: its licence does not let MARGIE offer it freely"
+                                exit 1
+                            }
+                            tools+=("$arg") ;;
             hf_token_file)  extra="$extra --hf-token-file $arg" ;;
             licence_statement)
                             licence_statement_matches "$arg" || {

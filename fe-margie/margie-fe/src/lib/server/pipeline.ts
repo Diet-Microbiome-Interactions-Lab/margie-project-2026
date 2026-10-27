@@ -55,7 +55,13 @@ export interface SettingDef {
  * operon finder, the envelope stage and MARGIE's own scripts, since the app may be used outside academia.
  * margie-desktop/scripts/stage.mjs writes the same list into the pipeline it ships (LICENCE_GATED_TOOLS).
  */
-export const LICENCE_TOOLS = ['kegg', 'tigrfam', 'dbcan', 'eggnog', 'merops', 'tcdb', 'uniprot', 'interpro', 'geneprop', 'psortb', 'deepsig', 'tmbed', 'phobius'];
+export const LICENCE_TOOLS = ['kegg', 'tigrfam', 'dbcan', 'eggnog', 'merops', 'tcdb', 'uniprot', 'interpro', 'geneprop', 'psortb', 'deepsig'];
+
+/**
+ * Tools whose licences do not let MARGIE offer them freely (pipeline.conf.sh HIDDEN_TOOLS): left out
+ * of what the app installs, and each run switches them off.
+ */
+export const HIDDEN_TOOLS = ['tmbed', 'phobius', 'signalp4', 'signalp6'];
 
 /**
  * Local-mode defaults over pipeline.conf.sh: GTDB-Tk off (too memory-hungry for
@@ -168,7 +174,6 @@ export const SETTINGS: SettingDef[] = [
 	{ key: 'DB_ROOT', label: 'Databases (db)', group: 'Folders', type: 'path', description: 'Where the reference databases are kept, one folder per tool (~170 GB in all).' },
 	{ key: 'OPERON_DB', label: 'Operon database', group: 'Folders', type: 'path', description: 'The operon co-occurrence reference the scoring step reads and grows with every genome.' },
 	{ key: 'MARGIE_DB', label: 'Results cache (SQLite)', group: 'Folders', type: 'path', description: 'One file holding each tool\'s output under the hash of the genome it came from, so the same genome is never computed twice. Copy the file and its cache travels with it.' },
-	{ key: 'PHOBIUS_TARBALL', label: 'Phobius download', group: 'Setup', type: 'path', description: "Phobius cannot be redistributed, so its image builds only from your own copy: the phobius101_linux.tgz you downloaded from phobius.sbc.su.se, or the folder you unpacked it into. Left empty, phobius is skipped." },
 	// The built-in model (not set up yet): where it lives, and which one. Chat with the genome points here.
 	{ key: 'LLM_ROOT', label: 'Model folder', group: 'LLM', type: 'path', description: 'Where the language models are kept, beside the databases: base-model and trained-model inside it.' },
 	{ key: 'LLM_BASE_MODEL', label: 'Base model', group: 'LLM', type: 'text', description: "The base model's folder (Hugging Face format: config.json and its weights), or a Hugging Face id to download." },
@@ -188,7 +193,7 @@ export const SETTINGS: SettingDef[] = [
 	{ key: 'LOCAL_MAX_MEMORY_GB', label: 'Memory this pipeline may use (GB)', group: 'Runtime', type: 'int', description: 'The whole memory budget on this computer, in gigabytes. Three quarters of the machine by default.' },
 	{ key: 'LOCAL_PARALLEL_TOOLS', label: 'Tools at once', group: 'Runtime', type: 'int', description: 'How many tools run side by side on this computer. They share the budget above: two at once means each gets half the cores and half the memory. One at a time gives each tool everything.' },
 	{ key: 'THREADS', label: 'Threads per tool', group: 'Runtime', type: 'int', description: "Threads a tool asks for. Left alone it follows the budget above: the cores divided by the tools running at once." },
-	{ key: 'USE_GPU', label: 'Use GPU', group: 'Runtime', type: 'choice', choices: ['auto', '1', '0'], description: 'auto uses a GPU when nvidia-smi is available (tmbed, llm).' },
+	{ key: 'USE_GPU', label: 'Use GPU', group: 'Runtime', type: 'choice', choices: ['auto', '1', '0'], description: 'auto uses a GPU when nvidia-smi is available (llm).' },
 	{ key: 'PARALLEL_TOOLS', label: 'Parallel tools (HPC)', group: 'Runtime', type: 'int', fallback: '6', description: 'Tools run at once per organism under SLURM. On this computer, "Tools at once" above decides that instead.' },
 	{ key: 'MIN_PHASE2_ORGS', label: 'Organisms before comparative phase', group: 'Runtime', type: 'int', fallback: '2', description: 'Scored organisms needed before AAI / ANI / closest / synteny run.' },
 	{ key: 'LICENCE_INTENDED_USE', label: 'Intended use', group: 'Licences', type: 'text', description: 'Recorded verbatim with every licence acceptance and in run logs. Must be truthful.' },

@@ -50,7 +50,7 @@ mkdir -p logs/containers
 
 module load apptainer 2>/dev/null || module load singularity 2>/dev/null || true
 
-# Gated tools (merops tcdb tmbed interpro phobius psortb) are set up
+# Gated tools (merops tcdb interpro psortb) are set up
 # only with the licence statement: set LICENCE_INTENDED_USE and LICENCE_STATEMENT
 # in pipeline.conf.sh section 8 (or type it in ./setup.sh at a terminal first).
 # Without it --accept-all-licences accepts nothing and they are skipped.
@@ -83,7 +83,7 @@ mkdir -p logs/databases
 
 module load apptainer 2>/dev/null || module load singularity 2>/dev/null || true
 
-# Gated tools (merops tcdb tmbed interpro phobius psortb) are set up
+# Gated tools (merops tcdb interpro psortb) are set up
 # only with the licence statement: set LICENCE_INTENDED_USE and LICENCE_STATEMENT
 # in pipeline.conf.sh section 8 (or type it in ./setup.sh at a terminal first).
 # Without it --accept-all-licences accepts nothing and they are skipped.
@@ -114,7 +114,7 @@ mkdir -p logs/setup
 
 module load apptainer 2>/dev/null || module load singularity 2>/dev/null || true
 
-# Gated tools (merops tcdb tmbed interpro phobius psortb) are set up
+# Gated tools (merops tcdb interpro psortb) are set up
 # only with the licence statement: set LICENCE_INTENDED_USE and LICENCE_STATEMENT
 # in pipeline.conf.sh section 8 (or type it in ./setup.sh at a terminal first).
 # Without it --accept-all-licences accepts nothing and they are skipped.
@@ -272,7 +272,7 @@ _write annotate-downstream.slurm <<SLURM
 # Skips gene calling; processes all genomes found in output/rasttk/.
 # 6 tools run in parallel (PARALLEL_TOOLS); gram-agnostic tools finish, then
 # the envelope stage infers each genome's envelope from tigrfam / pgap / pfam /
-# uniprot, then the gram-dependent tools (psortb, deepsig, signalp4) start.
+# uniprot, then the gram-dependent tools (psortb, deepsig) start.
 #
 # Submit:               sbatch accessory-files/slurm/annotate-downstream.slurm
 # Restrict to one tool: sbatch accessory-files/slurm/annotate-downstream.slurm --tool pfam
@@ -298,8 +298,8 @@ while [[ \$# -gt 0 ]]; do
     esac
 done
 
-pre_tools=(kegg cog pfam pgap tigrfam dbcan eggnog merops tcdb uniprot interpro geneprop tmbed phobius operon)
-post_tools=(psortb deepsig signalp4)
+pre_tools=(kegg cog pfam pgap tigrfam dbcan eggnog merops tcdb uniprot interpro geneprop operon)
+post_tools=(psortb deepsig)
 envelope_inputs=(tigrfam pgap pfam uniprot)
 
 if (( \${#filter_tools[@]} )); then

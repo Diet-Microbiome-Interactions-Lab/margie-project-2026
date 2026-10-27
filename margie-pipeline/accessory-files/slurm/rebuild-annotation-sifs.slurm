@@ -32,7 +32,7 @@ mkdir -p "$SIF_DIR"
 # All 20 containers updated in this session (directory-mode + gram-detection refactor).
 ALL_TOOLS=(
     kegg cog pfam pgap tigrfam dbcan eggnog merops tcdb uniprot interpro geneprop
-    tmhmm tmbed phobius tatfinder psortb deepsig
+    tmhmm tatfinder psortb deepsig
     operon
     consolidation
 )

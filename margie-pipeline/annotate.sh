@@ -56,8 +56,6 @@ runner_dir="$here/processing/scripts/run-individual-containers"
 annotation_tools_default=(
     # Stage C — general functional annotation (gram-agnostic)
     kegg cog pfam pgap tigrfam dbcan eggnog merops tcdb uniprot interpro geneprop
-    # Stage C — localization, gram-agnostic predictors
-    tmbed phobius
     # Stage C — operonic structure
     operon
     # envelope runs automatically between pre and post phases (not listed here)
@@ -102,7 +100,7 @@ else
 fi
 
 # ── Licence pre-flight: drops gated tools whose licence is not accepted ──
-gated_tools=("${LICENCE_GATED_TOOLS[@]:-merops tcdb tmbed interpro phobius psortb}")
+gated_tools=("${LICENCE_GATED_TOOLS[@]:-merops tcdb interpro psortb}")
 _is_gated() {
     local t=$1 g
     for g in "${gated_tools[@]+"${gated_tools[@]}"}"; do [[ "$g" == "$t" ]] && return 0; done
@@ -115,6 +113,15 @@ _is_gram_post() {
     for g in "${gram_post_tools[@]+"${gram_post_tools[@]}"}"; do [[ "$g" == "$t" ]] && return 0; done
     return 1
 }
+# Hidden tools (pipeline.conf.sh HIDDEN_TOOLS) are switched off, named or not.
+filtered=()
+skipped_hidden=()
+for t in "${annotation_tools[@]+"${annotation_tools[@]}"}"; do
+    if [[ " ${HIDDEN_TOOLS[*]-} " == *" $t "* ]]; then skipped_hidden+=("$t"); else filtered+=("$t"); fi
+done
+(( ${#skipped_hidden[@]} )) && warn "skipping ${skipped_hidden[*]}: not offered, as its licence does not let MARGIE offer it freely"
+annotation_tools=("${filtered[@]+"${filtered[@]}"}")
+
 filtered=()
 skipped_no_licence=()
 for t in "${annotation_tools[@]+"${annotation_tools[@]}"}"; do

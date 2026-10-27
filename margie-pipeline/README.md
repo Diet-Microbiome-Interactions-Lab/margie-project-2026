@@ -97,7 +97,7 @@ For a list of all setup options:
 ### Licence acknowledgement (required before using gated tools)
 
 Several tools integrated in this pipeline carry academic or non-commercial licences from
-their upstream providers (MEROPS, TCDB, TMbed, InterPro, Phobius and PSORTb).
+their upstream providers (MEROPS, TCDB, InterPro and PSORTb).
 They are all **off** until you accept them, and accepting means typing this statement:
 
 > I accept that I am using these tools for non-commercial purposes and have received all permissions from the upstream developers.
@@ -180,12 +180,11 @@ flowchart LR
     C --> D[rasttk or prodigal<br/><i>gene calling</i>]
     D --> E[Tier-1 tools]
     E --> V[envelope<br/><i>gram inference</i>]
-    V --> P[psortb · deepsig · signalp4]
+    V --> P[psortb · deepsig]
     P --> F[per-genome results<br/><i>margie-backend scripts</i>]
     F --> G[output/genomes/&lt;genome&gt;/<br/>FINAL table · Excel<br/>genome viewer · diagrams]
     subgraph Tier-1
       C1[functional<br/>kegg · cog · pfam · pgap<br/>tigrfam · dbcan · eggnog<br/>merops · tcdb · uniprot<br/>interpro · geneprop]
-      C2[localization<br/>tmbed · phobius]
       C3[structural<br/>operon]
     end
     subgraph per-genome results
@@ -203,14 +202,14 @@ flowchart LR
 | `prodigal` | Gene calling for every other genome | `input/<genome>.fna` | `output/rasttk/<genome>/gene_calls/` (same layout) |
 | Tier-1 | One containerised tool per annotation type, run independently per organism | `gene_calls/genome.faa` | per-tool normalised TSV |
 | `envelope` | Cell-envelope inference from tigrfam, pgap, pfam and uniprot marker hits | those four tools' TSVs | `output/envelope/<genome>/processed/envelope_summary.tsv` |
-| gram-dependent | PSORTb, DeepSig and SignalP 4.1, with models chosen from the envelope call | `gene_calls/genome.faa` | per-tool normalised TSV |
+| gram-dependent | PSORTb and DeepSig, with models chosen from the envelope call | `gene_calls/genome.faa` | per-tool normalised TSV |
 | per-genome results | margie-backend's consolidation, labeling, scoring, fingerprint, evidence report, genome viewer and report figures (host scripts in `processing/host-scripts/`) | every tool's TSVs, gathered per genome | `output/genomes/<genome>/`: FINAL table, Excel copy, genome viewer, diagrams |
 
 **Gram stain is inferred, not assumed.** Nothing about a genome's gram stain is decided before
 annotation. After the tier-1 tools, the `envelope` step reads each genome's tigrfam, pgap, pfam
 and uniprot results for outer-membrane and cell-wall markers and calls it
-`diderm-gram-negative-like`, `monoderm-gram-positive-like` or `archaea`. Only PSORTb, DeepSig and
-SignalP 4.1 use that call; selecting any of them runs those four tools too.
+`diderm-gram-negative-like`, `monoderm-gram-positive-like` or `archaea`. Only PSORTb and DeepSig
+use that call; selecting either of them runs those four tools too.
 
 ---
 
@@ -371,11 +370,14 @@ interactive terminal first to cache the credentials.
 | `envelope` | Cell-envelope inference (diderm / monoderm / archaea) from marker hits | — | BSD-3-Clause |
 | `psortb` | Subcellular localization, using the envelope call (PSORTb 3.0) | bundled | GPL-2.0 — gated |
 | `deepsig` | Signal peptide prediction (deep learning), using the envelope call | bundled | Open |
-| `tmbed` | Transmembrane topology (ProtT5 encoder, deep learning) | tmbed | CC-BY-NC-SA — gated |
-| `phobius` | Combined signal peptide and TM topology prediction | bundled | Academic — gated |
 | `operon` | Operon structure prediction | — | Open |
 
 Tools marked **gated** require licence acceptance before they will run. See Section 8.
+
+Phobius, TMbed and SignalP are not offered: their licences (Phobius and SignalP: academic, no
+redistribution; TMbed: ProtT5 weights CC-BY-NC-SA) do not let MARGIE offer them freely. Their
+scripts stay in the pipeline; `pipeline.conf.sh` lists them in `HIDDEN_TOOLS`, setup leaves them
+out and each run switches them off.
 
 ### Per-genome results — margie-backend's scripts
 
@@ -422,7 +424,6 @@ genome, each genome folder is reduced to its FINAL table, an Excel copy, `diagra
 | `taxonomy` | classification report, labeling | NCBI taxonomy dump |
 | `tcdb` | tcdb | TCDB download |
 | `tigrfam` | tigrfam, geneprop | NCBI FTP |
-| `tmbed` | tmbed | HuggingFace (Rostlab/prot\_t5\_xl\_half\_uniref50-enc) |
 | `type_strains` | scoring, labeling | Internal curated set |
 | `uniprot` | uniprot | UniProt FTP |
 
@@ -515,9 +516,7 @@ LICENCE_STATEMENT="I accept that I am using these tools for non-commercial purpo
 # Then set to 1 each tool whose upstream licence you have read and meet:
 LICENCE_AGREED_MEROPS=1
 LICENCE_AGREED_TCDB=1
-LICENCE_AGREED_TMBED=1
 LICENCE_AGREED_INTERPRO=1
-LICENCE_AGREED_PHOBIUS=1
 LICENCE_AGREED_PSORTB=1
 ```
 
@@ -536,9 +535,7 @@ basis. Acceptances recorded before the statement was required do not count.
 |---|---|---|---|
 | `merops` | Academic / non-commercial | Commercial use requires separate agreement | [MEROPS Terms](https://www.ebi.ac.uk/merops/about/terms_of_use.shtml) |
 | `tcdb` | Academic / non-commercial | Commercial use restricted | [TCDB About](https://www.tcdb.org/about.php) |
-| `tmbed` | CC-BY-NC-SA 4.0 | Non-commercial; share-alike if adapted | [HuggingFace — Rostlab](https://huggingface.co/Rostlab/prot_t5_xl_half_uniref50-enc) |
 | `interpro` | Mixed (per member database) | PROSITE and SMART may require commercial licences; most member DBs are open | [InterPro About](https://www.ebi.ac.uk/interpro/about/) |
-| `phobius` | Academic / non-commercial | Redistribution prohibited; academic use only | [Phobius licence](https://phobius.sbc.su.se/data.html) |
 | `psortb` | GPL-2.0-or-later (upstream) | Gated by this pipeline; off until accepted | [PSORTb](https://psort.org/) |
 
 ### Open-source tools in the pipeline
@@ -619,7 +616,7 @@ For each organism, the job runs in order:
 1. **rasttk or prodigal** — gene calling, as the genome table says
 2. **gram-agnostic tier-1 tools** — run in a parallel sliding window
 3. **envelope** — infers the cell envelope from tigrfam, pgap, pfam and uniprot
-4. **psortb, deepsig and signalp4** — run with the envelope call
+4. **psortb and deepsig** — run with the envelope call
 5. **Per-genome results** — margie-backend's consolidation, labeling, scoring, fingerprint, evidence report, genome viewer and figures
 
 Results appear in `output/` as each organism finishes. The pipeline is fully
@@ -652,7 +649,7 @@ skipped and processing resumes from where it left off.
 | `geneprop` produced no output | `geneprop` requires the tigrfam domtbl to already exist; confirm tigrfam ran first |
 | Classify job finishes quickly with no files in `input/` | Confirm `user-input/` contains `.fna`, `.fa` or `.fasta` files and that `setup.sh` completed the `gtdbtk` database step |
 | A genome was gene-called with Prodigal, not RASTtk | Its domain or genetic code is unknown: GTDB-Tk was off or could not classify it. Add both to `user-input/genome-metadata.tsv` and re-run |
-| psortb, deepsig or signalp4 skipped a genome | It has no envelope result: none of tigrfam, pgap, pfam or uniprot produced output for it |
+| psortb or deepsig skipped a genome | It has no envelope result: none of tigrfam, pgap, pfam or uniprot produced output for it |
 | Tools skipped with a licence warning | Accept them: type the licence statement in `./setup.sh` or the GUI, or set `LICENCE_INTENDED_USE`, `LICENCE_STATEMENT` and `LICENCE_AGREED_<TOOL>=1` in `pipeline.conf.sh` — see Section 8 |
 
 For verbose diagnostics, set `SET_X=1` before any command or run with `bash -x`:
@@ -738,8 +735,6 @@ tools whose results you use. A `CITATION.cff` is provided for citing the pipelin
 | RASTtk / BV-BRC | Brettin T *et al.* (2015) RASTtk: A modular and extensible implementation of the RAST algorithm for building custom annotation pipelines and annotating batches of genomes. *Scientific Reports* 5:8365. |
 | PSORTb | Yu NY *et al.* (2010) PSORTb 3.0: improved protein subcellular localization prediction with refined localization subcategories and predictive capabilities for all prokaryotes. *Bioinformatics* 26:1608–1615. |
 | DeepSig | Savojardo C *et al.* (2018) DeepSig: deep learning improves signal peptide detection in proteins. *Bioinformatics* 34:1690–1696. |
-| TMbed | Bernhofer M *et al.* (2022) TMbed: transmembrane proteins predicted through language model embeddings. *BMC Bioinformatics* 23:326. |
-| Phobius | Käll L *et al.* (2004) A combined transmembrane topology and signal peptide prediction method. *Journal of Molecular Biology* 338:1027–1036. |
 | dbCAN / run\_dbcan | Yin Y *et al.* (2012) dbCAN: a web resource for automated carbohydrate-active enzyme annotation. *Nucleic Acids Research* 40:W445–W451. |
 | eggNOG-mapper | Cantalapiedra CP *et al.* (2021) eggNOG-mapper v2: functional annotation, orthology assignments, and domain prediction at the metagenomic scale. *Molecular Biology and Evolution* 38:5825–5829. |
 | InterProScan | Jones P *et al.* (2014) InterProScan 5: genome-scale protein function classification. *Bioinformatics* 30:1236–1240. |

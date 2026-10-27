@@ -92,7 +92,7 @@
 	const GROUPS = [
 		{ label: 'Function and pathways', tools: ['kegg', 'cog', 'eggnog', 'uniprot', 'geneprop', 'operon'] },
 		{ label: 'Families and domains', tools: ['pfam', 'tigrfam', 'pgap', 'interpro', 'dbcan', 'merops'] },
-		{ label: 'Membrane and location', tools: ['tcdb', 'deepsig', 'signalp4', 'psortb', 'phobius', 'tmbed'] }
+		{ label: 'Membrane and location', tools: ['tcdb', 'deepsig', 'psortb'] }
 	];
 	const BLURB: Record<string, string> = {
 		kegg: 'KEGG pathways',
@@ -109,10 +109,7 @@
 		merops: 'Peptidases',
 		tcdb: 'Transporters',
 		deepsig: 'Signal peptides',
-		signalp4: 'Signal peptides, v4',
-		psortb: 'Cell location',
-		phobius: 'Membrane topology',
-		tmbed: 'Membrane helices'
+		psortb: 'Cell location'
 	};
 	const groups = $derived.by(() => {
 		const known = new Set(GROUPS.flatMap((g) => g.tools));

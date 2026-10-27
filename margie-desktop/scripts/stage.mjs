@@ -11,7 +11,8 @@
  * .stage/build.margie is margie-build (MARGIE_BUILD_REPO, default the checkout beside this repository)
  * as it is on disk, its git-ignored files left out, locked with MARGIE_BUILD_PASSWORD; when
  * MARGIE_BUILD_PASSWORD_SHA256 is set, the password must match it. Without a password the app
- * carries no build files.
+ * carries no build files. The hidden tools' folders (pipeline.conf.sh HIDDEN_TOOLS) are left out of
+ * both.
  */
 
 import { execFileSync } from 'node:child_process';
@@ -101,6 +102,25 @@ const defaults = gated
 if (defaults.length) conf = conf.replace(listLine, (m) => `${defaults.join('\n')}\n\n${m}`);
 fs.writeFileSync(confPath, conf);
 console.log(`  licence-gated: ${gated.join(' ')}`);
+// The hidden tools: their licences do not let MARGIE offer them, so their folders are left out.
+const hidden = new Set(
+	(conf.match(/^HIDDEN_TOOLS=\(([^)]*)\)$/m)?.[1] ?? '').split(/\s+/).filter(Boolean).map((t) => t.toLowerCase())
+);
+if (!hidden.size) {
+	console.error('pipeline.conf.sh has no HIDDEN_TOOLS line');
+	process.exit(1);
+}
+const inHiddenFolder = (f) => f.split('/').slice(0, -1).some((d) => hidden.has(d.toLowerCase()));
+const dropHidden = (dir) => {
+	for (const e of fs.readdirSync(dir, { withFileTypes: true })) {
+		if (!e.isDirectory()) continue;
+		const at = path.join(dir, e.name);
+		if (hidden.has(e.name.toLowerCase())) fs.rmSync(at, { recursive: true, force: true });
+		else dropHidden(at);
+	}
+};
+dropHidden(PIPELINE);
+console.log(`  hidden, folders left out: ${[...hidden].join(' ')}`);
 fs.writeFileSync(
 	path.join(PIPELINE, 'margie-bundle.json'),
 	JSON.stringify({ commit, describe, staged: new Date().toISOString() }, null, 2) + '\n'
@@ -130,7 +150,7 @@ if (!password) {
 	// (images, site configs, licence logs, Phobius's vendor files, databases).
 	const listed = execFileSync('git', ['-C', BUILD_REPO, 'ls-files', '-z', '--cached', '--others', '--exclude-standard'], { encoding: 'utf8' })
 		.split('\0')
-		.filter((f) => f && !f.endsWith('.DS_Store') && fs.existsSync(path.join(BUILD_REPO, f)))
+		.filter((f) => f && !f.endsWith('.DS_Store') && !inHiddenFolder(f) && fs.existsSync(path.join(BUILD_REPO, f)))
 		.sort();
 	const files = listed.map((f) => {
 		const at = path.join(BUILD_REPO, f);

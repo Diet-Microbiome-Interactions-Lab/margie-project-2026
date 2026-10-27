@@ -37,7 +37,7 @@ print_help_annotate_main() {
 
     _help_h2 "LICENCE PRE-FLIGHT  (restricted-use tools are auto-skipped)"
     printf "  ${C_DIM}Before running, ${C_GREEN}annotate.sh${C_NC} ${C_DIM}checks each tool's licence acceptance${C_NC}\n"
-    printf "  ${C_DIM}status. Restricted tools (${C_GREEN}merops tcdb tmbed interpro phobius psortb${C_NC}${C_DIM})${C_NC}\n"
+    printf "  ${C_DIM}status. Restricted tools (${C_GREEN}merops tcdb interpro psortb${C_NC}${C_DIM})${C_NC}\n"
     printf "  ${C_DIM}are SKIPPED if no acceptance is on record. Accepted tools get a${C_NC}\n"
     printf "  ${C_DIM}clearly-marked banner in the log showing the source (pipeline.conf /${C_NC}\n"
     printf "  ${C_DIM}cli-flag / interactive-setup), the timestamp, and your declared use.${C_NC}\n"
@@ -95,11 +95,9 @@ print_help_annotate_tools() {
     _help_h2 "ENVELOPE  (automatic, before the gram-dependent tools)"
     _help_kv "envelope" "diderm / monoderm / archaea from tigrfam, pgap, pfam, uniprot hits"
 
-    _help_h2 "LOCALIZATION & TOPOLOGY  (4)"
+    _help_h2 "LOCALIZATION  (2)"
     _help_kv "psortb"   "Subcellular localization (uses the envelope call)"
     _help_kv "deepsig"  "Signal peptide prediction (uses the envelope call)"
-    _help_kv "tmbed"    "Transmembrane topology (ProtT5-based)"
-    _help_kv "phobius"  "Combined signal-peptide / TM prediction"
 
     _help_h2 "STRUCTURAL  (1)"
     _help_kv "operon"    "Operon structure prediction (UniOP)  ${C_DIM}-- always runs; scoring reads it${C_NC}"
@@ -119,11 +117,11 @@ print_help_annotate_order() {
 
     _help_h2 "DEFAULT ORDER  (used when no ${C_GREEN}--tool${C_NC} is given)"
     printf "  ${C_GREEN}rasttk${C_NC}${C_WHITE}|${C_NC}${C_GREEN}prodigal${C_NC} -> ${C_WHITE}kegg -> cog -> pfam -> pgap -> tigrfam -> dbcan -> eggnog ->${C_NC}\n"
-    printf "  ${C_WHITE}merops -> tcdb -> uniprot -> interpro -> geneprop -> tmbed ->${C_NC}\n"
-    printf "  ${C_WHITE}phobius -> operon -> ${C_GREEN}envelope${C_NC} ${C_WHITE}-> psortb -> deepsig -> signalp4${C_NC}\n\n"
+    printf "  ${C_WHITE}merops -> tcdb -> uniprot -> interpro -> geneprop -> operon ->${C_NC}\n"
+    printf "  ${C_GREEN}envelope${C_NC} ${C_WHITE}-> psortb -> deepsig${C_NC}\n\n"
     printf "  ${C_WHITE}This order is hard-coded as ${C_GREEN}annotation_tools_default${C_NC} ${C_WHITE}near the top of${C_NC}\n"
     printf "  ${C_GREEN}annotate.sh${C_NC}${C_WHITE}. Gene calling is always first because every downstream tool${C_NC}\n"
-    printf "  ${C_WHITE}consumes its ${C_GREEN}*.faa${C_NC} ${C_WHITE}output; psortb, deepsig and signalp4 always follow${C_NC}\n"
+    printf "  ${C_WHITE}consumes its ${C_GREEN}*.faa${C_NC} ${C_WHITE}output; psortb and deepsig always follow${C_NC}\n"
     printf "  ${C_GREEN}envelope${C_NC}${C_WHITE}, and selecting one of them also runs tigrfam, pgap, pfam, uniprot.${C_NC}\n"
 
     _help_h2 "CUSTOM ORDER"
