@@ -231,7 +231,7 @@
 	   preview side by side to their right. */
 	.fb-board {
 		display: grid;
-		grid-template-columns: 168px minmax(0, 1fr);
+		grid-template-columns: 196px minmax(0, 1fr);
 		flex-grow: 1;
 		min-height: 0;
 		border: 1px solid var(--mg-border);

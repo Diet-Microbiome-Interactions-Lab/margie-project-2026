@@ -1357,11 +1357,22 @@
 		.fv-cols > span:nth-child(2) {
 			display: none;
 		}
+		/* A place keeps its path, on a line under its name, so the list says where each place is. */
 		.fv-place {
 			grid-template-columns: minmax(0, 1fr) auto;
+			grid-template-areas: 'name copy' 'path copy';
+			row-gap: 0;
+			padding-block: 4px;
 		}
-		.fv-path {
-			display: none;
+		.fv-place > .fv-name {
+			grid-area: name;
+		}
+		.fv-place > .fv-path {
+			grid-area: path;
+			padding-left: 24px;
+		}
+		.fv-place > .fv-pcopy {
+			grid-area: copy;
 		}
 	}
 
