@@ -1,8 +1,10 @@
 #!/usr/bin/env python3
-"""Adds one organism to the depot-hosted OCC reference (idempotent).
+"""Adds one organism to the depot-hosted OCC reference, or replaces its counts when it is there.
 
 Runs before per-organism C3 scoring so scoring reads the current cross-organism
-operon database.
+operon database. A genome already in the reference (by content fingerprint, else
+by name) has its stored contribution replaced by its current one, so a second run
+of the same annotation leaves the counts as they were.
 """
 from __future__ import annotations
 
@@ -34,7 +36,7 @@ def _read_organism_from_labeled(labeled_path: Path) -> str:
 
 
 def main() -> None:
-    """Loads the organism's genes and, under an fcntl lock, adds them to the OCC reference and writes a token file."""
+    """Loads the organism's genes and, under an fcntl lock, adds or replaces them in the OCC reference and writes a token file."""
     ap = argparse.ArgumentParser(description=__doc__)
     ap.add_argument("--organism", required=True, help="Genome stem / organism name")
     ap.add_argument("--labeled-input", required=True, help="labeling/labeled-genes.tsv")
@@ -91,32 +93,43 @@ def main() -> None:
             ref = c3_occ.new_reference()
 
         before = len(ref.get("organisms_added", set()))
-        # The same genome is known by its content (its proteins), whatever name it comes under: one
-        # already in the reference under another name is not added again.
+        # The same genome is known by its content (its proteins), whatever name it comes under, else by
+        # name: one already in the reference has its counts replaced under the name it has there, so
+        # they follow its current annotation.
         fingerprint = L.genome_fingerprint(genes["aa_hash"])
         known_as = c3_occ.load_members(reference_path).get(fingerprint) if fingerprint else None
-        same_genome = known_as if known_as and known_as != organism and known_as in ref.get("organisms_added", set()) else None
-        already_present = organism in ref.get("organisms_added", set()) or same_genome is not None
+        in_ref = ref.get("organisms_added", set())
+        if known_as and known_as in in_ref:
+            token = known_as
+        elif organism in in_ref:
+            token = organism
+        else:
+            token = None
+        same_genome = token if token is not None and token != organism else None
+        already_present = token is not None
 
-        if same_genome is None:
-            c3_occ.update_reference(ref, genes, run_root, organisms=[organism], skip_existing=True)
-            c3_occ.finalize_reference(ref)
-            c3_occ.save_reference(ref, reference_path)
-            # Records the content fingerprint so scoring can leave this genome out by content.
-            c3_occ.record_member(reference_path, fingerprint, organism)
-            # Records gene/operon tallies used for figure provenance.
-            c3_occ.record_pool_stats(reference_path, fingerprint, organism,
-                                     L.genome_pool_stats(genes))
+        replaced = c3_occ.replace_organism(ref, genes, run_root, organism, token=token)
+        c3_occ.finalize_reference(ref)
+        c3_occ.save_reference(ref, reference_path)
+        # Records the content fingerprint so scoring can leave this genome out by content.
+        c3_occ.record_member(reference_path, fingerprint, token or organism)
+        # Records gene/operon tallies used for figure provenance.
+        c3_occ.record_pool_stats(reference_path, fingerprint, token or organism,
+                                 L.genome_pool_stats(genes))
 
         after = len(ref.get("organisms_added", set()))
         # The reference's size now, for Results (a genome scored against fewer can be scored again).
-        Path(str(reference_path) + ".summary.json").write_text(json.dumps({
+        c3_occ.write_text_atomic(Path(str(reference_path) + ".summary.json"), json.dumps({
             "genomes": after, "updated_at": datetime.now(timezone.utc).isoformat(timespec="seconds")}) + "\n")
         added = after - before
         status = (f"already_present_as={same_genome}" if same_genome else
                   "already_present" if already_present else ("added" if added > 0 else "no_change"))
+        # replaced: the old counts came off exactly; replaced_from_recomputed_counts: they predate
+        # stored contributions, so the counts recomputed from the current files came off.
+        contribution = {"added": "added", "stored": "replaced",
+                        "recomputed": "replaced_from_recomputed_counts"}[replaced]
         msg = (
-            f"occ reference status={status}; organism={organism}; "
+            f"occ reference status={status}; contribution={contribution}; organism={organism}; "
             f"fingerprint={fingerprint[:12] or '(none)'}; "
             f"organisms_in_reference={after}; reference={reference_path}"
         )
