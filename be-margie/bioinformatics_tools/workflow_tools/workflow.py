@@ -2047,10 +2047,12 @@ class WorkflowBase(ProgramBase):
 
         # RASTtk concurrency: a mkdir mutex in margie_sb.smk's run_rasttk rule.
 
-        # Number of phase4 tools running at once (margie_sb.phase4.max_parallel_tools).
+        # Number of phase4 and phase8 tools running at once (margie_sb.phase<N>.max_parallel_tools).
         max_parallel_tools = self.conf.get('margie_sb', {}).get('phase4', {}).get('max_parallel_tools', 4)
+        max_parallel_phase8 = self.conf.get('margie_sb', {}).get('phase8', {}).get('max_parallel_tools', 4)
         extra_resources = {
             'margie_sb_phase4_slot': max_parallel_tools,
+            'margie_sb_phase8_slot': max_parallel_phase8,
             # One database load at a time (margie_sb.smk, load_minutes).
             'margie_sb_db_writer': 1,
             # One RASTtk (BV-BRC) job at a time (margie_sb.smk, run_rasttk).

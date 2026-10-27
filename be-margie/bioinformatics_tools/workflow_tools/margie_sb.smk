@@ -84,6 +84,15 @@ def runtime_min(key: str, default: int, config=None) -> int:
         minutes = int(default)
     return max(MIN_SLURM_RUNTIME_MINUTES, minutes)
 
+def tool_partition(tool: str, phase: int) -> str:
+    """Returns a tool's SLURM partition: margie_sb.<tool>.partition, else margie_sb.phase<N>.partition, else the run's default."""
+    for key in (f'margie_sb.{tool}.partition', f'margie_sb.phase{phase}.partition',
+                'compute.cluster_default.partition'):
+        value = str(rc(key, '', config=config) or '').strip()
+        if value:
+            return value
+    return 'cpu'
+
 def _llm_mem_mb() -> int:
     """llm.mem_mb, or with 0 (the default) 80% of the smallest node memory in llm.partition."""
     mb = int(rc('llm.mem_mb', 0, config=config) or 0)
@@ -665,6 +674,7 @@ rule run_consolidation:
         tkn=CONSOLIDATION_COMPUTE_TOKEN
     threads: rc('consolidation.threads', 1, config=config)
     resources:
+        slurm_partition=tool_partition('consolidation', 9),
         mem_mb=rc('consolidation.mem_mb', 8000, config=config),
         runtime=runtime_min('consolidation.runtime', 30, config=config)
     params:
@@ -703,6 +713,7 @@ rule run_labeling:
         tkn=LABELING_COMPUTE_TOKEN
     threads: rc('labeling.threads', 1, config=config)
     resources:
+        slurm_partition=tool_partition('labeling', 10),
         mem_mb=rc('labeling.mem_mb', 8000, config=config),
         runtime=runtime_min('labeling.runtime', 30, config=config)
     shell:
@@ -774,10 +785,11 @@ rule run_scoring:
         confidence_final=SCORING_CONFIDENCE_FINAL,
         final_annotation_with_confidence=SCORING_FINAL_ANNOTATION_WITH_CONFIDENCE,
         tkn=SCORING_COMPUTE_TOKEN
-    threads: rc('scoring.threads', 1, config=config)
+    threads: rc('scoring_heuristic.threads', rc('scoring.threads', 1, config=config), config=config)
     resources:
-        mem_mb=rc('scoring.mem_mb', 8000, config=config),
-        runtime=runtime_min('scoring.runtime', 30, config=config)
+        slurm_partition=tool_partition('scoring_heuristic', 11),
+        mem_mb=rc('scoring_heuristic.mem_mb', rc('scoring.mem_mb', 8000, config=config), config=config),
+        runtime=runtime_min('scoring_heuristic.runtime', rc('scoring.runtime', 30, config=config), config=config)
     shell:
         """
         echo "=== MARGIE_SB PHASE 11: SCORING ({wildcards.genome}) ==="
@@ -843,6 +855,7 @@ rule run_fingerprint:
         tkn=FINGERPRINT_COMPUTE_TOKEN
     threads: rc('fingerprint.threads', 1, config=config)
     resources:
+        slurm_partition=tool_partition('fingerprint', 12),
         mem_mb=rc('fingerprint.mem_mb', 8000, config=config),
         runtime=runtime_min('fingerprint.runtime', 30, config=config)
     shell:
@@ -871,6 +884,7 @@ rule update_fingerprint_database:
         db=FINGERPRINT_DATABASE_PATH
     threads: rc('fingerprint_database.threads', 1, config=config)
     resources:
+        slurm_partition=tool_partition('fingerprint_database', 13),
         mem_mb=rc('fingerprint_database.mem_mb', 4000, config=config),
         runtime=runtime_min('fingerprint_database.runtime', 15, config=config)
     shell:
@@ -892,8 +906,7 @@ rule run_operon_fingerprint:
         ec_consensus=LABELING_EC_CONSENSUS,
         confidence_final=SCORING_CONFIDENCE_FINAL,
         fingerprint_tkn=FINGERPRINT_COMPUTE_TOKEN,
-        labeling_genes=LABELING_LABELED,
-        phobius_top1=PHOBIUS_TOP1
+        labeling_genes=LABELING_LABELED
     output:
         operon_fingerprint=OPERON_FINGERPRINT,
         final_annotated=FINAL_ANNOTATED,
@@ -903,10 +916,11 @@ rule run_operon_fingerprint:
         gene_fp_db=FINGERPRINT_DATABASE_PATH,
         operon_fp_db_label_ordered=OPERON_FINGERPRINT_DATABASE_LABEL_ORDERED,
         operon_fp_db_label_composition=OPERON_FINGERPRINT_DATABASE_LABEL_COMPOSITION
-    threads: rc('operon_fingerprint.threads', 1, config=config)
+    threads: rc('fingerprint.threads', rc('operon_fingerprint.threads', 1, config=config), config=config)
     resources:
-        mem_mb=rc('operon_fingerprint.mem_mb', 4000, config=config),
-        runtime=runtime_min('operon_fingerprint.runtime', 15, config=config)
+        slurm_partition=tool_partition('fingerprint', 12),
+        mem_mb=rc('fingerprint.mem_mb', rc('operon_fingerprint.mem_mb', 4000, config=config), config=config),
+        runtime=runtime_min('fingerprint.runtime', rc('operon_fingerprint.runtime', 15, config=config), config=config)
     shell:
         """
         echo "=== MARGIE_SB PHASE 12: OPERON FINGERPRINT ({wildcards.genome}) ==="
@@ -926,7 +940,6 @@ rule run_operon_fingerprint:
         {LOADER_PYTHON} {FINGERPRINT_SCRIPTS_DIR}/make-final-annotated.py \
             --full-evidence-input {output.final_annotated} \
             --labeling-genes-input {input.labeling_genes} \
-            --phobius-top1-input {input.phobius_top1} \
             --fingerprint-full-input {input.fingerprint_full} \
             --output {output.final_annotated_publication}
         echo "operon fingerprint complete for {wildcards.genome}" > {output.tkn}
@@ -945,10 +958,11 @@ rule update_operon_fingerprint_database:
         evidence_composition=OPERON_FINGERPRINT_DATABASE_EVIDENCE_COMPOSITION,
         label_ordered=OPERON_FINGERPRINT_DATABASE_LABEL_ORDERED,
         label_composition=OPERON_FINGERPRINT_DATABASE_LABEL_COMPOSITION
-    threads: rc('operon_fingerprint_database.threads', 1, config=config)
+    threads: rc('fingerprint_database.threads', rc('operon_fingerprint_database.threads', 1, config=config), config=config)
     resources:
-        mem_mb=rc('operon_fingerprint_database.mem_mb', 4000, config=config),
-        runtime=runtime_min('operon_fingerprint_database.runtime', 15, config=config)
+        slurm_partition=tool_partition('fingerprint_database', 13),
+        mem_mb=rc('fingerprint_database.mem_mb', rc('operon_fingerprint_database.mem_mb', 4000, config=config), config=config),
+        runtime=runtime_min('fingerprint_database.runtime', rc('operon_fingerprint_database.runtime', 15, config=config), config=config)
     shell:
         """
         {LOADER_PYTHON} {FINGERPRINT_SCRIPTS_DIR}/update-operon-fingerprint-database.py \
@@ -1563,6 +1577,7 @@ rule run_quast:
     group: "quast"
     threads: rc('margie_sb.quast.threads', rc('quast.threads', 2, config=config), config=config)
     resources:
+        slurm_partition=tool_partition('quast', 1),
         mem_mb=rc('margie_sb.quast.mem_mb', rc('quast.mem_mb', 4000, config=config), config=config),
         runtime=runtime_min('margie_sb.quast.runtime', rc('quast.runtime', 120, config=config), config=config)
     params:
@@ -1853,6 +1868,7 @@ rule run_rasttk:
         genome=_one_of(RASTTK_GENOMES)
     threads: rc('rasttk.threads', 8, config=config)
     resources:
+        slurm_partition=tool_partition('rasttk', 3),
         mem_mb=rc('rasttk.mem_mb', 8000, config=config),
         runtime=runtime_min('rasttk.runtime', 120, config=config),
         # One RASTtk job at a time within a run (workflow.py caps it at 1); the lock below spans runs.
@@ -1934,6 +1950,7 @@ rule run_prodigal:
         genome=_one_of(PRODIGAL_GENOMES)
     threads: rc('prodigal.threads', 1, config=config)
     resources:
+        slurm_partition=tool_partition('rasttk', 3),
         mem_mb=rc('prodigal.mem_mb', 4000, config=config),
         runtime=runtime_min('prodigal.runtime', 60, config=config)
     params:
@@ -2025,6 +2042,7 @@ rule run_cog:
     priority: 1
     threads: rc('cog.threads', 8, config=config)
     resources:
+        slurm_partition=tool_partition('cog', 4),
         mem_mb=rc('cog.mem_mb', 4000, config=config),
         runtime=runtime_min('cog.runtime', 60, config=config),
         margie_sb_phase4_slot=1
@@ -2082,6 +2100,7 @@ rule run_pfam:
     priority: 1  # see run_cog
     threads: rc('pfam.threads', 8, config=config)
     resources:
+        slurm_partition=tool_partition('pfam', 4),
         mem_mb=rc('pfam.mem_mb', 8000, config=config),
         runtime=runtime_min('pfam.runtime', 60, config=config),
         margie_sb_phase4_slot=1
@@ -2138,6 +2157,7 @@ rule run_tigrfam:
         tkn=PHASE4_COMPUTE_TOKENS['tigrfam']
     threads: rc('tigrfam.threads', 8, config=config)
     resources:
+        slurm_partition=tool_partition('tigrfam', 4),
         mem_mb=rc('tigrfam.mem_mb', 4000, config=config),
         runtime=runtime_min('tigrfam.runtime', 60, config=config),
         margie_sb_phase4_slot=1
@@ -2194,6 +2214,7 @@ rule run_merops:
         tkn=PHASE4_COMPUTE_TOKENS['merops']
     threads: rc('merops.threads', 8, config=config)
     resources:
+        slurm_partition=tool_partition('merops', 4),
         mem_mb=rc('merops.mem_mb', 4000, config=config),
         runtime=runtime_min('merops.runtime', 30, config=config),
         margie_sb_phase4_slot=1
@@ -2250,6 +2271,7 @@ rule run_tcdb:
         tkn=PHASE4_COMPUTE_TOKENS['tcdb']
     threads: rc('tcdb.threads', 8, config=config)
     resources:
+        slurm_partition=tool_partition('tcdb', 4),
         mem_mb=rc('tcdb.mem_mb', 4000, config=config),
         runtime=runtime_min('tcdb.runtime', 30, config=config),
         margie_sb_phase4_slot=1
@@ -2307,6 +2329,7 @@ rule run_uniprot:
         tkn=PHASE4_COMPUTE_TOKENS['uniprot']
     threads: rc('uniprot.threads', 8, config=config)
     resources:
+        slurm_partition=tool_partition('uniprot', 4),
         mem_mb=rc('uniprot.mem_mb', 4000, config=config),
         runtime=runtime_min('uniprot.runtime', 30, config=config),
         margie_sb_phase4_slot=1
@@ -2364,6 +2387,7 @@ rule run_kegg:
         tkn=PHASE4_COMPUTE_TOKENS['kegg']
     threads: rc('kegg.threads', 8, config=config)
     resources:
+        slurm_partition=tool_partition('kegg', 4),
         mem_mb=rc('kegg.mem_mb', 16000, config=config),
         runtime=runtime_min('kegg.runtime', 90, config=config),
         margie_sb_phase4_slot=1
@@ -2419,6 +2443,7 @@ rule run_eggnog:
         tkn=PHASE4_COMPUTE_TOKENS['eggnog']
     threads: rc('eggnog.threads', 8, config=config)
     resources:
+        slurm_partition=tool_partition('eggnog', 4),
         mem_mb=rc('eggnog.mem_mb', 64000, config=config),
         runtime=runtime_min('eggnog.runtime', 90, config=config),
         margie_sb_phase4_slot=1
@@ -2475,6 +2500,7 @@ rule run_dbcan:
     priority: 1  # see run_cog
     threads: rc('dbcan.threads', 8, config=config)
     resources:
+        slurm_partition=tool_partition('dbcan', 4),
         mem_mb=rc('dbcan.mem_mb', 16000, config=config),
         runtime=runtime_min('dbcan.runtime', 60, config=config),
         margie_sb_phase4_slot=1
@@ -2530,6 +2556,7 @@ rule run_pgap:
         tkn=PHASE4_COMPUTE_TOKENS['pgap']
     threads: rc('pgap.threads', 8, config=config)
     resources:
+        slurm_partition=tool_partition('pgap', 4),
         mem_mb=rc('pgap.mem_mb', 12000, config=config),
         runtime=runtime_min('pgap.runtime', 60, config=config),
         margie_sb_phase4_slot=1
@@ -2586,6 +2613,7 @@ rule run_interpro:
         tkn=PHASE4_COMPUTE_TOKENS['interpro']
     threads: rc('interpro.threads', 32, config=config)
     resources:
+        slurm_partition=tool_partition('interpro', 4),
         mem_mb=rc('interpro.mem_mb', 48000, config=config),
         runtime=runtime_min('interpro.runtime', 300, config=config),
         # The cpu partition (highmem needs 64+ cores); the group's mem_mb fits one node.
@@ -2677,6 +2705,7 @@ rule run_geneprop:
     priority: 1  # see run_cog
     threads: rc('geneprop.threads', 4, config=config)
     resources:
+        slurm_partition=tool_partition('geneprop', 4),
         mem_mb=rc('geneprop.mem_mb', 2000, config=config),
         runtime=runtime_min('geneprop.runtime', 30, config=config),
         margie_sb_phase4_slot=1
@@ -2726,6 +2755,7 @@ rule run_operon:
         tkn=OPERON_COMPUTE_TOKEN
     threads: rc('operon.threads', 4, config=config)
     resources:
+        slurm_partition=tool_partition('operon', 5),
         mem_mb=rc('operon.mem_mb', 2000, config=config),
         runtime=runtime_min('operon.runtime', 30, config=config)
     params:
@@ -2772,6 +2802,7 @@ rule run_phobius:
         tkn=PHOBIUS_COMPUTE_TOKEN
     threads: rc('phobius.threads', 4, config=config)
     resources:
+        slurm_partition=tool_partition('phobius', 6),
         mem_mb=rc('phobius.mem_mb', 2000, config=config),
         runtime=runtime_min('phobius.runtime', 30, config=config)
     params:
@@ -2824,6 +2855,7 @@ rule run_tmbed:
         tkn=TMBED_COMPUTE_TOKEN
     threads: rc('tmbed.threads', 4, config=config)
     resources:
+        slurm_partition=tool_partition('tmbed', 6),
         mem_mb=rc('margie_sb.tmbed.mem_mb', rc('tmbed.mem_mb', 32000, config=config), config=config),
         runtime=runtime_min('margie_sb.tmbed.runtime', rc('tmbed.runtime', 240, config=config), config=config)
     params:
@@ -2886,6 +2918,7 @@ rule run_signalp6:
         tkn=SIGNALP6_COMPUTE_TOKEN
     threads: rc('signalp6.threads', 8, config=config)
     resources:
+        slurm_partition=tool_partition('signalp6', 6),
         mem_mb=rc('signalp6.mem_mb', 5000, config=config),
         runtime=runtime_min('signalp6.runtime', 15, config=config)
     params:
@@ -2958,6 +2991,7 @@ rule run_envelope:
         tkn=ENVELOPE_COMPUTE_TOKEN
     threads: rc('envelope.threads', 1, config=config)
     resources:
+        slurm_partition=tool_partition('envelope', 7),
         mem_mb=rc('envelope.mem_mb', 1000, config=config),
         runtime=runtime_min('envelope.runtime', 15, config=config)
     params:
@@ -3006,6 +3040,7 @@ rule run_deepsig:
         tkn=DEEPSIG_COMPUTE_TOKEN
     threads: rc('deepsig.threads', 4, config=config)
     resources:
+        slurm_partition=tool_partition('deepsig', 8),
         mem_mb=rc('deepsig.mem_mb', 2000, config=config),
         runtime=runtime_min('deepsig.runtime', 30, config=config),
         margie_sb_phase8_slot=1
@@ -3063,6 +3098,7 @@ rule run_psortb:
         tkn=PSORTB_COMPUTE_TOKEN
     threads: rc('psortb.threads', 4, config=config)
     resources:
+        slurm_partition=tool_partition('psortb', 8),
         mem_mb=rc('psortb.mem_mb', 2000, config=config),
         runtime=runtime_min('psortb.runtime', 30, config=config),
         margie_sb_phase8_slot=1
