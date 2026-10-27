@@ -315,7 +315,7 @@
 				<dl class="pop-rows">
 					{#if hashOf(row.g)}
 						<dt>Genome hash</dt>
-						<dd><span class="mg-mono">{hashOf(row.g)}</span>: assigned by MARGIE from the genome's DNA. Its tables and result files are named <span class="mg-mono">{row.g}</span>.</dd>
+						<dd><span class="mg-mono">{hashOf(row.g)}</span>: the start of the hash MARGIE assigns from the genome's DNA, which the database knows it by whole. Its result files are named <span class="mg-mono">{row.g}</span>.</dd>
 					{/if}
 					<dt>Progress</dt>
 					<dd>{ROW_WORD[row.state]}, {row.pct}% | {row.done} of {row.of} steps</dd>
@@ -642,7 +642,7 @@
 	/* The genome hash: a column of its own inside the genome's cell, muted. */
 	.gh {
 		flex: none;
-		width: 8.5ch;
+		width: 12.5ch;
 		margin-left: auto;
 		color: var(--mg-text-3);
 		font-size: var(--cr-fs-micro);

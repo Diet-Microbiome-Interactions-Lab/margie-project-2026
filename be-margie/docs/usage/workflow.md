@@ -124,7 +124,7 @@ output_cache
 UNIQUE(input_hash, tool, filename)
 ```
 
-- `input_hash`: first 16 hex chars of SHA-256 of the input file
+- `input_hash`: the genome hash, `fa1:` and all 64 hexadecimal digits of the SHA-256 of the records' names and bases; entries from older versions carry the first 16 hexadecimal digits of the file's SHA-256, which a restore still looks up
 - `tool`: rule/step name (e.g. `prodigal`, `step_a`)
 - `content`: raw bytes of the output file
 

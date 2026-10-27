@@ -111,7 +111,7 @@ def _safe_float(v: str, default: float) -> float:
 def _desc_fp(desc: str) -> str:
     if not desc:
         return ""
-    return hashlib.sha256(desc.encode("utf-8")).hexdigest()[:16]
+    return hashlib.sha256(desc.encode("utf-8")).hexdigest()
 
 
 def _pairwise_map(operon_results: Path) -> dict[str, list[tuple[str, float]]]:

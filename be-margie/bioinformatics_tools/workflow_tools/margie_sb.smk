@@ -7,11 +7,13 @@ import math
 import os
 import re
 import sys
+from functools import lru_cache
 
 # Add current directory to path to import workflow_helpers
 sys.path.insert(0, os.path.dirname(workflow.snakefile))
 from workflow_helpers import TOOL_RESOURCES, GTDBTK_CLASSIFY_RESOURCES, TOOL_PARTITIONS, rc, rc_bool, fixed_path, sif_path, db_path, db_token, discover_genomes, genome_calls, default_store_root, get_workflow_prefix_for, get_container_outputs_prefix_for
 from load_to_db import PIPELINE_VERSION
+from genome_identity import genome_hash as _genome_hash
 
 WORKFLOW_DIR = os.path.dirname(workflow.snakefile)
 LOAD_SCRIPT = os.path.join(WORKFLOW_DIR, "load_to_db.py")
@@ -66,6 +68,13 @@ MAIN_DATABASE = rc('main_database', config=config)
 GENOMES = discover_genomes(rc('input_fasta', config=config))
 if not GENOMES:
     raise ValueError(f"No genome files found for input_fasta={rc('input_fasta', config=config)!r}")
+
+
+@lru_cache(maxsize=None)
+def genome_hash_of(genome):
+    """The genome's full hash (fa1: and 64 hexadecimal digits), by which the fingerprint pools know it."""
+    return _genome_hash(GENOMES[genome])
+
 
 GENOME_PREFIX = get_workflow_prefix_for('{genome}', config=config)
 # Each container's raw output; output_dir keeps only results and tokens.
@@ -929,7 +938,8 @@ rule update_fingerprint_database:
     output:
         tkn=FINGERPRINT_DATABASE_UPDATED_TOKEN
     params:
-        db=FINGERPRINT_DATABASE_PATH
+        db=FINGERPRINT_DATABASE_PATH,
+        genome_hash=lambda wildcards: genome_hash_of(wildcards.genome)
     threads: tool_threads('fingerprint_database')
     retries: RUN_RETRIES
     resources:
@@ -941,6 +951,7 @@ rule update_fingerprint_database:
         {LOADER_PYTHON} {FINGERPRINT_SCRIPTS_DIR}/update-fingerprint-database.py \
             --hash-label-input {input.hash_label} \
             --organism {wildcards.genome} \
+            --genome-hash {params.genome_hash} \
             --fingerprint-database {params.db}
         echo "fingerprint-database updated for {wildcards.genome}" > {output.tkn}
         """
@@ -1007,7 +1018,8 @@ rule update_operon_fingerprint_database:
         evidence_ordered=OPERON_FINGERPRINT_DATABASE_EVIDENCE_ORDERED,
         evidence_composition=OPERON_FINGERPRINT_DATABASE_EVIDENCE_COMPOSITION,
         label_ordered=OPERON_FINGERPRINT_DATABASE_LABEL_ORDERED,
-        label_composition=OPERON_FINGERPRINT_DATABASE_LABEL_COMPOSITION
+        label_composition=OPERON_FINGERPRINT_DATABASE_LABEL_COMPOSITION,
+        genome_hash=lambda wildcards: genome_hash_of(wildcards.genome)
     threads: tool_threads('fingerprint_database', legacy='operon_fingerprint_database')
     retries: RUN_RETRIES
     resources:
@@ -1019,6 +1031,7 @@ rule update_operon_fingerprint_database:
         {LOADER_PYTHON} {FINGERPRINT_SCRIPTS_DIR}/update-operon-fingerprint-database.py \
             --operon-fingerprint-input {input.operon_fingerprint} \
             --organism {wildcards.genome} \
+            --genome-hash {params.genome_hash} \
             --evidence-ordered-database {params.evidence_ordered} \
             --evidence-composition-database {params.evidence_composition} \
             --label-ordered-database {params.label_ordered} \

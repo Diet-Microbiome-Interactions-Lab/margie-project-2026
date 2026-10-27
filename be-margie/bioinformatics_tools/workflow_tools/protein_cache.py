@@ -200,7 +200,7 @@ def tool_key(tool: str, cfg: dict) -> str:
     """Hashes what the tool's answer depends on besides the protein that MARGIE keeps to: the
     tool and the settings that change results. Container and database versions stay out."""
     parts: dict = {'schema': SCHEMA, 'tool': tool, 'params': _params(tool, cfg)}
-    return hashlib.sha256(json.dumps(parts, sort_keys=True).encode()).hexdigest()[:32]
+    return hashlib.sha256(json.dumps(parts, sort_keys=True).encode()).hexdigest()
 
 
 _carried: set = set()
@@ -571,7 +571,7 @@ def link_genome(db: str, faa: str, genome_hash: str, name: str = '', genes: dict
     hashes = sorted({h for _, h, _, _ in proteins})
     if not genome_hash or not hashes:
         return 0
-    protein_set = hashlib.sha256('\n'.join(hashes).encode()).hexdigest()[:32]
+    protein_set = hashlib.sha256('\n'.join(hashes).encode()).hexdigest()
     stamp = datetime.now(timezone.utc).isoformat()
     conn = _connect(db)
     try:
@@ -635,8 +635,8 @@ def record_fingerprints(db: str, genome_hash: str, hash_label_tsv: str, genes: d
     return len(found)
 
 
-def _hash16(text: str) -> str:
-    return hashlib.sha256(text.encode('utf-8')).hexdigest()[:16]
+def _sha256(text: str) -> str:
+    return hashlib.sha256(text.encode('utf-8')).hexdigest()
 
 
 def _rows_by_feature(path: Path) -> dict[str, list[dict]]:
@@ -737,9 +737,9 @@ def record_proteins(db: str, labeled_tsv: str, prefix: str, genome_hash: str = '
                     held.setdefault(h, {})[tool] = value
                 for h in chunk:
                     have = held.get(h, {})
-                    core = _hash16(' | '.join(f'{t}: {have.get(t, "")}' for t in CORE_TOOLS))
+                    core = _sha256(' | '.join(f'{t}: {have.get(t, "")}' for t in CORE_TOOLS))
                     extra_tools = sorted((t for t in have if _position(t) >= 100), key=lambda t: (_position(t), t))
-                    extra = _hash16(' | '.join(f'{t}: {have[t]}' for t in extra_tools)) if extra_tools else ''
+                    extra = _sha256(' | '.join(f'{t}: {have[t]}' for t in extra_tools)) if extra_tools else ''
                     prints.append((h, stamp, core, extra))
             conn.executemany("INSERT INTO protein_fingerprints (aa_hash, fingerprint, label, recorded_at, core_fingerprint, extra_fingerprint) "
                              "VALUES (?, '', '', ?, ?, ?) ON CONFLICT (aa_hash) DO UPDATE SET "

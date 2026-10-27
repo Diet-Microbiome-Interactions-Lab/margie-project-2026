@@ -255,7 +255,9 @@ def restore(db_path: str, input_file: str, tool_name: str,
 # RASTtk's gene ids, and the token a cached table names a gene by instead.
 _GENE_ID_RE = re.compile(rb"fig\|6666666\.\d+\.(?:peg|rna)\.\d+")
 _GENE_TOKEN = b"margie-gene:"
-_GENE_TOKEN_RE = re.compile(rb"margie-gene:([0-9a-f]{24})")
+# Gene hashes are 64 hexadecimal digits; tables cached with the older 24-digit form match no gene
+# of a run, so they are computed again.
+_GENE_TOKEN_RE = re.compile(rb"margie-gene:([0-9a-f]{64}|[0-9a-f]{24})")
 
 
 def gene_hashes(gff: str, faa: str) -> dict[str, str]:
@@ -277,7 +279,7 @@ def gene_hashes(gff: str, faa: str) -> dict[str, str]:
             continue
         fid = unquote(m.group(1))
         what = proteins.get(fid) or cols[2]
-        out[fid] = hashlib.sha256(f"{cols[0]}\t{cols[3]}\t{cols[4]}\t{cols[6]}\t{what}".encode()).hexdigest()[:24]
+        out[fid] = hashlib.sha256(f"{cols[0]}\t{cols[3]}\t{cols[4]}\t{cols[6]}\t{what}".encode()).hexdigest()
     return out if len(set(out.values())) == len(out) else {}
 
 
