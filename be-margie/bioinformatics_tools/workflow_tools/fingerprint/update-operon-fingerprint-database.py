@@ -4,9 +4,9 @@
 Counts each distinct operon once and adds it to four pools, keyed by the
 evidence/label ordered/composition hashes from add-operon-fingerprint.py,
 using the same fcntl lock and atomic write (temporary file and os.replace) as
-update-fingerprint-database.py. A genome is known by the genome hash ending
-its name (pool_members.genome_key): one already in a pool, under this name or
-another, has its previous entries replaced. Columns: pattern_id, fingerprint_hash,
+update-fingerprint-database.py. A genome is known by its full genome hash
+(--genome-hash, kept in each pool's <pool>.genomes.tsv): one already in a pool,
+under this name or another, has its previous entries replaced. Columns: pattern_id, fingerprint_hash,
 members_in_order, fingerprint_frequency (operons with this hash),
 fingerprint_label_frequency (operons with this member sequence), organisms,
 organism_counts (each genome's operons with this hash, "name=count" joined by "|").
@@ -69,19 +69,21 @@ def read_new_genome(operon_fp_tsv: Path) -> dict[str, dict]:
     return operons
 
 
-def update_pool(operons: dict[str, dict], organism: str, db_tsv: Path, key: str) -> None:
+def update_pool(operons: dict[str, dict], organism: str, db_tsv: Path, key: str,
+                genome_hash: str = "") -> None:
     """Updates one pool keyed on the `key` hash, holding an exclusive fcntl lock."""
     db_tsv.parent.mkdir(parents=True, exist_ok=True)
     lock_path = db_tsv.with_suffix(".lock")
     with open(lock_path, "w") as lock_fh:
         fcntl.flock(lock_fh, fcntl.LOCK_EX)
         try:
-            _do_update(operons, organism, db_tsv, key)
+            _do_update(operons, organism, db_tsv, key, genome_hash)
         finally:
             fcntl.flock(lock_fh, fcntl.LOCK_UN)
 
 
-def _do_update(new_operons: dict[str, dict], organism: str, db_tsv: Path, key: str) -> None:
+def _do_update(new_operons: dict[str, dict], organism: str, db_tsv: Path, key: str,
+               genome_hash: str = "") -> None:
     """Merges operon counts into a pool TSV, replacing the genome's previous entries, and writes it and its metadata JSON atomically."""
     patterns: dict[str, dict] = {}
     if db_tsv.exists() and db_tsv.stat().st_size > 0:
@@ -97,7 +99,9 @@ def _do_update(new_operons: dict[str, dict], organism: str, db_tsv: Path, key: s
                 }
 
     # A genome counts once, by its genome hash: its previous entries (any name) are replaced.
-    M.remove_genome(patterns, organism, "operon_count", f"{_LOG} {db_tsv.name}:")
+    members = M.load_members(db_tsv)
+    previous = M.remove_genome(patterns, organism, "operon_count", f"{_LOG} {db_tsv.name}:",
+                               genome_hash, members)
 
     # Each distinct operon counts once, even when a genome shares a hash.
     next_id = M.next_pattern_number(patterns)
@@ -129,6 +133,10 @@ def _do_update(new_operons: dict[str, dict], organism: str, db_tsv: Path, key: s
                 M.format_counts(pdata["counts"]),
             ])
     M.write_atomic(db_tsv, _write)
+    for name in previous:
+        members.pop(name, None)
+    members[organism] = genome_hash or M.genome_key(organism)
+    M.save_members(db_tsv, members)
 
     meta_path = db_tsv.parent / f"operon-fingerprint-database-{key}-metadata.json"
     meta = {
@@ -161,6 +169,8 @@ def main() -> None:
     parser.add_argument("--evidence-composition-database", required=True)
     parser.add_argument("--label-ordered-database", required=True)
     parser.add_argument("--label-composition-database", required=True)
+    parser.add_argument("--genome-hash", default="",
+                        help="the genome's full hash (fa1: and 64 hexadecimal digits); without it, the hash ending its name")
     args = parser.parse_args()
 
     operon_fp_path = Path(args.operon_fingerprint_input)
@@ -173,7 +183,7 @@ def main() -> None:
 
     for key, flag in _POOLS:
         db_path = getattr(args, flag.lstrip("-").replace("-", "_"))
-        update_pool(operons, args.organism, Path(db_path), key)
+        update_pool(operons, args.organism, Path(db_path), key, args.genome_hash)
         print(f"[update-operon-fingerprint-database] Updated {key} pool: {db_path}")
     print(f"[update-operon-fingerprint-database] Done.")
 

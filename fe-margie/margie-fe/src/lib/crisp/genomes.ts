@@ -14,11 +14,11 @@ export interface AtlasGenome {
 
 const STATE_ORDER: Record<GenomeState, number> = { running: 0, done: 1, partial: 2, pending: 3 };
 export const stemOf = (file: string) => file.replace(/\.(fna|fa|fasta)$/i, '');
-/** A run names each genome <file name>--<the first 8 characters of its hash> (coli--fa1:a1b2; older runs coli--a1b2c3d4). */
-const HASH_END = /--(fa1:[0-9a-f]{4}|[0-9a-f]{8})$/;
+/** A run names each genome <file name>--fa1:<the first 8 hexadecimal digits of its hash> (coli--fa1:a1b2c3d4; older runs coli--fa1:a1b2 or coli--a1b2c3d4). */
+const HASH_END = /--(fa1:[0-9a-f]{8}|fa1:[0-9a-f]{4}|[0-9a-f]{8})$/;
 /** A run's genome name without its hash: its file's name. */
 export const baseOf = (name: string) => name.replace(HASH_END, '');
-/** The genome hash a run's name carries (the first 8 characters, assigned by MARGIE from the genome's DNA); '' without one. */
+/** The start of the genome hash a run's name carries (assigned by MARGIE from the genome's DNA); '' without one. */
 export const hashOf = (name: string) => name.match(HASH_END)?.[1] ?? '';
 /** What the genome hash is, where it is shown. */
 export const HASH_NOTE = "Genome hash: assigned by MARGIE from the genome's DNA. Tables and result files name the genome <name>--<hash>, so genomes that share a file name stay apart.";

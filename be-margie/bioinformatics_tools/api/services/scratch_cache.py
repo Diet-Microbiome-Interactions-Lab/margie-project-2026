@@ -30,7 +30,7 @@ def folder(conn, user: dict) -> str:
 
 def backup(conn, user: dict, key: tuple) -> tuple:
     """read_cache's (load, save) for key: the copy kept under the working folder."""
-    digest = hashlib.sha1(repr(key[1:]).encode()).hexdigest()[:12]
+    digest = hashlib.sha256(repr(key[1:]).encode()).hexdigest()
     name = f"{key[1]}-{digest}.json"
 
     def load():

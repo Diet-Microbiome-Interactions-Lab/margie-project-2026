@@ -88,15 +88,17 @@ def name_clashes(db_path: str, genome_files: dict[str, str]) -> list[str]:
             if name in known and not known[name] & set(fasta_hashes(path))]
 
 
-# A genome's name in a run and its results: its file's name, two dashes and the first 8 characters
-# of its genome hash (coli--fa1:a1b2; coli--a1b2c3d4 from older runs), so genomes that share a file
-# name stay apart everywhere.
-NAMED_WITH_HASH = re.compile(r'--(fa1:[0-9a-f]{4}|[0-9a-f]{8})$')
+# A genome's name in a run and its results: its file's name, two dashes, "fa1:" and the first 8
+# hexadecimal digits of its genome hash (coli--fa1:a1b2c3d4), so genomes that share a file name stay
+# apart. The name is a label: tables, caches and the cross-genome references identify a genome by
+# its full hash. Older runs named genomes coli--fa1:a1b2 or coli--a1b2c3d4.
+NAME_HASH_DIGITS = 8
+NAMED_WITH_HASH = re.compile(r'--(fa1:[0-9a-f]{8}|fa1:[0-9a-f]{4}|[0-9a-f]{8})$')
 
 
 def name_with_hash(name: str, path: str) -> str:
-    """<name>--<the first 8 characters of the genome's hash>; a name that already ends in its own is kept."""
-    short = fasta_hashes(path)[0][:8]
+    """<name>--fa1:<the first 8 hexadecimal digits of the genome's hash>; a name that already ends in its own is kept."""
+    short = fasta_hashes(path)[0][:len('fa1:') + NAME_HASH_DIGITS]
     return name if name.endswith(f'--{short}') else f'{NAMED_WITH_HASH.sub("", name)}--{short}'
 
 
@@ -130,7 +132,7 @@ def merged_inputs_fingerprint(genome_dir: str) -> str:
             for chunk in iter(lambda: fh.read(1 << 20), b''):
                 digest.update(chunk)
         digest.update(b'\0')
-    return digest.hexdigest()[:16]
+    return digest.hexdigest()
 
 
 def input_keyed(key: str) -> bool:

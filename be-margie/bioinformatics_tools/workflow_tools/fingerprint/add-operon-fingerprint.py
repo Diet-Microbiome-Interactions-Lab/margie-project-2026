@@ -25,9 +25,9 @@ _NOT_IN_OPERON = "NOT_IN_AN_OPERON"
 _OPERON_PREFIX = "operon_"
 
 
-def _hash16(s: str) -> str:
-    """Returns the first 16 hex characters of the string's SHA-256 (hashlib)."""
-    return hashlib.sha256(s.encode("utf-8")).hexdigest()[:16]
+def _sha256(s: str) -> str:
+    """Returns the string's SHA-256 in hexadecimal (hashlib), all 64 digits."""
+    return hashlib.sha256(s.encode("utf-8")).hexdigest()
 
 
 def parse_hash_label(fingerprint_value: str) -> tuple[str, str] | None:
@@ -90,10 +90,10 @@ def main() -> None:
         ordered_hashes = [gene_hash_label[fid][0] for fid in ordered_fids]
         ordered_labels = [gene_hash_label[fid][1] for fid in ordered_fids]
 
-        evidence_ordered_hash = _hash16(" | ".join(ordered_hashes))
-        evidence_composition_hash = _hash16(" | ".join(sorted(ordered_hashes)))
-        label_ordered_hash = _hash16(" | ".join(ordered_labels))
-        label_composition_hash = _hash16(" | ".join(sorted(ordered_labels)))
+        evidence_ordered_hash = _sha256(" | ".join(ordered_hashes))
+        evidence_composition_hash = _sha256(" | ".join(sorted(ordered_hashes)))
+        label_ordered_hash = _sha256(" | ".join(ordered_labels))
+        label_composition_hash = _sha256(" | ".join(sorted(ordered_labels)))
         members_in_order = " -> ".join(ordered_labels)
         gene_pattern_hashes = " | ".join(ordered_hashes)
 

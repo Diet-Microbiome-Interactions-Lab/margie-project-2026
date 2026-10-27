@@ -30,9 +30,9 @@ _ALL_IDS_DESC_TOOLS = [
 ]
 
 
-def _hash16(s: str) -> str:
-    """Returns the first 16 hex characters of the string's SHA-256 (hashlib)."""
-    return hashlib.sha256(s.encode("utf-8")).hexdigest()[:16]
+def _sha256(s: str) -> str:
+    """Returns the string's SHA-256 in hexadecimal (hashlib), all 64 digits."""
+    return hashlib.sha256(s.encode("utf-8")).hexdigest()
 
 
 def _all_slots_empty(fingerprint_values: str) -> bool:
@@ -124,7 +124,7 @@ def main() -> None:
 
         for row in reader:
             values = build_fingerprint_values(row)
-            h = _hash16(values)
+            h = _sha256(values)
             label = row.get("best_consensus_product_descriptor", "")
             identity = {col: row.get(col, "") for col in _KEPT_COLUMNS}
             scores = build_scores_token(score_by_fid.get(row.get("feature_id", "")))

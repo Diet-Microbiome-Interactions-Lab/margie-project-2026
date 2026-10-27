@@ -1939,7 +1939,7 @@ def _job_report_paths(current_user: dict, conn, run_id: str) -> tuple[str, str, 
     except Exception:
         raise HTTPException(status_code=400, detail="Configuration file not found. Create your configuration first.")
     folder = f"{_stores_call(user_stores.scratch_root, conn, user_config)}/{JOB_REPORTS}"
-    stem = re.sub(r"[^A-Za-z0-9]", "", run_id)[:8]
+    stem = re.sub(r"[^A-Za-z0-9]", "", run_id)
     return f"{folder}/MARGIE-job-report-{stem}.pdf", f"{folder}/.work-{stem}", user_config
 
 

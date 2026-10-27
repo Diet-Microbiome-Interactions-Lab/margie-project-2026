@@ -3,10 +3,10 @@
 
 Adds the genome's labeled-genes-fingerprint-hash-label.tsv counts to
 fingerprint-database.tsv incrementally, under an fcntl lock, written through a
-temporary file and os.replace. A genome is known by the genome hash ending its
-name (pool_members.genome_key): one already in the database, under this name or
-another, has its previous entries replaced, so it counts once and follows its
-current annotation. Columns: pattern_id, fingerprint_hash, fingerprint_label,
+temporary file and os.replace. A genome is known by its full genome hash
+(--genome-hash, kept in fingerprint-database.tsv.genomes.tsv): one already in the
+database, under this name or another, has its previous entries replaced, so it
+counts once and follows its current annotation. Columns: pattern_id, fingerprint_hash, fingerprint_label,
 fingerprint_frequency (genes with this pattern), fingerprint_label_frequency
 (genes with this label), organisms ("|"-joined), organism_counts (each
 genome's genes with this pattern, "name=count" joined by "|").
@@ -61,20 +61,20 @@ def read_new_genome(hash_label_tsv: Path, organism: str) -> dict[str, int]:
 
 
 def update_database(counts: dict[str, int], labels: dict[str, str], organism: str,
-                     db_tsv: Path) -> None:
+                     db_tsv: Path, genome_hash: str = "") -> None:
     """Runs _do_update while holding an exclusive fcntl lock on a sibling .lock file."""
     db_tsv.parent.mkdir(parents=True, exist_ok=True)
     lock_path = db_tsv.with_suffix(".lock")
     with open(lock_path, "w") as lock_fh:
         fcntl.flock(lock_fh, fcntl.LOCK_EX)
         try:
-            _do_update(counts, labels, organism, db_tsv)
+            _do_update(counts, labels, organism, db_tsv, genome_hash)
         finally:
             fcntl.flock(lock_fh, fcntl.LOCK_UN)
 
 
 def _do_update(new_counts: dict[str, int], new_labels: dict[str, str], organism: str,
-                db_tsv: Path) -> None:
+                db_tsv: Path, genome_hash: str = "") -> None:
     """Merges new counts into the database TSV, replacing the genome's previous entries, and writes it and its metadata JSON atomically.
 
     Runs under the lock taken by update_database().
@@ -93,7 +93,8 @@ def _do_update(new_counts: dict[str, int], new_labels: dict[str, str], organism:
                 }
 
     # A genome counts once, by its genome hash: its previous entries (any name) are replaced.
-    M.remove_genome(patterns, organism, "gene_count", _LOG)
+    members = M.load_members(db_tsv)
+    previous = M.remove_genome(patterns, organism, "gene_count", _LOG, genome_hash, members)
 
     next_id = M.next_pattern_number(patterns)
     for h, count in new_counts.items():
@@ -132,6 +133,10 @@ def _do_update(new_counts: dict[str, int], new_labels: dict[str, str], organism:
                 M.format_counts(pdata["counts"]),
             ])
     M.write_atomic(db_tsv, _write)
+    for name in previous:
+        members.pop(name, None)
+    members[organism] = genome_hash or M.genome_key(organism)
+    M.save_members(db_tsv, members)
 
     meta_path = db_tsv.parent / "fingerprint-database-metadata.json"
     meta = {
@@ -154,6 +159,8 @@ def main() -> None:
     parser.add_argument("--organism", required=True, help="organism identifier to stamp in the pool")
     parser.add_argument("--fingerprint-database", required=True,
                         help="shared fingerprint-database.tsv path (created if absent, updated in place)")
+    parser.add_argument("--genome-hash", default="",
+                        help="the genome's full hash (fa1: and 64 hexadecimal digits); without it, the hash ending its name")
     args = parser.parse_args()
 
     hash_label_path = Path(args.hash_label_input)
@@ -166,7 +173,7 @@ def main() -> None:
     print(f"[update-fingerprint-database] {args.organism}: {sum(counts.values())} genes, "
           f"{len(counts)} distinct patterns")
     print(f"[update-fingerprint-database] Updating: {db_path}")
-    update_database(counts, labels, args.organism, db_path)
+    update_database(counts, labels, args.organism, db_path, args.genome_hash)
     print(f"[update-fingerprint-database] Done.")
 
 
