@@ -3,7 +3,8 @@
 
 C1 = informative sources / 7, over RAST, KEGG, EGGNOG, COG, PFAM, UNIPROT and
 one TIGRFAM cluster slot (PGAP/TIGRFAM/NCBIfam share models). A hit counts only
-if its description is informative. HAMAP, PIRSF, CDD and GENEPROP overlap the
+if its description is informative; the cluster slot counts when TIGRFAM, PGAP or
+NCBIfam (looked at in that order) gives an informative one, and names it. HAMAP, PIRSF, CDD and GENEPROP overlap the
 counted tools, and MEROPS/TCDB/DBCAN cover few genes, so none are counted.
 Writes the score, count, contributing tools and a "k/7 = x" formula per gene.
 """
@@ -18,6 +19,8 @@ csv.field_size_limit(10_000_000)
 # Independent decision tools; TIGRFAM/PGAP/NCBIfam count as one slot.
 STANDALONE_DECISION_TOOLS = ["RAST", "COG", "PFAM", "KEGG", "EGGNOG", "UNIPROT"]
 TIGRFAM_CLUSTER_SLOT = "TIGRFAM_CLUSTER"
+# The slot's members, in the order add-cluster-agreement.py prefers them.
+TIGRFAM_CLUSTER_MEMBERS = ["TIGRFAM", "PGAP", "NCBIFAM"]
 DECISION_TOOLS = STANDALONE_DECISION_TOOLS + [TIGRFAM_CLUSTER_SLOT]
 
 _IDENTITY_COLUMNS = [
@@ -29,10 +32,7 @@ _IDENTITY_COLUMNS = [
 ]
 
 # ─── Uninformative hit category ──────────────────────────────────────────────
-# Descriptions matching these groups name no function and count 0 toward C1.
-# Kept identical to labeling/assign-canonical-label.py. Only an activity word
-# (…ase, transport, regulator, …) rescues an unknown-function phrase; location
-# words do not.
+# No-function descriptions count 0 toward C1; mirrors assign-canonical-label.py.
 
 # Group 1 — exact null / boilerplate tokens.
 _UNINFORMATIVE = frozenset({
@@ -73,7 +73,7 @@ _PROTEIN_DOMAINS_DUF_RE = re.compile(r'^\s*protein containing domains?\s+duf', r
 _HYPOTHETICAL_ANYWHERE_RE = re.compile(r'\bhypothetical\b', re.IGNORECASE)
 _PROTEIN_CONSERVED_IN_BACTERIA_RE = re.compile(r'\bprotein\s+conserved\s+in\s+bacteria\b', re.IGNORECASE)
 _INTEGRAL_MEMBRANE_PROTEIN_RE = re.compile(r'^\s*integral\s+membrane\s+protein\s*$', re.IGNORECASE)
-# Function-word guard for Groups 3 & 7 (activity words only, no location words).
+# Function-word guard for Groups 3 & 7 (activity words, not location words).
 _FUNCTION_SIGNAL_RE = re.compile(
     r'(ase\b|transport|permease|pump|export|import|channel|carrier|symport|antiport|'
     r'bind|synth|kinas|reductas|hydrolas|transferas|isomeras|ligas|lyas|mutas|oxidas|'
@@ -121,15 +121,18 @@ def is_uninformative(val: str) -> bool:
 
 
 def compute_c1(labeled_row, cluster_row):
-    """Returns (C1 score, contributing tools) from best-hit descriptions and the TIGRFAM cluster status."""
+    """Returns (C1 score, contributing tools) from each tool's best-hit description (cluster_row: the caller's join, for its columns)."""
     informative_tools = []
     for tool in STANDALONE_DECISION_TOOLS:
         desc = labeled_row.get("RAST_description", "") if tool == "RAST" \
             else labeled_row.get(f"{tool}_best_hit_description", "")
         if desc and not is_uninformative(desc):
             informative_tools.append(tool)
-    if cluster_row.get("tigrfam_cluster_status", "no_evidence") != "no_evidence":
-        informative_tools.append(TIGRFAM_CLUSTER_SLOT)
+    # The shared slot: the first of its members whose best hit is informative ("hypothetical" counts for nothing).
+    member = next((t for t in TIGRFAM_CLUSTER_MEMBERS
+                   if not is_uninformative(labeled_row.get(f"{t}_best_hit_description", "") or "")), None)
+    if member:
+        informative_tools.append(f"{TIGRFAM_CLUSTER_SLOT}({member})")
     return len(informative_tools) / len(DECISION_TOOLS), informative_tools
 
 

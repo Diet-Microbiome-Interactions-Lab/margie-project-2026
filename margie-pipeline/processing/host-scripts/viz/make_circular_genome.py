@@ -3,7 +3,7 @@
 matplotlib from FINAL_ANNOTATION_WITH_CONFIDENCE.tsv.
 
 Everything comes from the FINAL table; only GC% is computed, from the per-gene
-nucleotide sequences:
+nucleotide sequences. A key under the legend names each ring and the GC line:
   * replicon / contig identity   <- parsed from gene_id  (<accession>_<start><strand><len>)
   * gene arc                      <- RAST_start / RAST_end / RAST_strand
   * ring colour                   <- CONFIDENCE_TIER
@@ -43,8 +43,10 @@ TIER = [
     ("NOT_APPLICABLE_NON_CODING", "#bdbdbd"),
 ]
 TCOL = dict(TIER)
-# Review-flag colour, separate from the tier colours; matches FLAG in gen_genome_viewer.py.
+# Review-flag colour; matches FLAG in gen_genome_viewer.py.
 REVIEW_COL = "#b32b1e"
+# Prophage, repeat and CRISPR regions, under the genes; matches REGION in gen_genome_viewer.py.
+REGION_COL = "#e6e6e1"
 GAP_DEG = 4.0                 # angular gap between replicons/contigs
 GAP_BUDGET_DEG = 40.0         # total gap angle, so many-contig drafts still fit in 360 deg
 MIN_SPAN_DEG = 4.0            # floor so a tiny plasmid/contig is still visible
@@ -63,8 +65,7 @@ GC_AMP = 0.13                        # GC deviation amplitude
 GC_SCALE = 0.09                      # GC deviation (frac) mapped to full amplitude
 
 
-# Gene-call columns carry the caller's prefix (RAST_start, PRODIGAL_start), so
-# they are matched by the part after the prefix.
+# Gene-call columns carry the caller's prefix, so they match on the suffix.
 GENE_CALLERS = ("rast", "rasttk", "prodigal")
 
 
@@ -108,7 +109,7 @@ def main():
     rows = [r for r in csv.DictReader(open(final, newline=""), delimiter="\t")]
     organism = col(rows[0], "organism_name")
 
-    # group genes by contig, record contig length = max end
+    # Groups genes by contig; contig length = max end.
     contigs = {}
     for r in rows:
         gid = col(r, "gene_id")
@@ -129,8 +130,7 @@ def main():
     gap_deg = min(GAP_DEG, GAP_BUDGET_DEG / n_gap)
     span_total = 360.0 - n_gap * gap_deg                        # angle available for sequence
 
-    # Span per contig proportional to length, with a floor capped at half the
-    # per-contig share so the arcs still close at 360.
+    # Spans scale with length; the floor is capped so the arcs still close at 360.
     min_span = min(MIN_SPAN_DEG, 0.5 * span_total / n_gap)
     floored = [c for c in order if span_total * contigs[c]["len"] / total_len < min_span]
     fixed = len(floored) * min_span
@@ -138,7 +138,7 @@ def main():
     rest = max(span_total - fixed, 0.0)
     spans = {c: (min_span if c in floored else rest * contigs[c]["len"] / big_len) for c in order}
 
-    # assign each contig a start angle going clockwise from START_DEG
+    # Assigns each contig a start angle clockwise from START_DEG.
     layout, cur = {}, START_DEG
     for c in order:
         cur -= gap_deg                                          # gap precedes each contig
@@ -150,11 +150,11 @@ def main():
         s0, span = layout[c]
         return s0 - span * (pos / contigs[c]["len"])           # clockwise: decreasing angle
 
-    fig, ax = plt.subplots(figsize=(11, 11))
+    fig, ax = plt.subplots(figsize=(11, 12))
     fig.patch.set_facecolor("white"); ax.set_facecolor("white")
-    ax.set_xlim(-1.36, 1.36); ax.set_ylim(-1.42, 1.30); ax.set_aspect("equal"); ax.axis("off")
+    ax.set_xlim(-1.36, 1.36); ax.set_ylim(-1.74, 1.30); ax.set_aspect("equal"); ax.axis("off")
 
-    # genome-wide mean GC (length-weighted) for the deviation baseline
+    # Length-weighted genome-wide mean GC, the deviation baseline.
     tot_gc = tot_bp = 0.0
     for r in rows:
         seq = col(r, "RAST_na_sequence")
@@ -163,7 +163,7 @@ def main():
             tot_gc += g * len(seq); tot_bp += len(seq)
     gc_mean = tot_gc / tot_bp if tot_bp else 0.5
 
-    gene_patches, gene_colors, review_lines = [], [], []
+    gene_patches, gene_colors, review_lines, region_patches = [], [], [], []
     for c in order:
         for r in contigs[c]["genes"]:
             try:
@@ -173,6 +173,12 @@ def main():
             a_hi, a_lo = ang(c, s), ang(c, e)
             if a_hi < a_lo:
                 a_hi, a_lo = a_lo, a_hi
+            # Regions RASTtk reports beside the genes (prophages, repeats, CRISPR arrays): a pale
+            # band across both gene rings, drawn under the genes they hold.
+            ftype = col(r, "FEATURE_TYPE").strip().lower()
+            if ftype and ftype not in ("cds", "peg", "rna"):
+                region_patches.append(Wedge((0, 0), R_FWD1, a_lo, max(a_hi, a_lo + 0.04), width=R_FWD1 - R_REV0))
+                continue
             tier = col(r, "CONFIDENCE_TIER").strip() or "NOT_APPLICABLE_NON_CODING"
             color = TCOL.get(tier, "#b3b8bf")
             fwd = col(r, "RAST_strand").strip() != "-"
@@ -183,11 +189,13 @@ def main():
                 mid = (a_hi + a_lo) / 2
                 review_lines.append([xy(R_REV_TICK0, mid), xy(R_REV_TICK1, mid)])
 
-    ax.add_collection(PatchCollection(gene_patches, facecolor=gene_colors, edgecolor="none", antialiased=True))
+    if region_patches:
+        ax.add_collection(PatchCollection(region_patches, facecolor=REGION_COL, edgecolor="none", zorder=1))
+    ax.add_collection(PatchCollection(gene_patches, facecolor=gene_colors, edgecolor="none", antialiased=True, zorder=2))
     if review_lines:
         ax.add_collection(LineCollection(review_lines, colors=REVIEW_COL, linewidths=0.7, alpha=0.9))
 
-    # GC ring: length-weighted mean GC in fixed-bp windows per contig -> smooth filled band
+    # GC ring: length-weighted mean GC in fixed-bp windows per contig.
     for c in order:
         L = contigs[c]["len"]
         nb = max(12, min(360, L // 6000))
@@ -225,7 +233,7 @@ def main():
         if spans[c] < TICK_MIN_SPAN_DEG:
             continue          # hairline arc
         step = 1_000_000 if L > 3_000_000 else 500_000
-        # Tick numerals only when replicons are captioned; draft contigs all restart at 0.
+        # Numerals only when replicons are captioned; draft contigs restart at 0.
         show_nums = L >= 250_000 and len(order) <= MAX_LABELLED
         p = 0
         while p <= L:
@@ -237,8 +245,7 @@ def main():
                 ax.text(xt, yt, f"{p/1e6:.1f}", ha="center", va="center", fontsize=7.5, color="#000000")
             p += step
 
-    # Replicon captions only for 2..MAX_LABELLED replicons; draft contigs are
-    # identified in FINAL_GENOME_VIEWER.html instead.
+    # Captions only for 2..MAX_LABELLED replicons; the HTML viewer names contigs.
     if 1 < len(order) <= MAX_LABELLED:
         placed = []                                            # (angle, radius) already used
         for c in order:
@@ -253,13 +260,13 @@ def main():
             ax.text(xl, yl, f"{c}\n{contigs[c]['len']/1e6:.2f} Mb", ha="center", va="center",
                     fontsize=fs, color="#000000", linespacing=0.95)
 
-    # centre block: stats only (the genome identifier / filename is the figure title)
+    # Centre block: stats only; the genome identifier is the figure title.
     n_flag = sum(1 for r in rows if col(r, "NEEDS_REVIEW?").strip().lower() == "yes")
-    ax.text(0, 0.05, f"{total_len/1e6:.2f} Mb · {len(rows):,} genes", ha="center", va="center",
+    ax.text(0, 0.05, f"{total_len/1e6:.2f} Mb | {len(rows):,} genes", ha="center", va="center",
             fontsize=13, color="#000000")
-    # many pieces means a draft assembly, so they are called contigs
+    # Many pieces means a draft assembly, so they are called contigs.
     unit = "contig" if len(order) > MAX_LABELLED else "replicon"
-    ax.text(0, -0.05, f"{len(order)} {unit}{'s' if len(order) > 1 else ''} · "
+    ax.text(0, -0.05, f"{len(order)} {unit}{'s' if len(order) > 1 else ''} | "
             f"{n_flag:,} flagged for review", ha="center", va="center", fontsize=11.5, color="#000000")
 
     # tier legend (bottom), only tiers actually present
@@ -273,6 +280,19 @@ def main():
         lx += 0.05 + 0.022 * len(lab) + 0.055
     ax.plot([lx + 0.022], [-1.322], marker="|", color=REVIEW_COL, ms=12, mew=1.6)
     ax.text(lx + 0.05, -1.322, "review flag", ha="left", va="center", fontsize=10.5, color="#000000")
+
+    # Key: what each ring and the centre line show.
+    big = max(order, key=lambda c: contigs[c]["len"])
+    win_kb = contigs[big]["len"] / max(12, min(360, contigs[big]["len"] // 6000)) / 1000
+    key = [
+        "Rings, outside in:  black band, the replicons (positions in Mb)  |  genes on the + strand  |  genes on the − strand",
+        "Gene rings coloured by confidence tier  |  dark red ticks: genes flagged for review"
+        + (f"  |  pale grey band: {len(region_patches)} prophage or repeat region{'s' if len(region_patches) != 1 else ''}" if region_patches else ""),
+        f"Centre line: GC content in {win_kb:.0f} kb windows; outside the grey circle is above the genome's mean GC "
+        f"({gc_mean * 100:.1f}%), inside below",
+    ]
+    for k, text in enumerate(key):
+        ax.text(0, -1.45 - 0.075 * k, text, ha="center", va="center", fontsize=9.6, color="#333333")
 
     ax.set_title(organism, fontsize=14, color=INK, pad=6)   # genome identifier / filename as the title
     out = Path(out); out.parent.mkdir(parents=True, exist_ok=True)

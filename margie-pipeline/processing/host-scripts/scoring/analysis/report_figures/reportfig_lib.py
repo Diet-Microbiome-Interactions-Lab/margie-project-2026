@@ -1,12 +1,13 @@
 #!/usr/bin/env python3
-"""reportfig_lib.py -- shared loading, styling and drawing for the report figures.
+"""reportfig_lib.py - shared foundation for the post-scoring report figures.
 
-Reads finished scoring outputs and the depot operon reference with pandas and
-draws with matplotlib; never writes into scoring folders. Figures describe what
-is plotted in plain language, and each PNG (>= 400 dpi) has a TSV of its numbers.
+Reads only finished per-organism scoring outputs and the depot operon reference,
+never writes into scoring folders, and provides the style, layout, data loading,
+gene-track and operon-page drawing used by every report figure (PNG plus TSV).
 """
 from __future__ import annotations
 
+import json
 import os
 import re
 import sys
@@ -20,7 +21,7 @@ from matplotlib.patches import FancyBboxPatch, Polygon, Rectangle  # noqa: E402
 import numpy as np  # noqa: E402
 import pandas as pd  # noqa: E402
 
-# Uses c3_lib's descriptor cleaning and uninformative gate so gene identity matches scoring.
+# Shares c3_lib's descriptor cleaning so gene identity matches scoring.
 _C3_DIR = Path(__file__).resolve().parent.parent  # .../scoring/analysis
 _SCORING_DIR = _C3_DIR.parent                      # .../scoring
 for _p in (str(_SCORING_DIR), str(_C3_DIR / "c3_figures")):
@@ -32,20 +33,16 @@ try:
     is_uninformative = _c3lib.is_uninformative
 except Exception:  # pragma: no cover - fall back to a minimal cleaner
     def clean_descriptor(desc: str) -> str:
-        """Returns the descriptor without "##" suffix or a leading "SOURCE:" tag (regex)."""
         d = (desc or "").split("##")[0].strip()
         return re.sub(r"^[A-Za-z0-9 _()-]+:\s*", "", d).strip()
 
     def is_uninformative(desc: str) -> bool:
-        """Returns True for empty or hypothetical/unknown descriptors."""
         d = (desc or "").strip().lower()
         return (not d) or d in {"hypothetical protein", "unknown", "uncharacterized protein"}
 
 DPI = 400
 
-# ---------------------------------------------------------------------------
-# Palette -- saturated hues; categorical colours are assigned in fixed order.
-# ---------------------------------------------------------------------------
+# ---- palette ----
 BLUE = "#1f77ff"
 ORANGE = "#ff8c00"
 GREEN = "#00b84d"
@@ -69,7 +66,7 @@ DARKRED = "#8b0000"   # "lowered by operon context"
 RAISED, LOWERED = OLIVE, DARKRED
 CATEGORICAL = [BLUE, ORANGE, GREEN, RED, PURPLE, CYAN, AMBER, TEAL, PINK, LIME]
 
-# Confidence tiers in fixed order (best -> worst), one hue each; non-coding is grey.
+# Confidence tiers, best to worst; non-coding genes are grey.
 CONF_TIER_ORDER = ["highest", "high", "medium", "fair", "low"]
 CONF_TIER_COLOR = {
     "highest": "#1f77ff",
@@ -81,7 +78,7 @@ CONF_TIER_COLOR = {
 NONCODING_TIER = "NOT_APPLICABLE_NON_CODING"
 NONCODING_COLOR = LIGHTGREY
 
-# Component colours used in every figure.
+# Fixed colours for the confidence components.
 COMPONENT_COLOR = {
     "C1": BLUE, "C2": ORANGE, "C3": GREEN, "C4": PURPLE,
     "preliminary": CYAN, "final": "#1f4fff",
@@ -93,15 +90,15 @@ COMPONENT_LABEL = {
     "C4": "C4  EC-number agreement",
 }
 
-# Serif preference: Times New Roman, metric-compatible substitutes, then DejaVu Serif.
+# Serif preference: Times New Roman, metric clones, then DejaVu Serif.
 _SERIF = ["Times New Roman", "Nimbus Roman No9 L", "Nimbus Roman",
           "Liberation Serif", "Tinos", "Times", "DejaVu Serif"]
 
-# Sans-serif preference: Helvetica/Arial and their metric clones, then DejaVu Sans.
+# Sans-serif preference: Helvetica/Arial or their clones, then DejaVu Sans.
 _SANS = ["Helvetica", "Nimbus Sans", "Arial", "Liberation Sans",
          "TeX Gyre Heros", "DejaVu Sans"]
 
-# Font files registered with matplotlib when present (its default cache omits these dirs).
+# Registered explicitly; matplotlib's font cache omits these directories.
 _FONT_FILES = [
     "/usr/share/fonts/urw-base35/NimbusSans-Regular.otf",
     "/usr/share/fonts/urw-base35/NimbusSans-Bold.otf",
@@ -110,7 +107,7 @@ _FONT_FILES = [
     "/usr/share/fonts/liberation-sans/LiberationSans-Regular.ttf",
     "/usr/share/fonts/liberation-sans/LiberationSans-Bold.ttf",
     "/usr/share/fonts/liberation-sans/LiberationSans-Italic.ttf",
-    # serif (Times-metric clones)
+    # Times-metric serif clones.
     "/usr/share/fonts/urw-base35/NimbusRoman-Regular.otf",
     "/usr/share/fonts/urw-base35/NimbusRoman-Bold.otf",
     "/usr/share/fonts/urw-base35/NimbusRoman-Italic.otf",
@@ -149,7 +146,7 @@ _STYLE = {
     "savefig.dpi": DPI,
     "savefig.facecolor": "white",
     "axes.grid": False,          # no grids anywhere
-    # mathtext italicises scientific names in non-bold serif italic.
+    # mathtext italicises scientific names in a non-bold serif.
     "mathtext.fontset": "custom",
     "mathtext.rm": "serif",
     "mathtext.it": "serif:italic",
@@ -159,7 +156,7 @@ _STYLE = {
 
 
 def _register_fonts() -> None:
-    """Registers the listed font files with matplotlib's font_manager, skipping missing ones."""
+    """Registers the bundled font files with matplotlib, skipping missing ones."""
     from matplotlib import font_manager as fm
     for p in _FONT_FILES:
         try:
@@ -170,29 +167,26 @@ def _register_fonts() -> None:
 
 
 def apply_style() -> None:
-    """Registers fonts and applies the report rcParams."""
+    """Registers fonts and applies the shared matplotlib rcParams."""
     _register_fonts()
     plt.rcParams.update(_STYLE)
 
 
-# ---------------------------------------------------------------------------
-# Layout helpers
-# ---------------------------------------------------------------------------
+# ---- layout helpers ----
 def panel_letter(ax, letter: str) -> None:
-    """Draws "(a)" at the panel's top-left, left of and below the centred title."""
+    """Draws "(letter)" at the top-left corner, below and left of the panel title."""
     ax.text(-0.065, 1.012, f"({letter})", transform=ax.transAxes,
             fontsize=15, fontweight="bold", va="bottom", ha="left",
             color=INK, clip_on=False)
 
 
 def set_title(ax, text: str) -> None:
-    """Sets a bold centred panel title padded above the panel letter."""
+    """Sets a bold centred title, padded to clear the panel letter."""
     ax.set_title(text, pad=26, loc="center", fontweight="bold")
 
 
-# ---------------------------------------------------------------------------
-# Provenance line -- the operon-database pool under each figure title, set once
-# per run with set_provenance() and drawn by finish() and the raw-suptitle figures.
+# ---- provenance line ----
+# Set once per run with set_provenance(); drawn under every figure title.
 _PROVENANCE: str | None = None
 
 
@@ -202,14 +196,18 @@ def set_provenance(text: str | None) -> None:
     _PROVENANCE = text
 
 
-def provenance_text(pool_organisms: int, stats=None, leave_one_out: bool = False) -> str:
-    """Builds the provenance text for the operon-database pool.
+def provenance_text(pool_organisms: int, stats=None, leave_one_out: bool = False,
+                    missing: str | None = None) -> str:
+    """Returns the provenance text describing the operon-database pool.
 
-    stats is an aggregate_pool_stats() dict or a bare total gene count;
-    leave_one_out notes that this organism is excluded from the pool.
-    """
+    stats is an aggregate_pool_stats() dict or a bare total-gene int; leave_one_out
+    notes that the candidate genome was excluded from the pool; missing names an operon
+    reference that could not be read (comparison_pool), whose figures say so."""
     loo = (" | this candidate genome EXCLUDED from the pool (leave-one-out, "
            "avoids candidate-self bias)" if leave_one_out else "")
+    if missing is not None:
+        return (f"(operon reference not found: {missing} | the pool is the {pool_organisms:,} genomes "
+                f"of the operon fingerprint database{loo})")
     if isinstance(stats, dict):
         return (f"(operon-database pool: {pool_organisms:,} genomes | "
                 f"{stats.get('total_genes', 0):,} genes | "
@@ -222,7 +220,7 @@ def provenance_text(pool_organisms: int, stats=None, leave_one_out: bool = False
 
 
 def draw_provenance_line(fig, y: float, fontsize: float = 9.3):
-    """Draws the provenance line at figure-fraction y when set and returns the artist, else None."""
+    """Draws the provenance line at figure-fraction y and returns the artist, or None if unset."""
     if not _PROVENANCE:
         return None
     return fig.text(0.5, y, _PROVENANCE, ha="center", va="top", fontsize=fontsize,
@@ -230,7 +228,7 @@ def draw_provenance_line(fig, y: float, fontsize: float = 9.3):
 
 
 def pool_total_genes(run_root, organisms) -> int:
-    """Returns the total gene count across the organisms' scored outputs, skipping missing ones."""
+    """Returns the total gene count over the organisms' scored output, skipping missing ones."""
     total = 0
     for org in organisms:
         try:
@@ -243,19 +241,17 @@ def pool_total_genes(run_root, organisms) -> int:
 def finish(fig, suptitle: str | None = None, organism: str | None = None,
            top: float = 0.93, h_pad: float = 2.6, w_pad: float = 2.8,
            band: float | None = None) -> None:
-    """Lays out the figure with tight_layout and reserves a title band of `band` inches.
+    """Lays out the figure and reserves a title band of `band` inches.
 
-    Draws the suptitle, the organism line when given, and the provenance line.
-    """
+    Draws the suptitle, an optional italic organism line and the provenance line."""
     if not suptitle and not organism:
         fig.tight_layout(h_pad=h_pad, w_pad=w_pad)
         return
-    # tight_layout(rect=) ignores the band with gene-track axes, so panels are laid
-    # out first and the band is reserved with subplots_adjust.
+    # tight_layout(rect=) ignores the band under gene tracks; reserved manually.
     fh = max(fig.get_figheight(), 3.0)
     b = band if band is not None else (1.55 if organism else 1.4)
     if _PROVENANCE:
-        b += 0.30  # extra headroom for the provenance line under the title
+        b += 0.30  # headroom for the provenance line
     try:
         fig.tight_layout(h_pad=h_pad, w_pad=w_pad)
     except Exception:
@@ -275,13 +271,12 @@ def finish(fig, suptitle: str | None = None, organism: str | None = None,
 
 
 def savefig(fig, path: Path, dpi: int = DPI) -> None:
-    """Saves the figure as PNG, cropping to a padded tight bbox that includes title and footer artists."""
+    """Saves the figure cropped to its content plus any registered title/footer artists."""
     path = Path(path)
     path.parent.mkdir(parents=True, exist_ok=True)
     extra = getattr(fig, "_report_extra_artists", None)
     if extra:
-        # bbox_inches="tight" remaps figure-fraction artists, so the tight bbox is
-        # computed once with the title/footer artists and suptitle, then used as is.
+        # Crop box built once, including the suptitle get_tightbbox would drop.
         r = fig.canvas.get_renderer()
         fig.draw(r)
         arts = list(extra)
@@ -298,7 +293,7 @@ def savefig(fig, path: Path, dpi: int = DPI) -> None:
 
 
 def write_tsv(df: pd.DataFrame, path: Path) -> None:
-    """Writes a DataFrame as a TSV with pandas."""
+    """Writes df as a TSV, creating the parent directory."""
     path = Path(path)
     path.parent.mkdir(parents=True, exist_ok=True)
     df.to_csv(path, sep="\t", index=False)
@@ -313,7 +308,7 @@ def short_desc(desc: str, maxlen: int = 26) -> str:
 
 
 def short_organism(org: str) -> str:
-    """Abbreviates an organism name by regex: 'Escherichia_coli_str._K-12...GCF_x' -> 'E. coli str. K-12'."""
+    """Returns a short name, e.g. 'Escherichia_coli_str._K-12...GCF_x' -> 'E. coli str. K-12'."""
     name = re.sub(r"_GCF_.*$", "", org or "").replace("_", " ").strip()
     parts = name.split()
     if len(parts) >= 2 and parts[0][:1].isupper():
@@ -328,11 +323,9 @@ _ORG_STRAINY = ("str", "substr", "strain", "biovar", "serovar", "pv")
 
 
 def italic_organism(org: str) -> str:
-    """Formats an organism name as mathtext with the scientific name in italics.
+    """Returns a mathtext organism label with the scientific name italic and strain upright.
 
-    Genus, epithets and 'Candidatus' use $\\mathit{...}$; strain designations and
-    the assembly accession (in parentheses) stay upright.
-    """
+    The assembly accession, if present, is appended in parentheses."""
     acc = re.search(r"(GC[AF]_\d+\.\d+)", org or "")
     name = re.sub(r"_GC[AF]_.*$", "", org or "").replace("_", " ").strip()
     toks = name.split()
@@ -375,7 +368,7 @@ def italic_organism(org: str) -> str:
 
 
 def organism_segments(org: str):
-    """Splits an organism name into [(text, is_italic)] segments: scientific name italic, strain/accession upright."""
+    """Returns [(text, is_italic)] segments of an organism name for offsetbox rendering."""
     acc = re.search(r"(GC[AF]_\d+\.\d+)", org or "")
     name = re.sub(r"_GC[AF]_.*$", "", org or "").replace("_", " ").strip()
     toks = name.split()
@@ -411,7 +404,7 @@ def organism_segments(org: str):
 
 
 def _organism_hpacker(org: str, fontsize: float):
-    """Returns a matplotlib HPacker of the organism segments in italic/upright text."""
+    """Returns an HPacker of the organism segments with real italics."""
     from matplotlib.offsetbox import TextArea, HPacker
     segs = organism_segments(org)
     boxes = [TextArea(t, textprops=dict(
@@ -421,7 +414,7 @@ def _organism_hpacker(org: str, fontsize: float):
 
 
 def draw_organism_line(fig, org: str, y: float = 0.945, fontsize: float = 15) -> None:
-    """Draws the organism name centred at figure-fraction y as a non-bold Text artist with mathtext italics."""
+    """Draws the non-bold organism name centred at figure-fraction y as a Text artist."""
     t = fig.text(0.5, y, italic_organism(org), ha="center", va="top",
                  fontsize=fontsize, fontweight="normal", color=INK)
     fig._report_extra_artists = getattr(fig, "_report_extra_artists", []) + [t]
@@ -429,7 +422,7 @@ def draw_organism_line(fig, org: str, y: float = 0.945, fontsize: float = 15) ->
 
 def draw_title(fig, description: str, org: str, fontsize_desc: float = 16,
                fontsize_org: float = 13.5, y: float = 0.998) -> None:
-    """Draws a bold description over the organism line as one top-centred matplotlib offsetbox."""
+    """Draws a bold description over the organism line as one top-centred offsetbox."""
     from matplotlib.offsetbox import TextArea, VPacker, AnnotationBbox
     desc = TextArea(description, textprops=dict(fontweight="bold",
                     fontsize=fontsize_desc, color=INK))
@@ -441,20 +434,17 @@ def draw_title(fig, description: str, org: str, fontsize_desc: float = 16,
     fig._report_extra_artists = getattr(fig, "_report_extra_artists", []) + [ab]
 
 
-# ---------------------------------------------------------------------------
-# Data loading -- finished scoring outputs only.
-# ---------------------------------------------------------------------------
+# ---- data loading (finished scoring outputs only) ----
 _CONF_FINAL = "scoring/scored-labeled-genes-confidence-final.tsv"
 _LABELED = "labeling/labeled-genes.tsv"
 _NOT_IN_OPERON = "NOT_IN_AN_OPERON"
 
-# reorganize_outputs.py may already have moved scoring/ and labeling/ into
-# per-tool-phased-output/, so files are resolved in both layouts.
+# Files resolve in both pre- and post-reorganize_outputs.py layouts.
 _PTP = "per-tool-phased-output"
 
 
 def _resolve_organism_file(base, rel):
-    """Returns the path of `rel` under an organism dir in either layout, or None."""
+    """Returns the path of rel under an organism dir in either layout, or None."""
     base = Path(base)
     for cand in (base / rel, base / _PTP / rel):
         if cand.is_file():
@@ -463,7 +453,7 @@ def _resolve_organism_file(base, rel):
 
 
 def _require_organism_file(base, rel):
-    """Returns the resolved path of `rel`, raising FileNotFoundError when absent."""
+    """Returns the path of rel in either layout, raising FileNotFoundError if absent."""
     p = _resolve_organism_file(base, rel)
     if p is None:
         raise FileNotFoundError(
@@ -474,7 +464,7 @@ def _require_organism_file(base, rel):
 
 
 def is_operon(oid) -> bool:
-    """Returns True only for a real operon id (starting with 'operon_')."""
+    """Returns True only for a real operon id (one starting with 'operon_')."""
     return bool(oid) and str(oid).startswith("operon_")
 
 _NUMERIC_COLS = [
@@ -486,13 +476,13 @@ _GENE_ID_RE = re.compile(r"^(.*)_(\d+)([+-])(\d+)$")
 
 
 def parse_contig(gene_id: str) -> str:
-    """Returns the contig part of a "<contig>_<start><strand><len>" gene_id (regex)."""
+    """Returns the contig part of a gene_id, or the id itself when it does not parse."""
     m = _GENE_ID_RE.match(gene_id or "")
     return m.group(1) if m else (gene_id or "")
 
 
 def discover_organisms(run_root: Path) -> list[str]:
-    """Returns organism names under the run that have a confidence-final file, in either layout."""
+    """Returns organism stems under the run that have a confidence-final scoring file."""
     run_root = Path(run_root)
     out = set()
     # pre-reorganize:  <organism>/scoring/...
@@ -505,7 +495,7 @@ def discover_organisms(run_root: Path) -> list[str]:
 
 
 def _coerce_numeric(df: pd.DataFrame) -> pd.DataFrame:
-    """Converts the known score columns to numbers with pandas.to_numeric."""
+    """Converts the known score columns to numbers in place."""
     for c in _NUMERIC_COLS:
         if c in df.columns:
             df[c] = pd.to_numeric(df[c], errors="coerce")
@@ -513,10 +503,9 @@ def _coerce_numeric(df: pd.DataFrame) -> pd.DataFrame:
 
 
 def load_organism_genes(run_root: Path, organism: str) -> pd.DataFrame:
-    """Loads one organism's confidence-final table joined to labeled-genes coordinates (pandas merge).
+    """Returns one row per gene: confidence-final scores and operon info joined to coordinates.
 
-    Adds clean_desc, uninformative, in_operon, contig and organism columns.
-    """
+    Adds clean_desc, uninformative, in_operon and contig."""
     run_root = Path(run_root)
     base = run_root / organism
     conf = pd.read_csv(_require_organism_file(base, _CONF_FINAL), sep="\t", dtype=str,
@@ -543,7 +532,7 @@ def load_organism_genes(run_root: Path, organism: str) -> pd.DataFrame:
 
 
 def load_all_genes(run_root: Path, organisms: list[str] | None = None) -> pd.DataFrame:
-    """Concatenates load_organism_genes() for every organism, skipping unreadable ones."""
+    """Returns the concatenated gene tables of the organisms, skipping ones that fail to load."""
     run_root = Path(run_root)
     organisms = organisms or discover_organisms(run_root)
     frames = []
@@ -557,12 +546,11 @@ def load_all_genes(run_root: Path, organisms: list[str] | None = None) -> pd.Dat
     return pd.concat(frames, ignore_index=True)
 
 
-# ---- operons with ordered members + coordinates -------------------------------
+# ---- operons with ordered members and coordinates ----
 def build_operons(genes: pd.DataFrame) -> pd.DataFrame:
-    """Returns one row per operon (pandas groupby) with ordered members, coordinates, scores and size.
+    """Returns one row per operon with ordered members, coordinates and per-gene scores.
 
-    members_in_order ("label1 -> label2 -> ...") is the join key of the operon-fingerprint database.
-    """
+    members_in_order ("label1 -> label2 -> ...") is the join key of the depot operon database."""
     ops = genes[genes["in_operon"]].copy()
     if ops.empty:
         return pd.DataFrame(columns=["organism", "operon_id", "members_in_order",
@@ -625,12 +613,11 @@ def build_operons(genes: pd.DataFrame) -> pd.DataFrame:
     return pd.DataFrame(rows)
 
 
-# ---- depot pangenome operon recurrence ----------------------------------------
+# ---- depot pangenome operon recurrence ----
 def load_operon_recurrence(depot_db: Path, restrict_to=None) -> dict[str, dict]:
-    """Reads the label-ordered operon-fingerprint database with pandas into {members_in_order: {label_frequency, organism_count, organisms}}.
+    """Returns {members_in_order: {label_frequency, organism_count, organisms}} from the depot DB.
 
-    restrict_to limits the organisms counted per operon; empty or None uses the whole database.
-    """
+    restrict_to, when non-empty, limits each operon's organisms to that set."""
     depot_db = Path(depot_db)
     keep = set(restrict_to) if restrict_to else None
     out: dict[str, dict] = {}
@@ -642,38 +629,71 @@ def load_operon_recurrence(depot_db: Path, restrict_to=None) -> dict[str, dict]:
                      engine="python")
     for _, r in df.iterrows():
         mio = r.get("members_in_order", "")
-        # Distinct organisms only.
+        # Recurrence counts distinct organisms; DB duplicates are dropped.
         orgs = sorted({x for x in (r.get("organisms", "") or "").split("|") if x})
         if keep is not None:
             orgs = [o for o in orgs if o in keep]
         n = len(orgs)
         rec = {
-            # when scoped, occurrences equal the scoped organism count
+            # Scoped: uses organism count; DB-wide frequency cannot be split.
             "label_frequency": (n if keep is not None
                                 else int(r.get("fingerprint_label_frequency", 0) or 0)),
             "organism_count": n,
             "organisms": orgs,
         }
-        # keeps the record with most organisms when text repeats under several hashes
+        # Keeps the record with most organisms when one text has several hashes.
         prev = out.get(mio)
         if prev is None or rec["organism_count"] > prev["organism_count"]:
             out[mio] = rec
     return out
 
 
+# Default depot locations of the operon recurrence DB and the OCC reference.
 DEFAULT_OPERON_DB = Path(os.environ.get("MARGIE_OPERON_FINGERPRINT_DB", "operon-fingerprint-database-label-ordered.tsv"))
-DEFAULT_OCC_REFERENCE = Path(os.environ.get("MARGIE_OCC_REFERENCE", "occ_reference.pkl"))
+# The OCC reference is always named by the workflow (--occ-reference); no default file is guessed.
+DEFAULT_OCC_REFERENCE = os.environ.get("MARGIE_OCC_REFERENCE", "")
+
+
+def comparison_pool(occ_reference, operon_db, leave_out: str | None = None):
+    """Returns (organisms, missing) for a figure's comparison pool: the OCC reference's genomes, less
+    leave_out, with missing None; or, when the reference cannot be read, the genomes of the operon
+    fingerprint database, with missing naming the reference, so the caption says so."""
+    ref = str(occ_reference or "").strip()
+    pool = load_occ_organisms(ref) if ref else None
+    missing = None
+    if pool is None:
+        missing = ref or "(not given)"
+        pool = {o for rec in load_operon_recurrence(Path(operon_db)).values() for o in rec["organisms"]}
+    pool = set(pool)
+    if leave_out:
+        pool.discard(leave_out)
+    return pool, missing
+
+
+def left_out_as(run_root, organism: str) -> str:
+    """Returns the OCC reference's name for this genome, as its C3 scoring left it out
+    (scoring/scored-against.json); the genome's own name when scoring did not record one."""
+    try:
+        got = json.loads((Path(run_root) / organism / "scoring" / "scored-against.json").read_text())
+        return str(got.get("left_out_as") or organism)
+    except (OSError, ValueError, AttributeError):
+        return organism
 
 
 def load_occ_organisms(occ_reference=DEFAULT_OCC_REFERENCE):
-    """Returns the set of organisms in the pickled OCC reference, or None when unreadable."""
+    """Returns the set of organisms in the OCC reference (the pool C3 was scored against).
+
+    Returns None when the reference is unreadable (comparison_pool then uses the fingerprint
+    database's genomes, and the figures say the reference was not found)."""
     try:
         import pickle
         with open(occ_reference, "rb") as fh:
             ref = pickle.load(fh)
         orgs = {str(o) for o in (ref.get("organisms_added") or []) if o}
         return orgs or None
-    except Exception:
+    except Exception as exc:
+        print(f"[report_figures] WARNING: the operon reference {occ_reference} could not be read ({exc}); "
+              "the figures compare with the operon fingerprint database's genomes and say so", flush=True)
         return None
 
 
@@ -682,7 +702,9 @@ _POOL_STAT_COLS = ("total_genes", "operonic_genes", "singleton_genes",
 
 
 def load_pool_stats(occ_reference=DEFAULT_OCC_REFERENCE):
-    """Reads the OCC .genome_stats.tsv sidecar with csv into {organism: {stat: int}}; empty when unreadable."""
+    """Returns {organism: {stat: int}} from the OCC reference's .genome_stats.tsv sidecar.
+
+    Returns an empty dict when the sidecar is absent or unreadable."""
     import csv
     path = Path(str(occ_reference) + ".genome_stats.tsv")
     out = {}
@@ -699,7 +721,7 @@ def load_pool_stats(occ_reference=DEFAULT_OCC_REFERENCE):
 
 
 def aggregate_pool_stats(stats_map, organisms):
-    """Sums per-genome pool stats over the organisms and adds n_genomes (how many had stats)."""
+    """Returns the pool stats summed over organisms, plus n_genomes (how many had stats)."""
     agg = {c: 0 for c in _POOL_STAT_COLS}
     n = 0
     for org in organisms:
@@ -713,7 +735,7 @@ def aggregate_pool_stats(stats_map, organisms):
 
 
 def rel_or_host(path, run_root) -> str:
-    """Formats a source path for the footer: run-relative "[output]" or absolute "[host]"."""
+    """Returns a footer path: run-relative tagged [output], else absolute tagged [host]."""
     p, run_root = Path(path), Path(run_root)
     try:
         return f"{p.relative_to(run_root)}  [output]"
@@ -723,9 +745,8 @@ def rel_or_host(path, run_root) -> str:
 
 def organism_source_lines(run_root, organism: str, coords: bool = False,
                           operon_db=None) -> list[str]:
-    """Returns the footer source lines for a per-organism figure."""
+    """Returns the footer source list for a per-organism figure, using the layout actually read."""
     run_root = Path(run_root)
-    # Uses the path actually read, in whichever layout.
     _base = run_root / organism
     lines = [rel_or_host(_resolve_organism_file(_base, _CONF_FINAL)
                          or _base / _CONF_FINAL, run_root)]
@@ -739,7 +760,7 @@ def organism_source_lines(run_root, organism: str, coords: bool = False,
 
 def global_source_lines(run_root, n_org: int, scored: bool = True,
                         operon_db=None) -> list[str]:
-    """Returns the footer source lines for a run-level (pangenome) figure."""
+    """Returns the footer source list for a run-level (pangenome) figure."""
     lines = []
     if scored:
         fname = _CONF_FINAL.split("/")[-1]
@@ -749,7 +770,7 @@ def global_source_lines(run_root, n_org: int, scored: bool = True,
     return lines
 
 
-# Column glossary drawn by draw_method_note; "\n" starts a new paragraph.
+# Column glossaries drawn by draw_method_note; each "\n" starts a new paragraph.
 OPERON_CORRECTION_NOTE = (
     "Columns —  "
     "C1 = tool coverage/agreement  |  "
@@ -758,7 +779,7 @@ OPERON_CORRECTION_NOTE = (
     "C3(hyb) = max(best adjacent ρ, best co-member ρ), per gene  |  "
     "C4 = EC agreement (< 1 = conflict)\n"
     "prelim = C1×C4  |  "
-    "operon boost = C2×C3, boost-only, shown adj/hyb (raises an uncertain gene, never lowers; novel C3→0 has been kept neutral and can only be penalized if the operon database is sufficient: hence, left for future work)  |  "
+    "operon boost = C2×C3, boost-only, shown adj/hyb (raises an uncertain gene and leaves the others as they are; novel C3→0 has been kept neutral and can only be penalized if the operon database is sufficient: hence, left for future work)  |  "
     "final = clip(prelim + boost, 0, 1), shown adj/hyb  |  "
     "review? = manual-check flag  |  "
     "review reason = EC conflict / ambiguous operon / low confidence (final < 0.5)  |  "
@@ -769,7 +790,7 @@ OPERON_PENALTY_NOTE = (
     "Reading the trail: ‘operon boost’ here is NEGATIVE — a penalty = C2·conflict, where conflict is a "
     "DESCRIPTOR contradiction: across the pooled genomes this gene’s operon slot carries a DIFFERENT "
     "functional descriptor by consensus, so the functional call we assigned is the contradicted minority. "
-    "C2 = operon probability only gates it (a doubtful operon shrinks the penalty; it can never create one). "
+    "C2 = operon probability only gates it (a doubtful operon shrinks the penalty). "
     "Crucially this is NOT a penalty for novelty: a merely-unseen operon (C3 → 0, no conflict) is neutral. "
     "Only positive cross-genome contradiction of the descriptor lowers the score — evidence the functional "
     "annotation, not the gene’s placement, is likely wrong. ‘review?’ reads ‘yes’ only when the drop is "
@@ -781,7 +802,7 @@ _STRW_CACHE: dict = {}   # (word, fontsize) -> width in figure-fraction units
 
 
 def _fig_strwidth(fig, renderer, s, fontsize):
-    """Returns the width of `s` at `fontsize` as a fraction of figure width, cached per (s, fontsize)."""
+    """Returns the width of s at fontsize as a fraction of the figure width, cached per word."""
     key = (s, fontsize)
     w = _STRW_CACHE.get(key)
     if w is not None:
@@ -799,10 +820,7 @@ def _fig_strwidth(fig, renderer, s, fontsize):
 
 def draw_method_note(fig, text: str, fontsize: float = 8.2,
                      left: float = 0.015, right: float = 0.985) -> None:
-    """Draws a fully justified glossary note below the plot content, word by word.
-
-    The last line of each paragraph is left-aligned; artists are registered for the crop.
-    """
+    """Draws a fully justified note below the plot content and registers it for the crop."""
     if not text:
         return
     fh = max(fig.get_figheight(), 3.0)
@@ -815,7 +833,7 @@ def draw_method_note(fig, text: str, fontsize: float = 8.2,
         renderer, low_in = None, 0.25
 
     def sw(s):
-        """Returns the measured width of s."""
+        """Returns the figure-fraction width of s."""
         return _fig_strwidth(fig, renderer, s, fontsize)
 
     avail = right - left
@@ -828,7 +846,7 @@ def draw_method_note(fig, text: str, fontsize: float = 8.2,
         if not words:
             y -= line_h
             continue
-        # greedy word-wrap to the available width
+        # Greedy word-wrap to the available width.
         rows, cur, cur_w = [], [], 0.0
         for wd in words:
             ww = sw(wd)
@@ -858,18 +876,18 @@ def draw_method_note(fig, text: str, fontsize: float = 8.2,
 
 
 def draw_sources_footer(fig, run_root, sources: list[str], fontsize: float = 6.8) -> None:
-    """Draws a small footer listing the files that fed the figure, wrapped with textwrap below the lowest content."""
+    """Draws a small footer listing the files behind the figure, below the lowest content."""
     if not sources:
         return
     run_root = Path(run_root)
-    # ":" appears only after the label; items are separated with "|".
+    # This label's ":" is the only colon separator; everything else uses "|".
     header = (f"Files used to build this figure:  paths relative to output/{run_root.name}/  "
               f"|  [host] = reference file on the compute host")
     fw, fh = fig.get_figwidth(), max(fig.get_figheight(), 3.0)
     approx = max(60, int(fw / (0.011 * fontsize)))
     body = "   |   ".join(sources)
     lines = [header] + (textwrap.wrap(body, width=approx) or [body])
-    # Places the footer just below the lowest content; savefig()'s crop includes it.
+    # Footer goes below the lowest content; savefig's crop includes it.
     try:
         fig.draw_without_rendering()
         r = fig.canvas.get_renderer()
@@ -885,7 +903,7 @@ def draw_sources_footer(fig, run_root, sources: list[str], fontsize: float = 6.8
 
 
 def _describe_figure_tsv(name: str) -> str:
-    """Returns a short description of a fig*_*.tsv file from its name."""
+    """Returns a manifest description for a fig*_*.tsv companion file."""
     fig = name.split("_", 1)[0]
     rest = name.split("_", 1)[1].rsplit(".", 1)[0].replace("_", " ") if "_" in name else ""
     return f"exact data table plotted in {fig}: {rest}".rstrip(": ")
@@ -894,13 +912,13 @@ def _describe_figure_tsv(name: str) -> str:
 def write_sources_manifest(outdir: Path, run_root: Path, organisms: list[str],
                            operon_db: Path,
                            occ_reference: Path = DEFAULT_OCC_REFERENCE) -> None:
-    """Writes figure-sources.tsv listing every input file and fig*_*.tsv with location, presence, size and time."""
+    """Writes figure-sources.tsv listing every input file and fig*_*.tsv with path, status and role."""
     from datetime import datetime
     outdir, run_root = Path(outdir), Path(run_root)
     rows = []
 
     def add(role: str, path, description: str) -> None:
-        """Appends one manifest row for a file."""
+        """Appends one manifest row with existence, size and modification time."""
         p = Path(path)
         try:
             ok = p.exists()
@@ -929,7 +947,8 @@ def write_sources_manifest(outdir: Path, run_root: Path, organisms: list[str],
         "depot pangenome operon-fingerprint database (label-ordered): how many "
         "genomes each operon recurs across and how often -- drives the "
         "reproduced / unique / most-conserved operon figures")
-    add("reference: operon co-occurrence (OCC)", occ_reference,
+    occ_given = str(occ_reference or "").strip() not in ("", ".")
+    add("reference: operon co-occurrence (OCC)", occ_reference if occ_given else "(not given)",
         "depot operon co-occurrence reference behind the operon-probability (C2) "
         "and operon-context (C3) scores that scoring wrote into the scored file")
     for tsv in sorted(outdir.glob("fig*_*.tsv")):
@@ -940,12 +959,9 @@ def write_sources_manifest(outdir: Path, run_root: Path, organisms: list[str],
     write_tsv(df, outdir / "figure-sources.tsv")
 
 
-# ---- small numeric helpers ----------------------------------------------------
+# ---- small numeric helpers ----
 def pca_svd(X: np.ndarray):
-    """Runs a standardised PCA via numpy SVD; columns of X are variables.
-
-    Returns (scores, loadings, explained_variance_ratio).
-    """
+    """Returns (scores, loadings, explained_variance_ratio) of standardized numpy SVD PCA."""
     Xc = X - np.nanmean(X, axis=0)
     sd = np.nanstd(Xc, axis=0)
     sd[sd == 0] = 1.0
@@ -980,10 +996,9 @@ SIZE_BIN_ORDER = ["2", "3-4", "5-8", "9-20", "21+"]
 
 
 def box_by_bin(ax, df, cat_col, value_col, order, color, ylabel, xlabel):
-    """Draws matplotlib box plots of value_col per ordered bin with the bin means overlaid as a line.
+    """Draws value_col boxplots per ordered bin with the bin means overlaid as a line.
 
-    Returns (labels, ns, medians, means) for the companion TSV.
-    """
+    Returns (labels, ns, medians, means) for the companion TSV."""
     from matplotlib.lines import Line2D
     data, labels, ns = [], [], []
     for b in order:
@@ -998,13 +1013,11 @@ def box_by_bin(ax, df, cat_col, value_col, order, color, ylabel, xlabel):
                     patch_artist=True, showfliers=False,
                     medianprops=dict(color=INK, lw=2.0),
                     whiskerprops=dict(color="#555555"), capprops=dict(color="#555555"))
-    # one categorical colour per bin
     for i, patch in enumerate(bp["boxes"]):
         patch.set_facecolor(CATEGORICAL[i % len(CATEGORICAL)])
         patch.set_alpha(0.85); patch.set_edgecolor("white"); patch.set_linewidth(1.5)
     medians = [float(np.median(x)) for x in data]
     means = [float(np.mean(x)) for x in data]
-    # mean overlay: black line with white diamonds
     ax.plot(xs, means, color=INK, lw=1.6, marker="D", markersize=8, zorder=6,
             markerfacecolor="white", markeredgecolor=INK, markeredgewidth=1.6)
     ax.set_xticks(xs)
@@ -1019,33 +1032,28 @@ def box_by_bin(ax, df, cat_col, value_col, order, color, ylabel, xlabel):
     return labels, ns, medians, means
 
 
-# ---------------------------------------------------------------------------
-# Gene-track drawing and gene tables: genes are numbered block arrows and their
-# full descriptors and scores are listed in a table.
-# ---------------------------------------------------------------------------
+# ---- gene-track drawing and descriptor index ----
+# Genes are numbered arrows; full descriptors go in a table or index.
 def tag_letter(i: int) -> str:
-    """Returns the 1-based gene number used as the tag in diagrams and tables."""
+    """Returns the 1-based number used to tag gene i in diagrams and tables."""
     return str(i + 1)
 
 
-# Physical gene-glyph size in inches, converted to data units so every arrow
-# looks the same in every track.
-_ARROW_W_IN = 0.74     # glyph length
+# Glyph sizes in inches, converted to data units so every arrow looks the same.
+_ARROW_W_IN = 0.74     # total glyph length (horizontal)
 _ARROW_HLEN_IN = 0.16  # head length
-_ARROW_BODY_IN = 0.18  # body thickness
-_ARROW_HEAD_IN = 0.36  # head thickness
+_ARROW_BODY_IN = 0.18  # body thickness (vertical)
+_ARROW_HEAD_IN = 0.36  # head thickness (vertical, wider than body)
 _TRACK_YRANGE = 1.9    # data height of one arrow row (== row_pitch)
-_TRACK_ROW_IN = 1.28   # inches per arrow row, also used by the atlas driver
-# Inches per data-y unit that pin_track_scale() enforces after layout, so arrows
-# are equally thick on every page.
+_TRACK_ROW_IN = 1.28   # inches per arrow row; the atlas driver uses the same value
+# Inches per data-y-unit that pin_track_scale() pins every track to.
 _TRACK_IN_PER_Y = _TRACK_ROW_IN / _TRACK_YRANGE
 
 
 def _arrow_geometry(ax, span: int, nrows: int = 1):
     """Returns glyph geometry (hw, body_ht, head_ht, head_len) in data units.
 
-    Vertical sizes use the pinned _TRACK_IN_PER_Y; horizontal sizes use the measured axis width.
-    """
+    Height uses the pinned _TRACK_IN_PER_Y scale; width uses the measured axis width."""
     fig = ax.figure
     try:
         pos = ax.get_position()
@@ -1062,10 +1070,9 @@ def _arrow_geometry(ax, span: int, nrows: int = 1):
 
 
 def pin_track_scale(ax) -> None:
-    """Resets a track axis's ylim after layout so its inches-per-data-unit equals _TRACK_IN_PER_Y.
+    """Resets a track's ylim after layout so its inches-per-data-unit equals _TRACK_IN_PER_Y.
 
-    Called once per track axis after the figure's final layout.
-    """
+    Called once per track axis after the figure's final layout."""
     info = getattr(ax, "_track_scale", None)
     if not info:
         return
@@ -1077,13 +1084,13 @@ def pin_track_scale(ax) -> None:
     if ax_h_in <= 0:
         return
     rng = ax_h_in / _TRACK_IN_PER_Y
-    # never narrower than the drawn rows
+    # Never frames tighter than the drawn rows.
     rng = max(rng, info["nrows"] * _TRACK_YRANGE)
     ax.set_ylim(info["y_top"] - rng, info["y_top"])
 
 
 def member_descriptor(m) -> str:
-    """Returns the cleaned descriptor prefixed with its source ("PGAP: ...") for tables and their sizing."""
+    """Returns the cleaned descriptor prefixed with its annotation source, for drawing and sizing tables."""
     full = clean_descriptor(m.get("label", "")) or (m.get("label", "") or "—")
     src = (m.get("source") or "").strip()
     if src and full != "—":
@@ -1092,21 +1099,19 @@ def member_descriptor(m) -> str:
 
 
 def member_table_units(members, desc_wrap: int = None) -> float:
-    """Returns the line count a gene table needs: header units plus each wrapped source-prefixed descriptor."""
+    """Returns the line units a gene table needs: header plus each wrapped source-prefixed descriptor."""
     w = desc_wrap or _TABLE_DESC_WRAP
     return _TABLE_HEADER_UNITS + sum(len(wrap_desc(member_descriptor(m), w)) for m in members)
 
 
 def _gene_arrow(cx, y, strand, col, geom):
-    """Returns a matplotlib Polygon block arrow pointing 5'→3' (right for +, left for −)."""
+    """Returns a block-arrow Polygon pointing 5'->3' (right for +, left for -)."""
     hw, bt, ht, hl = geom
     if str(strand) == "-":
-        # tip at left
         tip, sh = cx - hw, cx - hw + hl
         pts = [(cx + hw, y + bt), (sh, y + bt), (sh, y + ht), (tip, y),
                (sh, y - ht), (sh, y - bt), (cx + hw, y - bt)]
     else:
-        # tip at right
         tip, sh = cx + hw, cx + hw - hl
         pts = [(cx - hw, y + bt), (sh, y + bt), (sh, y + ht), (tip, y),
                (sh, y - ht), (sh, y - bt), (cx - hw, y - bt)]
@@ -1119,19 +1124,17 @@ def draw_gene_track(ax, members: list[dict], badge_per_operon: dict | None = Non
                     node_size: int = 760, strand_rows: bool = False,
                     min_span: int | None = None, per_row: int | None = None,
                     tag_fs: float = 12.0, gap_fs: float = 11.0):
-    """Draws genes as a gene-arrow map: a backbone, numbered block arrows per strand,
-    operon bands and intergenic gaps in bp.
+    """Draws genes as numbered block arrows on a backbone with operon bands and gap labels.
 
-    min_span fixes the number of gene slots so arrows keep one size; per_row wraps
-    long operons onto stacked rows; strand_rows is ignored. Returns
-    (tag, descriptor, score, location, colour) tuples for render_gene_table().
-    """
+    min_span fixes the slot count so arrows keep their size; per_row wraps long
+    operons onto stacked rows; strand_rows is ignored. Returns (tag, descriptor,
+    score, location, colour) tuples for render_gene_table()."""
     n = len(members)
     if n == 0:
         ax.axis("off")
         return []
     gene_col = [CATEGORICAL[(letter_offset + i) % len(CATEGORICAL)] for i in range(n)]
-    # rows of at most per_row genes; a single row when not wrapping
+    # Wraps onto rows of at most per_row genes only when the operon is longer.
     per = per_row if (per_row and n > per_row) else n
     per = max(int(per), 1)
     nrows = (n + per - 1) // per
@@ -1145,15 +1148,15 @@ def draw_gene_track(ax, members: list[dict], badge_per_operon: dict | None = Non
     tag_y = ht + 0.15                         # gene letter sits just above arrow
     gap_y = -(band_h + 0.20)                  # gap (bp) sits BELOW the operon band
     badge_y = tag_y + 0.30                    # operon-id caption sits above letters
-    # constant row pitch so the data range is exactly nrows*row_pitch
+    # Fixed pitch: data range is nrows * row_pitch, so arrow size is constant.
     row_pitch = _TRACK_YRANGE
 
-    def rc(k):                                # (row, local column, baseline y) of gene k
-        """Returns (row, column, baseline y) of gene k."""
+    def rc(k):
+        """Returns (row, local column, baseline y) of gene k."""
         r = k // per
         return r, k - r * per, -r * row_pitch
 
-    # operon bands over same-operon runs within a row, drawn first
+    # Operon bands per row run, drawn first so arrows sit on top.
     i = 0
     while i < n:
         oid = members[i].get("operon_id") or ""
@@ -1175,19 +1178,18 @@ def draw_gene_track(ax, members: list[dict], badge_per_operon: dict | None = Non
                         color="#6b7280", zorder=4)
         i = j + 1
 
-    # genome backbone behind the arrows -- one segment per row
+    # Genome backbone behind the arrows, one segment per row.
     for r in range(nrows):
         y_r = -r * row_pitch
         if nrows > 1:
             last_col = (min((r + 1) * per, n) - 1) - r * per
-            # extends 0.60 on both sides of the row's genes
             bx0, bx1 = off - 0.60, last_col + off + 0.60
         else:
             bx0, bx1 = x0, x1
         ax.plot([bx0, bx1], [y_r, y_r], color="#b7bdc6", lw=1.6, zorder=1,
                 solid_capstyle="round")
 
-    # intergenic gaps (bp) under the backbone (within a row only)
+    # Intergenic gaps (bp) under the backbone, within a row only.
     if show_gaps:
         for i in range(n - 1):
             r_i, c_i, y_i = rc(i)
@@ -1225,10 +1227,10 @@ def draw_gene_track(ax, members: list[dict], badge_per_operon: dict | None = Non
 
     ax.set_xlim(x0 - 0.10, x1 + 0.10)
     top_extra = 0.42 if badge_per_operon else 0.0
-    # data range is exactly nrows*row_pitch
+    # Data range is exactly nrows * row_pitch to match _arrow_geometry's scale.
     y_top = ht + 0.48 + top_extra
     ax.set_ylim(y_top - nrows * row_pitch, y_top)
-    # values pin_track_scale() needs after layout
+    # Stores what pin_track_scale() needs after layout.
     ax._track_scale = {"y_top": y_top, "nrows": nrows}
     ax.set_xticks([])
     ax.set_yticks([])
@@ -1238,12 +1240,14 @@ def draw_gene_track(ax, members: list[dict], badge_per_operon: dict | None = Non
 
 
 def _fmt_num(v):
-    """Returns v as float, or None for None/NaN."""
+    """Returns v as a float, or None for None/NaN."""
     return None if v is None or (isinstance(v, float) and np.isnan(v)) else float(v)
 
 
 def _score_breakdown(score) -> str:
-    """Formats a score dict as 'C3 0.65   confidence = (prelim 0.78, operon +0.05, final 0.83)'; a float as '(0.83)'."""
+    """Returns a score summary such as 'C3 0.65   confidence = (prelim 0.78, operon +0.05, final 0.83)'.
+
+    Missing parts are omitted; a plain float gives '(0.83)'."""
     if score is None:
         return ""
     if isinstance(score, (int, float)):
@@ -1270,10 +1274,9 @@ def _score_breakdown(score) -> str:
 
 def render_index(ax, entries, ncols: int = 1, fontsize: float = 10.5,
                  header: str | None = None, two_line: bool = False) -> None:
-    """Draws a gene-tag index of [(tag, descriptor, score)] entries in columns.
+    """Draws the gene-tag index of full descriptors with score breakdowns.
 
-    two_line=True puts the score breakdown on a second line under each descriptor.
-    """
+    entries are (tag, descriptor, score); two_line puts the breakdown on a second line."""
     ax.axis("off")
     if not entries:
         return
@@ -1313,21 +1316,21 @@ def render_index(ax, entries, ncols: int = 1, fontsize: float = 10.5,
 
 
 _TABLE_DESC_WRAP = 46   # descriptor wrap width (chars)
-_TABLE_HEADER_UNITS = 2.4   # two header lines (name + sub-line) plus padding
+_TABLE_HEADER_UNITS = 2.4   # two header lines (name + factor sub-line) plus padding
 
 
 def wrap_desc(desc: str, width: int = _TABLE_DESC_WRAP) -> list[str]:
-    """Wraps a descriptor into lines with textwrap, "—" when empty."""
+    """Returns the descriptor wrapped to width, or an em-dash line when empty."""
     return textwrap.wrap(desc or "—", width=width) or ["—"]
 
 
 def table_line_units(entries, desc_wrap: int = _TABLE_DESC_WRAP) -> float:
-    """Returns the line count a gene table needs: header units plus wrapped descriptor lines."""
+    """Returns the line units a gene table needs, for sizing its axis before drawing."""
     return _TABLE_HEADER_UNITS + sum(len(wrap_desc(e[1], desc_wrap)) for e in entries)
 
 
 def _conflict_code(score) -> str:
-    """Returns a conflict tag ("EC", "ambig", "desc", joined by "+") from C4 and the review reason, or "—"."""
+    """Returns conflict tags joined by '+': EC (C4 < 1), ambig (ambiguous operon), desc; else an em-dash."""
     codes = []
     c4 = _fmt_num(score.get("c4"))
     if c4 is not None and c4 < 0.999:
@@ -1341,7 +1344,7 @@ def _conflict_code(score) -> str:
 
 
 def _review_reason_short(score) -> str:
-    """Returns the review triggers condensed to one line of at most 48 characters, or "—"."""
+    """Returns a one-line review reason (at most 48 chars), or an em-dash when not flagged."""
     parts = []
     reason = (score.get("review_reason") or "").lower()
     c4 = _fmt_num(score.get("c4"))
@@ -1361,22 +1364,18 @@ def _review_reason_short(score) -> str:
 
 def breakdown_col_layout(entries, fontsize: float, page_width_in: float,
                          desc_wrap: int, left: float = 0.0, right: float = 0.985) -> dict:
-    """Computes table column x-positions (axis fractions) from the entries' content between left and right.
+    """Returns column x-positions (axis fractions) for the full-breakdown table between left and right.
 
-    Fixed-content columns take the width their values need; descriptor and review
-    reason share the rest. Computed once per page so all tables on it align.
-    """
+    Fixed columns take their content width; descriptor and review reason share the
+    rest. Computed once per page so every table on it aligns."""
     fs, fsn, fsf = fontsize, fontsize - 0.4, fontsize - 2.1
     Win = page_width_in or 18.0
     def _wf(s, pt):
-        """Estimates the width of s at pt points as a fraction of page width."""
         return (len(str(s)) * 0.60 * pt / 72.0) / Win
     GAP = 0.24 / Win
     def _numw(h, sub):
-        """Returns the width of a numeric column with header h and sub-line sub."""
         return max(_wf(h, fs), _wf(sub, fsf), _wf("+0.00", fsn))
-    def _numw2(h, sub):        # holds an "adj/hyb" pair such as 0.00/0.00
-        """Returns the width of an adj/hyb pair column."""
+    def _numw2(h, sub):        # column holding an "adj/hyb" pair such as 0.00/0.00
         return max(_wf(h, fs), _wf(sub, fsf), _wf("0.00/0.00", fsn))
     wrapped = [wrap_desc(e[1], desc_wrap) for e in entries]
     tag_w = max([_wf("gene", fs)] + [_wf(e[0], fs) for e in entries])
@@ -1422,27 +1421,22 @@ def breakdown_col_layout(entries, fontsize: float, page_width_in: float,
 
 def _fit_desc_wrap(members_per, fontsize: float, page_width_in: float,
                    desc_wrap: int, left: float, right: float) -> int:
-    """Returns the largest descriptor wrap width (>= 20, <= desc_wrap) that fits the descriptor column.
+    """Returns the largest wrap width (<= desc_wrap, >= 20) at which the descriptor column fits.
 
-    Uses breakdown_col_layout's width model before table height and columns are computed.
-    """
+    Uses the same width model as breakdown_col_layout."""
     fs, fsn, fsf = fontsize, fontsize - 0.4, fontsize - 2.1
     Win = page_width_in or 18.0
     def _wf(s, pt):
-        """Estimates the width of s at pt points as a fraction of page width."""
         return (len(str(s)) * 0.60 * pt / 72.0) / Win
     GAP = 0.24 / Win
     def _numw(h, sub):
-        """Returns the width of a numeric column with header h and sub-line sub."""
         return max(_wf(h, fs), _wf(sub, fsf), _wf("+0.00", fsn))
     def _numw2(h, sub):
-        """Returns the width of an adj/hyb pair column."""
         return max(_wf(h, fs), _wf(sub, fsf), _wf("0.00/0.00", fsn))
     members = [m for ms in members_per for m in ms]
     if not members:
         return desc_wrap
     def _loc(m):
-        """Formats a member's location as "start–end (strand)"."""
         try:
             return f"{int(m['start']):,}–{int(m['end']):,} ({m.get('strand', '+')})"
         except (TypeError, ValueError, KeyError):
@@ -1461,7 +1455,6 @@ def _fit_desc_wrap(members_per, fontsize: float, page_width_in: float,
     reason_nat = max([_wf("review reason", fs)] + [_wf(r, fsn) for r in reasons])
     fixed = (tag_w + loc_w + type_w + c1w + c2w + c3w + c4w + prew + opw + finw + revw
              + 12 * GAP)
-    # descriptor width left after the fixed columns and the reason column
     w_desc = (right - left) - fixed - reason_nat
     char_w = 0.60 * fs / 72.0 / Win
     n = int(w_desc / char_w) if char_w > 0 else desc_wrap
@@ -1472,11 +1465,9 @@ def render_gene_table(ax, entries, fontsize: float = 7.6, show_location: bool = 
                       show_scores: bool = True, desc_wrap: int = _TABLE_DESC_WRAP,
                       full_breakdown: bool = False, page_width_in: float = None,
                       col_layout: dict = None) -> None:
-    """Draws a gene table: coloured tag, wrapped descriptor, location, score columns with sub-headers, and review flag.
+    """Draws a gene table: tag, wrapped descriptor, location, score columns and review flag.
 
-    entries are draw_gene_track()'s (tag, descriptor, score, location, colour) tuples.
-    full_breakdown adds C1/C4, feature type and review reason using col_layout.
-    """
+    entries are draw_gene_track tuples; full_breakdown adds C1, C4, type and review reason."""
     ax.axis("off")
     if not entries:
         return
@@ -1485,16 +1476,15 @@ def render_gene_table(ax, entries, fontsize: float = 7.6, show_location: bool = 
     have_scores = show_scores and any(
         isinstance(e[2], dict) and _fmt_num(e[2].get("final")) is not None for e in entries)
     have_loc = show_location and any(len(e) > 3 and e[3] for e in entries)
-    # review column shown when prelim and operon values exist
     have_review = show_scores and any(
         isinstance(e[2], dict) and _fmt_num(e[2].get("prelim")) is not None
         and _fmt_num(e[2].get("operon")) is not None for e in entries)
     fs, fsn, fsf = fontsize, fontsize - 0.4, fontsize - 2.1
     wrapped = [wrap_desc(e[1], desc_wrap) for e in entries]
 
-    # column x-positions.
+    # Column x-positions.
     if full_breakdown:
-        # page-level col_layout keeps tables aligned; computed per table otherwise
+        # A page-level col_layout keeps every table on the page aligned.
         pos = col_layout or breakdown_col_layout(entries, fontsize, page_width_in, desc_wrap)
         x_tag, x_desc, x_loc = pos["x_tag"], pos["x_desc"], pos["x_loc"]
         x_type = pos["x_type"]
@@ -1511,7 +1501,7 @@ def render_gene_table(ax, entries, fontsize: float = 7.6, show_location: bool = 
     y = 0.992
 
     def cell(x, text, bold=False, color="#222222", size=fs, yy=None, ha="left"):
-        """Draws one table cell."""
+        """Draws one table cell at x on the current row."""
         ax.text(x, y if yy is None else yy, text, ha=ha, va="top", fontsize=size,
                 fontweight="bold" if bold else "normal", color=color)
 
@@ -1533,7 +1523,7 @@ def render_gene_table(ax, entries, fontsize: float = 7.6, show_location: bool = 
         cell(x_rev, "review?", bold=True)
         if full_breakdown:
             cell(x_reason, "review reason", bold=True)
-    # sub-header line naming what each column is a function of
+    # Sub-header line naming what each column is a function of.
     ysub = y - line_h
     if full_breakdown:
         subs = [(x_type, "feature"), (x_c1, "tool cov"), (x_c2, "operon"), (x_c3, "cons adj/hyb"),
@@ -1566,7 +1556,7 @@ def render_gene_table(ax, entries, fontsize: float = 7.6, show_location: bool = 
         if full_breakdown and x_type is not None and isinstance(score, dict):
             fty = str(score.get("feature_type") or "").strip()
             if fty:
-                # non-CDS features in a warm tone
+                # Non-CDS features (RNA, prophage) are shown in a warm tone.
                 tcol = "#555555" if fty.lower() == "cds" else "#a86400"
                 ax.text(x_type, y0, fty, ha="left", va="top", fontsize=fsn, color=tcol)
         if have_scores and isinstance(score, dict):
@@ -1574,7 +1564,7 @@ def render_gene_table(ax, entries, fontsize: float = 7.6, show_location: bool = 
             p = _fmt_num(score.get("prelim"))
             op = _fmt_num(score.get("operon")); f = _fmt_num(score.get("final"))
             c1 = _fmt_num(score.get("c1")); c4 = _fmt_num(score.get("c4"))
-            # values below 0.5 in the "lowered" colour
+            # Drivers below the 0.5 neutral line are coloured LOWERED.
             if full_breakdown and c1 is not None:
                 ax.text(x_c1, y0, f"{c1:.2f}", va="top", fontsize=fsn,
                         color=(LOWERED if c1 < 0.5 else "#333333"))
@@ -1587,14 +1577,14 @@ def render_gene_table(ax, entries, fontsize: float = 7.6, show_location: bool = 
                 ax.text(x_c3, y0, txt, va="top", fontsize=fsn,
                         color=(LOWERED if c3 < 0.5 else "#333333"))
             if full_breakdown and c4 is not None:
-                # C4 < 1 means an EC conflict was applied
+                # C4 < 1 means an EC conflict was applied.
                 ax.text(x_c4, y0, f"{c4:.2f}", va="top", fontsize=fsn,
                         color=(LOWERED if c4 < 0.999 else "#333333"))
             if p is not None:
                 ax.text(x_pre, y0, f"{p:.2f}", va="top", fontsize=fsn, color="#333333")
             if p is not None and op is not None:
                 if full_breakdown:
-                    # raw operon term C2·C3 (adj/hyb), not final - prelim
+                    # Raw boost C2*C3; final - prelim would hide the clip at 1.
                     c2v = _fmt_num(score.get("c2"))
                     c3a = _fmt_num(score.get("c3"))
                     c3h = _fmt_num(score.get("c3_hybrid"))
@@ -1611,7 +1601,7 @@ def render_gene_table(ax, entries, fontsize: float = 7.6, show_location: bool = 
                     if txt:
                         ax.text(x_op, y0, txt, va="top", fontsize=fsn, color=bcol)
                 else:
-                    d = op - p                        # compact table: effective change
+                    d = op - p                        # effective delta in the compact table
                     ax.text(x_op, y0, f"{d:+.2f}", va="top", fontsize=fsn,
                             color=(RAISED if d > 0 else (LOWERED if d < 0 else "#333333")))
             if f is not None:
@@ -1621,7 +1611,7 @@ def render_gene_table(ax, entries, fontsize: float = 7.6, show_location: bool = 
                         fontweight="bold", color="#111111")
         if have_review and isinstance(score, dict):
             if full_breakdown:
-                # scored review flag plus its reason
+                # Uses the scored needs_review flag plus a readable reason.
                 nr = str(score.get("review") or "").strip().lower()
                 flagged = nr in ("yes", "true", "1")
                 ax.text(x_rev, y0, "yes" if flagged else "no", va="top", fontsize=fsn,
@@ -1632,7 +1622,7 @@ def render_gene_table(ax, entries, fontsize: float = 7.6, show_location: bool = 
             else:
                 p_r = _fmt_num(score.get("prelim")); op_r = _fmt_num(score.get("operon"))
                 if p_r is not None and op_r is not None:
-                    if (op_r - p_r) <= -0.1:  # operon context materially LOWERED the score (>= 0.1)
+                    if (op_r - p_r) <= -0.1:  # operon context lowered the score by >= 0.1
                         ax.text(x_rev, y0, "yes", va="top", fontsize=fsn, fontweight="bold",
                                 color=LOWERED)
                     else:
@@ -1640,9 +1630,8 @@ def render_gene_table(ax, entries, fontsize: float = 7.6, show_location: bool = 
         y -= len(wlines) * line_h
 
 
-# ---- operon figures, drawn as the genome viewer's downloadable operon map ------
-# Port of operonFigureSVG in viz/gen_genome_viewer.py: scaled numbered arrows with
-# intergenic distances, then one table row per gene, in viewer pixels (1/96 in).
+# ---- operon pages, ported from the genome viewer's operon map ----
+# Mirrors operonFigureSVG (viz/gen_genome_viewer.py); viewer px = 1/96 in.
 VIEWER_TIER_COL = ["#1F77FF", "#00B84D", "#FFCC00", "#FF8C00", "#EE2233"]
 VIEWER_OPERON_CYCLE = ["#1F77FF", "#FF8C00", "#00B84D", "#B65CFF", "#00C2D1", "#EE2233"]
 VIEWER_NONCODE = "#d5d5d5"
@@ -1654,13 +1643,13 @@ _V_SERIF = ["Times New Roman", "Times", "Nimbus Roman", "Liberation Serif", "Dej
 
 
 def _v_tier_index(tier) -> int:
-    """Returns the tier's index in CONF_TIER_ORDER, or -1."""
+    """Returns the tier's index in CONF_TIER_ORDER, or -1 (non-coding/unknown)."""
     t = (str(tier or "")).strip().lower()
     return CONF_TIER_ORDER.index(t) if t in CONF_TIER_ORDER else -1
 
 
 def _v_review_short(reason) -> str:
-    """Shortens a review sentence to its trigger tags, as the viewer's revShort does."""
+    """Returns the short trigger tag(s) of a review reason, as the viewer's revShort does."""
     if not reason or str(reason).strip() in ("", "nan", "-"):
         return "yes"
     s, t = str(reason).lower(), []
@@ -1674,7 +1663,7 @@ def _v_review_short(reason) -> str:
 
 
 def _v_num(v):
-    """Returns v as float, or None for NaN or non-numbers."""
+    """Returns v as a float, or None for missing/NaN/unparseable values."""
     try:
         f = float(v)
         return None if f != f else f
@@ -1683,23 +1672,23 @@ def _v_num(v):
 
 
 def _v_dec(v) -> str:
-    """Formats a number with two decimals, "—" when missing."""
+    """Returns v with two decimals, or an em-dash."""
     f = _v_num(v)
     return "—" if f is None else f"{f:.2f}"
 
 
 def _v_flagged(m) -> bool:
-    """Returns True when the member needs review."""
+    """Returns True when the member is flagged for review."""
     return str(m.get("needs_review") or "").strip().lower() in ("yes", "true", "1")
 
 
 def operon_block_px(n_genes: int) -> int:
-    """Returns the height in px of one operon block (headings, arrows, table)."""
+    """Returns the pixel height of one operon block (headings, arrows and table)."""
     return 104 + 30 + 48 + 24 + _V_ROW * max(n_genes, 1) + 40
 
 
 def _v_block(ax, y0, members, heading, detail):
-    """Draws one operon or gene stretch at vertical offset y0 (px) with matplotlib and returns its height."""
+    """Draws one operon block at vertical offset y0 (px) and returns its height."""
     T = lambda x, y, text, px, bold=False, ha="left": ax.text(
         x, y, text, fontsize=px * 0.75, fontweight="bold" if bold else "normal",
         ha=ha, va="baseline", color="#000000", family=_V_SERIF)
@@ -1787,11 +1776,9 @@ def _v_block(ax, y0, members, heading, detail):
 
 
 def render_operon_page(outpath, blocks, *, org_label, suptitle, dpi=288, **_legacy) -> None:
-    """Writes one PNG page of operon blocks (see _v_block) under a title, with the tier key at the foot.
+    """Writes one page of operon blocks under a title and organism, with the tier key at the foot.
 
-    blocks = [{"members": [...], "heading": ..., "detail": ...}]; other keyword
-    arguments are accepted and ignored.
-    """
+    blocks are {"members", "heading" or "title", "detail"} dicts; extra keyword arguments are ignored."""
     blocks = [b for b in blocks if b.get("members")]
     if not blocks:
         return
@@ -1827,7 +1814,9 @@ def render_operon_page(outpath, blocks, *, org_label, suptitle, dpi=288, **_lega
 
 
 def operon_members_informative(members_in_order: str, min_informative: int | None = None):
-    """Returns True when an "a -> b -> ..." operon has >= 2 members and all (or min_informative) are informative."""
+    """Returns True for an operon of >=2 members that are all (or >= min_informative) informative.
+
+    Uses scoring's is_uninformative gate; "-" members count as uninformative."""
     members = [m.strip() for m in (members_in_order or "").split(" -> ") if m.strip()]
     if len(members) < 2:
         return False
@@ -1838,7 +1827,7 @@ def operon_members_informative(members_in_order: str, min_informative: int | Non
 
 
 def operon_to_members(op_row) -> list[dict]:
-    """Converts a build_operons() row into member dicts with per-gene coordinates and scores."""
+    """Returns draw_gene_track member dicts, with per-gene scores, from a build_operons() row."""
     out = []
     labels = op_row["member_labels"]
 

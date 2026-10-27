@@ -1,8 +1,9 @@
 #!/usr/bin/env python3
-"""Builds FINAL_ANNOTATION_WITH_CONFIDENCE.tsv, the user-facing scoring table.
+"""Build FINAL_ANNOTATION_WITH_CONFIDENCE.tsv for user download.
 
-Presents gene identity, descriptor provenance, localisation/topology, and C1-C4
-confidence with expanded reasoning in BASE_COLUMNS order.
+This file is a scoring-phase, user-facing table that presents gene identity,
+descriptor provenance, localization/topology context, and C1-C4 confidence
+explanations in one ordered sheet.
 """
 from __future__ import annotations
 
@@ -78,7 +79,6 @@ BASE_COLUMNS = [
 
 
 def _load_tsv(path: Path) -> dict[str, dict[str, str]]:
-    """Reads a TSV with csv into a dict keyed by feature_id, keeping the first row."""
     out: dict[str, dict[str, str]] = {}
     with open(path, newline="") as fh:
         for row in csv.DictReader(fh, delimiter="\t"):
@@ -89,7 +89,6 @@ def _load_tsv(path: Path) -> dict[str, dict[str, str]]:
 
 
 def _excel_col_name(i: int) -> str:
-    """Returns the Excel column letters for a 0-based index (0 -> "A", 26 -> "AA")."""
     n = i + 1
     out = []
     while n > 0:
@@ -99,24 +98,10 @@ def _excel_col_name(i: int) -> str:
 
 
 def _prefixed_columns(cols: list[str]) -> list[str]:
-    """Prefixes each header with its Excel column letter, "Column-A: name"."""
     return [f"Column-{_excel_col_name(i)}: {name}" for i, name in enumerate(cols)]
 
 
-def _caller_columns(cols: list[str], caller: str) -> list[str]:
-    """Renames RAST_* headers after the gene caller that ran (e.g. PRODIGAL_start).
-
-    Earlier stages use RAST_* names for every caller; only this output table uses the caller's name.
-    """
-    caller = (caller or "rasttk").strip().lower()
-    if caller in ("", "rasttk", "rast"):
-        return cols
-    prefix = caller.upper() + "_"
-    return [prefix + c[len("RAST_"):] if c.startswith("RAST_") else c for c in cols]
-
-
 def _safe_float(v: str, default: float) -> float:
-    """Returns float(v), or default when it cannot be parsed."""
     try:
         return float(v)
     except (TypeError, ValueError):
@@ -124,14 +109,12 @@ def _safe_float(v: str, default: float) -> float:
 
 
 def _desc_fp(desc: str) -> str:
-    """Returns the first 16 hex characters of the description's SHA-256 (hashlib)."""
     if not desc:
         return ""
     return hashlib.sha256(desc.encode("utf-8")).hexdigest()[:16]
 
 
 def _pairwise_map(operon_results: Path) -> dict[str, list[tuple[str, float]]]:
-    """Reads operon_results.tsv with csv into {feature_id: [(neighbour_id, pairwise probability)]}."""
     out: dict[str, list[tuple[str, float]]] = {}
     with open(operon_results, newline="") as fh:
         for row in csv.DictReader(fh, delimiter="\t"):
@@ -156,7 +139,6 @@ def _pairwise_map(operon_results: Path) -> dict[str, list[tuple[str, float]]]:
 
 
 def _localization_summary(cf: dict[str, str]) -> str:
-    """Joins the SignalP6, TMbed and PSORTb calls into one " | "-separated string."""
     segs = []
     if cf.get("SIGNALP6_prediction"):
         segs.append(f"SIGNALP6={cf.get('SIGNALP6_prediction')}")
@@ -168,7 +150,6 @@ def _localization_summary(cf: dict[str, str]) -> str:
 
 
 def _hierarchy_order(hrow: dict[str, str]) -> str:
-    """Formats the hierarchy tier as "<name> (score=<score>)"."""
     s = (hrow.get("hierarchy_tier_score") or "").strip()
     n = (hrow.get("hierarchy_tier_name") or "").strip()
     if s and n:
@@ -184,7 +165,6 @@ def _c2_reasoning(
     descriptor_by_fid: dict[str, str],
     c2_score_text: str,
 ) -> str:
-    """Builds the C2 reasoning text listing each adjacent pair's UniOP probability."""
     if operon_id == "NOT_APPLICABLE_NON_CODING":
         return "non-coding feature: C2 not applicable (UniOP_operon_probability column left blank)"
     if operon_id == "NOT_IN_AN_OPERON":
@@ -215,8 +195,7 @@ def _c2_reasoning(
         + "; ".join(details)
         + f"; mean pairwise probability = {c2_score_text or '0.5000'}. Here C2 IS this raw "
         "UniOP operon probability (reported unchanged in the UniOP_operon_probability column); "
-        "the 0.5 floor is never invoked because UniOP within-operon probabilities are always "
-        ">= 0.5."
+        "UniOP within-operon probabilities are 0.5 or more, so C2 takes them as they are."
     )
 
 
@@ -224,7 +203,6 @@ def _operon_members(
     labeled_by_fid: dict[str, dict[str, str]],
     operon_by_fid: dict[str, dict[str, str]],
 ) -> dict[str, list[tuple[str, int]]]:
-    """Groups operon members by operon_id, sorted by gene start."""
     by_operon: dict[str, list[tuple[str, int]]] = {}
     for fid, op in operon_by_fid.items():
         operon_id = (op.get("operon_id") or "").strip()
@@ -250,7 +228,6 @@ def _c3_pair_details_for_operon(
     pair_prob_by_pair: dict[frozenset[str], float],
     ref: dict,
 ) -> str:
-    """Describes each adjacent pair's C3 term (OCC reliability) or why the pair is excluded."""
     parts = []
     for (a, _), (b, _) in zip(operon_members[:-1], operon_members[1:]):
         da = descriptor_by_fid.get(a, "")
@@ -269,7 +246,7 @@ def _c3_pair_details_for_operon(
         if rho_mean <= 0.0 and rho_lb <= 0.0:
             parts.append(f"({da})<->({db}): no OCC evidence (novel) -> EXCLUDED from C3")
             continue
-        # C3 is conservation only; the UniOP value is shown because C2 gates it in the final score.
+        # C3 term is conservation only; UniOP probability is shown for reference.
         parts.append(
             f"({da})<->({db}): C3 term=rho_mean={rho_mean:.4f} (OCC_lb={rho_lb:.4f}; "
             f"UniOP pairwise={p:.4f} -> C2 gate in final)"
@@ -278,7 +255,6 @@ def _c3_pair_details_for_operon(
 
 
 def _parse_c3_counts(text: str) -> tuple[int | None, int | None, int | None, int | None]:
-    """Extracts (supported, evaluated, neutral, unlinked) adjacency counts from the C3 breakdown by regex."""
     if not text:
         return None, None, None, None
     m = re.search(
@@ -295,7 +271,6 @@ def _parse_c3_counts(text: str) -> tuple[int | None, int | None, int | None, int
 
 
 def _clean_c3_reasoning_prefix(text: str) -> str:
-    """Returns the C3 breakdown text unless it is the standard "operon context:" summary."""
     if not text:
         return ""
     t = text.strip()
@@ -311,7 +286,6 @@ def _c3_reasoning_expanded(
     pair_details: str,
     reference_organism_count: int,
 ) -> str:
-    """Builds the expanded C3 reasoning from the breakdown counts, reference size and pair details."""
     if operon_id == "NOT_APPLICABLE_NON_CODING":
         return "non-coding feature: C3 not applicable; neutral handling used by scorer."
     if operon_id == "NOT_IN_AN_OPERON":
@@ -341,7 +315,6 @@ def _c3_reasoning_expanded(
 
 
 def _parse_c4_formula(c4_formula: str) -> tuple[str, str]:
-    """Rewrites the C4 formula with named terms by regex and returns (formula, reasoning)."""
     if not c4_formula:
         return "", ""
     m = re.search(r"\(\s*(\d+)\s*/\s*5\s*\)\s*\*\s*([0-9]*\.?[0-9]+)", c4_formula)
@@ -362,7 +335,6 @@ def _parse_c4_formula(c4_formula: str) -> tuple[str, str]:
 
 
 def main() -> None:
-    """Joins the labeling, operon, scoring and OCC data and writes the final annotation table."""
     ap = argparse.ArgumentParser(description=__doc__)
     ap.add_argument("--labeled-input", required=True)
     ap.add_argument("--operon-info-input", required=True)
@@ -372,8 +344,6 @@ def main() -> None:
     ap.add_argument("--confidence-final-input", required=True)
     ap.add_argument("--c4-input", required=True)
     ap.add_argument("--occ-reference", required=True)
-    ap.add_argument("--gene-caller", default="rasttk",
-                    help="the caller that produced the genes; its name goes on the gene-call columns")
     ap.add_argument("--output", required=True)
     args = ap.parse_args()
 
@@ -402,6 +372,10 @@ def main() -> None:
     ref = c3_occ.load_reference(Path(args.occ_reference))
     if not ref.get("finalized"):
         c3_occ.finalize_reference(ref)
+    # The per-pair details use the reference C3 was scored against: this genome left out.
+    organism = next((str(r.get("organism_name") or "").strip() for r in labeled_by_fid.values()), "")
+    genes = L.load_organism(organism, Path(args.labeled_input), Path(args.operon_info_input), compute_hash=True)
+    ref, _, _ = C3S.leave_self_out(ref, Path(args.occ_reference), genes, organism, args.labeled_input)
     ref_organism_count = len(ref.get("organisms_added", []))
 
     pairwise = _pairwise_map(Path(args.operon_results_input))
@@ -425,9 +399,7 @@ def main() -> None:
         for oid, members in operon_members.items()
     }
 
-    # The header names the caller that ran; col_map is still keyed by the
-    # internal names, so everything below is written once for both callers.
-    prefixed_cols = _prefixed_columns(_caller_columns(BASE_COLUMNS, args.gene_caller))
+    prefixed_cols = _prefixed_columns(BASE_COLUMNS)
     col_map = dict(zip(BASE_COLUMNS, prefixed_cols))
 
     out_path = Path(args.output)

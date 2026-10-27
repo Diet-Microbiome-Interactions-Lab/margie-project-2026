@@ -203,14 +203,13 @@ stage_scoring() {
         --confidence-final-input "$s/scored-labeled-genes-confidence-final.tsv" \
         --c4-input "$s/scored-labeled-genes-c4-ec-agreement.tsv" \
         --occ-reference "$OCC_REFERENCE" \
-        --gene-caller "$(genome_caller_ran "$g" 2>/dev/null || echo rasttk)" \
         --output "$s/FINAL_ANNOTATION_WITH_CONFIDENCE.tsv"
 }
 
 # ── phase 12: fingerprint ─────────────────────────────────────────────────────
 stage_fingerprint() {
     local g="$1" d="$GENOME_RESULTS_DIR/$1"
-    local l="$d/labeling" s="$d/scoring" f="$d/fingerprint" phobius="$d/phobius/phobius_top1.tsv"
+    local l="$d/labeling" s="$d/scoring" f="$d/fingerprint"
     mkdir -p "$f" "$FP_DIR"
     run fingerprint fingerprint/add-gene-fingerprint.py \
         --labeled-input "$l/labeled-genes.tsv" --confidence-final-input "$s/scored-labeled-genes-confidence-final.tsv" \
@@ -233,14 +232,9 @@ stage_fingerprint() {
         --operon-fp-label-composition-database "$OPERON_FP_LABEL_COMPOSITION" \
         --ec-consensus-input "$l/labeled-genes-ec-consensus.tsv" \
         --output "$s/scored-raw-labeled-genes-final-annotated.tsv"
-    # make-final-annotated.py needs a phobius summary; phobius is licence-gated, so an empty one stands in.
-    if [[ ! -f "$phobius" ]]; then
-        phobius="$f/phobius_top1.not-run.tsv"
-        printf 'feature_id\n' > "$phobius"
-    fi
     run fingerprint fingerprint/make-final-annotated.py \
         --full-evidence-input "$s/scored-raw-labeled-genes-final-annotated.tsv" \
-        --labeling-genes-input "$l/labeled-genes.tsv" --phobius-top1-input "$phobius" \
+        --labeling-genes-input "$l/labeled-genes.tsv" \
         --fingerprint-full-input "$f/labeled-genes-fingerprint-full.tsv" \
         --output "$s/FINAL-scored-labeled-genes-annotated.tsv"
     run fingerprint fingerprint/update-operon-fingerprint-database.py \

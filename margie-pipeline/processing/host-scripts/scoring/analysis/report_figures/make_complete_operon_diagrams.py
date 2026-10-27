@@ -99,6 +99,8 @@ def main() -> None:
     ap.add_argument("--run-root", required=True)
     ap.add_argument("--organism", required=True)
     ap.add_argument("--operon-db", default=str(L.DEFAULT_OPERON_DB))
+    ap.add_argument("--occ-reference", default=str(L.DEFAULT_OCC_REFERENCE),
+                    help="the OCC reference scoring used (its genomes are the comparison pool)")
     ap.add_argument("--output-dir", default=None,
                     help="defaults to <run>/<organism>/scoring/figures")
     args = ap.parse_args()
@@ -115,15 +117,14 @@ def main() -> None:
     genes = L.load_organism_genes(run_root, args.organism)
     operons = L.build_operons(genes)
 
-    # Pool = the OCC reference's organisms minus this one (leave-one-out), with
-    # tallies from the OCC genome-stats sidecar, as in the standard reports.
-    restrict = L.load_occ_organisms() or set(L.discover_organisms(run_root))
-    restrict = set(restrict)
-    restrict.discard(org_label)
+    # Leave-one-out pool: OCC organisms minus this one, under the reference's name for it, as in
+    # the standard reports.
+    restrict, missing = L.comparison_pool(args.occ_reference, args.operon_db,
+                                          leave_out=L.left_out_as(run_root, args.organism))
     recurrence = L.load_operon_recurrence(Path(args.operon_db), restrict_to=restrict)
     pool_list = sorted(restrict)
-    pstats = L.aggregate_pool_stats(L.load_pool_stats(), pool_list)
-    L.set_provenance(L.provenance_text(len(pool_list), pstats, leave_one_out=True))
+    pstats = L.aggregate_pool_stats(L.load_pool_stats(Path(args.occ_reference)), pool_list) if not missing else None
+    L.set_provenance(L.provenance_text(len(pool_list), pstats, leave_one_out=True, missing=missing))
 
     ops = operons.copy()
     ops["pangenome_organisms"] = ops["members_in_order"].map(
@@ -142,7 +143,6 @@ def main() -> None:
         if int(size) < 2:
             continue
         bin_ops = [r for _, r in ops[ops["size"] == size].iterrows()]
-        # Most-shared operons first, then by id
         bin_ops.sort(key=lambda r: (-k_lookup(r), str(r["operon_id"])))
         heights = [_block_height(_members(r)) for r in bin_ops]
         pages = _paginate(bin_ops, heights)

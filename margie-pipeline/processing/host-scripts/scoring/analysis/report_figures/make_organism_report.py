@@ -30,9 +30,7 @@ def _table_units(members) -> float:
     return L.member_table_units(members)
 
 
-# ---------------------------------------------------------------------------
-# fig01 -- confidence tiers and the confidence-score distribution
-# ---------------------------------------------------------------------------
+# ---- fig01: confidence tiers and the confidence-score distribution ----
 def fig01(genes: pd.DataFrame, outdir: Path, org_label: str) -> None:
     """Draws genes per confidence tier and the final-score histogram (numpy)."""
     coding = genes[genes["confidence_tier"] != L.NONCODING_TIER]
@@ -77,9 +75,7 @@ def fig01(genes: pd.DataFrame, outdir: Path, org_label: str) -> None:
                 outdir / "fig01_confidence_score_histogram.tsv")
 
 
-# ---------------------------------------------------------------------------
-# fig02 -- preliminary -> operon-adjusted -> final confidence
-# ---------------------------------------------------------------------------
+# ---- fig02: preliminary -> operon-adjusted -> final confidence ----
 def fig02(genes: pd.DataFrame, outdir: Path, org_label: str) -> None:
     """Draws preliminary vs final confidence, the operon-correction histogram and before/after means.
 
@@ -98,7 +94,7 @@ def fig02(genes: pd.DataFrame, outdir: Path, org_label: str) -> None:
 
     fig, (axA, axB, axC) = plt.subplots(1, 3, figsize=(16.2, 5.4))
 
-    # (a) preliminary vs final -- olive=raised, dark red=lowered, hollow black=unchanged
+    # (a) preliminary vs final: olive raised, dark red lowered, hollow unchanged
     axA.plot([0, 1], [0, 1], color="black", lw=1.3, ls="--", zorder=1)
     axA.scatter(prelim[eq], final[eq], s=13, facecolor="none", edgecolor="black",
                 linewidths=0.5, label="unchanged", zorder=2)
@@ -110,7 +106,8 @@ def fig02(genes: pd.DataFrame, outdir: Path, org_label: str) -> None:
              fontsize=12.5, fontweight="bold", color=L.INK)
     axA.set_xlabel("preliminary confidence (C1–C4)")
     axA.set_ylabel("final confidence score")
-    axA.set_xlim(0, 1); axA.set_ylim(0, 1)
+    # A little room past 0 and 1, so genes scored 0 or 1 show whole.
+    axA.set_xlim(-0.03, 1.03); axA.set_ylim(-0.03, 1.03)
     axA.legend(loc="lower right", fontsize=8, frameon=True, facecolor="white",
                edgecolor="#bbbbbb", framealpha=0.95)
     L.set_title(axA, "Preliminary vs final")
@@ -142,11 +139,11 @@ def fig02(genes: pd.DataFrame, outdir: Path, org_label: str) -> None:
     axC.set_ylabel("mean confidence")
     axC.set_xlim(-0.35, 1.35)
     axC.set_ylim(min(means) - 0.05, max(means) + 0.05)
-    axC.set_xlabel(f"{int(up.sum()):,} genes raised · {int(dn.sum()):,} lowered")
+    axC.set_xlabel(f"{int(up.sum()):,} genes raised | {int(dn.sum()):,} lowered")
     L.set_title(axC, "Mean confidence before vs after")
     L.panel_letter(axC, "c")
 
-    L.finish(fig, "How operon context changes confidence", organism=org_label, top=0.9)
+    L.finish(fig, "How operon context changes confidence", organism=org_label, top=0.9, band=1.8)
     L.draw_sources_footer(fig, _RUN_ROOT, L.organism_source_lines(_RUN_ROOT, org_label))
     L.savefig(fig, outdir / "fig02_confidence_stages.png")
     out = pd.DataFrame({
@@ -164,9 +161,7 @@ def fig02(genes: pd.DataFrame, outdir: Path, org_label: str) -> None:
                 outdir / "fig02_confidence_stage_means.tsv")
 
 
-# ---------------------------------------------------------------------------
-# fig03 -- operon-context score and pangenome breadth by operon size
-# ---------------------------------------------------------------------------
+# ---- fig03: operon-context score and pangenome breadth by operon size ----
 def _box_by_bin(ax, df, value_col, color, ylabel):
     """Draws box plots of value_col by operon size bin via reportfig_lib.box_by_bin."""
     return L.box_by_bin(ax, df, "size_bin", value_col, L.SIZE_BIN_ORDER, color,
@@ -192,8 +187,7 @@ def fig03(genes: pd.DataFrame, operons: pd.DataFrame, recurrence: dict,
     L.set_title(axA, "Operon-context score by operon size")
     L.panel_letter(axA, "a")
 
-    # (b) share of this organism's operons that also occur in >=2 pangenome
-    # organisms, by operon size (matched operons only).
+    # (b) operons also in >=2 pangenome organisms, by size (matched operons only)
     matched = ops[ops["pangenome_organisms"].notna()]
     labB, pctB, nB = [], [], []
     for b in L.SIZE_BIN_ORDER:
@@ -230,9 +224,7 @@ def fig03(genes: pd.DataFrame, operons: pd.DataFrame, recurrence: dict,
                 outdir / "fig03_recurrence_by_operon_size.tsv")
 
 
-# ---------------------------------------------------------------------------
-# fig04 -- distribution of each confidence component (C1..C4)
-# ---------------------------------------------------------------------------
+# ---- fig04: distribution of each confidence component (C1..C4) ----
 def fig04(genes: pd.DataFrame, outdir: Path, org_label: str) -> None:
     """Draws a histogram with median for each of C1-C4."""
     comps = [("C1", "c1_score"), ("C2", "c2_score_from_operon_probability"),
@@ -261,9 +253,7 @@ def fig04(genes: pd.DataFrame, outdir: Path, org_label: str) -> None:
     L.write_tsv(pd.DataFrame(rows), outdir / "fig04_component_summary.tsv")
 
 
-# ---------------------------------------------------------------------------
-# fig05 -- one real operon neighbourhood (gene track)
-# ---------------------------------------------------------------------------
+# ---- fig05: one real operon neighbourhood (gene track) ----
 def _pick_window(genes: pd.DataFrame, span: int = 11) -> pd.DataFrame:
     """Returns a window of genes on the largest contig centred on a boundary between two operons at least 100 bp apart."""
     g = genes.dropna(subset=["gene_start"]).copy()
@@ -334,10 +324,7 @@ def fig05(genes: pd.DataFrame, outdir: Path, org_label: str) -> None:
     L.write_tsv(out, outdir / "fig05_operon_neighbourhood.tsv")
 
 
-# ---------------------------------------------------------------------------
-# fig06 / fig07 / fig08 -- galleries of the most-reproduced, most-unique and
-# penalised operons: gene track plus full descriptors and confidence.
-# ---------------------------------------------------------------------------
+# ---- fig06/07/08: galleries of reproduced, unique and penalised operons ----
 _GALLERY_N = 10
 _GALLERY_CAP = 6   # members drawn per operon row
 
@@ -400,7 +387,7 @@ def fig06_07(operons: pd.DataFrame, recurrence: dict, outdir: Path, org_label: s
         lambda m: recurrence.get(m, {}).get("organism_count", 0))
     ops["pangenome_occurrences"] = ops["members_in_order"].map(
         lambda m: recurrence.get(m, {}).get("label_frequency", 0))
-    # show operons of named-function genes only (same informative gate as scoring)
+    # Keeps operons of named-function genes only (scoring's informative gate).
     ops["all_named"] = ops["members_in_order"].map(
         lambda m: L.operon_members_informative(m))
     ops["mostly_named"] = ops["members_in_order"].map(
@@ -442,6 +429,8 @@ def main() -> None:
     ap.add_argument("--run-root", required=True)
     ap.add_argument("--organism", required=True)
     ap.add_argument("--operon-db", default=str(L.DEFAULT_OPERON_DB))
+    ap.add_argument("--occ-reference", default=str(L.DEFAULT_OCC_REFERENCE),
+                    help="the OCC reference scoring used (its genomes are the comparison pool)")
     ap.add_argument("--output-dir", default=None,
                     help="default: <run>/<organism>/scoring/figures")
     args = ap.parse_args()
@@ -457,17 +446,15 @@ def main() -> None:
     org_label = args.organism
     genes = L.load_organism_genes(run_root, args.organism)
     operons = L.build_operons(genes)
-    # Recurrence and the pool caption use the OCC reference's organisms,
-    # falling back to this run's organisms when the OCC is unreadable.
-    restrict = L.load_occ_organisms() or set(L.discover_organisms(run_root))
-    # Leave-one-out: the pool excludes this organism, as in its C3 scoring.
-    restrict = set(restrict)
-    restrict.discard(org_label)
+    # Leave-one-out: the pool excludes this organism, as in its C3 scoring, under the reference's
+    # name for it (an earlier run may have added it under another name).
+    restrict, missing = L.comparison_pool(args.occ_reference, args.operon_db,
+                                          leave_out=L.left_out_as(run_root, args.organism))
     recurrence = L.load_operon_recurrence(Path(args.operon_db), restrict_to=restrict)
     # Provenance line: pool size and tallies from the OCC genome-stats sidecar.
     pool_list = sorted(restrict)
-    pstats = L.aggregate_pool_stats(L.load_pool_stats(), pool_list)
-    L.set_provenance(L.provenance_text(len(pool_list), pstats, leave_one_out=True))
+    pstats = L.aggregate_pool_stats(L.load_pool_stats(Path(args.occ_reference)), pool_list) if not missing else None
+    L.set_provenance(L.provenance_text(len(pool_list), pstats, leave_one_out=True, missing=missing))
 
     jobs = [
         ("fig01", lambda: fig01(genes, outdir, org_label)),
@@ -486,7 +473,7 @@ def main() -> None:
             failures.append(name)
             print(f"[make_organism_report] {name} FAILED:\n{traceback.format_exc()}",
                   file=sys.stderr)
-    L.write_sources_manifest(outdir, run_root, [args.organism], Path(args.operon_db))
+    L.write_sources_manifest(outdir, run_root, [args.organism], Path(args.operon_db), Path(args.occ_reference))
     print(f"[make_organism_report] {args.organism}: {len(jobs) - len(failures)}/{len(jobs)} "
           f"figure groups ok → {outdir}")
     if failures:

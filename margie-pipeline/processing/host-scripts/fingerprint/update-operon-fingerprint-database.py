@@ -4,7 +4,8 @@
 Counts each distinct operon once and adds it to four pools, keyed by the
 evidence/label ordered/composition hashes from add-operon-fingerprint.py,
 using the same fcntl lock and .tmp-then-rename write as
-update-fingerprint-database.py. Columns: pattern_id, fingerprint_hash,
+update-fingerprint-database.py. A genome already in a pool, by name, is not
+counted again. Columns: pattern_id, fingerprint_hash,
 members_in_order, fingerprint_frequency (operons with this hash),
 fingerprint_label_frequency (operons with this member sequence), organisms.
 """
@@ -86,7 +87,12 @@ def _do_update(new_operons: dict[str, dict], organism: str, db_tsv: Path, key: s
                     "organisms": set(o for o in row.get("organisms", "").split("|") if o),
                 }
 
-    # Each distinct operon counts once, even when several in one genome share a hash.
+    # A genome counts once: a run of a genome already in the pool leaves it as it is.
+    if any(organism in p["organisms"] for p in patterns.values()):
+        print(f"[update-operon-fingerprint-database] {organism} is already in {db_tsv.name}; not counted again")
+        return
+
+    # Each distinct operon counts once, even when a genome shares a hash.
     for oid, parsed in new_operons.items():
         h = parsed[key]
         members = parsed["members"]

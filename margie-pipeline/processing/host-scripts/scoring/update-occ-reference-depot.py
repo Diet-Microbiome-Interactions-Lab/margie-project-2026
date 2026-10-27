@@ -9,7 +9,9 @@ from __future__ import annotations
 import argparse
 import csv
 import fcntl
+import json
 import sys
+from datetime import datetime, timezone
 from pathlib import Path
 
 _THIS_DIR = Path(__file__).resolve().parent
@@ -89,22 +91,30 @@ def main() -> None:
             ref = c3_occ.new_reference()
 
         before = len(ref.get("organisms_added", set()))
-        already_present = organism in ref.get("organisms_added", set())
-
-        c3_occ.update_reference(ref, genes, run_root, organisms=[organism], skip_existing=True)
-        c3_occ.finalize_reference(ref)
-        c3_occ.save_reference(ref, reference_path)
-
-        # Records the content fingerprint so scoring can leave this genome out by content.
+        # The same genome is known by its content (its proteins), whatever name it comes under: one
+        # already in the reference under another name is not added again.
         fingerprint = L.genome_fingerprint(genes["aa_hash"])
-        c3_occ.record_member(reference_path, fingerprint, organism)
-        # Records gene/operon tallies used for figure provenance.
-        c3_occ.record_pool_stats(reference_path, fingerprint, organism,
-                                 L.genome_pool_stats(genes))
+        known_as = c3_occ.load_members(reference_path).get(fingerprint) if fingerprint else None
+        same_genome = known_as if known_as and known_as != organism and known_as in ref.get("organisms_added", set()) else None
+        already_present = organism in ref.get("organisms_added", set()) or same_genome is not None
+
+        if same_genome is None:
+            c3_occ.update_reference(ref, genes, run_root, organisms=[organism], skip_existing=True)
+            c3_occ.finalize_reference(ref)
+            c3_occ.save_reference(ref, reference_path)
+            # Records the content fingerprint so scoring can leave this genome out by content.
+            c3_occ.record_member(reference_path, fingerprint, organism)
+            # Records gene/operon tallies used for figure provenance.
+            c3_occ.record_pool_stats(reference_path, fingerprint, organism,
+                                     L.genome_pool_stats(genes))
 
         after = len(ref.get("organisms_added", set()))
+        # The reference's size now, for Results (a genome scored against fewer can be scored again).
+        Path(str(reference_path) + ".summary.json").write_text(json.dumps({
+            "genomes": after, "updated_at": datetime.now(timezone.utc).isoformat(timespec="seconds")}) + "\n")
         added = after - before
-        status = "already_present" if already_present else ("added" if added > 0 else "no_change")
+        status = (f"already_present_as={same_genome}" if same_genome else
+                  "already_present" if already_present else ("added" if added > 0 else "no_change"))
         msg = (
             f"occ reference status={status}; organism={organism}; "
             f"fingerprint={fingerprint[:12] or '(none)'}; "

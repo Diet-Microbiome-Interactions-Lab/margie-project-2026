@@ -63,7 +63,7 @@ _OUT_COLS = [
     "confidence_tier",
     "needs_review",
     "needs_review_reason",
-    # ── Copies of label and coordinates placed next to the confidence columns ─
+    # ── Label and coordinate copies ──────────────────────────────────
     "gene_id_copy",
     "gene_start_copy",
     "gene_end_copy",
@@ -90,8 +90,6 @@ def main() -> None:
                         help="labeled-genes-final-annotated.tsv (from add-fingerprint-to-final.py)")
     parser.add_argument("--labeling-genes-input", required=True,
                         help="labeling/labeled-genes.tsv")
-    parser.add_argument("--phobius-top1-input", required=True,
-                        help="phobius/phobius_top1.tsv")
     parser.add_argument("--fingerprint-full-input", required=True,
                         help="fingerprint/labeled-genes-fingerprint-full.tsv")
     parser.add_argument("--output", required=True,
@@ -100,14 +98,12 @@ def main() -> None:
 
     in_path      = Path(args.full_evidence_input)
     lab_path     = Path(args.labeling_genes_input)
-    phob_path    = Path(args.phobius_top1_input)
     fp_full_path = Path(args.fingerprint_full_input)
     out_path     = Path(args.output)
 
     for label, p in [
         ("full-evidence",    in_path),
         ("labeling-genes",   lab_path),
-        ("phobius-top1",     phob_path),
         ("fingerprint-full", fp_full_path),
     ]:
         if not p.is_file():
@@ -137,7 +133,7 @@ def main() -> None:
             lab = lab_by_gene.get(fid, {})
             fp  = fp_by_gene.get(fid, {})
 
-            # The full fingerprint already reads "pattern hash: ... || label: ... || fingerprint: ...".
+            # Full fingerprint already includes pattern hash, label and fingerprint.
             fp_pattern = fp.get("fingerprint", "")
             if fp_pattern:
                 gene_fp = fp_pattern

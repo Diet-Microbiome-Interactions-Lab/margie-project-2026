@@ -22,9 +22,7 @@ csv.field_size_limit(10 ** 8)
 TIERS = ["highest", "high", "medium", "fair", "low"]          # index 0..4; -1 = non-coding
 TIER_IDX = {t: i for i, t in enumerate(TIERS)}
 
-# Evidence trail entries (display name, group, candidate columns) read from the
-# consolidated per-tool matrix; decision databases first, then domain
-# signatures, then specialised callers.
+# Evidence trail entries (name, group, candidate columns), decision databases first.
 EVIDENCE = [
     ("RAST", "decision", ["RAST_description"]),
     ("COG", "decision", ["COG_description"]),
@@ -56,9 +54,36 @@ EV_NAMES = [e[0] for e in EVIDENCE]
 EV_GROUPS = [e[1] for e in EVIDENCE]
 _UNINF = re.compile(r"^(hypothetical|uncharacter|unknown|putative uncharacter|domain of unknown"
                     r"|conserved (hypothetical|protein)|duf\d)", re.I)
-# alignment-based tools carry a % identity worth showing on the evidence trail
+# Alignment-based tools carry a % identity shown on the evidence trail.
 IDENTITY_COL = {"UniProt": "UNIPROT_percent_identity", "COG": "COG_identity",
                 "MEROPS": "MEROPS_percent_identity", "TCDB": "TCDB_percent_identity"}
+
+
+# The evidence trail's names for C1's slots; its shared slot covers three databases.
+C1_SLOT_TOOLS = {"RAST": ["RAST"], "COG": ["COG"], "PFAM": ["Pfam"], "KEGG": ["KEGG"], "EGGNOG": ["eggNOG"],
+                 "UNIPROT": ["UniProt"], "TIGRFAM_CLUSTER": ["PGAP", "TIGRFAM", "NCBIfam"]}
+
+
+def c1_counted(reasoning: str) -> list[str]:
+    """Returns the evidence-trail names C1 counted, from its reasoning ("k/7 ... : PFAM;TIGRFAM_CLUSTER")."""
+    if ":" not in (reasoning or ""):
+        return []
+    tail = reasoning.rsplit(":", 1)[1]
+    out = []
+    for slot in (x.strip() for x in tail.split(";") if x.strip()):
+        # "TIGRFAM_CLUSTER(PGAP)": the member that counted; a bare slot (older tables) lights all three.
+        member = re.fullmatch(r"TIGRFAM_CLUSTER\((\w+)\)", slot, re.I)
+        if member:
+            out.append({"TIGRFAM": "TIGRFAM", "PGAP": "PGAP", "NCBIFAM": "NCBIfam"}.get(member.group(1).upper(), member.group(1)))
+        else:
+            out += C1_SLOT_TOOLS.get(slot.upper(), [])
+    return out
+
+
+def viewer_version() -> str:
+    """A short hash of this script: the same script always draws the same kind of map."""
+    import hashlib
+    return hashlib.sha256(Path(__file__).read_bytes()).hexdigest()[:12]
 
 
 def fmt_pid(v):
@@ -72,8 +97,7 @@ def fmt_pid(v):
     return f"{round(x)}% id"
 
 
-# Gene-call columns carry the caller's prefix (RAST_start, PRODIGAL_start), so
-# they are matched by the part after the prefix.
+# Gene-call columns carry the caller's prefix (RAST_start), so the suffix is matched.
 GENE_CALLERS = ("rast", "rasttk", "prodigal")
 
 
@@ -113,8 +137,7 @@ def num(v, nd=2):
         return None
 
 
-# Locations of the consolidated matrix relative to the FINAL table's directory,
-# before and after reorganize_outputs.py; --consolidated overrides them.
+# Consolidated matrix locations relative to the FINAL table; --consolidated overrides.
 _CONS_NAME = "consolidated-merged-all-columns.tsv"
 _CONS_CANDIDATES = (
     Path("per-tool-phased-output") / "consolidation" / _CONS_NAME,  # reorganized
@@ -147,7 +170,9 @@ def load_fingerprints(final_path):
     Parses "pattern hash: X || label: Y || fingerprint: F1: v | F2: v ..."; empty fields are dropped.
     """
     base = Path(final_path).resolve().parent
-    for rel in ("../fingerprint/labeled-genes-fingerprint-full.tsv", "fingerprint/labeled-genes-fingerprint-full.tsv"):
+    # Beside the scoring folder during a run, or under per-tool-phased-output once the run has tidied its folder.
+    for rel in ("../fingerprint/labeled-genes-fingerprint-full.tsv", "fingerprint/labeled-genes-fingerprint-full.tsv",
+                "per-tool-phased-output/fingerprint/labeled-genes-fingerprint-full.tsv"):
         p = (base / rel).resolve()
         if p.is_file():
             break
@@ -187,7 +212,7 @@ def main():
         raise SystemExit(f"no rows in {final}")
     organism = col(rows[0], "organism_name")
 
-    # consolidated per-tool matrix (for the evidence trail); join by feature_id
+    # Consolidated per-tool matrix for the evidence trail, keyed by feature_id.
     cons_path = find_consolidated(final, explicit_cons)
     cons = {}
     if cons_path is not None:
@@ -243,7 +268,7 @@ def main():
         return {"pid": pidv, "en": en, "desc": desc[:80],
                 "inf": bool(desc) and not _UNINF.match(clean_ev(desc))}
 
-    # contig lengths (max end), largest first
+    # Contig lengths (max end), largest first.
     clen = {}
     for r in rows:
         gid = col(r, "gene_id")
@@ -261,8 +286,7 @@ def main():
 
     fps = load_fingerprints(final)
     genes = []
-    # Longer per-gene report text in XF order, gzipped into the page and unpacked
-    # only when a report is downloaded.
+    # Per-gene report text in XF order, gzipped into the page, unpacked on download.
     XF = ["gene_id", "FEATURE_TYPE", "ENVELOPE", "ENVELOPE_reason", "best_consensus_product_descriptor_source_hierarchy_order",
           "best_consensus_product_descriptor_source_audit_trail", "specialized_database_hits", "localization_and_topology_hits",
           "C1_reasoning", "C2_score_formula", "C2_score_reasoning", "C3_score_formula", "C3_score_reasoning",
@@ -284,8 +308,11 @@ def main():
         in_op = col(r, "IS_IN_OPERON?").strip().lower() == "yes" and opid.startswith("operon_")
         rv = col(r, "NEEDS_REVIEW?").strip().lower() == "yes"
         c4v = num(col(r, "C4_score_EC_conflict"))
+        # Regions RASTtk reports beside the genes (prophages, repeats, CRISPR arrays) span many genes.
+        ftype = col(r, "FEATURE_TYPE").strip().lower()
         genes.append({
             "s": s, "e": e,
+            "rg": 1 if ftype and ftype not in ("cds", "peg", "rna") else 0,
             "st": -1 if col(r, "RAST_strand").strip() == "-" else 1,
             "ci": cidx[contig_of(gid)],
             "ti": ti,
@@ -293,6 +320,7 @@ def main():
             "op": opid if in_op else None,
             "pr": num(col(r, "UniOP_operon_probability")),
             "c1": num(col(r, "C1_score_database_coverage")),
+            "c1t": c1_counted(col(r, "C1_reasoning")),
             "c2": num(col(r, "C2_score_pairwise_genes_UniOP_probability")),
             "c3": num(col(r, "C3_score_operon_context")),
             "c3h": num(col(r, "C3_score_operon_context_hybrid")),
@@ -301,7 +329,7 @@ def main():
             "fin": num(col(r, "ADJUSTED_CONFIDENCE_WITH_OPERON_CONTEXT")),
             "finh": num(col(r, "ADJUSTED_CONFIDENCE_WITH_OPERON_CONTEXT_hybrid")),
             "tih": TIER_IDX.get(col(r, "CONFIDENCE_TIER_hybrid").strip(), -1),
-            "imp": 1 if col(r, "DOES_OPERON_CONTEXT_IMPROVE_CONFIDENCE?").strip().lower() == "yes" else 0,
+            "imp": 1 if col(r, "DOES_OPERON_CONTEXT_IMPROVE_CONFIDENCE?").strip().lower() in ("increases", "yes") else 0,
             "ecs": col(r, "EC_EVIDENCE_STATUS"),
             "c4r": col(r, "C4_score_reasoning")[:200] if (c4v is not None and c4v < 1) else "",
             "rv": 1 if rv else 0,
@@ -316,7 +344,6 @@ def main():
 
     n_op = len({g["op"] for g in genes if g["op"]})
     n_flag = sum(g["rv"] for g in genes)
-    # Display label is the genome identifier as given.
     short = organism
 
     data = {
@@ -331,12 +358,15 @@ def main():
     html = TEMPLATE.replace("/*__DATA__*/", json.dumps(data, separators=(",", ":"))).replace("__XTRA__", packed)
 
     if "--artifact" in sys.argv:
-        # Artifact mode emits only title, style and body content; the host supplies the document shell.
+        # Artifact mode emits title, style and body only; the host supplies the shell.
         style = re.search(r"<style>.*?</style>", html, re.S).group(0)
         inner = re.search(r"<body>(.*)</body>", html, re.S).group(1)
         html = (f"<title>{short} genome — MARGIE confidence viewer</title>\n"
                 f"{style}\n{inner}")
 
+    # Which version of this script drew the map, first in the file: Results offers to make a map again
+    # only when it was drawn by an older one (see viewer_version()).
+    html = html.replace("<!doctype html>", f"<!doctype html>\n<!-- margie-viewer {viewer_version()} -->", 1)
     out = Path(out); out.parent.mkdir(parents=True, exist_ok=True)
     out.write_text(html)
     print(f"wrote {out}  ({short}: {len(genes)} genes, {len(order)} replicons, "
@@ -464,8 +494,13 @@ TEMPLATE = r"""<!doctype html>
   .trail h4{font-size:12px;margin:0 0 2px;color:var(--muted);font-weight:normal;letter-spacing:.5px;text-transform:uppercase}
   .trail .cnt{color:var(--muted);font-size:12px;margin-bottom:4px}
   .grp{font-size:11.5px;color:var(--muted);margin:9px 0 2px;font-style:italic}
-  .erow{display:grid;grid-template-columns:88px 1fr;gap:8px;font-size:11.5px;padding:1.5px 0;line-height:1.3}
+  .erow{display:grid;grid-template-columns:minmax(88px,max-content) minmax(0,1fr);gap:8px;font-size:11.5px;padding:1.5px 0;line-height:1.3}
   .erow .etool{color:var(--muted);white-space:nowrap}
+  .erow .edesc{overflow-wrap:anywhere}
+  .ehint{font-size:11px;font-style:italic}
+  .fpgrid{display:grid;grid-template-columns:max-content minmax(0,1fr);gap:1.5px 10px;font-size:11.5px;line-height:1.3}
+  .fpk{color:var(--muted);white-space:nowrap}
+  .fpv{overflow-wrap:anywhere}
   .erow.win .etool{color:var(--operon);font-weight:bold}
   .erow.win .edesc{font-weight:bold}
   .chosen{display:inline-block;font-size:9.5px;color:#fff;background:var(--operon);border-radius:2px;padding:1px 7px;margin-left:7px;vertical-align:1px}
@@ -561,6 +596,8 @@ const OPERON_CYCLE=["#1F77FF","#FF8C00","#00B84D","#B65CFF","#00C2D1","#EE2233"]
 // Retained for the legend swatch and the operon card tag.
 const OPERON=OPERON_CYCLE[0];
 const NONCODE="#d5d5d5", NONOP="#6b6b6b", FLAG="#b32b1e";
+// A region (prophage, repeat, CRISPR array): a pale band under the genes it holds.
+const REGION="#eeeeea";
 // Stable per-operon colour: hash the id so a given operon keeps its colour
 // across renders and modes, instead of depending on iteration order.
 function opColor(id){
@@ -630,17 +667,19 @@ order.forEach((ci,k)=>{
   }
 });
 
-// ---- gene layer (event-delegated) ----
+// ---- gene layer (event-delegated); regions sit in their own layer underneath ----
+const regionLayer=el("g",{}); svg.appendChild(regionLayer);
 const geneLayer=el("g",{}); svg.appendChild(geneLayer);
 const flagLayer=el("g",{}); svg.appendChild(flagLayer);
 const nodes=[];
 D.genes.forEach((g,i)=>{
   let aHi=ang(g.ci,g.s), aLo=ang(g.ci,g.e); if(aHi<aLo){const t=aHi;aHi=aLo;aLo=t;}
   if(aHi-aLo<0.05) aHi=aLo+0.05;
-  const ro=g.st>0?R.fO:R.rO, ri=g.st>0?R.fI:R.rI;
+  // A region spans both gene rings, under the genes; a gene fills its strand's ring.
+  const ro=g.rg?R.fO:g.st>0?R.fO:R.rO, ri=g.rg?R.rI:g.st>0?R.fI:R.rI;
   const poly=el("polygon",{points:`${P(ro,aHi)} ${P(ro,aLo)} ${P(ri,aLo)} ${P(ri,aHi)}`,class:"gene"});
   poly.dataset.i=i; if(g.op)poly.dataset.op=g.op;
-  geneLayer.appendChild(poly); nodes.push(poly);
+  (g.rg?regionLayer:geneLayer).appendChild(poly); nodes.push(poly);
   if(g.rv){const mid=(aHi+aLo)/2;const[x0,y0]=pol(R.tick-6,mid),[x1,y1]=pol(R.tick+6,mid);
     const ln=el("line",{x1:x0,y1:y0,x2:x1,y2:y1,stroke:FLAG,"stroke-width":.9}); ln.dataset.flag=i; flagLayer.appendChild(ln);}
 });
@@ -671,6 +710,7 @@ function shown(g){
   }
 }
 function geneFill(g){
+  if(g.rg) return REGION;
   if(!shown(g)) return HIDDEN;
   if(mode==="gene") return g.ti<0?NONCODE:TIER_COL[g.ti];
   if(mode==="review") return g.rv?(g.ti<0?NONCODE:TIER_COL[g.ti]):"#ececea";
@@ -814,7 +854,9 @@ function fingerprintBox(g){
   if(!fp) return "";
   let h=`<div class="trail"><h4>fingerprint</h4>`;
   if(fp.l) h+=`<div class="cnt">label: <b>${esc(fp.l)}</b></div>`;
-  (fp.f||[]).forEach(([k,v])=>{ h+=`<div class="erow"><span class="etool">${esc(k.replace(/_/g," "))}</span><span class="edesc">${esc(v)}</span></div>`; });
+  h+=`<div class="fpgrid">`;
+  (fp.f||[]).forEach(([k,v])=>{ h+=`<span class="fpk">${esc(k.replace(/_/g," "))}</span><span class="fpv">${esc(v)}</span>`; });
+  h+=`</div>`;
   if(fp.h) h+=`<div class="cnt fphash">pattern hash ${esc(fp.h)}</div>`;
   return h+`</div>`;
 }
@@ -924,16 +966,19 @@ async function downloadGene(i){
   setTimeout(()=>URL.revokeObjectURL(a.href),1500);
 }
 document.addEventListener("click",e=>{ const b=e.target.closest("[data-gene-dl]"); if(b) downloadGene(+b.dataset.geneDl); });
-const GRP_LABEL={decision:"decision databases (set C1)",domain:"domain / family signatures",special:"specialised callers"};
+const GRP_LABEL={decision:"decision databases (C1)",domain:"domain / family signatures (not in C1)",special:"specialised callers (not in C1)"};
 function isWin(name,src){ if(!src)return false; const a=name.toUpperCase().replace(/[^A-Z]/g,""),b=src.toUpperCase().replace(/[^A-Z]/g,"");
   return a&&b&&(b.indexOf(a)>=0||a.indexOf(b)>=0); }
 function evidenceTrail(g){
   const ev=g.ev||[];
   if(!ev.length) return `<div class="trail"><h4>evidence trail</h4><div class="cnt">no per-tool record for this feature.</div></div>`;
-  const infN=ev.filter(r=>r[3]).length;
+  // As C1 counts: 7 slots (TIGRFAM, PGAP and NCBIfam share one), and only the databases C1 counted are bright.
+  const counted=new Set(g.c1t||[]);
+  const k=g.c1!=null?Math.round(g.c1*7):null;
   let h=`<div class="trail"><h4>evidence trail</h4>`
-       +`<div class="cnt">${infN} of ${ev.length} databases returned an informative name`
-       +`${g.src?` | chosen: <b>${esc(g.src)}</b>`:""}</div>`;
+       +`<div class="cnt">${k!=null?`C1 counts <b>${k} of 7</b> databases (TIGRFAM, PGAP and NCBIfam share one)`:"evidence"}`
+       +`${g.src?` | chosen: <b>${esc(g.src)}</b>`:""}</div>`
+       +`<div class="cnt ehint">dimmed: not counted in C1 (no function in the name, such as hypothetical, uncharacterized or a UPF or DUF family, or the TIGRFAM slot it shares with PGAP and NCBIfam already counted)</div>`;
   if(g.c4!=null && g.c4<1)
     h+=`<div class="ecflag">⚑ EC conflict: C4 = ${pct(g.c4)}${g.ecs?" ("+esc(g.ecs)+")":""}. `
       +`${esc(g.c4r||"tools disagree on the EC number; compare the [EC:…] tags below.")}</div>`;
@@ -943,7 +988,9 @@ function evidenceTrail(g){
     const grp=D.evGroups[ti], name=D.evNames[ti];
     if(grp!==last){ h+=`<div class="grp">${GRP_LABEL[grp]||grp}</div>`; last=grp; }
     const win=isWin(name,g.src);
-    h+=`<div class="erow${win?" win":""}${inf?"":" uninf"}"><span class="etool">${esc(name)}`
+    // A decision database is bright when C1 counted it; the others keep their own informative mark.
+    const lit=grp==="decision"&&g.c1t?counted.has(name):inf;
+    h+=`<div class="erow${win?" win":""}${lit?"":" uninf"}"><span class="etool">${esc(name)}`
       +`${metric?` <span class="emetric">${esc(metric)}</span>`:""}</span>`
       +`<span class="edesc">${esc(desc)}${win?`<span class="chosen">chosen</span>`:""}</span></div>`;
   });

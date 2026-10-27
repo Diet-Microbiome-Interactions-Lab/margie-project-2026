@@ -23,8 +23,10 @@ Usage:
 """
 import argparse
 import csv
+import json
 import math
 import sys
+from datetime import datetime, timezone
 from pathlib import Path
 
 # c3_occ and c3_lib sit next to this script and match how the reference was built.
@@ -39,8 +41,7 @@ _NEUTRAL = 0.5
 
 
 # ---------------------------------------------------------------------------
-# Adjacency channel: Jeffreys posterior mean here (c3_score); c3_occ.rho_adj
-# gives the 95% lower bound (c3_lowerbound).
+# Adjacency channel: Jeffreys posterior mean; c3_occ.rho_adj gives the 95% lower bound.
 # ---------------------------------------------------------------------------
 def _enrich_w(key, na, nb, ref):
     """Returns the adjacency enrichment weight lift/(lift+lambda), as in c3_occ.finalize_reference."""
@@ -154,9 +155,7 @@ def is_informative(uninformative, clean_descriptor):
 
 
 # ---------------------------------------------------------------------------
-# Conflict signal: a mate's consensus partner (>= _CONFLICT_MIN_SUPPORT genomes)
-# differs from this descriptor, which has <= _CONFLICT_MINORITY of that support.
-# Reported as c3_descriptor_conflict; not applied to the score.
+# Conflict signal: a mate's consensus partner differs from this descriptor; reported only.
 _CONFLICT_MIN_SUPPORT = 3
 _CONFLICT_MINORITY = 0.34
 
@@ -253,8 +252,7 @@ def compute(genes, ref, pmap, allhyp_value=_NEUTRAL, c3_mode="adjacency"):
         n_inf = sum(1 for x in recs if x.inf_flag)
         all_hyp = (n_inf == 0)
 
-        # C3 is conservation only (UniOP probability enters later as C2); a
-        # never-seen adjacency is excluded rather than scored.
+        # C3 is conservation only (UniOP enters as C2); unseen adjacencies are excluded.
         terms_mean, terms_lb, w_terms = [], [], []
         n_zero = n_neutral = n_supported = n_nolink = 0
         for a, b in zip(recs[:-1], recs[1:]):
@@ -289,7 +287,7 @@ def compute(genes, ref, pmap, allhyp_value=_NEUTRAL, c3_mode="adjacency"):
             c3_lb = geomean(terms_lb)
             gclass = "operon_member"
 
-        # Operon ambiguity: fraction of adjacent pairs with a hypothetical member (review note only)
+        # Operon ambiguity: fraction of adjacent pairs with a hypothetical member.
         n_pairs_total = len(recs) - 1
         operon_ambiguity = (n_neutral / n_pairs_total) if n_pairs_total > 0 else 0.0
 
@@ -364,11 +362,15 @@ def _breakdown_and_formula(info, raw_operon_id):
     if info.get("c3_mode") == "hybrid":
         if c3 <= 0.0:
             return ("operon member, no conserved adjacency or co-member partnership "
-                    "(novel context, neutral)", f"max(rho_adj, rho_op) = {c3:.4f}")
+                    "(novel context, no support from other genomes)", f"max(rho_adj, rho_op) = {c3:.4f}")
         return ("operon context (hybrid): strongest of this gene's adjacency and "
                 "co-membership partnerships across genomes",
                 f"max(best rho_adj, best rho_op) = {c3:.4f}")
     if info["n_pairs_used"] == 0:
+        # 0.5 when there was nothing to judge; 0 when informative neighbours had no support in the reference.
+        if c3 <= 0.0:
+            return ("operon member, no informative adjacency supported in the reference genomes",
+                    f"no supported adjacency = {c3:.4f}")
         return ("operon member, no UniOP-linked informative adjacency (neutral)",
                 f"neutral = {c3:.4f}")
     reason = (f"operon context: {info['n_supported']}/{info['n_pairs_used']} "
@@ -377,6 +379,39 @@ def _breakdown_and_formula(info, raw_operon_id):
     formula = (f"geomean(rho_adj) over {info['n_pairs_used']} "
                f"adjacencies = {c3:.4f}")
     return reason, formula
+
+
+SCORED_AGAINST = "scored-against.json"
+
+
+def leave_self_out(ref, reference_path, genes, organism, genes_file):
+    """Returns (reference without this genome, its name in the reference or None, 'fingerprint' or 'name').
+
+    The genome is matched by content fingerprint through the reference's members.tsv, else by
+    name; a genome absent from the reference returns the reference unchanged.
+    """
+    fp = L.genome_fingerprint(genes["aa_hash"])
+    members = c3_occ.load_members(reference_path)
+    token = members.get(fp) if fp else None
+    how = "fingerprint"
+    if token is None and organism in ref.get("organisms_added", set()):
+        token, how = organism, "name"
+    if token is None:
+        return ref, None, None
+    run_root = Path(genes_file).resolve().parents[2]
+    return c3_occ.leave_one_out(ref, genes, run_root, organism, token=token), token, how
+
+
+def write_scored_against(path, reference, compared, left_out_self, left_out_as=None):
+    """Writes how many genomes of the OCC reference this genome was scored against (itself left out),
+    and the reference's name for it (left_out_as), which the report figures leave out too."""
+    Path(path).write_text(json.dumps({
+        "reference": str(Path(reference).resolve()),
+        "genomes": compared,
+        "left_out_self": left_out_self,
+        "left_out_as": left_out_as,
+        "scored_at": datetime.now(timezone.utc).isoformat(timespec="seconds"),
+    }, indent=1) + "\n")
 
 
 def main():
@@ -432,19 +467,14 @@ def main():
                             Path(args.operon_info), compute_hash=True)
     print(f"  genes: {len(genes)}")
 
-    # --- Leave-one-out: removes this genome from the reference when present,
-    # matched by content fingerprint, else by name.
+    # Leave-one-out: drops this genome from the reference by fingerprint, else by name.
+    left_out = False
+    token = None
     if args.leave_one_out:
-        run_root = Path(args.genes_file).resolve().parents[2]
-        fp = L.genome_fingerprint(genes["aa_hash"])
-        members = c3_occ.load_members(args.reference)
-        token = members.get(fp) if fp else None
-        if token is None and organism in ref.get("organisms_added", set()):
-            token = organism  # fallback: matched by name
+        n_before = len(ref["organisms_added"])
+        ref, token, how = leave_self_out(ref, args.reference, genes, organism, args.genes_file)
         if token is not None:
-            n_before = len(ref["organisms_added"])
-            ref = c3_occ.leave_one_out(ref, genes, run_root, organism, token=token)
-            how = "fingerprint" if (fp and members.get(fp) == token) else "name"
+            left_out = True
             print(f"[c3-scorer] leave-one-out: removed this genome "
                   f"(matched by {how} as '{token}') from the reference "
                   f"-> {n_before} - 1 = {len(ref['organisms_added'])} organisms, "
@@ -452,6 +482,12 @@ def main():
         else:
             print("[c3-scorer] leave-one-out: this genome is not in the reference "
                   "-> scoring against the full reference (already out-of-sample)")
+
+    # What this genome was compared with, beside its scores: Results says when the reference has
+    # grown since, so it can be scored again against the larger reference.
+    write_scored_against(Path(args.output).parent / SCORED_AGAINST, args.reference,
+                         compared=len(ref.get("organisms_added", ())), left_out_self=left_out,
+                         left_out_as=token if left_out else None)
 
     pmap = load_pairwise_probs(args.operon_results)
     print(f"  UniOP per-pair probabilities: {len(pmap)}")
