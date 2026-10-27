@@ -9,8 +9,9 @@ across the pan-genome reference (leave-one-out by default).
                   mean (k+0.5)/(n+1) times the enrichment weight.
   hybrid mode:    per-gene max of best adjacent rho_adj and best co-member rho_op.
 Pairs with a hypothetical member or no OCC evidence are excluded; an operon with
-none left scores 0. Singletons, non-coding genes and all-hypothetical operons
-score 0.5 (--allhyp-value). Both variants are written side by side.
+none left scores 0. An operon with no informative member scores 0 (--allhyp-value):
+context can strengthen a name but not invent one. Singletons and non-coding genes
+score 0.5 and take no context term. Both variants are written side by side.
 
 Usage:
     python3 c3_score_organism.py \
@@ -19,7 +20,7 @@ Usage:
         --operon-results /path/to/operon/operon_results.tsv \
         --reference      /path/to/reference_data/occ_reference.pkl \
         --output         /path/to/scored-...-c3-operonic-context-confidence.tsv \
-        [--allhyp-value 0.5]
+        [--allhyp-value 0.0]
 """
 import argparse
 import csv
@@ -38,6 +39,8 @@ import c3_lib as L       # noqa: E402
 csv.field_size_limit(10_000_000)
 
 _NEUTRAL = 0.5
+# C3 of an operon with no informative member: no context term.
+_ALLHYP = 0.0
 
 
 # ---------------------------------------------------------------------------
@@ -224,7 +227,7 @@ def load_pairwise_probs(operon_results_path):
 
 
 # ---------------------------------------------------------------------------
-def compute(genes, ref, pmap, allhyp_value=_NEUTRAL, c3_mode="adjacency"):
+def compute(genes, ref, pmap, allhyp_value=_ALLHYP, c3_mode="adjacency"):
     """Scores every gene with pandas groupby per operon and returns {feature_id: {c3, c3_lowerbound, ...}}.
 
     Computes both the adjacency and hybrid C3; c3_mode picks which is the primary c3.
@@ -364,8 +367,8 @@ def _breakdown_and_formula(info, raw_operon_id):
             reason = "singleton, not in an operon (neutral)"
         return reason, f"neutral = {c3:.4f}"
     if cls == "all_hypothetical_operon":
-        return ("all-hypothetical operon (neutral, equivalent to singleton)",
-                f"neutral = {c3:.4f}")
+        return ("no informative member: context not assessable",
+                f"no informative member = {c3:.4f}")
     # operon_member
     if info.get("c3_mode") == "hybrid":
         if c3 <= 0.0:
@@ -375,12 +378,12 @@ def _breakdown_and_formula(info, raw_operon_id):
                 "co-membership partnerships across genomes",
                 f"max(best rho_adj, best rho_op) = {c3:.4f}")
     if info["n_pairs_used"] == 0:
-        # 0.5 when there was nothing to judge; 0 when informative neighbours had no support in the reference.
-        if c3 <= 0.0:
-            return ("operon member, no informative adjacency supported in the reference genomes",
-                    f"no supported adjacency = {c3:.4f}")
-        return ("operon member, no UniOP-linked informative adjacency (neutral)",
-                f"neutral = {c3:.4f}")
+        # C3 is 0: no adjacent informative pair to assess, or none supported in the reference.
+        if info.get("n_evaluated", 0) == 0:
+            return ("operon member, no UniOP-linked adjacent pair of informative genes to assess",
+                    f"no assessable adjacency = {c3:.4f}")
+        return ("operon member, no informative adjacency supported in the reference genomes",
+                f"no supported adjacency = {c3:.4f}")
     # n_evaluated: adjacent informative pairs with a UniOP link; n_supported: those with OCC evidence.
     reason = (f"operon context: {info['n_supported']}/{info['n_evaluated']} "
               f"OCC-supported adjacencies, {info['n_neutral']} neutral"
@@ -443,8 +446,8 @@ def main():
     ap.add_argument("--reference", required=True,
                     help="OCC reference pickle (occ_reference.pkl)")
     ap.add_argument("--output", required=True, help="output TSV path")
-    ap.add_argument("--allhyp-value", type=float, default=_NEUTRAL,
-                    help="C3 for an all-hypothetical operon (default 0.5)")
+    ap.add_argument("--allhyp-value", type=float, default=_ALLHYP,
+                    help="C3 for an operon with no informative member (default 0: no context term)")
     ap.add_argument("--c3-mode", choices=("adjacency", "hybrid"), default="adjacency",
                     help="'adjacency' (default, shipped): operon-level geomean(rho_adj). "
                          "'hybrid': per-gene max(best adjacency, best co-member) -- "
