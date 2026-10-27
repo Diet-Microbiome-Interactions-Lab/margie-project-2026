@@ -594,8 +594,9 @@ def log_workflow_run(db_path: str, run_id: str, input_file: str, workflow_name: 
             conn = _get_connection(db_path)
             try:
                 conn.execute(CREATE_RUN_LOG_SQL)
+                # The loader's run_log keeps one row per (input_hash, tool): a genome's newest run replaces it.
                 conn.execute(
-                    "INSERT INTO run_log "
+                    "INSERT OR REPLACE INTO run_log "
                     "(run_id, input_hash, tool, input_path, row_count, rules_completed, status, loaded_at) "
                     "VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
                     (run_id, input_hash, workflow_name, input_file, 0, rules_completed, status, now),

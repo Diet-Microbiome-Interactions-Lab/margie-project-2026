@@ -23,6 +23,8 @@ _OPERON_HASH_RE = {
     "label_composition": re.compile(r"operon hash by label \(composition\):\s*(\S+)"),
 }
 _NOT_IN_OPERON = "NOT_IN_AN_OPERON"
+# Real operon ids start with "operon_"; NOT_IN_AN_OPERON and NOT_APPLICABLE_NON_CODING are not operons.
+_OPERON_PREFIX = "operon_"
 
 _NEW_COLUMNS = [
     "fingerprint_hash",
@@ -152,7 +154,8 @@ def main() -> None:
         for row in csv.DictReader(fh, delimiter="\t"):
             fid = row.get("feature_id", "")
             fp_str = row.get("operon_fingerprint", "")
-            if fid and fp_str and fid not in operon_hashes_by_gene:
+            in_operon = (row.get("operon_id") or "").startswith(_OPERON_PREFIX)
+            if fid and fp_str and in_operon and fid not in operon_hashes_by_gene:
                 operon_hashes_by_gene[fid] = parse_operon_hashes(fp_str)
 
     # Per-gene EC evidence
@@ -184,7 +187,7 @@ def main() -> None:
         for row in reader:
             cf_rows.append(row)
             oid = row.get("operon_id", _NOT_IN_OPERON) or _NOT_IN_OPERON
-            if oid != _NOT_IN_OPERON:
+            if oid.startswith(_OPERON_PREFIX):
                 try:
                     pos = int(row.get("operon_gene_position_in_operon", "0") or "0")
                 except ValueError:
@@ -218,11 +221,12 @@ def main() -> None:
             operon_ordered_count = operon_fp_label_ordered_db.get(label_ordered_hash, "")
             operon_composition_count = operon_fp_label_composition_db.get(label_composition_hash, "")
 
-            # Operon member detail
-            if oid != _NOT_IN_OPERON and oid in operon_members:
+            # Operon member detail; a gene outside an operon shows its operon id (NOT_IN_AN_OPERON or
+            # NOT_APPLICABLE_NON_CODING).
+            if oid in operon_members:
                 member_detail = build_member_detail(operon_members[oid])
             else:
-                member_detail = _NOT_IN_OPERON
+                member_detail = oid
 
             row["fingerprint_hash"] = fp_hash
             row["fingerprint_consensus_label"] = fp_label
@@ -252,7 +256,7 @@ def main() -> None:
 
     n_fp_matched = sum(1 for v in fp_by_gene.values() if v[0])
     n_operonic = sum(1 for row in cf_rows
-                     if (row.get("operon_id") or _NOT_IN_OPERON) != _NOT_IN_OPERON)
+                     if (row.get("operon_id") or "").startswith(_OPERON_PREFIX))
     print(f"[add-fingerprint-to-final] {n_written} genes written → {output_path}")
     print(f"  fingerprint hashes matched: {n_fp_matched}/{len(fp_by_gene)}")
     print(f"  genes in operons (member detail generated): {n_operonic}/{n_written}")

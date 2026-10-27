@@ -2,13 +2,17 @@
 
 Scores how well a gene's operon neighbourhood is conserved across genomes, from
 pan-genome co-occurrence of clean descriptors in qualifying operons (informative
-members outnumber uninformative ones). The reference holds additive counts, so
-organisms are added or subtracted (leave-one-out) exactly; finalize_reference()
-derives per-pair reliabilities before scoring.
+members outnumber uninformative ones). The reference holds additive counts and
+each genome's own contribution, so a genome is subtracted (leave-one-out) or
+replaced exactly; finalize_reference() derives per-pair reliabilities before scoring.
 """
 import csv
+import os
 import re
+import secrets
+import stat
 from collections import defaultdict
+from pathlib import Path
 
 import numpy as np
 from scipy.stats import beta as _beta
@@ -53,13 +57,14 @@ def _key(a, b):
     return (a, b) if a < b else (b, a)
 
 
-REF_VERSION = 2   # bump when the counts schema changes
+REF_VERSION = 2   # bump when the counts schema changes; "contrib" is optional within version 2
 
 
 def new_reference(params=None):
     """Creates an empty OCC reference of additive pan-genome counts.
 
-    rho_adj / rho_op are derived later by finalize_reference().
+    rho_adj / rho_op are derived later by finalize_reference(). contrib holds each
+    genome's own counts (organism_contribution()), so it is subtracted exactly.
     """
     p = dict(DEFAULTS)
     if params:
@@ -77,22 +82,32 @@ def new_reference(params=None):
         M_adj=0, M_op=0,               # totals for the enrichment null
         n_qualifying_operons=0,
         organisms_added=set(),         # guards against double-counting
+        contrib={},                    # organism -> its counts as added
         # --- derived (filled by finalize_reference) -----------------------
         rho_adj={}, rho_op={},
         params=p, finalized=False,
     )
 
 
-def _accumulate_organism(ref, org, org_genes, contig):
-    """Adds one organism's qualifying operons to the reference counts (pandas groupby per operon).
+def organism_contribution(org, org_genes, contig, canon=None):
+    """Returns one organism's counts from its qualifying operons as a compact record (pandas groupby per operon).
 
-    Counts descriptor presence, same-operon pairs and same-contig adjacent pairs.
+    present: its descriptors in qualifying operons; adj / coop: {pair: instances}
+    for same-contig adjacent and same-operon informative pairs; n_op: qualifying
+    operons. deg_adj, deg_op, M_adj and M_op follow from adj / coop, as each
+    instance adds 1 to both descriptors' degree and to M. canon maps descriptors
+    to the string objects the reference already holds, so a pickle stores each once.
     """
+    canon = {} if canon is None else canon
     uninf = {f: bool(u) for f, u in
              zip(org_genes["feature_id"], org_genes["uninformative"])}
-    cln = {f: _norm(c) for f, c in
-           zip(org_genes["feature_id"], org_genes["clean_descriptor"])}
+    cln = {}
+    for f, c in zip(org_genes["feature_id"], org_genes["clean_descriptor"]):
+        d = _norm(c)
+        cln[f] = canon.setdefault(d, d)
 
+    present, adj, coop = set(), defaultdict(int), defaultdict(int)
+    n_op = 0
     for oid, sub in org_genes.groupby("operon_id"):
         if not str(oid).startswith("operon_"):
             continue
@@ -104,23 +119,17 @@ def _accumulate_organism(ref, org, org_genes, contig):
         n_unf = len(recs) - n_inf
         if n_inf <= n_unf or n_inf == 0:
             continue
-        ref["n_qualifying_operons"] += 1
+        n_op += 1
 
         # present (informative members of a qualifying operon)
         inf_descs = {cln[r["feature_id"]] for r in inf_recs}
-        for d in inf_descs:
-            ref["present"][d].add(org)
+        present |= inf_descs
 
         # --- co-operon channel: unique informative descriptor pairs ---------
         dl = sorted(inf_descs)
         for i in range(len(dl)):
             for j in range(i + 1, len(dl)):
-                k = (dl[i], dl[j])
-                ref["coop_org"][k].add(org)
-                ref["coop_inst"][k] += 1
-                ref["deg_op"][dl[i]] += 1
-                ref["deg_op"][dl[j]] += 1
-                ref["M_op"] += 1
+                coop[(dl[i], dl[j])] += 1
 
         # --- adjacency channel: consecutive informative genes (same contig) -
         for a, b in zip(recs[:-1], recs[1:]):
@@ -132,20 +141,75 @@ def _accumulate_organism(ref, org, org_genes, contig):
             da, db = cln[fa], cln[fb]
             if not da or not db or da == db:
                 continue
-            k = _key(da, db)
-            ref["adj_org"][k].add(org)
-            ref["adj_inst"][k] += 1
-            ref["deg_adj"][da] += 1
-            ref["deg_adj"][db] += 1
-            ref["M_adj"] += 1
+            adj[_key(da, db)] += 1
+    return dict(present=tuple(sorted(present)), adj=dict(adj), coop=dict(coop), n_op=n_op)
+
+
+# (membership, instances, degree, total) buckets of each channel, with its contribution key
+_CHANNELS = (("adj", "adj_org", "adj_inst", "deg_adj", "M_adj"),
+             ("coop", "coop_org", "coop_inst", "deg_op", "M_op"))
+
+
+def _add_contribution(ref, tok, c):
+    """Adds a contribution record to the reference counts under tok, in place."""
+    for d in c["present"]:
+        ref["present"][d].add(tok)
+    for ck, org_b, inst_b, deg_b, m in _CHANNELS:
+        for k, n in c[ck].items():
+            ref[org_b][k].add(tok)
+            ref[inst_b][k] += n
+            ref[deg_b][k[0]] += n
+            ref[deg_b][k[1]] += n
+            ref[m] += n
+    ref["n_qualifying_operons"] += c["n_op"]
+
+
+def _remove_contribution(ref, tok, c):
+    """Subtracts a contribution record from the reference counts under tok in place, pruning emptied keys."""
+    for d in c["present"]:
+        s = ref["present"].get(d)
+        if s is not None:
+            s.discard(tok)
+            if not s:
+                del ref["present"][d]
+    for ck, org_b, inst_b, deg_b, m in _CHANNELS:
+        for k, n in c[ck].items():
+            s = ref[org_b].get(k)
+            if s is not None:
+                s.discard(tok)
+                if not s:
+                    del ref[org_b][k]
+            for bucket, key in ((inst_b, k), (deg_b, k[0]), (deg_b, k[1])):
+                if key in ref[bucket]:
+                    ref[bucket][key] -= n
+                    if ref[bucket][key] <= 0:
+                        del ref[bucket][key]
+            ref[m] -= n
+    ref["n_qualifying_operons"] -= c["n_op"]
+
+
+def _canon(ref):
+    """Returns {descriptor: the reference's own string object} for organism_contribution()."""
+    return {d: d for d in ref["present"]}
+
+
+def _accumulate_organism(ref, org, org_genes, contig):
+    """Adds one organism's qualifying operons to the reference counts and returns its contribution.
+
+    Counts descriptor presence, same-operon pairs and same-contig adjacent pairs.
+    """
+    c = organism_contribution(org, org_genes, contig, canon=_canon(ref))
+    _add_contribution(ref, org, c)
+    return c
 
 
 def update_reference(ref, genes, run_root, organisms=None, skip_existing=True):
     """Adds organisms from a genes DataFrame to the reference in place and returns it.
 
     organisms limits which are added (default: all new ones); already-added
-    organisms are skipped, or raise when skip_existing is False. Leaves the
-    reference un-finalized.
+    organisms are skipped, or raise when skip_existing is False. Each added
+    organism's contribution is stored in ref["contrib"]. Leaves the reference
+    un-finalized.
     """
     all_orgs = sorted(genes["organism"].unique())
     if organisms is not None:
@@ -162,15 +226,44 @@ def update_reference(ref, genes, run_root, organisms=None, skip_existing=True):
 
     contig = build_contig_map(run_root, to_add)
     gg = genes[genes["organism"].isin(to_add)]
+    contrib = ref.setdefault("contrib", {})
     for org in to_add:
-        _accumulate_organism(ref, org, gg[gg["organism"] == org], contig)
+        contrib[org] = _accumulate_organism(ref, org, gg[gg["organism"] == org], contig)
         ref["organisms_added"].add(org)
     ref["finalized"] = False
     return ref
 
 
+def replace_organism(ref, genes, run_root, organism, token=None):
+    """Replaces one genome's counts in ref, in place, with its contribution from its current files.
+
+    The counts under ``token`` (its name in the reference, default ``organism``)
+    are removed with its stored contribution, or, for a genome added before
+    contributions were stored, with one recomputed from its current files. Returns
+    'stored', 'recomputed' or 'added' (token was absent). Leaves ref un-finalized.
+    """
+    tok = token if token is not None else organism
+    contig = build_contig_map(run_root, [organism])
+    new = organism_contribution(organism, genes[genes["organism"] == organism], contig,
+                                canon=_canon(ref))
+    contrib = ref.setdefault("contrib", {})
+    how = "added"
+    if tok in ref["organisms_added"]:
+        old = contrib.get(tok)
+        how = "stored" if old is not None else "recomputed"
+        _remove_contribution(ref, tok, old if old is not None else new)
+    _add_contribution(ref, tok, new)
+    ref["organisms_added"].add(tok)
+    contrib[tok] = new
+    ref["finalized"] = False
+    return how
+
+
 def _copy_counts(ref):
-    """Returns a deep copy of the reference's additive counts with empty rho tables."""
+    """Returns a deep copy of the reference's additive counts with empty rho tables.
+
+    Contribution records are shared with ref, which replaces them rather than changing them.
+    """
     return dict(
         version=ref["version"],
         present=defaultdict(set, {d: set(s) for d, s in ref["present"].items()}),
@@ -183,6 +276,7 @@ def _copy_counts(ref):
         M_adj=ref["M_adj"], M_op=ref["M_op"],
         n_qualifying_operons=ref["n_qualifying_operons"],
         organisms_added=set(ref["organisms_added"]),
+        contrib=dict(ref.get("contrib") or {}),
         rho_adj={}, rho_op={},
         params=dict(ref["params"]), finalized=False,
     )
@@ -192,9 +286,11 @@ def subtract_organism(ref, genes, run_root, organism, token=None,
                       require_present=True):
     """Returns an un-finalized copy of ref with one genome's counts subtracted (leave-one-out).
 
-    The genome's contribution is recomputed from its files under ``organism``
-    and removed under ``token`` (its stored name, default ``organism``); emptied
-    keys are pruned. Raises when token is absent unless require_present is False.
+    The genome's stored contribution under ``token`` (its stored name, default
+    ``organism``) is removed; a reference without one (added before contributions
+    were stored) has it recomputed from the files under ``organism``, which can
+    differ from what was added. Emptied keys are pruned. Prints which was used.
+    Raises when token is absent unless require_present is False.
     """
     tok = token if token is not None else organism
     if tok not in ref["organisms_added"]:
@@ -202,34 +298,19 @@ def subtract_organism(ref, genes, run_root, organism, token=None,
             raise ValueError("organism not in OCC reference: %s" % tok)
         return _copy_counts(ref)
 
-    # Recomputes this genome's contribution in isolation
-    g = new_reference(ref["params"])
-    contig = build_contig_map(run_root, [organism])
-    _accumulate_organism(g, organism, genes[genes["organism"] == organism], contig)
+    c = (ref.get("contrib") or {}).get(tok)
+    if c is not None:
+        print(f"[c3-occ] leave-one-out: subtracted '{tok}' with its stored contribution (exact)")
+    else:
+        contig = build_contig_map(run_root, [organism])
+        c = organism_contribution(organism, genes[genes["organism"] == organism], contig)
+        print(f"[c3-occ] leave-one-out: '{tok}' has no stored contribution (added before they were "
+              f"stored); subtracted one recomputed from its current files")
 
     out = _copy_counts(ref)
-    # Removes the stored token from every membership set the genome touched
-    for d in g["present"]:
-        if d in out["present"]:
-            out["present"][d].discard(tok)
-            if not out["present"][d]:
-                del out["present"][d]
-    for bucket in ("adj_org", "coop_org"):
-        for k in g[bucket]:
-            if k in out[bucket]:
-                out[bucket][k].discard(tok)
-                if not out[bucket][k]:
-                    del out[bucket][k]
-    # Subtracts instance, degree and M counts
-    for bucket in ("adj_inst", "coop_inst", "deg_adj", "deg_op"):
-        for k, c in g[bucket].items():
-            out[bucket][k] -= c
-            if out[bucket][k] <= 0:
-                out[bucket].pop(k, None)
-    out["M_adj"] -= g["M_adj"]
-    out["M_op"] -= g["M_op"]
-    out["n_qualifying_operons"] -= g["n_qualifying_operons"]
+    _remove_contribution(out, tok, c)
     out["organisms_added"].discard(tok)
+    out["contrib"].pop(tok, None)
     out["finalized"] = False
     return out
 
@@ -296,15 +377,44 @@ def finalize_reference(ref):
     return ref
 
 
-def save_reference(ref, path):
-    """Writes the reference (counts and derived tables) to disk with pickle."""
-    import pickle
-    from pathlib import Path
+def write_atomic(path, write, binary=False):
+    """Writes through write(fh) to a temporary file beside path, then os.replace()s it into place.
+
+    Readers see the old file or the new one, not a partial write; the new file keeps the old one's
+    permission bits. Returns the path.
+    """
     path = Path(path)
     path.parent.mkdir(parents=True, exist_ok=True)
-    with open(path, "wb") as fh:
-        pickle.dump(ref, fh, protocol=pickle.HIGHEST_PROTOCOL)
+    tmp = path.with_name(f".{path.name}.{os.getpid()}.{secrets.token_hex(4)}.tmp")
+    try:
+        with (open(tmp, "xb") if binary else open(tmp, "x", newline="")) as fh:
+            write(fh)
+            fh.flush()
+            os.fsync(fh.fileno())
+        try:
+            os.chmod(tmp, stat.S_IMODE(os.stat(path).st_mode))
+        except FileNotFoundError:
+            pass
+        os.replace(tmp, path)
+    except BaseException:
+        try:
+            os.unlink(tmp)
+        except OSError:
+            pass
+        raise
     return path
+
+
+def write_text_atomic(path, text):
+    """Writes text to path with write_atomic()."""
+    return write_atomic(path, lambda fh: fh.write(text))
+
+
+def save_reference(ref, path):
+    """Writes the reference (counts and derived tables) to disk with pickle, atomically."""
+    import pickle
+    return write_atomic(path, lambda fh: pickle.dump(ref, fh, protocol=pickle.HIGHEST_PROTOCOL),
+                        binary=True)
 
 
 def load_reference(path):
@@ -321,7 +431,6 @@ def load_reference(path):
 # ---- Members sidecar: genome fingerprint -> organism token (leave-one-out) ----
 def members_sidecar_path(reference_path):
     """Returns the members sidecar path, <reference>.members.tsv."""
-    from pathlib import Path
     return Path(str(reference_path) + ".members.tsv")
 
 
@@ -338,19 +447,19 @@ def load_members(reference_path):
 
 
 def record_member(reference_path, fingerprint, organism):
-    """Upserts fingerprint -> organism in the members sidecar; the caller holds the reference lock."""
+    """Upserts fingerprint -> organism in the members sidecar (atomic write); the caller holds the reference lock."""
     if not fingerprint:
         return
     members = load_members(reference_path)
     if members.get(fingerprint) == organism:
         return
     members[fingerprint] = organism
-    p = members_sidecar_path(reference_path)
-    p.parent.mkdir(parents=True, exist_ok=True)
-    with open(p, "w", newline="") as fh:
+
+    def _write(fh):
         w = csv.writer(fh, delimiter="\t")
         for fp, org in sorted(members.items(), key=lambda x: (x[1], x[0])):
             w.writerow([fp, org])
+    write_atomic(members_sidecar_path(reference_path), _write)
 
 
 # ---- Pool-stats sidecar: per-genome tallies keyed by organism token ----
@@ -360,7 +469,6 @@ POOL_STAT_COLS = ("total_genes", "operonic_genes", "singleton_genes",
 
 def pool_stats_sidecar_path(reference_path):
     """Returns the pool-stats sidecar path, <reference>.genome_stats.tsv."""
-    from pathlib import Path
     return Path(str(reference_path) + ".genome_stats.tsv")
 
 
@@ -380,7 +488,7 @@ def load_pool_stats(reference_path):
 
 
 def record_pool_stats(reference_path, fingerprint, organism, stats):
-    """Upserts one genome's POOL_STAT_COLS stats in the pool-stats sidecar."""
+    """Upserts one genome's POOL_STAT_COLS stats in the pool-stats sidecar (atomic write)."""
     if not organism:
         return
     p = pool_stats_sidecar_path(reference_path)
@@ -393,14 +501,15 @@ def record_pool_stats(reference_path, fingerprint, organism, stats):
                     existing[o] = row
     existing[organism] = dict(fingerprint=fingerprint or "", organism=organism,
                               **{c: int(stats.get(c, 0)) for c in POOL_STAT_COLS})
-    p.parent.mkdir(parents=True, exist_ok=True)
-    with open(p, "w", newline="") as fh:
+
+    def _write(fh):
         w = csv.writer(fh, delimiter="\t")
         w.writerow(("fingerprint", "organism") + POOL_STAT_COLS)
         for o in sorted(existing):
             r = existing[o]
             w.writerow([r.get("fingerprint", ""), o]
                        + [int(float(r.get(c, 0) or 0)) for c in POOL_STAT_COLS])
+    write_atomic(p, _write)
 
 
 def build_reference(genes, run_root, params=None):

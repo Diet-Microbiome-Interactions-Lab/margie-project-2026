@@ -5,7 +5,8 @@ Combines the gene-level hashes and labels of each operon's members into four
 SHA-256 hashes: by evidence (gene pattern hashes) and by label, each in
 genomic order and sorted. Evidence hashes are stricter; label hashes match
 across species. Writes one row per gene, repeating its operon's fingerprint;
-genes outside an operon get none.
+genes outside an operon (ids not starting with "operon_", such as
+NOT_IN_AN_OPERON and the non-coding NOT_APPLICABLE_NON_CODING) get none.
 """
 from __future__ import annotations
 
@@ -20,6 +21,8 @@ csv.field_size_limit(10_000_000)
 
 _HASH_LABEL_RE = re.compile(r"^pattern hash: (?P<hash>\S+) \|\| label: (?P<label>.*)$")
 _NOT_IN_OPERON = "NOT_IN_AN_OPERON"
+# Real operon ids start with "operon_"; NOT_IN_AN_OPERON and NOT_APPLICABLE_NON_CODING are not operons.
+_OPERON_PREFIX = "operon_"
 
 
 def _hash16(s: str) -> str:
@@ -67,9 +70,9 @@ def main() -> None:
         for row in csv.DictReader(fh, delimiter="\t"):
             rows.append(row)
             fid = row["feature_id"]
-            oid = row.get("operon_id", _NOT_IN_OPERON)
+            oid = row.get("operon_id") or _NOT_IN_OPERON
             operon_id_by_gene[fid] = oid
-            if oid != _NOT_IN_OPERON:
+            if oid.startswith(_OPERON_PREFIX):
                 try:
                     pos = int(row.get("operon_gene_position_in_operon", "0"))
                 except ValueError:
@@ -122,7 +125,7 @@ def main() -> None:
                 "operon_fingerprint": operon_fingerprint.get(oid, ""),
             })
             n += 1
-            if oid != _NOT_IN_OPERON:
+            if oid.startswith(_OPERON_PREFIX):
                 n_operonic += 1
 
     print(f"[add-operon-fingerprint] Wrote {n} genes → {output_path}")

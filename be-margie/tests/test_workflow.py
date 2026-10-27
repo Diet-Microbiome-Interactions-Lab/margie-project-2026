@@ -692,8 +692,8 @@ class TestDoMargieSb:
             wf.do_margie_sb(mode='dev')
 
         cache_map = captured['cache_map_fn']('genome1')
-        # One RASTtk (BV-BRC) job and one database load at a time within a run.
-        assert captured['resources']['margie_sb_bvbrc'] == 1
+        # Three RASTtk (BV-BRC) jobs (margie_sb.phase3.max_parallel_genomes) and one database load at a time.
+        assert captured['resources']['margie_sb_bvbrc'] == 3
         assert captured['resources']['margie_sb_db_writer'] == 1
 
         expected_tools = {

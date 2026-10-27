@@ -2,11 +2,14 @@
 """update-fingerprint-database.py — merges one genome's gene fingerprints into the shared database.
 
 Adds the genome's labeled-genes-fingerprint-hash-label.tsv counts to
-fingerprint-database.tsv incrementally, under an fcntl lock with a .tmp write
-and rename. A genome already in the database, by name, is not counted again.
-Columns: pattern_id, fingerprint_hash, fingerprint_label,
+fingerprint-database.tsv incrementally, under an fcntl lock, written through a
+temporary file and os.replace. A genome is known by the genome hash ending its
+name (pool_members.genome_key): one already in the database, under this name or
+another, has its previous entries replaced, so it counts once and follows its
+current annotation. Columns: pattern_id, fingerprint_hash, fingerprint_label,
 fingerprint_frequency (genes with this pattern), fingerprint_label_frequency
-(genes with this label), organisms ("|"-joined).
+(genes with this label), organisms ("|"-joined), organism_counts (each
+genome's genes with this pattern, "name=count" joined by "|").
 """
 from __future__ import annotations
 
@@ -20,6 +23,11 @@ from datetime import datetime, timezone
 from pathlib import Path
 
 csv.field_size_limit(10_000_000)
+
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+import pool_members as M  # noqa: E402
+
+_LOG = "[update-fingerprint-database]"
 
 _HASH_LABEL_RE = re.compile(r"^pattern hash: (?P<hash>\S+) \|\| label: (?P<label>.*)$")
 
@@ -67,7 +75,7 @@ def update_database(counts: dict[str, int], labels: dict[str, str], organism: st
 
 def _do_update(new_counts: dict[str, int], new_labels: dict[str, str], organism: str,
                 db_tsv: Path) -> None:
-    """Merges new counts into the database TSV, rewrites it via .tmp and rename, and writes metadata JSON.
+    """Merges new counts into the database TSV, replacing the genome's previous entries, and writes it and its metadata JSON atomically.
 
     Runs under the lock taken by update_database().
     """
@@ -81,46 +89,49 @@ def _do_update(new_counts: dict[str, int], new_labels: dict[str, str], organism:
                     "label": row["fingerprint_label"],
                     "gene_count": int(row["fingerprint_frequency"]),
                     "organisms": set(o for o in row.get("organisms", "").split("|") if o),
+                    "counts": M.parse_counts(row.get(M.COUNTS_COLUMN, "")),
                 }
 
-    # A genome counts once: a run of a genome already in the database leaves it as it is.
-    if any(organism in p["organisms"] for p in patterns.values()):
-        print(f"[update-fingerprint-database] {organism} is already in {db_tsv.name}; not counted again")
-        return
+    # A genome counts once, by its genome hash: its previous entries (any name) are replaced.
+    M.remove_genome(patterns, organism, "gene_count", _LOG)
 
+    next_id = M.next_pattern_number(patterns)
     for h, count in new_counts.items():
-        if h in patterns:
-            patterns[h]["gene_count"] += count
-            patterns[h]["organisms"].add(organism)
+        if h in patterns and patterns[h]["organisms"]:
             # Identical hashes should carry identical labels.
             if patterns[h]["label"] != new_labels[h]:
-                print(f"[update-fingerprint-database] WARNING: hash {h} previously mapped to "
+                print(f"{_LOG} WARNING: hash {h} previously mapped to "
                       f"label '{patterns[h]['label']}', now seeing '{new_labels[h]}' from {organism} "
                       f"-- keeping the original, this shouldn't happen if assign-canonical-label.py "
                       f"is deterministic", file=sys.stderr)
+        elif h in patterns:
+            patterns[h]["label"] = new_labels[h]
         else:
-            patterns[h] = {
-                "pattern_id": f"pattern_{len(patterns) + 1}",
-                "label": new_labels[h],
-                "gene_count": count,
-                "organisms": {organism},
-            }
+            patterns[h] = {"pattern_id": f"pattern_{next_id}", "label": new_labels[h],
+                           "gene_count": 0, "organisms": set(), "counts": {}}
+            next_id += 1
+        patterns[h]["gene_count"] += count
+        patterns[h]["organisms"].add(organism)
+        patterns[h]["counts"][organism] = count
+    # Patterns that only the replaced entries held are dropped.
+    patterns = {h: p for h, p in patterns.items() if p["gene_count"] > 0 and p["organisms"]}
 
     label_freq: dict[str, int] = {}
     for pdata in patterns.values():
         label_freq[pdata["label"]] = label_freq.get(pdata["label"], 0) + pdata["gene_count"]
 
-    tmp_path = db_tsv.with_suffix(".tmp")
-    with tmp_path.open("w", newline="", encoding="utf-8") as fh:
+    def _write(fh):
         writer = csv.writer(fh, delimiter="\t")
         writer.writerow(["pattern_id", "fingerprint_hash", "fingerprint_label",
-                         "fingerprint_frequency", "fingerprint_label_frequency", "organisms"])
+                         "fingerprint_frequency", "fingerprint_label_frequency", "organisms",
+                         M.COUNTS_COLUMN])
         for h, pdata in sorted(patterns.items(), key=lambda item: -item[1]["gene_count"]):
             writer.writerow([
                 pdata["pattern_id"], h, pdata["label"], pdata["gene_count"],
                 label_freq[pdata["label"]], "|".join(sorted(pdata["organisms"])),
+                M.format_counts(pdata["counts"]),
             ])
-    tmp_path.replace(db_tsv)
+    M.write_atomic(db_tsv, _write)
 
     meta_path = db_tsv.parent / "fingerprint-database-metadata.json"
     meta = {
@@ -131,7 +142,7 @@ def _do_update(new_counts: dict[str, int], new_labels: dict[str, str], organism:
         "last_updated": datetime.now(timezone.utc).isoformat(),
         "last_updated_by": organism,
     }
-    meta_path.write_text(json.dumps(meta, indent=2), encoding="utf-8")
+    M.write_atomic(meta_path, lambda fh: fh.write(json.dumps(meta, indent=2)))
 
 
 def main() -> None:
