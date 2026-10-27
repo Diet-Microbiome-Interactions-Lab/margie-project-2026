@@ -37,17 +37,17 @@ UNINFORMATIVE_PREFIXES = (
     "region of unknown function",
     "repeat of unknown function",
     "module of unknown function",
-    "duf",
-    "upf",
     "uncharacteri",
     "putative uncharacteri",
     "conserved hypothetical",
     "hypothetical",
     "unknown protein",
     "unknown function",
-    "orf",
     "pfam uncharacteri",
 )
+# Group 2 tags as whole words: "DUF167 family protein", "UPF0145 protein", "ORF1", "orf_12",
+# and not "Orfamide synthetase".
+_TAG_PREFIX_RE = re.compile(r'^(?:duf|upf|orf)(?:_?\d+[a-z]?)?\b', re.IGNORECASE)
 
 _UNKNOWN_FUNC_RE = re.compile(
     r'^\s*(?:(?:bacterial|viral|archaeal|eukaryotic|fungal|plant|marine|'
@@ -96,6 +96,8 @@ def is_uninformative(val: str) -> bool:
     for prefix in UNINFORMATIVE_PREFIXES:
         if v.startswith(prefix):
             return True
+    if _TAG_PREFIX_RE.match(v):
+        return True
     # Groups 8, 4, 5, 6
     if (_UNKNOWN_FUNC_RE.match(v) or _DB_ID_HYPOTHETICAL_RE.match(v)
             or _UPF_ONLY_RE.match(v) or _PSORT_ONLY_RE.match(v) or _BARE_DUF_RE.match(v)
