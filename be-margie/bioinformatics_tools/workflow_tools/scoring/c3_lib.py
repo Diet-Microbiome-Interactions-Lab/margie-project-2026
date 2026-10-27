@@ -26,14 +26,7 @@ is_uninformative = _rules.is_uninformative
 
 
 # ─── Descriptor cleaning: SOURCE: tags stripped so sources group together ───
-_SOURCE_PREFIX_RE = re.compile(
-    r'^(?:'
-    r'JCVI|NCBIFAM|NCBI Protein Cluster \(PRK\)|PRK|TIGR|TIGRFAM|PGAP|HAMAP|'
-    r'PIRSF|UniProt|UNIPROT|KEGG|EGGNOG|eggNOG|PFAM|Pfam|CDD|COG|RAST|MEROPS|'
-    r'TCDB|DBCAN|SwissProt|FIG\d+'
-    r')\s*:\s*',
-    re.IGNORECASE,
-)
+_SOURCE_PREFIX_RE = _rules.SOURCE_TAG_RE
 
 
 def clean_descriptor(desc: str) -> str:
@@ -46,11 +39,7 @@ def clean_descriptor(desc: str) -> str:
         left, right = d.split(" ## ", 1)
         d = right.strip() if right.strip() else left.strip()
     # Strips leading SOURCE: tags until none remain (e.g. "JCVI: PRK: x").
-    prev = None
-    while prev != d:
-        prev = d
-        d = _SOURCE_PREFIX_RE.sub("", d).strip()
-    return d
+    return _rules.strip_source_tags(d)
 
 
 def sha256_hash(seq: str) -> str:

@@ -86,9 +86,34 @@ _UNCHARACTERIZED_RE = re.compile(r'\buncharacteri[sz]ed\b', re.IGNORECASE)
 _LOCUS_OR_TAG_RE = re.compile(r'^\(?(?:duf\d+|upf\d+|[a-z]{1,5}\d{0,4}[a-z]?\d{0,4})\)?$', re.IGNORECASE)
 
 
+# Leading source tags ("JCVI: ", "NCBI Protein Cluster (PRK): ", "FIG00001: "), which the rules
+# look past; the reported descriptor keeps them.
+SOURCE_TAG_RE = re.compile(
+    r'^(?:'
+    r'JCVI|NCBIFAM|NCBI Protein Cluster \(PRK\)|PRK|TIGR|TIGRFAM|PGAP|HAMAP|'
+    r'PIRSF|UniProt|UNIPROT|KEGG|EGGNOG|eggNOG|PFAM|Pfam|CDD|COG|RAST|MEROPS|'
+    r'TCDB|DBCAN|SwissProt|FIG\d+'
+    r')\s*:\s*',
+    re.IGNORECASE,
+)
+
+
+def strip_source_tags(desc: str) -> str:
+    """Returns the description without its leading SOURCE: tags, removed until none remain (regex)."""
+    d = (desc or "").strip()
+    prev = None
+    while prev != d:
+        prev = d
+        d = SOURCE_TAG_RE.sub("", d).strip()
+    return d
+
+
 def is_uninformative(val: str) -> bool:
-    """Returns True when a description names no function, using the word lists and regexes above."""
-    v = (val or "").strip().lower()
+    """Returns True when a description names no function, using the word lists and regexes above.
+
+    Leading source tags are stripped first, so "JCVI: DUF167 family protein" is a DUF.
+    """
+    v = strip_source_tags(val).lower()
     # Group 1
     if not v or v in UNINFORMATIVE:
         return True
