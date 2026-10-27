@@ -1,7 +1,9 @@
 /**
  * Copies the bundled margie-pipeline to PIPELINE_HOME (it writes inside its own folder,
  * so it cannot run from the read-only bundle) on first start and whenever the bundle's
- * commit differs. Files are overwritten, never deleted; a git clone or non-pipeline folder is left alone.
+ * commit differs. Files are overwritten; the folders a former build left for a hidden tool
+ * (pipeline.conf.sh HIDDEN_TOOLS) are removed from the code, and data and results stay.
+ * A git clone or non-pipeline folder is left alone.
  */
 
 import fs from 'node:fs';
@@ -10,6 +12,32 @@ import { PIPELINE_BUNDLE, PIPELINE_HOME } from './paths.js';
 import { isPipeline } from './settings.js';
 
 const STAMP = 'margie-bundle.json';
+/** Data and results, which a refresh leaves as they are. */
+const DATA = new Set(['db', 'input', 'logs', 'output', 'user-input', 'run-history']);
+
+/** pipeline.conf.sh HIDDEN_TOOLS, lower-cased. */
+const hiddenTools = (dir) => {
+	try {
+		const m = fs.readFileSync(path.join(dir, 'pipeline.conf.sh'), 'utf8').match(/^HIDDEN_TOOLS=\(([^)]*)\)$/m);
+		return new Set((m?.[1] ?? '').split(/\s+/).filter(Boolean).map((t) => t.toLowerCase()));
+	} catch {
+		return new Set();
+	}
+};
+
+/** Removes the folders under dir named after a hidden tool; returns how many. */
+function dropHidden(dir, hidden) {
+	let n = 0;
+	for (const e of fs.readdirSync(dir, { withFileTypes: true })) {
+		if (!e.isDirectory()) continue;
+		const at = path.join(dir, e.name);
+		if (hidden.has(e.name.toLowerCase())) {
+			fs.rmSync(at, { recursive: true, force: true });
+			n++;
+		} else n += dropHidden(at, hidden);
+	}
+	return n;
+}
 
 const readStamp = (dir) => {
 	try {
@@ -33,5 +61,11 @@ export function installBundledPipeline() {
 	for (const d of ['db', 'input', 'logs', 'output', 'user-input']) {
 		fs.mkdirSync(path.join(PIPELINE_HOME, d), { recursive: true });
 	}
-	return `${installed ? 'updated' : 'installed'}: ${bundled.describe}`;
+	// A former build's folders for the hidden tools go; the code folders only.
+	const hidden = hiddenTools(PIPELINE_BUNDLE);
+	let dropped = 0;
+	for (const e of hidden.size ? fs.readdirSync(PIPELINE_HOME, { withFileTypes: true }) : []) {
+		if (e.isDirectory() && !DATA.has(e.name)) dropped += dropHidden(path.join(PIPELINE_HOME, e.name), hidden);
+	}
+	return `${installed ? 'updated' : 'installed'}: ${bundled.describe}${dropped ? ` (${dropped} hidden-tool folders removed)` : ''}`;
 }
