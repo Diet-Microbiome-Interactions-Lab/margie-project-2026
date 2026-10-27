@@ -8,8 +8,8 @@ writes every component with its reasoning, both stages, the tier and the review 
   final       = clip(preliminary + context, 0, 1)
 A parallel "hybrid" final uses the hybrid C3. Context only raises the score.
 Tiers: > 0.9 highest | > 0.7 high | > 0.5 medium | > 0.3 fair | else low.
-needs_review is set by EC conflict, final < 0.5, or an ambiguous operon that
-gave no boost. C2 sets no flag: UniOP joins two genes from a pair probability of
+needs_review is set by EC conflict, final < 0.5, or an ambiguous operon whose
+context term is below 0.1. C2 sets no flag: UniOP joins two genes from a pair probability of
 0.5, so an operon gene's C2 is 0.5 to 1.
 """
 import argparse
@@ -359,8 +359,9 @@ def main() -> None:
                 reasons.append("EC conflict — independent EC sources disagree")
             if low_conf:
                 reasons.append(f"low confidence (final={final:.4f} < {_NEUTRAL})")
-            # Mostly uncharacterized operon that gave no boost: review note only.
-            operon_ambiguous = (in_operon and context_effect != "increases"
+            # Mostly uncharacterized operon whose context term (C2·C3, unclipped) is below 0.1: review
+            # note only. A gene near 1 already keeps a large context term from flagging it.
+            operon_ambiguous = (in_operon and context < _CONTEXT_MATERIAL_THRESHOLD
                                 and ambiguity >= _OPERON_AMBIGUITY_MIN)
             if operon_ambiguous:
                 reasons.append(
