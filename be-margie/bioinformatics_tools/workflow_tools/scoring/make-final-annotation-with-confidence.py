@@ -314,17 +314,21 @@ def _c3_reasoning_expanded(
     return explanation
 
 
-def _parse_c4_formula(c4_formula: str) -> tuple[str, str]:
+def _parse_c4_formula(c4_formula: str, n_ec_tools: str = "") -> tuple[str, str]:
+    """Returns the (formula, reasoning) text for C4 from its formula; the weight shown is min(m, 5)/5."""
     if not c4_formula:
         return "", ""
     m = re.search(r"\(\s*(\d+)\s*/\s*5\s*\)\s*\*\s*([0-9]*\.?[0-9]+)", c4_formula)
     if not m:
         return c4_formula, ""
-    n_tools = m.group(1)
+    weight_n = m.group(1)
     conflict_fraction = m.group(2)
+    # The tool count is the C4 table's c4_n_ec_tools, else "(m=N)" in the formula, else the weight's.
+    in_formula = re.search(r"\(m=(\d+)\)", c4_formula)
+    n_tools = (n_ec_tools or "").strip() or (in_formula.group(1) if in_formula else weight_n)
     pretty = (
-        "C4_EC_conflict_clearance = 1 - (EC_reporting_tools_count / 5) * EC_conflict_fraction "
-        f"= 1 - ({n_tools}/5) * {conflict_fraction}"
+        "C4_EC_conflict_clearance = 1 - (min(EC_reporting_tools_count, 5) / 5) * EC_conflict_fraction "
+        f"= 1 - ({weight_n}/5) * {conflict_fraction}"
     )
     reasoning = (
         f"EC_reporting_tools_count = {n_tools}. "
@@ -461,7 +465,8 @@ def main() -> None:
 
             c4_row = c4_by_fid.get(fid, {})
             c4_formula_src = (cf.get("c4_formula") or c4_row.get("c4_formula") or "").strip()
-            c4_formula_pretty, c4_extra_reasoning = _parse_c4_formula(c4_formula_src)
+            c4_formula_pretty, c4_extra_reasoning = _parse_c4_formula(
+                c4_formula_src, c4_row.get("c4_n_ec_tools", ""))
             c4_reasoning_src = (cf.get("c4_reasoning") or c4_row.get("c4_reasoning") or "").strip()
             if c4_extra_reasoning:
                 c4_reasoning = f"{c4_extra_reasoning} {c4_reasoning_src}".strip()

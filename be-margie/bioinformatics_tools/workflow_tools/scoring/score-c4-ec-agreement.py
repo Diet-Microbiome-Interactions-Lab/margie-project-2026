@@ -84,9 +84,16 @@ def c4_conflict_fraction(evmap: dict):
 
 
 def c4_clearance(conflict_fraction: float, n_ec_tools: int) -> float:
-    """Returns c4_score = 1 - (m/5)*R, floored at 0."""
+    """Returns c4_score = 1 - (min(m, 5)/5)*R, floored at 0."""
     weight = min(n_ec_tools, N_EC_CAPABLE_TOOLS) / float(N_EC_CAPABLE_TOOLS)
     return max(0.0, 1.0 - weight * conflict_fraction)
+
+
+def c4_formula(n_ec_tools: int, conflict_fraction: float, c4_score: float) -> str:
+    """Returns the C4 formula text with the capped weight min(m, 5)/5 the score uses."""
+    w = min(n_ec_tools, N_EC_CAPABLE_TOOLS)
+    return (f"c4_score = 1 - (min(m,5)/5)*R = 1 - ({w}/{N_EC_CAPABLE_TOOLS})*{conflict_fraction:.4f} "
+            f"= {c4_score:.4f} (m={n_ec_tools})")
 
 
 def _build_c4_reasoning(status: str, evidence: str, conflict_fraction: float,
@@ -104,10 +111,11 @@ def _build_c4_reasoning(status: str, evidence: str, conflict_fraction: float,
         return (f"{n_ec_tools} tools reported ECs and none disagree "
                 f"(0/{n_total_pairs} tool-pairs conflict): {ev} — "
                 f"c4_score=1.0000 (no penalty on C1)")
-    weight = min(n_ec_tools, N_EC_CAPABLE_TOOLS) / float(N_EC_CAPABLE_TOOLS)
+    w = min(n_ec_tools, N_EC_CAPABLE_TOOLS)
+    weight = w / float(N_EC_CAPABLE_TOOLS)
     return (f"{n_conflict_pairs}/{n_total_pairs} EC tool-pairs conflict among "
             f"{n_ec_tools} tools (R={conflict_fraction:.4f}): {ev} — "
-            f"penalty=(m/5)·R=({n_ec_tools}/5)·{conflict_fraction:.4f}"
+            f"penalty=(min(m,5)/5)·R=({w}/5)·{conflict_fraction:.4f}"
             f"={weight * conflict_fraction:.4f} → c4_score={c4_score:.4f} "
             f"(discounts C1 by {100.0 * (1.0 - c4_score):.1f}%); "
             f"categorical status={status}")
@@ -191,9 +199,7 @@ def main() -> None:
             out_row["c4_score"] = f"{c4:.4f}"
             out_row["c4_reasoning"] = _build_c4_reasoning(
                 status, ec_evidence, conflict_fraction, n_conf, n_total, m, c4)
-            out_row["c4_formula"] = (
-                f"c4_score = 1 - (m/5)*R = 1 - ({m}/5)*{conflict_fraction:.4f} = {c4:.4f}"
-            )
+            out_row["c4_formula"] = c4_formula(m, conflict_fraction, c4)
             out_row["confidence_flag"] = flag
             out_row["hierarchy_tier_name"] = prov["hierarchy_tier_name"]
             out_row["hierarchy_tier_score"] = prov["hierarchy_tier_score"]
