@@ -9,8 +9,9 @@ across the pan-genome reference (leave-one-out by default).
                   mean (k+0.5)/(n+1) times the enrichment weight.
   hybrid mode:    per-gene max of best adjacent rho_adj and best co-member rho_op.
 Pairs with a hypothetical member or no OCC evidence are excluded; an operon with
-none left scores 0. Singletons, non-coding genes and all-hypothetical operons
-score 0.5 (--allhyp-value). Both variants are written side by side.
+none left scores 0. An operon with no informative member scores 0 (--allhyp-value):
+context can strengthen a name but not invent one. Singletons and non-coding genes
+score 0.5 and take no context term. Both variants are written side by side.
 
 Usage:
     python3 c3_score_organism.py \
@@ -19,7 +20,7 @@ Usage:
         --operon-results /path/to/operon/operon_results.tsv \
         --reference      /path/to/reference_data/occ_reference.pkl \
         --output         /path/to/scored-...-c3-operonic-context-confidence.tsv \
-        [--allhyp-value 0.5]
+        [--allhyp-value 0.0]
 """
 import argparse
 import csv
@@ -38,6 +39,8 @@ import c3_lib as L       # noqa: E402
 csv.field_size_limit(10_000_000)
 
 _NEUTRAL = 0.5
+# C3 of an operon with no informative member: no context term.
+_ALLHYP = 0.0
 
 
 # ---------------------------------------------------------------------------
@@ -176,9 +179,17 @@ def build_partner_consensus(ref):
 
 
 def descriptor_conflict(descriptor, neigh_descriptors, partners):
-    """Returns the strongest contradiction (0-1) of a descriptor by its mates' consensus partners."""
+    """Returns the strongest contradiction (0-1) of a descriptor by its mates' consensus partners.
+
+    Descriptors are compared lower-cased (c3_occ._norm), as the reference keys them; a mate with
+    the same descriptor is skipped, as the reference holds no pair of a descriptor with itself.
+    """
+    descriptor = c3_occ._norm(descriptor)
     worst = 0.0
     for a in neigh_descriptors:
+        a = c3_occ._norm(a)
+        if not a or a == descriptor:
+            continue
         pc = partners.get(a)
         if not pc:
             continue
@@ -216,7 +227,7 @@ def load_pairwise_probs(operon_results_path):
 
 
 # ---------------------------------------------------------------------------
-def compute(genes, ref, pmap, allhyp_value=_NEUTRAL, c3_mode="adjacency"):
+def compute(genes, ref, pmap, allhyp_value=_ALLHYP, c3_mode="adjacency"):
     """Scores every gene with pandas groupby per operon and returns {feature_id: {c3, c3_lowerbound, ...}}.
 
     Computes both the adjacency and hybrid C3; c3_mode picks which is the primary c3.
@@ -239,7 +250,7 @@ def compute(genes, ref, pmap, allhyp_value=_NEUTRAL, c3_mode="adjacency"):
             c3=_NEUTRAL, c3_lowerbound=_NEUTRAL, gene_class="singleton",
             c3_adjacency=_NEUTRAL, c3_lb_adjacency=_NEUTRAL,
             c3_hybrid=_NEUTRAL, c3_lb_hybrid=_NEUTRAL,
-            operon_id="", n_pairs=0, n_pairs_used=0, n_supported=0,
+            operon_id="", n_pairs=0, n_evaluated=0, n_pairs_used=0, n_supported=0,
             n_neutral=0, n_nolink=0, descriptor_conflict=0.0, operon_significance=0.0,
             operon_ambiguity=0.0,
         )
@@ -335,7 +346,7 @@ def compute(genes, ref, pmap, allhyp_value=_NEUTRAL, c3_mode="adjacency"):
                 c3_adjacency=c3_adj, c3_lb_adjacency=c3_adj_lb,
                 c3_hybrid=c3_hyb, c3_lb_hybrid=c3_hyb_lb,
                 gene_class=gclass, operon_id=oid,
-                n_pairs=len(recs) - 1, n_pairs_used=n_used,
+                n_pairs=len(recs) - 1, n_evaluated=n_supported + n_zero, n_pairs_used=n_used,
                 n_supported=n_supported, n_neutral=(n_neutral + n_zero),
                 n_nolink=n_nolink, descriptor_conflict=conflict,
                 operon_significance=operon_sig, operon_ambiguity=operon_ambiguity,
@@ -356,8 +367,8 @@ def _breakdown_and_formula(info, raw_operon_id):
             reason = "singleton, not in an operon (neutral)"
         return reason, f"neutral = {c3:.4f}"
     if cls == "all_hypothetical_operon":
-        return ("all-hypothetical operon (neutral, equivalent to singleton)",
-                f"neutral = {c3:.4f}")
+        return ("no informative member: context not assessable",
+                f"no informative member = {c3:.4f}")
     # operon_member
     if info.get("c3_mode") == "hybrid":
         if c3 <= 0.0:
@@ -367,17 +378,18 @@ def _breakdown_and_formula(info, raw_operon_id):
                 "co-membership partnerships across genomes",
                 f"max(best rho_adj, best rho_op) = {c3:.4f}")
     if info["n_pairs_used"] == 0:
-        # 0.5 when there was nothing to judge; 0 when informative neighbours had no support in the reference.
-        if c3 <= 0.0:
-            return ("operon member, no informative adjacency supported in the reference genomes",
-                    f"no supported adjacency = {c3:.4f}")
-        return ("operon member, no UniOP-linked informative adjacency (neutral)",
-                f"neutral = {c3:.4f}")
-    reason = (f"operon context: {info['n_supported']}/{info['n_pairs_used']} "
+        # C3 is 0: no adjacent informative pair to assess, or none supported in the reference.
+        if info.get("n_evaluated", 0) == 0:
+            return ("operon member, no UniOP-linked adjacent pair of informative genes to assess",
+                    f"no assessable adjacency = {c3:.4f}")
+        return ("operon member, no informative adjacency supported in the reference genomes",
+                f"no supported adjacency = {c3:.4f}")
+    # n_evaluated: adjacent informative pairs with a UniOP link; n_supported: those with OCC evidence.
+    reason = (f"operon context: {info['n_supported']}/{info['n_evaluated']} "
               f"OCC-supported adjacencies, {info['n_neutral']} neutral"
               + (f", {info['n_nolink']} unlinked" if info["n_nolink"] else ""))
-    formula = (f"geomean(rho_adj) over {info['n_pairs_used']} "
-               f"adjacencies = {c3:.4f}")
+    formula = (f"geomean(rho_adj) over {info['n_supported']} "
+               f"OCC-supported adjacencies = {c3:.4f}")
     return reason, formula
 
 
@@ -388,15 +400,23 @@ def leave_self_out(ref, reference_path, genes, organism, genes_file):
     """Returns (reference without this genome, its name in the reference or None, 'fingerprint' or 'name').
 
     The genome is matched by content fingerprint through the reference's members.tsv, else by
-    name; a genome absent from the reference returns the reference unchanged.
+    name; a members.tsv name the reference no longer holds falls back to the name. A genome
+    absent from the reference returns the reference unchanged. Prints each fallback.
     """
     fp = L.genome_fingerprint(genes["aa_hash"])
     members = c3_occ.load_members(reference_path)
+    in_ref = ref.get("organisms_added", set())
     token = members.get(fp) if fp else None
     how = "fingerprint"
-    if token is None and organism in ref.get("organisms_added", set()):
+    if token is not None and token not in in_ref:
+        print(f"[c3-scorer] leave-one-out: members.tsv names this genome '{token}', which the "
+              f"reference does not hold; matching by name")
+        token = None
+    if token is None and organism in in_ref:
         token, how = organism, "name"
     if token is None:
+        print("[c3-scorer] leave-one-out: this genome is not in the reference by fingerprint or "
+              "name; scoring against the full reference")
         return ref, None, None
     run_root = Path(genes_file).resolve().parents[2]
     return c3_occ.leave_one_out(ref, genes, run_root, organism, token=token), token, how
@@ -426,8 +446,8 @@ def main():
     ap.add_argument("--reference", required=True,
                     help="OCC reference pickle (occ_reference.pkl)")
     ap.add_argument("--output", required=True, help="output TSV path")
-    ap.add_argument("--allhyp-value", type=float, default=_NEUTRAL,
-                    help="C3 for an all-hypothetical operon (default 0.5)")
+    ap.add_argument("--allhyp-value", type=float, default=_ALLHYP,
+                    help="C3 for an operon with no informative member (default 0: no context term)")
     ap.add_argument("--c3-mode", choices=("adjacency", "hybrid"), default="adjacency",
                     help="'adjacency' (default, shipped): operon-level geomean(rho_adj). "
                          "'hybrid': per-gene max(best adjacency, best co-member) -- "
@@ -479,9 +499,6 @@ def main():
                   f"(matched by {how} as '{token}') from the reference "
                   f"-> {n_before} - 1 = {len(ref['organisms_added'])} organisms, "
                   f"{len(ref['rho_adj'])} rho_adj entries")
-        else:
-            print("[c3-scorer] leave-one-out: this genome is not in the reference "
-                  "-> scoring against the full reference (already out-of-sample)")
 
     # What this genome was compared with, beside its scores: Results says when the reference has
     # grown since, so it can be scored again against the larger reference.
@@ -503,7 +520,7 @@ def main():
         "c3_score", "c3_descriptor_conflict", "c3_operon_significance",
         "c3_operon_ambiguity",
         "c3_signal_breakdown", "c3_formula",
-        "c3_gene_class", "c3_operon_id", "c3_n_pairs_used", "c3_n_supported",
+        "c3_gene_class", "c3_operon_id", "c3_n_pairs_evaluated", "c3_n_pairs_used", "c3_n_supported",
         "c3_n_neutral", "c3_n_unlinked", "c3_lowerbound",
         # both variants; c3_score is the --c3-mode selection
         "c3_score_adjacency", "c3_lowerbound_adjacency",
@@ -525,7 +542,7 @@ def main():
                 c3=_NEUTRAL, c3_lowerbound=_NEUTRAL, gene_class="singleton",
                 c3_adjacency=_NEUTRAL, c3_lb_adjacency=_NEUTRAL,
                 c3_hybrid=_NEUTRAL, c3_lb_hybrid=_NEUTRAL,
-                operon_id="", n_pairs=0, n_pairs_used=0, n_supported=0,
+                operon_id="", n_pairs=0, n_evaluated=0, n_pairs_used=0, n_supported=0,
                 n_neutral=0, n_nolink=0, descriptor_conflict=0.0,
                 operon_significance=0.0, operon_ambiguity=0.0))
             reason, formula = _breakdown_and_formula(info, raw_oid)
@@ -539,6 +556,7 @@ def main():
             out_row["c3_formula"] = formula
             out_row["c3_gene_class"] = info["gene_class"]
             out_row["c3_operon_id"] = info["operon_id"]
+            out_row["c3_n_pairs_evaluated"] = info["n_evaluated"]
             out_row["c3_n_pairs_used"] = info["n_pairs_used"]
             out_row["c3_n_supported"] = info["n_supported"]
             out_row["c3_n_neutral"] = info["n_neutral"]

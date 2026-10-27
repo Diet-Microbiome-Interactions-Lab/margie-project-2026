@@ -1,6 +1,7 @@
 """A genome counts once in the fingerprint databases: a later run of a genome already in a pool
-(fingerprint/update-fingerprint-database.py, update-operon-fingerprint-database.py) leaves the pool
-as it is, as the operon reference does, so frequencies do not grow with each run of one genome."""
+(fingerprint/update-fingerprint-database.py, update-operon-fingerprint-database.py) replaces its
+entries, so a run of the same annotation leaves the pool as it is and frequencies do not grow with
+each run of one genome."""
 
 import csv
 import importlib.util
