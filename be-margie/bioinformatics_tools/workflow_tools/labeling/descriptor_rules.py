@@ -1,0 +1,157 @@
+"""Shared descriptor rules for labeling, C1 and C3.
+
+is_uninformative() says whether a description names no function;
+hit_is_informative() says whether a tool's chosen hit, as labeled-genes.tsv
+records it, counts: its own description (not the accession standing in for a
+missing one) that names a function, and for UniProt an identity of at least
+UNIPROT_PIDENT_MIN. assign-canonical-label.py, scoring/score-c1-tool-coverage.py
+and scoring/c3_lib.py import these, so the three agree. Not run directly.
+"""
+from __future__ import annotations
+
+import re
+
+# Group 1 — exact null / boilerplate tokens.
+UNINFORMATIVE = frozenset({
+    "", "-", ".", "na", "n/a", "none", "null",
+    "unknown", "uncharacterized", "uncharacterised", "putative", "predicted",
+    "hypothetical protein",
+    "conserved hypothetical protein",
+    "conserved protein",
+    "conserved domain protein",
+    "predicted protein",
+    "function unknown",
+    "domain of unknown function",
+    "general function prediction only",
+    "poorly characterized",
+    "open reading frame",
+})
+# Null tokens: a hit with one of these has no description of its own.
+NULLISH = frozenset({"", "-", ".", "na", "n/a", "none", "null"})
+
+# Group 2 — leading-phrase families (unknown-function nouns, DUF/UPF, ORF, …).
+UNINFORMATIVE_PREFIXES = (
+    "domain of unknown function",
+    "protein of unknown function",
+    "family of unknown function",
+    "region of unknown function",
+    "repeat of unknown function",
+    "module of unknown function",
+    "duf",
+    "upf",
+    "uncharacteri",
+    "putative uncharacteri",
+    "conserved hypothetical",
+    "hypothetical",
+    "unknown protein",
+    "unknown function",
+    "orf",
+    "pfam uncharacteri",
+)
+
+_UNKNOWN_FUNC_RE = re.compile(
+    r'^\s*(?:(?:bacterial|viral|archaeal|eukaryotic|fungal|plant|marine|'
+    r'transmembrane|integral membrane|membrane)\s+)?'
+    r'(?:domain|protein|family|repeat|region|module)\s+of\s+unknown\s+function',
+    re.IGNORECASE,
+)
+# Group 8 — DB-id-prefixed hypothetical ("FIG####: … hypothetical").
+_DB_ID_HYPOTHETICAL_RE = re.compile(
+    r'^(?:fig\d+|tigr\d+)[:\s].*(?:hypothetical|conserved hypothetical)', re.IGNORECASE,
+)
+# Group 4 — eggNOG "Belongs to the UPF#### family" (Uncharacterized Protein Family).
+_UPF_ONLY_RE = re.compile(r'^\s*belongs to the upf\d+', re.IGNORECASE)
+# eggNOG "Psort location ..." descriptions give localisation only, not a product.
+_PSORT_ONLY_RE = re.compile(r'^\s*psort location\b', re.IGNORECASE)
+# Group 5 — a description that is nothing but a DUF tag ("Pfam:DUF955", "DUF955 family").
+_BARE_DUF_RE = re.compile(r'^\s*(?:pfam:)?\(?duf\d+\)?(?:\s+(?:family|domain))?\s*$', re.IGNORECASE)
+# Group 6 — "protein containing domains DUF###" (RAST multi-DUF stubs).
+_PROTEIN_DOMAINS_DUF_RE = re.compile(r'^\s*protein containing domains?\s+duf', re.IGNORECASE)
+_HYPOTHETICAL_ANYWHERE_RE = re.compile(r'\bhypothetical\b', re.IGNORECASE)
+_PROTEIN_CONSERVED_IN_BACTERIA_RE = re.compile(r'\bprotein\s+conserved\s+in\s+bacteria\b', re.IGNORECASE)
+_INTEGRAL_MEMBRANE_PROTEIN_RE = re.compile(r'^\s*integral\s+membrane\s+protein\s*$', re.IGNORECASE)
+# Function-word guard for Groups 3 & 7 (activity words, not location words).
+_FUNCTION_SIGNAL_RE = re.compile(
+    r'(ase\b|transport|permease|pump|export|import|channel|carrier|symport|antiport|'
+    r'bind|synth|kinas|reductas|hydrolas|transferas|isomeras|ligas|lyas|mutas|oxidas|'
+    r'dehydrogen|regulat|repressor|activator|\bfactor\b|receptor|sensor|subunit|ribosom|'
+    r'polymeras|oxidoreduct|enzyme|proteas|peptidas|nucleas|phosphatas|efflux|resistance|'
+    r'virulence|toxin|flippase|homeostasis|assembly|motility|adhesin|chaperone|'
+    r'helicas|topoisomeras|gyrase|recombinas|integras|transposas|methylas|glycosyl|'
+    r'dismutas|catalas|peroxidas|cytochrome|ferredoxin|cytoskelet|cell division|'
+    r'degradation|tolerance|translation|utilization)', re.IGNORECASE,
+)
+_UNCHARACTERIZED_RE = re.compile(r'\buncharacteri[sz]ed\b', re.IGNORECASE)
+# Group 7 helper: a bare locus tag or DUF/UPF tag after "conserved protein".
+_LOCUS_OR_TAG_RE = re.compile(r'^\(?(?:duf\d+|upf\d+|[a-z]{1,5}\d{0,4}[a-z]?\d{0,4})\)?$', re.IGNORECASE)
+
+
+def is_uninformative(val: str) -> bool:
+    """Returns True when a description names no function, using the word lists and regexes above."""
+    v = (val or "").strip().lower()
+    # Group 1
+    if not v or v in UNINFORMATIVE:
+        return True
+    # Group 2
+    for prefix in UNINFORMATIVE_PREFIXES:
+        if v.startswith(prefix):
+            return True
+    # Groups 8, 4, 5, 6
+    if (_UNKNOWN_FUNC_RE.match(v) or _DB_ID_HYPOTHETICAL_RE.match(v)
+            or _UPF_ONLY_RE.match(v) or _PSORT_ONLY_RE.match(v) or _BARE_DUF_RE.match(v)
+            or _HYPOTHETICAL_ANYWHERE_RE.search(v)
+            or _PROTEIN_CONSERVED_IN_BACTERIA_RE.search(v)
+            or _INTEGRAL_MEMBRANE_PROTEIN_RE.match(v)
+            or _PROTEIN_DOMAINS_DUF_RE.match(v)):
+        return True
+    # Groups 3 & 7 — unknown-function markers without a function word.
+    if not _FUNCTION_SIGNAL_RE.search(v):
+        if "of unknown function" in v:
+            return True
+        if _UNCHARACTERIZED_RE.search(v):
+            return True
+        if v.startswith("conserved protein"):
+            rest = v[len("conserved protein"):].strip(" ,.;:-")
+            if not rest or _BARE_DUF_RE.match(rest) or _LOCUS_OR_TAG_RE.match(rest):
+                return True
+    return False
+
+
+# ─── Tool gates ───────────────────────────────────────────────────────────────
+# UniProt hits count at identity >= 40%; the other tools are thresholded upstream.
+UNIPROT_PIDENT_MIN = 40.0
+
+
+def _to_float(s, default: float) -> float:
+    """Returns float(s), or default when it cannot be parsed."""
+    try:
+        return float(s)
+    except (TypeError, ValueError):
+        return default
+
+
+def uniprot_gate_passed(stat) -> bool:
+    """Returns True when a UniProt identity is unavailable or at least UNIPROT_PIDENT_MIN."""
+    pident = _to_float(stat, -1.0)
+    return pident < 0 or pident >= UNIPROT_PIDENT_MIN
+
+
+def has_own_description(hit_id: str, description: str) -> bool:
+    """Returns True when a hit's description is its own: not a null token and not the hit's accession."""
+    desc = (description or "").strip()
+    if desc.lower() in NULLISH:
+        return False
+    return not (hit_id and desc == hit_id.strip())
+
+
+def hit_is_informative(tool_name: str, hit_id: str, description: str, stat: str = "") -> bool:
+    """Returns True when a tool's chosen hit counts as informative evidence.
+
+    Its description is its own (has_own_description), names a function
+    (is_uninformative is False), and for UNIPROT the identity passes
+    uniprot_gate_passed(). This is labeling's first-pass test without PFAM's
+    keep-anyway exception.
+    """
+    if not has_own_description(hit_id, description) or is_uninformative(description):
+        return False
+    return tool_name != "UNIPROT" or uniprot_gate_passed(stat)

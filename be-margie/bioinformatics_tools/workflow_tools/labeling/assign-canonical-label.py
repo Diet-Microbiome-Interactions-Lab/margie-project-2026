@@ -25,102 +25,12 @@ csv.field_size_limit(10_000_000)
 
 
 # ─── STEP 0: uninformative-description filtering ───────────────────────────────
+# The rules sit in descriptor_rules.py beside this script, shared with C1 and C3.
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+import descriptor_rules as R  # noqa: E402
 
-_UNINFORMATIVE = frozenset({
-    "", "-", ".", "na", "n/a", "none", "null",
-    "unknown", "uncharacterized", "uncharacterised", "putative", "predicted",
-    "hypothetical protein",
-    "conserved hypothetical protein",
-    "conserved protein",
-    "conserved domain protein",
-    "predicted protein",
-    "function unknown",
-    "domain of unknown function",
-    "general function prediction only",
-    "poorly characterized",
-    "open reading frame",
-})
-_NULLISH_UNINFORMATIVE = frozenset({"", "-", ".", "na", "n/a", "none", "null"})
-
-_UNINFORMATIVE_PREFIXES = (
-    "domain of unknown function",
-    "protein of unknown function",
-    "family of unknown function",
-    "region of unknown function",
-    "repeat of unknown function",
-    "module of unknown function",
-    "duf",
-    "upf",
-    "uncharacteri",
-    "putative uncharacteri",
-    "conserved hypothetical",
-    "hypothetical",
-    "unknown protein",
-    "unknown function",
-    "orf",
-    "pfam uncharacteri",
-)
-
-_UNKNOWN_FUNC_RE = re.compile(
-    r'^\s*(?:(?:bacterial|viral|archaeal|eukaryotic|fungal|plant|marine|'
-    r'transmembrane|integral membrane|membrane)\s+)?'
-    r'(?:domain|protein|family|repeat|region|module)\s+of\s+unknown\s+function',
-    re.IGNORECASE,
-)
-
-_DB_ID_HYPOTHETICAL_RE = re.compile(
-    r'^(?:fig\d+|tigr\d+)[:\s].*(?:hypothetical|conserved hypothetical)',
-    re.IGNORECASE,
-)
-
-# More uninformative patterns, kept identical to scoring/score-c1-tool-coverage.py.
-_UPF_ONLY_RE = re.compile(r'^\s*belongs to the upf\d+', re.IGNORECASE)
-# eggNOG's "Psort location ..." descriptions give localisation only, not a product.
-_PSORT_ONLY_RE = re.compile(r'^\s*psort location\b', re.IGNORECASE)
-_BARE_DUF_RE = re.compile(r'^\s*(?:pfam:)?\(?duf\d+\)?(?:\s+(?:family|domain))?\s*$', re.IGNORECASE)
-_PROTEIN_DOMAINS_DUF_RE = re.compile(r'^\s*protein containing domains?\s+duf', re.IGNORECASE)
-_HYPOTHETICAL_ANYWHERE_RE = re.compile(r'\bhypothetical\b', re.IGNORECASE)
-_PROTEIN_CONSERVED_IN_BACTERIA_RE = re.compile(r'\bprotein\s+conserved\s+in\s+bacteria\b', re.IGNORECASE)
-_INTEGRAL_MEMBRANE_PROTEIN_RE = re.compile(r'^\s*integral\s+membrane\s+protein\s*$', re.IGNORECASE)
-_FUNCTION_SIGNAL_RE = re.compile(
-    r'(ase\b|transport|permease|pump|export|import|channel|carrier|symport|antiport|'
-    r'bind|synth|kinas|reductas|hydrolas|transferas|isomeras|ligas|lyas|mutas|oxidas|'
-    r'dehydrogen|regulat|repressor|activator|\bfactor\b|receptor|sensor|subunit|ribosom|'
-    r'polymeras|oxidoreduct|enzyme|proteas|peptidas|nucleas|phosphatas|efflux|resistance|'
-    r'virulence|toxin|flippase|homeostasis|assembly|motility|adhesin|chaperone|'
-    r'helicas|topoisomeras|gyrase|recombinas|integras|transposas|methylas|glycosyl|'
-    r'dismutas|catalas|peroxidas|cytochrome|ferredoxin|cytoskelet|cell division|'
-    r'degradation|tolerance|translation|utilization)', re.IGNORECASE,
-)
-_UNCHARACTERIZED_RE = re.compile(r'\buncharacteri[sz]ed\b', re.IGNORECASE)
-_LOCUS_OR_TAG_RE = re.compile(r'^\(?(?:duf\d+|upf\d+|[a-z]{1,5}\d{0,4}[a-z]?\d{0,4})\)?$', re.IGNORECASE)
-
-
-def is_uninformative(val: str) -> bool:
-    """Returns True when a description names no function, using the word lists and regexes above."""
-    v = val.strip().lower()
-    if not v or v in _UNINFORMATIVE:
-        return True
-    for prefix in _UNINFORMATIVE_PREFIXES:
-        if v.startswith(prefix):
-            return True
-    if (_UNKNOWN_FUNC_RE.match(v) or _DB_ID_HYPOTHETICAL_RE.match(v)
-            or _UPF_ONLY_RE.match(v) or _PSORT_ONLY_RE.match(v) or _BARE_DUF_RE.match(v)
-            or _HYPOTHETICAL_ANYWHERE_RE.search(v)
-            or _PROTEIN_CONSERVED_IN_BACTERIA_RE.search(v)
-            or _INTEGRAL_MEMBRANE_PROTEIN_RE.match(v)
-            or _PROTEIN_DOMAINS_DUF_RE.match(v)):
-        return True
-    if not _FUNCTION_SIGNAL_RE.search(v):
-        if "of unknown function" in v:
-            return True
-        if _UNCHARACTERIZED_RE.search(v):
-            return True
-        if v.startswith("conserved protein"):
-            rest = v[len("conserved protein"):].strip(" ,.;:-")
-            if not rest or _BARE_DUF_RE.match(rest) or _LOCUS_OR_TAG_RE.match(rest):
-                return True
-    return False
+_NULLISH_UNINFORMATIVE = R.NULLISH
+is_uninformative = R.is_uninformative
 
 
 # ─── STEP 0b: e-value formatting ────────────────────────────────────────────────
@@ -306,8 +216,8 @@ def eval_pirsf(row: dict[str, str]) -> ToolEvaluation:
 
 
 # ─── STEP 6: UNIPROT ─────────────────────────────────────────────────────────────
-# Gated here at identity >= 40% and ranked by highest identity.
-_UNIPROT_PIDENT_MIN = 40.0
+# Gated here at identity >= 40% (descriptor_rules.UNIPROT_PIDENT_MIN) and ranked by highest identity.
+_UNIPROT_PIDENT_MIN = R.UNIPROT_PIDENT_MIN
 
 
 def eval_uniprot(row: dict[str, str]) -> ToolEvaluation:
@@ -323,7 +233,7 @@ def eval_uniprot(row: dict[str, str]) -> ToolEvaluation:
     chosen = informative_pool[0] if informative_pool else pool[0]
 
     pident = safe_float(chosen.stat, -1.0)
-    gate_passed = pident < 0 or pident >= _UNIPROT_PIDENT_MIN
+    gate_passed = R.uniprot_gate_passed(chosen.stat)
     gate_note = (f"pident={pident:.1f}% {'>=' if gate_passed else '<'} {_UNIPROT_PIDENT_MIN:.0f}% required"
                 if pident >= 0 else "pident unavailable, gate skipped")
     informative = not is_uninformative(chosen.description)
