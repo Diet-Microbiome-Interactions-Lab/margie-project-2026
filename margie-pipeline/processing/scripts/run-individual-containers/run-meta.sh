@@ -81,6 +81,13 @@ run() {
 run_soft() {
     run "$@" || echo "[meta] WARN: $1: $(basename "$2") failed (non-fatal)" >&2
 }
+# genome_hash <genome> — the genome's full hash (fa1: and 64 hexadecimal digits) of its FASTA in
+# $INPUT_RASTTK, by margie_sb's genome_identity.py; empty when the FASTA is not there.
+genome_hash() {
+    local f="$INPUT_RASTTK/$1.fna"
+    [[ -s "$f" ]] || return 0
+    "$PY" -c 'import sys; sys.path.insert(0, sys.argv[1]); from genome_identity import genome_hash; print(genome_hash(sys.argv[2]))' "$HS" "$f"
+}
 
 # ── gather ────────────────────────────────────────────────────────────────────
 # Rebuilds the genome's folder from scratch out of the per-tool results.
@@ -219,7 +226,8 @@ stage_fingerprint() {
         --output-full "$f/labeled-genes-fingerprint-full.tsv" \
         --output-full-with-scores "$f/labeled-genes-fingerprint-full-with-scores.tsv"
     run fingerprint fingerprint/update-fingerprint-database.py \
-        --hash-label-input "$f/labeled-genes-fingerprint-hash-label.tsv" --organism "$g" --fingerprint-database "$FP_DB"
+        --hash-label-input "$f/labeled-genes-fingerprint-hash-label.tsv" --organism "$g" \
+        --genome-hash "$(genome_hash "$g")" --fingerprint-database "$FP_DB"
     run fingerprint fingerprint/add-operon-fingerprint.py \
         --operon-input "$l/labeled-genes-operon-info.tsv" --hash-label-input "$f/labeled-genes-fingerprint-hash-label.tsv" \
         --output "$f/labeled-genes-operon-fingerprint.tsv"
@@ -239,6 +247,7 @@ stage_fingerprint() {
         --output "$s/FINAL-scored-labeled-genes-annotated.tsv"
     run fingerprint fingerprint/update-operon-fingerprint-database.py \
         --operon-fingerprint-input "$f/labeled-genes-operon-fingerprint.tsv" --organism "$g" \
+        --genome-hash "$(genome_hash "$g")" \
         --evidence-ordered-database "$OPERON_FP_EVIDENCE_ORDERED" \
         --evidence-composition-database "$OPERON_FP_EVIDENCE_COMPOSITION" \
         --label-ordered-database "$OPERON_FP_LABEL_ORDERED" \

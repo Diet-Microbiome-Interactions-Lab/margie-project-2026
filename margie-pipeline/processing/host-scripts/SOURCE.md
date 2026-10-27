@@ -1,7 +1,7 @@
 # Host scripts from margie-backend
 
 These are margie-backend's post-annotation scripts, copied unchanged from
-`bioinformatics_tools/workflow_tools/` at margie-backend commit `7851981` (be-margie/ in the margie-project-2026 monorepo).
+`bioinformatics_tools/workflow_tools/` at margie-backend commit `7bcae31` (be-margie/ in the margie-project-2026 monorepo).
 They run on the host, not in a container, as they do in margie-backend's
 `margie_sb.smk`; `processing/scripts/run-individual-containers/run-meta.sh`
 calls them with the same arguments and in the same order.
@@ -17,6 +17,7 @@ calls them with the same arguments and in the same order.
 | `scoring/analysis/report_figures/` | per-organism and pangenome report figures |
 | `enrich_with_envelope.py` | adds the envelope call to deepsig / psortb / signalp4 results |
 | `reorganize_outputs.py` | final per-genome folder layout |
+| `genome_identity.py` | the genome hash the fingerprint pools know a genome by (`run-meta.sh`'s `genome_hash`) |
 
 Not copied: `scoring/analysis/c3_figures/` (research figures, not part of a
 run), the database loaders and the LLM step.
@@ -38,5 +39,5 @@ for d in consolidation labeling fingerprint evidence viz; do
 done
 rsync -a --exclude __pycache__ --exclude analysis "$SRC/scoring/" "$DST/scoring/"
 rsync -a --delete --exclude __pycache__ "$SRC/scoring/analysis/report_figures/" "$DST/scoring/analysis/report_figures/"
-cp "$SRC/enrich_with_envelope.py" "$SRC/reorganize_outputs.py" "$DST/"
+cp "$SRC/enrich_with_envelope.py" "$SRC/reorganize_outputs.py" "$SRC/genome_identity.py" "$DST/"
 ```
