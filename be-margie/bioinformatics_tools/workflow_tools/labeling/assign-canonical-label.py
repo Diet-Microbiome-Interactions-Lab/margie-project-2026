@@ -331,15 +331,23 @@ def eval_tcdb(row: dict[str, str]) -> ToolEvaluation:
 
 
 def eval_dbcan(row: dict[str, str]) -> ToolEvaluation:
-    """Evaluates the single dbCAN row as confirmatory evidence; its stat is the number of agreeing sub-tools."""
-    desc = row.get("DBCAN_description", "")
-    if not desc:
+    """Evaluates the single dbCAN row as confirmatory evidence; its stat is the number of agreeing sub-tools.
+
+    A call is its family ID (DBCAN_id); without a description the family ID is shown in its place.
+    """
+    desc = (row.get("DBCAN_description", "") or "").strip()
+    hid = (row.get("DBCAN_id", "") or "").strip()
+    if not desc and not hid:
         return _no_hit("DBCAN", confirmatory=True)
-    hid = row.get("DBCAN_id", "")
     n_tools = row.get("DBCAN_number_of_tools_hit", "")
-    informative = not is_uninformative(desc)
-    return ToolEvaluation("DBCAN", hid, desc, informative, True,
-                          f"{n_tools} sub-tools agree", informative, n_tools,
+    note = f"{n_tools} sub-tools agree"
+    if desc:
+        shown, informative = desc, not is_uninformative(desc)
+    else:
+        shown, informative = hid, False
+        note += " (family ID only; no description)"
+    return ToolEvaluation("DBCAN", hid, shown, informative, True,
+                          note, informative, n_tools,
                           hid, desc, n_tools, confirmatory=True)
 
 
