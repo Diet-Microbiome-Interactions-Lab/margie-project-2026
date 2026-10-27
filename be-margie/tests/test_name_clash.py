@@ -1,9 +1,10 @@
-"""Each genome runs as <name>--<the first 8 characters of its hash> (workflow.named_with_hash: a folder
+"""Each genome runs as <name>--fa1:<the first 8 hexadecimal digits of its hash> (workflow.named_with_hash: a folder
 of links the run reads, the files as they are), keeping its own settings, so genomes that share a
 file name stay apart. workflow.name_clashes, a check kept behind it, finds a name another genome
 (other DNA) has in the MARGIE database; the same genome, or its file saved again, is not one."""
 
 import json
+import re
 import sqlite3
 
 from bioinformatics_tools.workflow_tools.load_to_db import fasta_hashes
@@ -55,9 +56,11 @@ def test_each_genome_runs_under_its_name_and_hash_with_its_settings(tmp_path):
     coli, dorei = _fasta(inputs, "coli", "TTGA" * 50), _fasta(inputs, "dorei", "GGCC" * 40)
     folder = named_with_hash({"coli": coli, "dorei": dorei}, str(tmp_path / "run" / ".margie-input"))
     genomes = discover_genomes(folder)
-    named = {f"coli--{fasta_hashes(coli)[0][:8]}", f"dorei--{fasta_hashes(dorei)[0][:8]}"}
+    # fa1: and the first 8 hexadecimal digits of the genome hash.
+    named = {f"coli--{fasta_hashes(coli)[0][:12]}", f"dorei--{fasta_hashes(dorei)[0][:12]}"}
     assert set(genomes) == named
-    renamed = f"coli--{fasta_hashes(coli)[0][:8]}"
+    renamed = f"coli--{fasta_hashes(coli)[0][:12]}"
+    assert re.fullmatch(r"coli--fa1:[0-9a-f]{8}", renamed)
     assert open(genomes[renamed]).read() == open(coli).read()
     # Its settings in config.yaml stay with it, by its file's name.
     config = {"margie_sb": {"genome_info": {"coli.fna": {"domain": "Archaea", "genetic_code": "11"}}}}
@@ -71,4 +74,5 @@ def test_a_name_that_already_carries_its_hash_keeps_it(tmp_path):
     # Another genome's hash on the name is replaced by this genome's, in either form.
     assert name_with_hash("coli--0000aaaa", coli) == named
     assert name_with_hash("coli--fa1:0000", coli) == named
+    assert name_with_hash("coli--fa1:0000aaaa", coli) == named
     assert named.startswith("coli--fa1:")
