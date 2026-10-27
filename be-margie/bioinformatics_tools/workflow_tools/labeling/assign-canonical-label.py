@@ -7,7 +7,8 @@ informative and passes its gate:
   Tier 1: PGAP > NCBIFAM > TIGRFAM   -- curated prokaryotic family rules
   Tier 2: HAMAP > PIRSF > UNIPROT    -- family rule / whole-protein HMM / Swiss-Prot hit
   Tier 3: KEGG | Tier 4: EGGNOG | Tier 5: RAST | Tier 6: PFAM | Tier 7: CDD | Tier 8: COG
-  Tier 9: fallback -- the first tool with any description, else "No DB hits"
+  Tier 9: fallback -- the first tool whose description names a protein (not an
+          accession or "Psort location ..."), then any description, else "No DB hits"
 Only UniProt is gated here (identity >= 40%); the other tools were thresholded
 upstream. For multi-hit tools the best hit is the best-ranked informative one,
 falling back to the literal best; every hit stays in the _all_* columns.
@@ -392,7 +393,12 @@ def assign_label(
     # Pass 1: first evaluation that qualifies (informative + gate passed).
     winner = next((ev for ev in evaluations if ev.qualifies), None)
 
-    # Pass 2: first tool with any description, ignoring informativeness and gates.
+    # Pass 2: first tool whose description names a protein ("hypothetical protein" does; an
+    # accession standing in for a description or "Psort location ..." does not), ignoring
+    # informativeness and gates; then the first with any description.
+    if winner is None:
+        winner = next((ev for ev in evaluations
+                       if ev.description and R.names_a_protein(ev.hit_id, ev.description)), None)
     if winner is None:
         winner = next((ev for ev in evaluations if ev.description), None)
 

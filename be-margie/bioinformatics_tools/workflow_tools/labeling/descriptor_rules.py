@@ -48,6 +48,17 @@ UNINFORMATIVE_PREFIXES = (
 # Group 2 tags as whole words: "DUF167 family protein", "UPF0145 protein", "ORF1", "orf_12",
 # and not "Orfamide synthetase".
 _TAG_PREFIX_RE = re.compile(r'^(?:duf|upf|orf)(?:_?\d+[a-z]?)?\b', re.IGNORECASE)
+# Group 9 — an accession and nothing else: an eggNOG seed ortholog (taxid.locus, "504832.OCAR_7106")
+# or a database accession ("K00845", "COG0001", "PF00001.21", "TIGR00001", "NF000001.1",
+# "IPR000001", "MF_00001", "PIRSF000001", "cd00001", "WP_000001.1", "FIG00001", "GO:0000001",
+# a UniProt accession). A bare EC number ("1.1.1.1") is not one.
+_ACCESSION_ONLY_RE = re.compile(
+    r'^(?:\d+\.(?=[\w.\-]*[a-z])[\w.\-]+'
+    r'|k\d{5}|cog\d{4}|arcog\d{5}|enog\w+|pf\d{5}|tigr\d{5}|nf\d{6}|ipr\d{6}|mf_\d{5}|pirsf\d{6}'
+    r'|(?:cd|cl|sm)\d{5}|smart\d{5}|[anwxyz]p_\d+|fig\d+|go:\d{7}'
+    r'|[opq]\d[a-z0-9]{3}\d|[a-nr-z]\d(?:[a-z][a-z0-9]{2}\d){1,2})(?:\.\d+)?$',
+    re.IGNORECASE,
+)
 
 _UNKNOWN_FUNC_RE = re.compile(
     r'^\s*(?:(?:bacterial|viral|archaeal|eukaryotic|fungal|plant|marine|'
@@ -121,7 +132,7 @@ def is_uninformative(val: str) -> bool:
     for prefix in UNINFORMATIVE_PREFIXES:
         if v.startswith(prefix):
             return True
-    if _TAG_PREFIX_RE.match(v):
+    if _TAG_PREFIX_RE.match(v) or _ACCESSION_ONLY_RE.match(v):
         return True
     # Groups 8, 4, 5, 6
     if (_UNKNOWN_FUNC_RE.match(v) or _DB_ID_HYPOTHETICAL_RE.match(v)
@@ -169,6 +180,15 @@ def has_own_description(hit_id: str, description: str) -> bool:
     if desc.lower() in NULLISH:
         return False
     return not (hit_id and desc == hit_id.strip())
+
+
+def names_a_protein(hit_id: str, description: str) -> bool:
+    """Returns True when a description is the hit's own and is neither an accession nor a
+    localisation-only text ("Psort location ..."); "hypothetical protein" names one."""
+    if not has_own_description(hit_id, description):
+        return False
+    v = strip_source_tags(description).lower()
+    return bool(v) and not (_ACCESSION_ONLY_RE.match(v) or _PSORT_ONLY_RE.match(v))
 
 
 def hit_is_informative(tool_name: str, hit_id: str, description: str, stat: str = "") -> bool:
