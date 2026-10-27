@@ -225,7 +225,6 @@ propagates everywhere automatically.
 # In pipeline.conf.sh:
 
 SLURM_ACCOUNT=your_account_name    # your HPC allocation (required for job submission)
-BVBRC_USERNAME=your_bvbrc_username # your BV-BRC / PATRIC account (for rasttk gene calling)
 LICENCE_INTENDED_USE="academic research at <your institution>"  # see Section 8
 ```
 
@@ -330,20 +329,13 @@ TOOL_rasttk_POSTPROC=""
 
 All per-tool overrides are documented in the comments inside `pipeline.conf.sh`.
 
-### BV-BRC login (for rasttk)
+### BV-BRC (for rasttk)
 
-The `rasttk` tool uses BV-BRC (formerly PATRIC) CLI tools for gene calling. Set your username
-in `pipeline.conf.sh`:
-
-```bash
-BVBRC_LOGIN=1
-BVBRC_USERNAME=your_bvbrc_username
-```
-
-On the first run, the rasttk container will prompt for your password interactively and cache
-the session locally (gitignored). Subsequent SLURM jobs reuse the cached session automatically.
-If submitting non-interactive SLURM jobs, run `./annotate.sh --tool rasttk` once from an
-interactive terminal first to cache the credentials.
+The `rasttk` tool uses BV-BRC (formerly PATRIC) CLI tools for gene calling. They call BV-BRC's
+public services, which need no account, so there is nothing to set. A login is optional: with
+`BVBRC_LOGIN=1` in `pipeline.conf.sh`, the rasttk container asks for the account and password on
+first use and caches the session locally (gitignored). For non-interactive SLURM jobs, run
+`./annotate.sh --tool rasttk` once from an interactive terminal first.
 
 ---
 

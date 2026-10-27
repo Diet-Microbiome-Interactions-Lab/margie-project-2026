@@ -72,9 +72,8 @@ _bvbrc_prompt_login() {
         return 1
     }
 
-    # A preset username leaves only the password to prompt for.
+    # p3-login asks for the account and password.
     local p3_cmd=( p3-login )
-    [[ -n "${BVBRC_USERNAME:-}" ]] && p3_cmd+=( "$BVBRC_USERNAME" )
 
     case "$runtime" in
         apptainer|singularity)

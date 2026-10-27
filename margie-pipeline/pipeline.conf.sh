@@ -350,14 +350,13 @@ LICENCE_GATED_TOOLS=(merops tcdb interpro psortb)
 : "${MIN_PHASE2_ORGS:=2}"
 
 # section 11 — BV-BRC login for the rasttk step (bvbrc-env.sh)
-# With BVBRC_LOGIN=1, run-rasttk.sh runs `p3-login` in the rasttk container on
-# first use and reuses the cached session afterwards. For SLURM jobs, log in once
+# RASTtk uses BV-BRC's public services, which need no account. With BVBRC_LOGIN=1,
+# run-rasttk.sh runs `p3-login` in the rasttk container, which asks for the account
+# and password, and reuses the cached session afterwards. For SLURM jobs, log in once
 # from an interactive terminal first. To force a new login:
 #   source processing/scripts/shared/bvbrc-env.sh && bvbrc_reset_session
 #
 # BVBRC_LOGIN         0 = off, 1 = on
-# BVBRC_USERNAME      BV-BRC account name passed to p3-login (empty: prompt for it)
 # BVBRC_SESSION_DIR   where p3 credentials are cached (gitignored)
-: "${BVBRC_LOGIN:=1}"
-: "${BVBRC_USERNAME:=}"
+: "${BVBRC_LOGIN:=0}"
 : "${BVBRC_SESSION_DIR:=$REPO_ROOT/processing/.bvbrc}"
