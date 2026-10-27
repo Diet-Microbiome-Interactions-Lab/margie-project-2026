@@ -2,13 +2,15 @@
 """Descriptor gate and per-organism loader for the C3 operon-context scorer.
 
 is_uninformative() and clean_descriptor() decide whether a descriptor names a
-function and normalise it (the gate matches score-c1-tool-coverage.py);
+function and normalise it (the gate is labeling/descriptor_rules.py, shared
+with labeling and score-c1-tool-coverage.py);
 load_organism() joins labeled-genes.tsv and labeled-genes-operon-info.tsv into
 one pandas row per gene.
 """
 import csv
 import hashlib
 import re
+import sys
 from pathlib import Path
 
 import pandas as pd
@@ -16,89 +18,15 @@ import pandas as pd
 csv.field_size_limit(10_000_000)
 
 
-_UNINFORMATIVE = frozenset({
-    "", "-", ".", "na", "n/a", "none", "null",
-    "unknown", "uncharacterized", "uncharacterised", "putative", "predicted",
-    "hypothetical protein", "conserved hypothetical protein", "conserved protein",
-    "conserved domain protein", "predicted protein", "function unknown",
-    "domain of unknown function", "general function prediction only",
-    "poorly characterized", "open reading frame",
-})
-_UNINFORMATIVE_PREFIXES = (
-    "domain of unknown function", "protein of unknown function",
-    "family of unknown function", "region of unknown function",
-    "repeat of unknown function", "module of unknown function",
-    "duf", "upf", "uncharacteri", "putative uncharacteri",
-    "conserved hypothetical", "hypothetical", "unknown protein",
-    "unknown function", "orf", "pfam uncharacteri",
-)
-_UNKNOWN_FUNC_RE = re.compile(
-    r'^\s*(?:(?:bacterial|viral|archaeal|eukaryotic|fungal|plant|marine|'
-    r'transmembrane|integral membrane|membrane)\s+)?'
-    r'(?:domain|protein|family|repeat|region|module)\s+of\s+unknown\s+function',
-    re.IGNORECASE,
-)
-_DB_ID_HYPOTHETICAL_RE = re.compile(
-    r'^(?:fig\d+|tigr\d+)[:\s].*(?:hypothetical|conserved hypothetical)', re.IGNORECASE,
-)
-_UPF_ONLY_RE = re.compile(r'^\s*belongs to the upf\d+', re.IGNORECASE)
-# eggNOG "Psort location ..." descriptions give localisation only, not a product.
-_PSORT_ONLY_RE = re.compile(r'^\s*psort location\b', re.IGNORECASE)
-_BARE_DUF_RE = re.compile(r'^\s*(?:pfam:)?\(?duf\d+\)?(?:\s+(?:family|domain))?\s*$', re.IGNORECASE)
-_PROTEIN_DOMAINS_DUF_RE = re.compile(r'^\s*protein containing domains?\s+duf', re.IGNORECASE)
-_HYPOTHETICAL_ANYWHERE_RE = re.compile(r'\bhypothetical\b', re.IGNORECASE)
-_PROTEIN_CONSERVED_IN_BACTERIA_RE = re.compile(r'\bprotein\s+conserved\s+in\s+bacteria\b', re.IGNORECASE)
-_INTEGRAL_MEMBRANE_PROTEIN_RE = re.compile(r'^\s*integral\s+membrane\s+protein\s*$', re.IGNORECASE)
-_FUNCTION_SIGNAL_RE = re.compile(
-    r'(ase\b|transport|permease|pump|export|import|channel|carrier|symport|antiport|'
-    r'bind|synth|kinas|reductas|hydrolas|transferas|isomeras|ligas|lyas|mutas|oxidas|'
-    r'dehydrogen|regulat|repressor|activator|\bfactor\b|receptor|sensor|subunit|ribosom|'
-    r'polymeras|oxidoreduct|enzyme|proteas|peptidas|nucleas|phosphatas|efflux|resistance|'
-    r'virulence|toxin|flippase|homeostasis|assembly|motility|adhesin|chaperone|'
-    r'helicas|topoisomeras|gyrase|recombinas|integras|transposas|methylas|glycosyl|'
-    r'dismutas|catalas|peroxidas|cytochrome|ferredoxin|cytoskelet|cell division|'
-    r'degradation|tolerance|translation|utilization)', re.IGNORECASE,
-)
-_UNCHARACTERIZED_RE = re.compile(r'\buncharacteri[sz]ed\b', re.IGNORECASE)
-_LOCUS_OR_TAG_RE = re.compile(r'^\(?(?:duf\d+|upf\d+|[a-z]{1,5}\d{0,4}[a-z]?\d{0,4})\)?$', re.IGNORECASE)
+# The informative gate is labeling's (labeling/descriptor_rules.py), shared with C1.
+sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "labeling"))
+import descriptor_rules as _rules  # noqa: E402
 
-
-def is_uninformative(val: str) -> bool:
-    """Returns True when the description names no function (word lists and regexes above)."""
-    v = (val or "").strip().lower()
-    if not v or v in _UNINFORMATIVE:
-        return True
-    for prefix in _UNINFORMATIVE_PREFIXES:
-        if v.startswith(prefix):
-            return True
-    if (_UNKNOWN_FUNC_RE.match(v) or _DB_ID_HYPOTHETICAL_RE.match(v)
-            or _UPF_ONLY_RE.match(v) or _PSORT_ONLY_RE.match(v) or _BARE_DUF_RE.match(v)
-            or _HYPOTHETICAL_ANYWHERE_RE.search(v)
-            or _PROTEIN_CONSERVED_IN_BACTERIA_RE.search(v)
-            or _INTEGRAL_MEMBRANE_PROTEIN_RE.match(v)
-            or _PROTEIN_DOMAINS_DUF_RE.match(v)):
-        return True
-    if not _FUNCTION_SIGNAL_RE.search(v):
-        if "of unknown function" in v:
-            return True
-        if _UNCHARACTERIZED_RE.search(v):
-            return True
-        if v.startswith("conserved protein"):
-            rest = v[len("conserved protein"):].strip(" ,.;:-")
-            if not rest or _BARE_DUF_RE.match(rest) or _LOCUS_OR_TAG_RE.match(rest):
-                return True
-    return False
+is_uninformative = _rules.is_uninformative
 
 
 # ─── Descriptor cleaning: SOURCE: tags stripped so sources group together ───
-_SOURCE_PREFIX_RE = re.compile(
-    r'^(?:'
-    r'JCVI|NCBIFAM|NCBI Protein Cluster \(PRK\)|PRK|TIGR|TIGRFAM|PGAP|HAMAP|'
-    r'PIRSF|UniProt|UNIPROT|KEGG|EGGNOG|eggNOG|PFAM|Pfam|CDD|COG|RAST|MEROPS|'
-    r'TCDB|DBCAN|SwissProt|FIG\d+'
-    r')\s*:\s*',
-    re.IGNORECASE,
-)
+_SOURCE_PREFIX_RE = _rules.SOURCE_TAG_RE
 
 
 def clean_descriptor(desc: str) -> str:
@@ -111,11 +39,7 @@ def clean_descriptor(desc: str) -> str:
         left, right = d.split(" ## ", 1)
         d = right.strip() if right.strip() else left.strip()
     # Strips leading SOURCE: tags until none remain (e.g. "JCVI: PRK: x").
-    prev = None
-    while prev != d:
-        prev = d
-        d = _SOURCE_PREFIX_RE.sub("", d).strip()
-    return d
+    return _rules.strip_source_tags(d)
 
 
 def sha256_hash(seq: str) -> str:

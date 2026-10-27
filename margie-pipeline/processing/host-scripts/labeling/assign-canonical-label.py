@@ -7,7 +7,8 @@ informative and passes its gate:
   Tier 1: PGAP > NCBIFAM > TIGRFAM   -- curated prokaryotic family rules
   Tier 2: HAMAP > PIRSF > UNIPROT    -- family rule / whole-protein HMM / Swiss-Prot hit
   Tier 3: KEGG | Tier 4: EGGNOG | Tier 5: RAST | Tier 6: PFAM | Tier 7: CDD | Tier 8: COG
-  Tier 9: fallback -- the first tool with any description, else "No DB hits"
+  Tier 9: fallback -- the first tool whose description names a protein (not an
+          accession or "Psort location ..."), then any description, else "No DB hits"
 Only UniProt is gated here (identity >= 40%); the other tools were thresholded
 upstream. For multi-hit tools the best hit is the best-ranked informative one,
 falling back to the literal best; every hit stays in the _all_* columns.
@@ -25,102 +26,12 @@ csv.field_size_limit(10_000_000)
 
 
 # ─── STEP 0: uninformative-description filtering ───────────────────────────────
+# The rules sit in descriptor_rules.py beside this script, shared with C1 and C3.
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+import descriptor_rules as R  # noqa: E402
 
-_UNINFORMATIVE = frozenset({
-    "", "-", ".", "na", "n/a", "none", "null",
-    "unknown", "uncharacterized", "uncharacterised", "putative", "predicted",
-    "hypothetical protein",
-    "conserved hypothetical protein",
-    "conserved protein",
-    "conserved domain protein",
-    "predicted protein",
-    "function unknown",
-    "domain of unknown function",
-    "general function prediction only",
-    "poorly characterized",
-    "open reading frame",
-})
-_NULLISH_UNINFORMATIVE = frozenset({"", "-", ".", "na", "n/a", "none", "null"})
-
-_UNINFORMATIVE_PREFIXES = (
-    "domain of unknown function",
-    "protein of unknown function",
-    "family of unknown function",
-    "region of unknown function",
-    "repeat of unknown function",
-    "module of unknown function",
-    "duf",
-    "upf",
-    "uncharacteri",
-    "putative uncharacteri",
-    "conserved hypothetical",
-    "hypothetical",
-    "unknown protein",
-    "unknown function",
-    "orf",
-    "pfam uncharacteri",
-)
-
-_UNKNOWN_FUNC_RE = re.compile(
-    r'^\s*(?:(?:bacterial|viral|archaeal|eukaryotic|fungal|plant|marine|'
-    r'transmembrane|integral membrane|membrane)\s+)?'
-    r'(?:domain|protein|family|repeat|region|module)\s+of\s+unknown\s+function',
-    re.IGNORECASE,
-)
-
-_DB_ID_HYPOTHETICAL_RE = re.compile(
-    r'^(?:fig\d+|tigr\d+)[:\s].*(?:hypothetical|conserved hypothetical)',
-    re.IGNORECASE,
-)
-
-# More uninformative patterns, kept identical to scoring/score-c1-tool-coverage.py.
-_UPF_ONLY_RE = re.compile(r'^\s*belongs to the upf\d+', re.IGNORECASE)
-# eggNOG's "Psort location ..." descriptions give localisation only, not a product.
-_PSORT_ONLY_RE = re.compile(r'^\s*psort location\b', re.IGNORECASE)
-_BARE_DUF_RE = re.compile(r'^\s*(?:pfam:)?\(?duf\d+\)?(?:\s+(?:family|domain))?\s*$', re.IGNORECASE)
-_PROTEIN_DOMAINS_DUF_RE = re.compile(r'^\s*protein containing domains?\s+duf', re.IGNORECASE)
-_HYPOTHETICAL_ANYWHERE_RE = re.compile(r'\bhypothetical\b', re.IGNORECASE)
-_PROTEIN_CONSERVED_IN_BACTERIA_RE = re.compile(r'\bprotein\s+conserved\s+in\s+bacteria\b', re.IGNORECASE)
-_INTEGRAL_MEMBRANE_PROTEIN_RE = re.compile(r'^\s*integral\s+membrane\s+protein\s*$', re.IGNORECASE)
-_FUNCTION_SIGNAL_RE = re.compile(
-    r'(ase\b|transport|permease|pump|export|import|channel|carrier|symport|antiport|'
-    r'bind|synth|kinas|reductas|hydrolas|transferas|isomeras|ligas|lyas|mutas|oxidas|'
-    r'dehydrogen|regulat|repressor|activator|\bfactor\b|receptor|sensor|subunit|ribosom|'
-    r'polymeras|oxidoreduct|enzyme|proteas|peptidas|nucleas|phosphatas|efflux|resistance|'
-    r'virulence|toxin|flippase|homeostasis|assembly|motility|adhesin|chaperone|'
-    r'helicas|topoisomeras|gyrase|recombinas|integras|transposas|methylas|glycosyl|'
-    r'dismutas|catalas|peroxidas|cytochrome|ferredoxin|cytoskelet|cell division|'
-    r'degradation|tolerance|translation|utilization)', re.IGNORECASE,
-)
-_UNCHARACTERIZED_RE = re.compile(r'\buncharacteri[sz]ed\b', re.IGNORECASE)
-_LOCUS_OR_TAG_RE = re.compile(r'^\(?(?:duf\d+|upf\d+|[a-z]{1,5}\d{0,4}[a-z]?\d{0,4})\)?$', re.IGNORECASE)
-
-
-def is_uninformative(val: str) -> bool:
-    """Returns True when a description names no function, using the word lists and regexes above."""
-    v = val.strip().lower()
-    if not v or v in _UNINFORMATIVE:
-        return True
-    for prefix in _UNINFORMATIVE_PREFIXES:
-        if v.startswith(prefix):
-            return True
-    if (_UNKNOWN_FUNC_RE.match(v) or _DB_ID_HYPOTHETICAL_RE.match(v)
-            or _UPF_ONLY_RE.match(v) or _PSORT_ONLY_RE.match(v) or _BARE_DUF_RE.match(v)
-            or _HYPOTHETICAL_ANYWHERE_RE.search(v)
-            or _PROTEIN_CONSERVED_IN_BACTERIA_RE.search(v)
-            or _INTEGRAL_MEMBRANE_PROTEIN_RE.match(v)
-            or _PROTEIN_DOMAINS_DUF_RE.match(v)):
-        return True
-    if not _FUNCTION_SIGNAL_RE.search(v):
-        if "of unknown function" in v:
-            return True
-        if _UNCHARACTERIZED_RE.search(v):
-            return True
-        if v.startswith("conserved protein"):
-            rest = v[len("conserved protein"):].strip(" ,.;:-")
-            if not rest or _BARE_DUF_RE.match(rest) or _LOCUS_OR_TAG_RE.match(rest):
-                return True
-    return False
+_NULLISH_UNINFORMATIVE = R.NULLISH
+is_uninformative = R.is_uninformative
 
 
 # ─── STEP 0b: e-value formatting ────────────────────────────────────────────────
@@ -238,14 +149,20 @@ def evaluate_accession_tool(
     stat_col: str,
     gate_note_suffix: str = "",
     confirmatory: bool = False,
+    rank_by_score: bool = False,
 ) -> ToolEvaluation:
-    """Evaluates an accession-keyed tool ranked by e-value: picks the best hit and builds its gate note."""
+    """Evaluates an accession-keyed tool: picks the best hit and builds its gate note.
+
+    Hits are ranked by lowest e-value, or with rank_by_score by highest score (shown as reported).
+    """
     hits = parse_all_hits(row, id_col, desc_col, stat_col)
     if not hits:
         return _no_hit(tool_name, confirmatory)
 
-    chosen, overrode = select_best_hit(hits, rank_mode="min")
-    stat_norm = normalize_evalue(chosen.stat)
+    rank_mode, stat_name = ("max", "score") if rank_by_score else ("min", "evalue")
+    fmt = (lambda v: v) if rank_by_score else normalize_evalue
+    chosen, overrode = select_best_hit(hits, rank_mode=rank_mode)
+    stat_norm = fmt(chosen.stat)
 
     # Uninformative hits fail pass 1; no description falls back to the accession.
     desc_norm = chosen.description.strip().lower()
@@ -258,13 +175,18 @@ def evaluate_accession_tool(
 
     all_ids = ";".join(h.hit_id for h in hits)
     all_descs = "; ".join(f"{h.hit_id}: {h.description}" for h in hits) if len(hits) > 1 else chosen.description
-    all_stats = "; ".join(f"{h.hit_id}: {normalize_evalue(h.stat)}" for h in hits) if len(hits) > 1 else stat_norm
+    all_stats = "; ".join(f"{h.hit_id}: {fmt(h.stat)}" for h in hits) if len(hits) > 1 else stat_norm
 
-    note = f"evalue={stat_norm}"
+    note = f"{stat_name}={stat_norm}"
     if overrode:
-        literal_best = min(hits, key=lambda h: safe_float(h.stat, float("inf")))
-        note += (f" (used {chosen.hit_id} over lower-evalue-but-uninformative "
-                f"{literal_best.hit_id}, evalue={normalize_evalue(literal_best.stat)})")
+        if rank_by_score:
+            literal_best = max(hits, key=lambda h: safe_float(h.stat, float("-inf")))
+            better = "higher-score"
+        else:
+            literal_best = min(hits, key=lambda h: safe_float(h.stat, float("inf")))
+            better = "lower-evalue"
+        note += (f" (used {chosen.hit_id} over {better}-but-uninformative "
+                f"{literal_best.hit_id}, {stat_name}={fmt(literal_best.stat)})")
     if effective_desc != chosen.description:
         note += f" (description missing; accession used as fallback label)"
     if gate_note_suffix:
@@ -289,8 +211,12 @@ def eval_tigrfam(row: dict[str, str]) -> ToolEvaluation:
 
 # ─── STEP 3: HAMAP ───────────────────────────────────────────────────────────────
 def eval_hamap(row: dict[str, str]) -> ToolEvaluation:
-    """Evaluates InterPro HAMAP hits (InterProScan cutoff applied upstream)."""
-    return evaluate_accession_tool(row, "HAMAP", "INTERPRO_HAMAP_id", "INTERPRO_HAMAP_description", "INTERPRO_HAMAP_evalue")
+    """Evaluates InterPro HAMAP hits (InterProScan cutoff applied upstream).
+
+    INTERPRO_HAMAP_evalue holds HAMAP's profile score (higher is better), so hits rank highest first.
+    """
+    return evaluate_accession_tool(row, "HAMAP", "INTERPRO_HAMAP_id", "INTERPRO_HAMAP_description",
+                                   "INTERPRO_HAMAP_evalue", rank_by_score=True)
 
 
 # ─── STEP 4: NCBIFAM ─────────────────────────────────────────────────────────────
@@ -306,8 +232,8 @@ def eval_pirsf(row: dict[str, str]) -> ToolEvaluation:
 
 
 # ─── STEP 6: UNIPROT ─────────────────────────────────────────────────────────────
-# Gated here at identity >= 40% and ranked by highest identity.
-_UNIPROT_PIDENT_MIN = 40.0
+# Gated here at identity >= 40% (descriptor_rules.UNIPROT_PIDENT_MIN) and ranked by highest identity.
+_UNIPROT_PIDENT_MIN = R.UNIPROT_PIDENT_MIN
 
 
 def eval_uniprot(row: dict[str, str]) -> ToolEvaluation:
@@ -323,7 +249,7 @@ def eval_uniprot(row: dict[str, str]) -> ToolEvaluation:
     chosen = informative_pool[0] if informative_pool else pool[0]
 
     pident = safe_float(chosen.stat, -1.0)
-    gate_passed = pident < 0 or pident >= _UNIPROT_PIDENT_MIN
+    gate_passed = R.uniprot_gate_passed(chosen.stat)
     gate_note = (f"pident={pident:.1f}% {'>=' if gate_passed else '<'} {_UNIPROT_PIDENT_MIN:.0f}% required"
                 if pident >= 0 else "pident unavailable, gate skipped")
     informative = not is_uninformative(chosen.description)
@@ -339,12 +265,8 @@ def eval_uniprot(row: dict[str, str]) -> ToolEvaluation:
 
 # ─── STEP 7: PFAM ────────────────────────────────────────────────────────────────
 def eval_pfam(row: dict[str, str]) -> ToolEvaluation:
-    """Evaluates PFAM hits (--cut_ga upstream); a hit qualifies even when all its domains are DUF/UPF."""
-    ev = evaluate_accession_tool(row, "PFAM", "PFAM_id", "PFAM_description", "PFAM_full_seq_evalue")
-    if ev.hit_id and not ev.qualifies:
-        return ev._replace(qualifies=True,
-                           gate_note=ev.gate_note + " (uninformative, e.g. DUF -- kept anyway)")
-    return ev
+    """Evaluates PFAM hits (--cut_ga upstream); like the other tools, an uninformative hit (e.g. a DUF) does not qualify."""
+    return evaluate_accession_tool(row, "PFAM", "PFAM_id", "PFAM_description", "PFAM_full_seq_evalue")
 
 
 # ─── STEP 8: CDD ─────────────────────────────────────────────────────────────────
@@ -405,15 +327,23 @@ def eval_tcdb(row: dict[str, str]) -> ToolEvaluation:
 
 
 def eval_dbcan(row: dict[str, str]) -> ToolEvaluation:
-    """Evaluates the single dbCAN row as confirmatory evidence; its stat is the number of agreeing sub-tools."""
-    desc = row.get("DBCAN_description", "")
-    if not desc:
+    """Evaluates the single dbCAN row as confirmatory evidence; its stat is the number of agreeing sub-tools.
+
+    A call is its family ID (DBCAN_id); without a description the family ID is shown in its place.
+    """
+    desc = (row.get("DBCAN_description", "") or "").strip()
+    hid = (row.get("DBCAN_id", "") or "").strip()
+    if not desc and not hid:
         return _no_hit("DBCAN", confirmatory=True)
-    hid = row.get("DBCAN_id", "")
     n_tools = row.get("DBCAN_number_of_tools_hit", "")
-    informative = not is_uninformative(desc)
-    return ToolEvaluation("DBCAN", hid, desc, informative, True,
-                          f"{n_tools} sub-tools agree", informative, n_tools,
+    note = f"{n_tools} sub-tools agree"
+    if desc:
+        shown, informative = desc, not is_uninformative(desc)
+    else:
+        shown, informative = hid, False
+        note += " (family ID only; no description)"
+    return ToolEvaluation("DBCAN", hid, shown, informative, True,
+                          note, informative, n_tools,
                           hid, desc, n_tools, confirmatory=True)
 
 
@@ -476,13 +406,20 @@ def assign_label(
     Returns (label, source, source_id, hierarchy, audit_trail, evaluations,
     confirmatory_evals, confirmatory_summary).
     """
+    # Localization, topology and signal-peptide columns take no part in the label.
+    row = R.without_localization(row)
     evaluations = [fn(row) for fn in _EVALUATORS]
     confirmatory_evals = [fn(row) for fn in _CONFIRMATORY_EVALUATORS]
 
     # Pass 1: first evaluation that qualifies (informative + gate passed).
     winner = next((ev for ev in evaluations if ev.qualifies), None)
 
-    # Pass 2: first tool with any description, ignoring informativeness and gates.
+    # Pass 2: first tool whose description names a protein ("hypothetical protein" does; an
+    # accession standing in for a description or "Psort location ..." does not), ignoring
+    # informativeness and gates; then the first with any description.
+    if winner is None:
+        winner = next((ev for ev in evaluations
+                       if ev.description and R.names_a_protein(ev.hit_id, ev.description)), None)
     if winner is None:
         winner = next((ev for ev in evaluations if ev.description), None)
 

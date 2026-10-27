@@ -36,6 +36,10 @@ Python pickle of one dict, schema version 2 (c3_occ.REF_VERSION):
   M_adj, M_op           totals for the two channels
   n_qualifying_operons  number of operons counted
   organisms_added       the organisms it was built from (names below)
+  contrib               organism -> its own counts as added (present, adj, coop,
+                        n_op); written by c3_occ.py for genomes added from
+                        now on, and absent from this file, so leave-one-out
+                        of these 29 recomputes their counts from their files
 Open it only with the matching c3_occ.py; the version check refuses others.
 
 Contents

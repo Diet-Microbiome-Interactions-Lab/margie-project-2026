@@ -3,11 +3,13 @@
 
 Counts each distinct operon once and adds it to four pools, keyed by the
 evidence/label ordered/composition hashes from add-operon-fingerprint.py,
-using the same fcntl lock and .tmp-then-rename write as
-update-fingerprint-database.py. A genome already in a pool, by name, is not
-counted again. Columns: pattern_id, fingerprint_hash,
+using the same fcntl lock and atomic write (temporary file and os.replace) as
+update-fingerprint-database.py. A genome is known by the genome hash ending
+its name (pool_members.genome_key): one already in a pool, under this name or
+another, has its previous entries replaced. Columns: pattern_id, fingerprint_hash,
 members_in_order, fingerprint_frequency (operons with this hash),
-fingerprint_label_frequency (operons with this member sequence), organisms.
+fingerprint_label_frequency (operons with this member sequence), organisms,
+organism_counts (each genome's operons with this hash, "name=count" joined by "|").
 """
 from __future__ import annotations
 
@@ -21,6 +23,11 @@ from datetime import datetime, timezone
 from pathlib import Path
 
 csv.field_size_limit(10_000_000)
+
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+import pool_members as M  # noqa: E402
+
+_LOG = "[update-operon-fingerprint-database]"
 
 _OPERON_FP_RE = re.compile(
     r"^operon hash by evidence \(ordered\): (?P<evidence_ordered>\S+) \|\| "
@@ -46,8 +53,9 @@ def read_new_genome(operon_fp_tsv: Path) -> dict[str, dict]:
     n_unparsed = 0
     with open(operon_fp_tsv, newline="") as fh:
         for row in csv.DictReader(fh, delimiter="\t"):
-            oid = row.get("operon_id", "")
-            if oid == "NOT_IN_AN_OPERON" or oid in operons:
+            oid = row.get("operon_id", "") or ""
+            # Real operon ids start with "operon_" (NOT_IN_AN_OPERON and NOT_APPLICABLE_NON_CODING do not).
+            if not oid.startswith("operon_") or oid in operons:
                 continue
             parsed = parse_operon_fingerprint(row.get("operon_fingerprint", ""))
             if parsed is None:
@@ -74,7 +82,7 @@ def update_pool(operons: dict[str, dict], organism: str, db_tsv: Path, key: str)
 
 
 def _do_update(new_operons: dict[str, dict], organism: str, db_tsv: Path, key: str) -> None:
-    """Merges operon counts into a pool TSV, rewrites it via .tmp and rename, and writes metadata JSON."""
+    """Merges operon counts into a pool TSV, replacing the genome's previous entries, and writes it and its metadata JSON atomically."""
     patterns: dict[str, dict] = {}
     if db_tsv.exists() and db_tsv.stat().st_size > 0:
         with db_tsv.open(newline="", encoding="utf-8") as fh:
@@ -85,43 +93,42 @@ def _do_update(new_operons: dict[str, dict], organism: str, db_tsv: Path, key: s
                     "members_in_order": row["members_in_order"],
                     "operon_count": int(row["fingerprint_frequency"]),
                     "organisms": set(o for o in row.get("organisms", "").split("|") if o),
+                    "counts": M.parse_counts(row.get(M.COUNTS_COLUMN, "")),
                 }
 
-    # A genome counts once: a run of a genome already in the pool leaves it as it is.
-    if any(organism in p["organisms"] for p in patterns.values()):
-        print(f"[update-operon-fingerprint-database] {organism} is already in {db_tsv.name}; not counted again")
-        return
+    # A genome counts once, by its genome hash: its previous entries (any name) are replaced.
+    M.remove_genome(patterns, organism, "operon_count", f"{_LOG} {db_tsv.name}:")
 
     # Each distinct operon counts once, even when a genome shares a hash.
+    next_id = M.next_pattern_number(patterns)
     for oid, parsed in new_operons.items():
         h = parsed[key]
-        members = parsed["members"]
-        if h in patterns:
-            patterns[h]["operon_count"] += 1
-            patterns[h]["organisms"].add(organism)
-        else:
-            patterns[h] = {
-                "pattern_id": f"pattern_{len(patterns) + 1}",
-                "members_in_order": members,
-                "operon_count": 1,
-                "organisms": {organism},
-            }
+        if h not in patterns:
+            patterns[h] = {"pattern_id": f"pattern_{next_id}", "members_in_order": parsed["members"],
+                           "operon_count": 0, "organisms": set(), "counts": {}}
+            next_id += 1
+        patterns[h]["operon_count"] += 1
+        patterns[h]["organisms"].add(organism)
+        patterns[h]["counts"][organism] = patterns[h]["counts"].get(organism, 0) + 1
+    # Patterns that only the replaced entries held are dropped.
+    patterns = {h: p for h, p in patterns.items() if p["operon_count"] > 0 and p["organisms"]}
 
     label_freq: dict[str, int] = {}
     for pdata in patterns.values():
         label_freq[pdata["members_in_order"]] = label_freq.get(pdata["members_in_order"], 0) + pdata["operon_count"]
 
-    tmp_path = db_tsv.with_suffix(".tmp")
-    with tmp_path.open("w", newline="", encoding="utf-8") as fh:
+    def _write(fh):
         writer = csv.writer(fh, delimiter="\t")
         writer.writerow(["pattern_id", "fingerprint_hash", "members_in_order",
-                         "fingerprint_frequency", "fingerprint_label_frequency", "organisms"])
+                         "fingerprint_frequency", "fingerprint_label_frequency", "organisms",
+                         M.COUNTS_COLUMN])
         for h, pdata in sorted(patterns.items(), key=lambda item: -item[1]["operon_count"]):
             writer.writerow([
                 pdata["pattern_id"], h, pdata["members_in_order"], pdata["operon_count"],
                 label_freq[pdata["members_in_order"]], "|".join(sorted(pdata["organisms"])),
+                M.format_counts(pdata["counts"]),
             ])
-    tmp_path.replace(db_tsv)
+    M.write_atomic(db_tsv, _write)
 
     meta_path = db_tsv.parent / f"operon-fingerprint-database-{key}-metadata.json"
     meta = {
@@ -132,7 +139,7 @@ def _do_update(new_operons: dict[str, dict], organism: str, db_tsv: Path, key: s
         "last_updated": datetime.now(timezone.utc).isoformat(),
         "last_updated_by": organism,
     }
-    meta_path.write_text(json.dumps(meta, indent=2), encoding="utf-8")
+    M.write_atomic(meta_path, lambda fh: fh.write(json.dumps(meta, indent=2)))
 
 
 _POOLS = [

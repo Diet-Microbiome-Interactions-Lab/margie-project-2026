@@ -1,7 +1,8 @@
 #!/usr/bin/env python3
 """make-final-excel.py — converts the FINAL annotation TSV to a coloured Excel workbook (openpyxl).
 
-Each row is tinted with its CONFIDENCE_TIER_HYBRID colour (non-coding rows grey),
+Each row is tinted with its CONFIDENCE_TIER colour, the default (adjacency) tier
+(non-coding rows grey),
 rows with NEEDS_REVIEW? = yes get a box border, and a "Legend" sheet explains both.
 """
 from __future__ import annotations
@@ -90,6 +91,8 @@ _COL_WIDTHS: dict[str, int] = {
     "best_consensus_product_descriptor_copy": 36,
 }
 _DEFAULT_WIDTH = 16
+# Widths by unprefixed, lower-cased header (_norm_col), so "Column-L: best_consensus_..." finds its own.
+_WIDTH_BY_NAME: dict[str, int] = {k.lower(): v for k, v in _COL_WIDTHS.items()}
 
 
 _FILL_CACHE: dict[str, PatternFill] = {}
@@ -130,8 +133,8 @@ def _row_get(row: dict, *candidate_names: str) -> str:
 
 
 def _row_tint(row: dict) -> tuple[str, str]:
-    """Returns the row's (background, font) colours from its CONFIDENCE_TIER_HYBRID tier, grey when unscored."""
-    tier = str(_row_get(row, "confidence_tier_hybrid", "CONFIDENCE_TIER_hybrid")).strip().lower()
+    """Returns the row's (background, font) colours from its CONFIDENCE_TIER tier, grey when unscored."""
+    tier = str(_row_get(row, "confidence_tier", "CONFIDENCE_TIER")).strip().lower()
     if tier not in _TIER_BRIGHT:
         return _ROW_NONCODING_BG, _ROW_NONCODING_FG
     return _tint_hex(_TIER_BRIGHT[tier], _ROW_TINT), "000000"
@@ -197,9 +200,8 @@ def main() -> None:
                         left=_REVIEW_SIDE if ci == 1 else None,
                         right=_REVIEW_SIDE if ci == ncol else None)
 
-            # Tallies by CONFIDENCE_TIER_HYBRID band, the whole-row colour.
-            band = str(_row_get(row, "confidence_tier_hybrid",
-                                "CONFIDENCE_TIER_hybrid")).strip().lower()
+            # Tallies by CONFIDENCE_TIER band, the whole-row colour.
+            band = str(_row_get(row, "confidence_tier", "CONFIDENCE_TIER")).strip().lower()
             if band not in _TIER_BRIGHT:
                 band = "non-coding"
             band_counts[band] = band_counts.get(band, 0) + 1
@@ -212,7 +214,7 @@ def main() -> None:
 
     # ── column widths ───────────────────────────────────────────────────────
     for ci, h in enumerate(headers, 1):
-        ws.column_dimensions[get_column_letter(ci)].width = _COL_WIDTHS.get(h, _DEFAULT_WIDTH)
+        ws.column_dimensions[get_column_letter(ci)].width = _WIDTH_BY_NAME.get(_norm_col(h), _DEFAULT_WIDTH)
 
     # ── Legend sheet: what each row colour and the box border mean ───────────
     lg = wb.create_sheet("Legend")
@@ -235,7 +237,7 @@ def main() -> None:
     for c in (1, 2, 3):
         lg.cell(1, c).fill = _fill(_HDR_BG)
 
-    lg.cell(3, 1, "ROW COLOUR = confidence tier (CONFIDENCE_TIER_HYBRID)").font = _font("000000", bold=True)
+    lg.cell(3, 1, "ROW COLOUR = confidence tier (CONFIDENCE_TIER)").font = _font("000000", bold=True)
     tiers = [
         ("highest", "highest confidence  (final > 0.90)"),
         ("high",    "high confidence  (0.70 – 0.90)"),
@@ -257,7 +259,7 @@ def main() -> None:
     out_path.parent.mkdir(parents=True, exist_ok=True)
     wb.save(str(out_path))
     print(f"[make-final-excel] {n} genes → {out_path}")
-    print(f"  {len(headers)} columns; whole-row colour = CONFIDENCE_TIER_HYBRID band")
+    print(f"  {len(headers)} columns; whole-row colour = CONFIDENCE_TIER band")
     for band in ("highest", "high", "medium", "fair", "low", "non-coding"):
         if band_counts.get(band):
             print(f"    {band:11s}: {band_counts[band]}")

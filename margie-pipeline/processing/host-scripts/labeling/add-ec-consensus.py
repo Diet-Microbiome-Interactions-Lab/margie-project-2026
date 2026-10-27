@@ -3,7 +3,8 @@
 
 Collects EC numbers from 13 tools in the merged table (dedicated EC columns or
 regex on descriptions) and compares each tool's full EC set. "X.X.X.-" is
-compatible with any fully resolved EC in the same subclass. Status is
+compatible with any fully resolved EC in the same subclass, but does not make
+two different resolved ECs agree (cluster_ec_values). Status is
 full_consensus, majority_consensus, single_source, conflicting or no_evidence;
 product_descriptor_ec_consistent says whether the winning label source's ECs
 overlap the consensus (True/False/NA). Old 3.6.3.x vs new class 7 numbers
@@ -18,6 +19,9 @@ import sys
 from pathlib import Path
 
 csv.field_size_limit(10_000_000)
+
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+import descriptor_rules as R  # noqa: E402
 
 EC_PATTERN = re.compile(r"(\d+\.\d+\.\d+\.(?:\d+|-))")
 
@@ -55,7 +59,11 @@ def extract_ec_numbers(text: str) -> set[str]:
 
 
 def collect_ec_evidence(merged_row: dict[str, str]) -> dict[str, set[str]]:
-    """Returns {tool: EC set} for every tool with at least one EC in the merged row."""
+    """Returns {tool: EC set} for every tool with at least one EC in the merged row.
+
+    Localization, topology and signal-peptide columns are not EC sources (R.without_localization).
+    """
+    merged_row = R.without_localization(merged_row)
     evidence: dict[str, set[str]] = {}
     for tool, src_col in EC_SOURCE_COLUMN.items():
         values = extract_ec_numbers(merged_row.get(src_col, ""))
@@ -78,16 +86,23 @@ def most_specific(ec_values: set[str]) -> str:
     return resolved[0] if resolved else sorted(ec_values)[0]
 
 
+def _is_wildcard(ec: str) -> bool:
+    """Returns True for an "X.X.X.-" EC."""
+    return ec.split(".")[3:4] == ["-"]
+
+
 def cluster_ec_values(all_values: set[str]) -> list[set[str]]:
-    """Groups EC strings into ec_compatible() classes by greedy pairwise assignment."""
-    clusters: list[set[str]] = []
-    for val in all_values:
-        for cluster in clusters:
-            if any(ec_compatible(val, member) for member in cluster):
-                cluster.add(val)
-                break
-        else:
-            clusters.append({val})
+    """Groups EC strings into compatibility classes, in sorted order of their ECs.
+
+    Each fully resolved EC heads one class with the "X.X.X.-" wildcards that contain it. A
+    wildcard joins the class of each EC it contains, so two resolved ECs that differ stay in two
+    classes when one wildcard contains both; a wildcard containing none heads its own class.
+    """
+    values = sorted(all_values)
+    resolved = [v for v in values if not _is_wildcard(v)]
+    wildcards = [v for v in values if _is_wildcard(v)]
+    clusters = [{r} | {w for w in wildcards if ec_compatible(r, w)} for r in resolved]
+    clusters += [{w} for w in wildcards if not any(ec_compatible(w, r) for r in resolved)]
     return clusters
 
 
@@ -132,24 +147,27 @@ def classify_ec_agreement(evidence: dict[str, set[str]]) -> tuple[str, str, int,
         supporting = [t for t in tools if intersection <= tool_to_classes[t]]
         return "majority_consensus", consensus, len(supporting), total_distinct, ";".join(sorted(supporting))
 
-    # No shared class: reports the best-supported class, status conflicting.
+    # No shared class: reports the best-supported class (ties: the first EC in sorted order), status conflicting.
     class_support: dict[str, set[str]] = {}
     for tool, classes in tool_to_classes.items():
         for c in classes:
             class_support.setdefault(c, set()).add(tool)
-    top_class, top_tools = max(class_support.items(), key=lambda kv: len(kv[1]))
+    top_class, top_tools = min(class_support.items(), key=lambda kv: (-len(kv[1]), kv[0]))
     return "conflicting", top_class, len(top_tools), total_distinct, ";".join(sorted(top_tools))
 
 
 def check_label_consistency(product_descriptor_source: str, evidence: dict[str, set[str]], consensus_ecs: str) -> str:
-    """Returns "True"/"False"/"NA" for whether the winning tool's ECs overlap the consensus set."""
+    """Returns "True"/"False"/"NA" for whether one of the winning tool's ECs is ec_compatible() with a consensus EC.
+
+    A partial "1.2.3.-" from the winner matches a consensus "1.2.3.4", as it belongs to that class.
+    """
     if not consensus_ecs or product_descriptor_source not in EC_SOURCE_COLUMN:
         return "NA"
     winner_values = evidence.get(product_descriptor_source)
     if not winner_values:
         return "NA"
     consensus_set = set(consensus_ecs.split(";"))
-    return "True" if winner_values & consensus_set else "False"
+    return "True" if any(ec_compatible(w, c) for w in winner_values for c in consensus_set) else "False"
 
 
 def build_evidence_string(evidence: dict[str, set[str]]) -> str:

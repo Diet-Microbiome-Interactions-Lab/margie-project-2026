@@ -144,8 +144,13 @@ def normalise_col(raw_col: str, tool_name: str) -> str:
 
 # ─── Discovery ────────────────────────────────────────────────────────────────
 
+# The per-gene tool folders merged: those with a row-key strategy, and interpro. Other folders in a
+# genome's output (genome_info/, llm/, mauve/, evidence/, ...) are not read.
+TOOL_FOLDERS: frozenset[str] = frozenset(ROW_KEY_SPEC) | {"interpro"}
+
+
 def discover_tool_tables(output_root: Path, extra_excluded: set[str]) -> list[tuple[str, Path]]:
-    """Lists (tool_name, path) for each tool's results table under output_root/<tool>/.
+    """Lists (tool_name, path) for each tool's results table under output_root/<tool>/, for TOOL_FOLDERS.
 
     InterPro yields one entry per member-database file; rasttk's file is rast.tsv and prodigal's
     prodigal.tsv. With both gene callers' tables present, RASTtk's is the one listed.
@@ -159,7 +164,7 @@ def discover_tool_tables(output_root: Path, extra_excluded: set[str]) -> list[tu
         if not tool_dir.is_dir():
             continue
         tool_name = tool_dir.name
-        if tool_name in excluded:
+        if tool_name in excluded or tool_name not in TOOL_FOLDERS:
             continue
 
         if tool_name == "interpro":

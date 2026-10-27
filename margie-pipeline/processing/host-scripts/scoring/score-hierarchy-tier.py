@@ -3,7 +3,10 @@
 
 Maps each gene's product_descriptor_source in labeled-genes.tsv to a numeric
 trust tier following assign-canonical-label.py's priority order
-(Tier 1 PGAP/NCBIFAM/TIGRFAM ... Tier 8 COG); "NONE" scores below every tier.
+(Tier 1 PGAP/NCBIFAM/TIGRFAM ... Tier 8 COG); "NONE" scores below every tier,
+and so does a label that is not informative by labeling's rule
+(labeling/descriptor_rules.py), such as a "hypothetical protein" from
+labeling's fallback pass.
 """
 import argparse
 import csv
@@ -11,6 +14,9 @@ import sys
 from pathlib import Path
 
 csv.field_size_limit(10_000_000)
+
+sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "labeling"))
+import descriptor_rules as R  # noqa: E402
 
 # tool_name -> (tier_score, tier_name), following assign-canonical-label.py.
 HIERARCHY_TIER = {
@@ -28,6 +34,10 @@ HIERARCHY_TIER = {
     "COG": (0, "tier8_orthology_assignment"),
 }
 _NO_WINNER_SCORE, _NO_WINNER_NAME = -1, "no_qualifying_winner"
+# A label that names no function scores as low as no winner.
+_UNINFORMATIVE_SCORE, _UNINFORMATIVE_NAME = -1, "uninformative_label"
+# labeled-genes.tsv column holding a source's best-hit statistic, for its gate.
+_STAT_COLUMN = {"UNIPROT": "UNIPROT_best_hit_percent_identity"}
 
 _IDENTITY_COLUMNS = [
     "feature_id",
@@ -38,9 +48,21 @@ _IDENTITY_COLUMNS = [
 ]
 
 
-def score_hierarchy_tier(product_descriptor_source):
-    """Returns (tier_score, tier_name) for a label source, or the no-winner pair."""
-    return HIERARCHY_TIER.get(product_descriptor_source, (_NO_WINNER_SCORE, _NO_WINNER_NAME))
+def score_hierarchy_tier(product_descriptor_source, labeled_row=None):
+    """Returns (tier_score, tier_name) for a label source, or the no-winner pair.
+
+    With the labeled-genes.tsv row, a label that is not informative (R.hit_is_informative on
+    the label, its source id and, for UniProt, the identity) gets the uninformative pair.
+    """
+    tier = HIERARCHY_TIER.get(product_descriptor_source, (_NO_WINNER_SCORE, _NO_WINNER_NAME))
+    if labeled_row is None or product_descriptor_source not in HIERARCHY_TIER:
+        return tier
+    if not R.hit_is_informative(product_descriptor_source,
+                                labeled_row.get("product_descriptor_source_id", "") or "",
+                                labeled_row.get("best_consensus_product_descriptor", "") or "",
+                                labeled_row.get(_STAT_COLUMN.get(product_descriptor_source, ""), "") or ""):
+        return _UNINFORMATIVE_SCORE, _UNINFORMATIVE_NAME
+    return tier
 
 
 def main() -> None:
@@ -71,7 +93,7 @@ def main() -> None:
         for row in reader:
             source = row.get("product_descriptor_source", "")
             out_row = {col: row.get(col, "") for col in _IDENTITY_COLUMNS}
-            score, name = score_hierarchy_tier(source)
+            score, name = score_hierarchy_tier(source, row)
             out_row["hierarchy_tier_score"] = str(score)
             out_row["hierarchy_tier_name"] = name
             writer.writerow(out_row)
