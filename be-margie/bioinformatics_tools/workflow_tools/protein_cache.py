@@ -453,6 +453,27 @@ def _computed_here(prefix: str, tool: str, proteins: list) -> set[str]:
     return {h for fid, h, _, _ in proteins if fid in ids}
 
 
+def _by_name(lines: str, old: list[str], new: list[str]) -> str:
+    """Rows written under the columns `old`, rewritten under `new` by column name (a column `new`
+    adds is empty)."""
+    at = {c: i for i, c in enumerate(old)}
+    out = []
+    for line in lines.splitlines():
+        parts = line.split('\t')
+        out.append('\t'.join(parts[at[c]] if c in at and at[c] < len(parts) else '' for c in new))
+    return '\n'.join(out)
+
+
+def _reheader(conn, tool: str, key: str, filename: str, old: str, new: str) -> int:
+    """Rewrites a tool file's cached rows from the header `old` to `new` by column name; returns the count."""
+    old_cols, new_cols = old.split('\t'), new.split('\t')
+    rows = conn.execute('SELECT aa_hash, lines FROM protein_cache WHERE tool = ? AND tool_key = ? AND filename = ?',
+                        (tool, key, filename)).fetchall()
+    conn.executemany('UPDATE protein_cache SET lines = ? WHERE tool = ? AND tool_key = ? AND filename = ? AND aa_hash = ?',
+                     [(_by_name(lines, old_cols, new_cols), tool, key, filename, h) for h, lines in rows])
+    return len(rows)
+
+
 def store(db: str, faa: str, prefix: str, tool: str, cfg: dict, genome: str = '') -> int:
     """Adds the genome's uncached proteins from the tool's final results, each with the genome it
     came from; returns the count."""
@@ -505,9 +526,17 @@ def store(db: str, faa: str, prefix: str, tool: str, cfg: dict, genome: str = ''
         stamp = datetime.now(timezone.utc).isoformat()
         with conn:
             for filename, (header, _) in tables.items():
-                if header:
-                    conn.execute('INSERT OR IGNORE INTO protein_cache_header VALUES (?, ?, ?, ?)',
-                                 (tool, key, filename, header))
+                if not header:
+                    continue
+                # A tool whose columns changed (a new container): the cached rows move to the new
+                # header by column name, and the header is replaced.
+                row = conn.execute('SELECT header FROM protein_cache_header WHERE tool = ? AND tool_key = ? AND filename = ?',
+                                   (tool, key, filename)).fetchone()
+                if row and row[0] != header:
+                    moved = _reheader(conn, tool, key, filename, row[0], header)
+                    LOGGER.info('protein cache: %s %s has new columns; %d cached entries moved to them', tool, filename, moved)
+                conn.execute('INSERT OR REPLACE INTO protein_cache_header VALUES (?, ?, ?, ?)',
+                             (tool, key, filename, header))
             for filename, (_, rows) in tables.items():
                 conn.executemany('INSERT OR IGNORE INTO protein_cache (aa_hash, tool, tool_key, filename, lines, cached_at, genome) '
                                  'VALUES (?, ?, ?, ?, ?, ?, ?)',
@@ -533,7 +562,18 @@ if [ -s "$produced" ]; then
   [ "$produced" = "$dest" ] || cp "$produced" "$dest" || exit 1
   if [ -s "$cached" ]; then
     if [ "$kind" = domtbl ]; then grep -v '^#' "$cached" >> "$dest" || true
-    else tail -n +2 "$cached" >> "$dest" || exit 1; fi
+    elif [ "$(head -n 1 "$dest")" = "$(head -n 1 "$cached")" ]; then tail -n +2 "$cached" >> "$dest" || exit 1
+    else
+      # The tool's columns changed since the rows were cached: each cached row is laid out under
+      # the new header by column name (a new column is empty).
+      command -v awk >/dev/null || { echo "protein cache: cached rows of $4 have other columns and awk is missing" >&2; exit 1; }
+      head -n 1 "$dest" > "$dest.header" || exit 1
+      awk -F '\t' -v OFS='\t' 'NR == FNR { for (i = 1; i <= NF; i++) want[i] = $i; n = NF; next }
+        FNR == 1 { for (i = 1; i <= NF; i++) at[$i] = i; next }
+        { row = ""; for (i = 1; i <= n; i++) { v = (want[i] in at) ? $(at[want[i]]) : ""; row = (i == 1) ? v : row OFS v }; print row }' \
+        "$dest.header" "$cached" >> "$dest" || exit 1
+      rm -f "$dest.header"
+    fi
   fi
 elif [ -s "$cached" ]; then
   cp "$cached" "$dest" || exit 1

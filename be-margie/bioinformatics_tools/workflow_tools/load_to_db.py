@@ -124,6 +124,13 @@ def _ensure_run_log(conn: sqlite3.Connection) -> None:
             conn.execute(f"ALTER TABLE run_log ADD COLUMN {col} {col_type}")
     # The already-loaded and earlier-name lookups go by genome.
     conn.execute("CREATE INDEX IF NOT EXISTS run_log__fasta_hash ON run_log(fasta_hash, tool)")
+    # One row per genome and tool, the newest: a table created without UNIQUE(input_hash, tool)
+    # keeps each pair's newest row and gets the rule as an index.
+    unique = any(row[2] and [c[2] for c in conn.execute(f"PRAGMA index_info('{row[1]}')")] == ["input_hash", "tool"]
+                 for row in conn.execute("PRAGMA index_list(run_log)"))
+    if not unique:
+        conn.execute("DELETE FROM run_log WHERE id NOT IN (SELECT MAX(id) FROM run_log GROUP BY input_hash, tool)")
+        conn.execute("CREATE UNIQUE INDEX IF NOT EXISTS run_log__input_tool ON run_log(input_hash, tool)")
 
 
 def _ensure_organism_index(conn: sqlite3.Connection, table_name: str, col: str = "organism_name") -> None:
