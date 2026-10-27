@@ -39,7 +39,7 @@ TOOL_RESOURCES = {
     'prodigal': (1, 4000, 60),
     'cog': (4, 4000, 60),
     'kegg': (8, 8000, 90),
-    'eggnog': (16, 64000, 180),
+    'eggnog': (32, 64000, 180),  # 64 GB holds 32 cores on the cpu partition (memory per CPU), so it uses them
     'uniprot': (4, 4000, 60),
     'pfam': (4, 4000, 120),
     'tigrfam': (4, 4000, 60),
@@ -51,7 +51,7 @@ TOOL_RESOURCES = {
     'interpro': (8, 16000, 300),
     'operon': (2, 2000, 30),
     'phobius': (2, 2000, 60),
-    'tmbed': (8, 48000, 1440),
+    'tmbed': (64, 64000, 720),  # highmem takes 64 cores or more, for up to a day (the retry's 24 h fits)
     'signalp6': (8, 6000, 180),
     'envelope': (1, 1000, 30),
     'deepsig': (2, 2000, 60),
@@ -64,7 +64,8 @@ TOOL_RESOURCES = {
 }
 # GTDB-Tk's full classification (classify_wf with species placement), when margie_sb.gtdbtk.classify is on.
 GTDBTK_CLASSIFY_RESOURCES = (64, 460000, 240)
-# Partitions other than the cluster default: TMbed's ProtT5 runs for hours on CPU.
+# Partitions other than the cluster default: TMbed's ProtT5 runs for hours on CPU. On the cpu
+# partition each core comes with about 2 GB of memory, so a request's memory decides the cores it holds.
 TOOL_PARTITIONS = {'tmbed': 'highmem', 'llm': 'gpu'}
 
 
