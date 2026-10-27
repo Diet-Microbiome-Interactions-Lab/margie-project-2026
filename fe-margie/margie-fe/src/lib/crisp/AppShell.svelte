@@ -227,7 +227,7 @@
 					<Menu size={18} />
 				</button>
 			</AppBar.Lead>
-			<AppBar.Headline>
+			<AppBar.Headline class="mg-headline">
 				<a href="/" class="mg-home inline-flex items-center align-middle gap-2 text-xl font-bold hover:text-primary-600 transition-colors" title="Home">
 					<House class="size-5 shrink-0" />
 					<span>MARGIE</span>
@@ -514,16 +514,26 @@
 		height: 18px;
 		padding: 9px;
 	}
+	/* The name, the platform and the beta note on one line; the platform's name shows where it fits. */
+	:global(.crisp .mg-headline) {
+		display: flex;
+		align-items: center;
+		flex-wrap: nowrap;
+		min-width: 0;
+		overflow: hidden;
+		white-space: nowrap;
+	}
 	.mg-home-sub {
 		display: none;
-		padding-left: 10px;
-		margin-left: 4px;
+		padding-left: 12px;
+		margin-left: 6px;
 		border-left: 1px solid var(--color-surface-300-700);
 		font-size: 0.9rem;
 		font-weight: 400;
+		white-space: nowrap;
 		opacity: 0.7;
 	}
-	@media (min-width: 1100px) {
+	@media (min-width: 1600px) {
 		.mg-home-sub {
 			display: inline;
 		}
@@ -572,6 +582,7 @@
 	/* The beta note: small, in the warning colour, so it is seen without taking room. */
 	.mg-beta {
 		display: inline-flex;
+		flex: none;
 		align-items: center;
 		gap: 4px;
 		margin-left: 12px;
@@ -601,7 +612,7 @@
 	}
 	/* The running job: its ring and a line of where it has got to. */
 	.mg-running {
-		max-width: min(42vw, 420px);
+		max-width: min(30vw, 360px);
 		gap: 8px;
 	}
 	.mg-running span {

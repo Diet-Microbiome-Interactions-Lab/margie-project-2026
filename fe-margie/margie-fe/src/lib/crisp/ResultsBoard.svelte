@@ -449,7 +449,7 @@
 />
 
 <div class="rb" class:full bind:this={board}>
-	<aside class="rb-side" class:shut={listShut} style="--w: {listShut ? 44 : ui.size('app:results-list', 220)}px">
+	<aside class="rb-side" class:shut={listShut} style="--w: {listShut ? 44 : ui.size('app:results-list', 300)}px">
 		<div class="rb-side-head">
 			<span class="rb-side-title">Genomes <b>{rows.length}</b></span>
 			<button
@@ -489,12 +489,13 @@
 					data-sveltekit-replacestate
 					data-sveltekit-noscroll
 				>
+					<span class="rb-row-icon rb-dot" aria-hidden="true"></span>
 					<span class="rb-row-name" title={r.name}>{baseOf(r.name)}</span>
 					<span class="rb-row-sub">{sub(r.name, r.state)}</span>
 				</a>
 			{/each}
 		</nav>
-		{#if !listShut}<Resizer id="app:results-list" fallback={220} min={160} max={420} label="Resize the genome list" />{/if}
+		{#if !listShut}<Resizer id="app:results-list" fallback={300} min={200} max={520} label="Resize the genome list" />{/if}
 	</aside>
 
 	<section class="rb-report" aria-labelledby="rb-title">
@@ -919,12 +920,14 @@
 		opacity: 0;
 		pointer-events: none;
 	}
-	/* One line a genome: its name, and its gene count or state on the right. */
+	/* Two lines a genome, as the job list has them: its name, then its gene count or state. */
 	.rb-row {
-		display: flex;
-		align-items: baseline;
-		gap: 8px;
-		padding: 4px 8px;
+		display: grid;
+		grid-template-columns: auto minmax(0, 1fr);
+		grid-template-areas: 'icon name' 'icon sub';
+		align-items: center;
+		gap: 2px 8px;
+		padding: 7px 10px;
 		border: 1px solid transparent;
 		border-radius: var(--mg-r-sm);
 		transition:
@@ -939,13 +942,33 @@
 		background: color-mix(in srgb, var(--mg-accent) 12%, var(--mg-surface-2));
 	}
 	.rb-row-icon {
+		grid-area: icon;
 		display: inline-flex;
 		flex-shrink: 0;
 		align-self: center;
 		color: var(--mg-accent-ink, var(--mg-accent));
 	}
+	/* A genome's state as a dot, coloured as the job list colours a job. */
+	.rb-dot {
+		width: 14px;
+		justify-content: center;
+	}
+	.rb-dot::before {
+		content: '';
+		width: 8px;
+		height: 8px;
+		border-radius: 50%;
+		background: var(--mg-text-3);
+	}
+	.rb-row.done .rb-dot::before {
+		background: var(--mg-ok);
+	}
+	.rb-row.running .rb-dot::before {
+		background: var(--mg-accent);
+		box-shadow: 0 0 0 3px color-mix(in srgb, var(--mg-accent) 22%, transparent);
+	}
 	.rb-row-name {
-		flex: 1;
+		grid-area: name;
 		min-width: 0;
 		overflow: hidden;
 		text-overflow: ellipsis;
@@ -955,18 +978,18 @@
 	.rb-row[aria-current='page'] .rb-row-name {
 		font-weight: 600;
 	}
-	/* The second column: one width for each row, set off by a faint rule. */
 	.rb-row-sub {
-		flex: 0 0 7.6em;
+		grid-area: sub;
+		min-width: 0;
 		overflow: hidden;
-		padding-left: 8px;
-		border-left: 1px solid color-mix(in srgb, var(--mg-text) 12%, transparent);
 		color: var(--mg-text-3);
 		font-size: var(--mg-fs-xs);
 		font-variant-numeric: tabular-nums;
-		text-align: right;
 		text-overflow: ellipsis;
 		white-space: nowrap;
+	}
+	.rb-row-sub:empty {
+		display: none;
 	}
 	.rb-row.running .rb-row-sub {
 		color: var(--mg-accent-ink, var(--mg-accent));
@@ -1395,15 +1418,14 @@
 	}
 
 	/* the tabs: a pill that slides (motion/thumb.ts) */
-	/* Across the whole report, each tab an equal share. */
-	/* In the head's row, between the name and the downloads. */
+	/* Across the whole report, on a row of their own, each tab an equal share. */
 	.rb-tabs {
-		flex: 0 1 auto;
+		flex: 1 1 100%;
 		display: grid;
 		grid-auto-flow: column;
 		grid-auto-columns: minmax(max-content, 1fr);
 		gap: 2px;
-		margin: 0 auto;
+		margin: 0;
 		padding: 4px;
 		border: 1px solid var(--mg-border);
 		border-radius: var(--mg-r-sm);
