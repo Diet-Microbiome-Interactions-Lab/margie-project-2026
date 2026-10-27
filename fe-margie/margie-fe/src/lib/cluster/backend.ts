@@ -578,7 +578,7 @@ async function addGenomes(form: FormData) {
 }
 
 /** Lists optional annotation tools with their licence state. */
-/** Comparison and the LLM layer: not offered yet, so never in a run (lib/license NOT_YET). */
+/** Comparison, the LLM layer and the hidden tools: never in a run (lib/license NOT_YET). */
 const LATER = NOT_YET;
 
 async function listTools(): Promise<{ annotation: Tool[] }> {

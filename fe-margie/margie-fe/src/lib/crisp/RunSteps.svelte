@@ -325,7 +325,7 @@
 					consolidation, labeling, fingerprints and scoring are part of every run.
 				{:else}
 					Recommended runs the phase 4 tools, which the envelope stage and scoring read. MEROPS and TCDB add peptidase and
-					transporter calls. Tools with licence terms (MEROPS, Phobius, SignalP and others) stay off until you accept their
+					transporter calls. Tools with licence terms (MEROPS and TCDB) stay off until you accept their
 					terms; add them yourself. KEGG uses only the public KOfam data. Gene calling, operons, consolidation, labeling, fingerprints and
 					scoring are part of every run.
 				{/if}

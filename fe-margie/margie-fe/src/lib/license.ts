@@ -6,10 +6,16 @@ import { authHeaders } from '$lib/auth.js';
 import { getApiUrl } from '$lib/config';
 
 /**
- * Steps switched off for now (comparison and the LLM layer): never in a run, so their
- * licences are neither shown nor asked about. Workflow keys and catalog ids both.
+ * Tools whose licences do not let MARGIE offer them (Phobius and SignalP: academic, no
+ * redistribution; TMbed: ProtT5 weights CC-BY-NC-SA), hidden by the backend too.
  */
-export const NOT_YET = new Set(['ani', 'aai', 'closest', 'closest-organisms', 'mauve', 'synteny', 'llm']);
+export const HIDDEN = ['phobius', 'tmbed', 'signalp6', 'signalp4'];
+
+/**
+ * Steps switched off for now (comparison and the LLM layer) and the HIDDEN tools: never in a run,
+ * so their licences are neither shown nor asked about. Workflow keys and catalog ids both.
+ */
+export const NOT_YET = new Set(['ani', 'aai', 'closest', 'closest-organisms', 'mauve', 'synteny', 'llm', ...HIDDEN]);
 
 export interface ToolProvenance {
 	version?: string;

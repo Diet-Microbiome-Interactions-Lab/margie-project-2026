@@ -102,13 +102,14 @@ def inventory(cfg: dict, home: str) -> list[dict]:
         rows.append({'id': f'image:{key}', 'kind': 'image', 'tool': key, 'label': label, 'name': sif,
                      'path': _join(sif_dir, sif), 'shared': _join(SHARED_SIF, sif), 'optional': key in OPTIONAL})
 
+    # Hidden tools (workflow_registry.HIDDEN_TOOLS) are off in each run, so nothing is set up for them.
     for t in MARGIE_SB_PHASED_TOOLS:
-        if t.get('uses_container', True):
+        if t.get('uses_container', True) and not t.get('hidden'):
             image(t['key'], t['label'], t['sif'])
         if t['key'] == 'rasttk':
             image(GENE_CALLER['key'], GENE_CALLER['label'], GENE_CALLER['sif'])
     for t in MARGIE_SB_PHASED_TOOLS:
-        if not t.get('database'):
+        if not t.get('database') or t.get('hidden'):
             continue
         key = t['key']
         explicit = _cfg_get(cfg, f'db.{key}')
