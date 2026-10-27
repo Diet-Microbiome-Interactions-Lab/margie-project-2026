@@ -296,10 +296,11 @@ def _c3_reasoning_expanded(
     if supported is not None and evaluated is not None:
         explanation = (
             f"{operon_id} (total number of genes in this operon = {operon_member_count}): "
-            f"evaluated adjacent gene-pairs with usable UniOP probability = {evaluated}; "
-            f"pairs with OCC support (>0 reliability in cross-organism OCC reference) = {supported}; "
+            f"adjacent pairs of informative genes with a UniOP link (evaluated) = {evaluated}; "
+            f"of these, pairs with OCC support (>0 reliability in the cross-organism OCC reference; "
+            f"C3 is their geometric mean) = {supported}; "
             f"pairs EXCLUDED from C3 (hypothetical member or no OCC evidence -> novel, not penalized) = {neutral}; "
-            f"adjacent pairs missing usable UniOP probability = {unlinked}. "
+            f"adjacent pairs without a UniOP link = {unlinked}. "
             f"OCC reference population size = {reference_organism_count} organisms."
         )
     else:

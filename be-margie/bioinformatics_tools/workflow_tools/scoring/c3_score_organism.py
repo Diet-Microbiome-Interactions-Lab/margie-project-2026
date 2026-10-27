@@ -247,7 +247,7 @@ def compute(genes, ref, pmap, allhyp_value=_NEUTRAL, c3_mode="adjacency"):
             c3=_NEUTRAL, c3_lowerbound=_NEUTRAL, gene_class="singleton",
             c3_adjacency=_NEUTRAL, c3_lb_adjacency=_NEUTRAL,
             c3_hybrid=_NEUTRAL, c3_lb_hybrid=_NEUTRAL,
-            operon_id="", n_pairs=0, n_pairs_used=0, n_supported=0,
+            operon_id="", n_pairs=0, n_evaluated=0, n_pairs_used=0, n_supported=0,
             n_neutral=0, n_nolink=0, descriptor_conflict=0.0, operon_significance=0.0,
             operon_ambiguity=0.0,
         )
@@ -343,7 +343,7 @@ def compute(genes, ref, pmap, allhyp_value=_NEUTRAL, c3_mode="adjacency"):
                 c3_adjacency=c3_adj, c3_lb_adjacency=c3_adj_lb,
                 c3_hybrid=c3_hyb, c3_lb_hybrid=c3_hyb_lb,
                 gene_class=gclass, operon_id=oid,
-                n_pairs=len(recs) - 1, n_pairs_used=n_used,
+                n_pairs=len(recs) - 1, n_evaluated=n_supported + n_zero, n_pairs_used=n_used,
                 n_supported=n_supported, n_neutral=(n_neutral + n_zero),
                 n_nolink=n_nolink, descriptor_conflict=conflict,
                 operon_significance=operon_sig, operon_ambiguity=operon_ambiguity,
@@ -381,11 +381,12 @@ def _breakdown_and_formula(info, raw_operon_id):
                     f"no supported adjacency = {c3:.4f}")
         return ("operon member, no UniOP-linked informative adjacency (neutral)",
                 f"neutral = {c3:.4f}")
-    reason = (f"operon context: {info['n_supported']}/{info['n_pairs_used']} "
+    # n_evaluated: adjacent informative pairs with a UniOP link; n_supported: those with OCC evidence.
+    reason = (f"operon context: {info['n_supported']}/{info['n_evaluated']} "
               f"OCC-supported adjacencies, {info['n_neutral']} neutral"
               + (f", {info['n_nolink']} unlinked" if info["n_nolink"] else ""))
-    formula = (f"geomean(rho_adj) over {info['n_pairs_used']} "
-               f"adjacencies = {c3:.4f}")
+    formula = (f"geomean(rho_adj) over {info['n_supported']} "
+               f"OCC-supported adjacencies = {c3:.4f}")
     return reason, formula
 
 
@@ -516,7 +517,7 @@ def main():
         "c3_score", "c3_descriptor_conflict", "c3_operon_significance",
         "c3_operon_ambiguity",
         "c3_signal_breakdown", "c3_formula",
-        "c3_gene_class", "c3_operon_id", "c3_n_pairs_used", "c3_n_supported",
+        "c3_gene_class", "c3_operon_id", "c3_n_pairs_evaluated", "c3_n_pairs_used", "c3_n_supported",
         "c3_n_neutral", "c3_n_unlinked", "c3_lowerbound",
         # both variants; c3_score is the --c3-mode selection
         "c3_score_adjacency", "c3_lowerbound_adjacency",
@@ -538,7 +539,7 @@ def main():
                 c3=_NEUTRAL, c3_lowerbound=_NEUTRAL, gene_class="singleton",
                 c3_adjacency=_NEUTRAL, c3_lb_adjacency=_NEUTRAL,
                 c3_hybrid=_NEUTRAL, c3_lb_hybrid=_NEUTRAL,
-                operon_id="", n_pairs=0, n_pairs_used=0, n_supported=0,
+                operon_id="", n_pairs=0, n_evaluated=0, n_pairs_used=0, n_supported=0,
                 n_neutral=0, n_nolink=0, descriptor_conflict=0.0,
                 operon_significance=0.0, operon_ambiguity=0.0))
             reason, formula = _breakdown_and_formula(info, raw_oid)
@@ -552,6 +553,7 @@ def main():
             out_row["c3_formula"] = formula
             out_row["c3_gene_class"] = info["gene_class"]
             out_row["c3_operon_id"] = info["operon_id"]
+            out_row["c3_n_pairs_evaluated"] = info["n_evaluated"]
             out_row["c3_n_pairs_used"] = info["n_pairs_used"]
             out_row["c3_n_supported"] = info["n_supported"]
             out_row["c3_n_neutral"] = info["n_neutral"]

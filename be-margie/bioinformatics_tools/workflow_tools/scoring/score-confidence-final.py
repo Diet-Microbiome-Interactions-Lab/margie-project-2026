@@ -382,7 +382,12 @@ def main() -> None:
             # alias: confidence_score == final confidence
             out_row["confidence_score"] = f"{final:.4f}"
             
-            if in_operon:
+            if in_operon and args.context_mode == "c3-only":
+                context_formula = (
+                    f"context=C3=({c3:.3f})={boost:+.4f} "
+                    f"[boost-only, c3-only mode; C3 conservation, C2={c2:.3f} not applied. "
+                    f"conflict={conflict:.3f}, sig={significance:.3f} computed but NOT applied -- penalty disabled]")
+            elif in_operon:
                 context_formula = (
                     f"context=C2·C3=({c2:.3f}·{c3:.3f})={boost:+.4f} "
                     f"[boost-only; C2 gates, C3 conservation. conflict={conflict:.3f}, "
