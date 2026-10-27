@@ -1,5 +1,5 @@
-HMMER_VERSION=3.4
-HMMER_SOURCE=http://eddylab.org/software/hmmer/hmmer-3.4.tar.gz
+HMMER_VERSION=3.3.2 in the Apptainer image (Debian 12 package hmmer); 3.4 in the Docker image (built from source)
+HMMER_SOURCE=Debian 12 package hmmer (Apptainer); http://eddylab.org/software/hmmer/hmmer-3.4.tar.gz (Docker)
 PGAP_HMM_RELEASE=hmm_PGAP-15.0
 PGAP_HMM_SOURCE=https://ftp.ncbi.nlm.nih.gov/hmm/current/
 BASE_IMAGE=debian:12-slim

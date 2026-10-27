@@ -160,7 +160,10 @@ cpu: ${THREADS}
 format: detail
 YMLEOF
 
-    local _cmd="exec_annotation --config ${_cfg} -o ${_raw_txt} ${_faa}"
+    # KofamScan's working files go to a folder of this genome's own (its default, ./tmp, would be
+    # shared by KEGG jobs running at once from one working directory).
+    local _tmp="$_raw_dir/kofamscan-tmp"
+    local _cmd="exec_annotation --config ${_cfg} --tmp-dir ${_tmp} -o ${_raw_txt} ${_faa}"
 
     pipeline_log_section "KofamScan annotation (exec_annotation)"
     pipeline_log_kv      "Tool"                  "KofamScan 1.3.0"
@@ -186,13 +189,15 @@ YMLEOF
         echo "[kegg] Running KofamScan ..."
         pipeline_log_run_logged "KofamScan annotation" "" "$_raw_err" \
             exec_annotation \
-                --config "$_cfg" \
-                -o       "$_raw_txt" \
+                --config  "$_cfg" \
+                --tmp-dir "$_tmp" \
+                -o        "$_raw_txt" \
                 "$_faa"
         pipeline_log_kv_path "Raw TXT" "$_raw_txt"
     fi
 
     rm -f "$_cfg"
+    rm -rf "$_tmp"
 
     # ── Post-process raw detail-format file → normalised per-hit TSV ────────
     run_postprocess() {

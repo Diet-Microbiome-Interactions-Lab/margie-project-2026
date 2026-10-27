@@ -1,7 +1,7 @@
 # Host scripts from margie-backend
 
 These are margie-backend's post-annotation scripts, copied unchanged from
-`bioinformatics_tools/workflow_tools/` at margie-backend commit `7bcae31` (be-margie/ in the margie-project-2026 monorepo).
+`bioinformatics_tools/workflow_tools/` at margie-backend commit `f55e46b` (be-margie/ in the margie-project-2026 monorepo).
 They run on the host, not in a container, as they do in margie-backend's
 `margie_sb.smk`; `processing/scripts/run-individual-containers/run-meta.sh`
 calls them with the same arguments and in the same order.

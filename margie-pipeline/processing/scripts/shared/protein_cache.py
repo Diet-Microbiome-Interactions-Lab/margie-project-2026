@@ -256,6 +256,15 @@ def merge(work: str, tooldir: str, tool: str, ran: bool) -> None:
             dest.write_text(cached.read_text())
             continue
         rows = [l for l in extra if not l.startswith('#')] if kind == 'domtbl' else extra[1:]
+        if kind != 'domtbl' and extra:
+            # Rows cached under other columns are laid out under the tool's header by column name.
+            with open(dest) as fh:
+                have = fh.readline().rstrip('\n').split('\t')
+            was = extra[0].split('\t')
+            if was != have:
+                at = {c: i for i, c in enumerate(was)}
+                rows = ['\t'.join(p[at[c]] if c in at and at[c] < len(p) else '' for c in have)
+                        for p in (r.split('\t') for r in rows)]
         if rows:
             with open(dest, 'a') as fh:
                 fh.write('\n'.join(rows) + '\n')

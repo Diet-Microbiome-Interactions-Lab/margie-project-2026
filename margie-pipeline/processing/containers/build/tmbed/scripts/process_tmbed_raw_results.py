@@ -218,8 +218,9 @@ def build_processed_records(
                 feature_id              = protein_id_value,
                 tmbed_segment_index     = segment_position_index,
                 tmbed_segment_count     = total_segment_count,
-                tmbed_segment_start     = segment_start,
-                tmbed_segment_end       = segment_end,
+                # Residues numbered from 1, as the other topology tools number them; the end is inclusive.
+                tmbed_segment_start     = segment_start + 1,
+                tmbed_segment_end       = segment_end + 1,
                 tmbed_segment_length    = segment_length_value,
                 tmbed_topology          = topology_label_value,
                 tmbed_raw_label         = raw_label,

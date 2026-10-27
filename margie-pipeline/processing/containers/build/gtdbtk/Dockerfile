@@ -3,7 +3,7 @@
 
 FROM mambaorg/micromamba:1.5.8
 
-ARG GTDBTK_VERSION=2.4.0
+ARG GTDBTK_VERSION=2.7.0
 
 USER root
 SHELL ["/bin/bash", "-lc"]
