@@ -46,8 +46,9 @@ def read_new_genome(operon_fp_tsv: Path) -> dict[str, dict]:
     n_unparsed = 0
     with open(operon_fp_tsv, newline="") as fh:
         for row in csv.DictReader(fh, delimiter="\t"):
-            oid = row.get("operon_id", "")
-            if oid == "NOT_IN_AN_OPERON" or oid in operons:
+            oid = row.get("operon_id", "") or ""
+            # Real operon ids start with "operon_" (NOT_IN_AN_OPERON and NOT_APPLICABLE_NON_CODING do not).
+            if not oid.startswith("operon_") or oid in operons:
                 continue
             parsed = parse_operon_fingerprint(row.get("operon_fingerprint", ""))
             if parsed is None:
