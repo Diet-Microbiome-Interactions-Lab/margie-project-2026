@@ -410,6 +410,8 @@ def assign_label(
     Returns (label, source, source_id, hierarchy, audit_trail, evaluations,
     confirmatory_evals, confirmatory_summary).
     """
+    # Localization, topology and signal-peptide columns take no part in the label.
+    row = R.without_localization(row)
     evaluations = [fn(row) for fn in _EVALUATORS]
     confirmatory_evals = [fn(row) for fn in _CONFIRMATORY_EVALUATORS]
 

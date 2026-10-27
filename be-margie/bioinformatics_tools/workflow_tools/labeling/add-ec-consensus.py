@@ -20,6 +20,9 @@ from pathlib import Path
 
 csv.field_size_limit(10_000_000)
 
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+import descriptor_rules as R  # noqa: E402
+
 EC_PATTERN = re.compile(r"(\d+\.\d+\.\d+\.(?:\d+|-))")
 
 # tool_name -> merged-table column scanned for EC numbers.
@@ -56,7 +59,11 @@ def extract_ec_numbers(text: str) -> set[str]:
 
 
 def collect_ec_evidence(merged_row: dict[str, str]) -> dict[str, set[str]]:
-    """Returns {tool: EC set} for every tool with at least one EC in the merged row."""
+    """Returns {tool: EC set} for every tool with at least one EC in the merged row.
+
+    Localization, topology and signal-peptide columns are not EC sources (R.without_localization).
+    """
+    merged_row = R.without_localization(merged_row)
     evidence: dict[str, set[str]] = {}
     for tool, src_col in EC_SOURCE_COLUMN.items():
         values = extract_ec_numbers(merged_row.get(src_col, ""))

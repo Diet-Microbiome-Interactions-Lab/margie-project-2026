@@ -155,6 +155,17 @@ def is_uninformative(val: str) -> bool:
     return False
 
 
+# ─── Evidence that is not scored ──────────────────────────────────────────────
+# Localization, topology and signal-peptide tools and the envelope call, by column prefix: they
+# stay in the merged and final tables as evidence and are not inputs to labeling or scoring.
+LOCALIZATION_PREFIXES = ("PHOBIUS_", "TMBED_", "SIGNALP6_", "SIGNALP4_", "PSORTB_", "DEEPSIG_", "ENVELOPE_")
+
+
+def without_localization(row: dict) -> dict:
+    """Returns the row without its LOCALIZATION_PREFIXES columns."""
+    return {k: v for k, v in row.items() if not str(k or "").startswith(LOCALIZATION_PREFIXES)}
+
+
 # ─── Tool gates ───────────────────────────────────────────────────────────────
 # UniProt hits count at identity >= 40%; the other tools are thresholded upstream.
 UNIPROT_PIDENT_MIN = 40.0
