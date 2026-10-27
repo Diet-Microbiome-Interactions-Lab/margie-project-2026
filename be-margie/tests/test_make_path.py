@@ -106,9 +106,19 @@ def test_a_run_without_the_cache_says_so_on_its_command_line():
 
 def test_resume_and_restart_keep_a_run_without_the_cache():
     from bioinformatics_tools.api.routers import ssh
-    with patch(f"{SSH}._run_remote_check", return_value=(0, "NOCACHE\n")) as run:
+    with patch(f"{SSH}._run_remote_check", return_value=(0, "FOUND\n")) as run:
         assert ssh._ran_without_cache(None, "/scratch/u/run-1") is True
     assert "/scratch/u/run-1/run-command.sh" in run.call_args[0][1]
+    assert "'use_cache: false'" in run.call_args[0][1]
     with patch(f"{SSH}._run_remote_check", return_value=(1, "")):
         assert ssh._ran_without_cache(None, "/scratch/u/run-2") is False
     assert ssh._ran_without_cache(None, None) is False
+
+
+def test_resume_and_restart_keep_the_full_operon_map():
+    from bioinformatics_tools.api.routers import ssh
+    with patch(f"{SSH}._run_remote_check", return_value=(0, "FOUND\n")) as run:
+        assert ssh._ran_with_full_operon_map(None, "/scratch/u/run-1") is True
+    assert "'run_full_operon_map: true'" in run.call_args[0][1]
+    with patch(f"{SSH}._run_remote_check", return_value=(1, "")):
+        assert ssh._ran_with_full_operon_map(None, "/scratch/u/run-2") is False

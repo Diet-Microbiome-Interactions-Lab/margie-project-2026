@@ -26,8 +26,10 @@ from urllib.parse import unquote
 
 try:
     from bioinformatics_tools.workflow_tools.genome_identity import genome_hash, legacy_file_hash, normalise_protein, read_fasta
+    from bioinformatics_tools.workflow_tools.load_to_db import _ensure_run_log as ensure_run_log
 except ImportError:  # imported from margie_sb.smk, with this folder on sys.path
     from genome_identity import genome_hash, legacy_file_hash, normalise_protein, read_fasta
+    from load_to_db import _ensure_run_log as ensure_run_log
 
 LOGGER = logging.getLogger(__name__)
 
@@ -554,19 +556,7 @@ def store_all(db_path: str, input_file: str,
         LOGGER.info("✓ Cached outputs for %s", tool_name)
 
 
-CREATE_RUN_LOG_SQL = """
-CREATE TABLE IF NOT EXISTS run_log (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    run_id TEXT NOT NULL,
-    input_hash TEXT NOT NULL,
-    tool TEXT NOT NULL,
-    input_path TEXT,
-    row_count INTEGER,
-    rules_completed INTEGER,
-    status TEXT NOT NULL,
-    loaded_at TEXT NOT NULL
-);
-"""
+# run_log is load_to_db's table: one definition, one row per genome and tool.
 
 
 def log_workflow_run(db_path: str, run_id: str, input_file: str, workflow_name: str,
@@ -595,7 +585,7 @@ def log_workflow_run(db_path: str, run_id: str, input_file: str, workflow_name: 
             """Inner function for retry wrapper."""
             conn = _get_connection(db_path)
             try:
-                conn.execute(CREATE_RUN_LOG_SQL)
+                ensure_run_log(conn)
                 # The loader's run_log keeps one row per (input_hash, tool): a genome's newest run replaces it.
                 conn.execute(
                     "INSERT OR REPLACE INTO run_log "

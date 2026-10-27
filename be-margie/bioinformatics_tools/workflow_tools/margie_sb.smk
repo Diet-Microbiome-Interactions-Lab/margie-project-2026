@@ -802,6 +802,7 @@ rule update_c3_occ_reference_depot:
     output:
         tkn=SCORING_OCC_REFERENCE_TOKEN
     threads: 1
+    retries: RUN_RETRIES
     resources:
         mem_mb=rc('scoring_occ_update.mem_mb', 4000, config=config),
         runtime=runtime_min('scoring_occ_update.runtime', 30, config=config)
@@ -1107,6 +1108,7 @@ rule archive_scoring_to_depot:
     params:
         dest_dir=SCORING_ARCHIVE_DIR
     threads: 1
+    retries: RUN_RETRIES
     resources:
         mem_mb=rc('scoring_archive.mem_mb', 1000, config=config),
         runtime=runtime_min('scoring_archive.runtime', 10, config=config)
@@ -1129,6 +1131,7 @@ rule publish_final_annotation_to_depot:
     params:
         dest_root=FINAL_TABLES_DEPOT_PATH
     threads: 1
+    retries: RUN_RETRIES
     resources:
         mem_mb=rc('final_tables_depot.mem_mb', 1000, config=config),
         runtime=runtime_min('final_tables_depot.runtime', 10, config=config)
@@ -1155,6 +1158,7 @@ rule run_report_figures_one_genome:
         occ_reference=C3_REFERENCE_PKL,
         run_root=_OUTPUT_ROOT
     threads: 1
+    retries: RUN_RETRIES
     resources:
         mem_mb=rc('report_figures.mem_mb', 8000, config=config),
         runtime=runtime_min('report_figures.runtime', 30, config=config)
@@ -1186,6 +1190,7 @@ rule run_genome_viewer_one_genome:
         html=GENOME_VIEWER_HTML,
         png=GENOME_VIEWER_CIRCULAR_PNG
     threads: 1
+    retries: RUN_RETRIES
     resources:
         mem_mb=rc('genome_viewer.mem_mb', 8000, config=config),
         runtime=runtime_min('genome_viewer.runtime', 30, config=config)
@@ -1216,6 +1221,7 @@ rule run_full_operon_map_one_genome:
         occ_reference=C3_REFERENCE_PKL,
         run_root=_OUTPUT_ROOT
     threads: 1
+    retries: RUN_RETRIES
     resources:
         mem_mb=rc('full_operon_map.mem_mb', 8000, config=config),
         runtime=runtime_min('full_operon_map.runtime', 90, config=config)
@@ -1243,6 +1249,7 @@ rule run_report_figures_global:
         occ_reference=C3_REFERENCE_PKL,
         run_root=_OUTPUT_ROOT
     threads: 1
+    retries: RUN_RETRIES
     resources:
         mem_mb=rc('report_figures.global_mem_mb', 16000, config=config),
         runtime=runtime_min('report_figures.global_runtime', 45, config=config)
@@ -1275,6 +1282,7 @@ rule queue_sqlite_backup_snapshot:
         partition=rc('sqlite_backup.partition', '', config=config),
         time_limit=rc('sqlite_backup.time', '01:00:00', config=config)
     threads: 1
+    retries: RUN_RETRIES
     resources:
         mem_mb=rc('sqlite_backup.mem_mb', 1000, config=config),
         runtime=runtime_min('sqlite_backup.runtime', 10, config=config)
@@ -1320,6 +1328,7 @@ rule make_annotation_gff:
         scoring_tkn=SCORING_TOKEN
     output:
         gff=ANNOTATION_GFF
+    retries: RUN_RETRIES
     shell:
         """
         echo "=== MARGIE_SB: ANNOTATION GFF ({wildcards.genome}) ==="
@@ -1341,6 +1350,7 @@ rule build_gene_evidence_report:
     output:
         prepared_dir=directory(EVIDENCE_PREPARED_DIR)
     threads: rc('evidence.threads', 1, config=config)
+    retries: RUN_RETRIES
     resources:
         mem_mb=rc('evidence.mem_mb', 8000, config=config),
         runtime=runtime_min('evidence.runtime', 60, config=config)
@@ -1459,6 +1469,7 @@ rule copy_to_genome_pool:
     output:
         tkn=GENOME_POOL_TOKEN
     threads: 1
+    retries: RUN_RETRIES
     resources:
         mem_mb=rc('genome_pool.mem_mb', 1000, config=config),
         runtime=runtime_min('genome_pool.runtime', 10, config=config)
@@ -1483,6 +1494,7 @@ rule run_ani_batch:
         tkn=ANI_COMPUTE_TOKEN
     group: "ani"
     threads: rc('ani.threads', 8, config=config)
+    retries: RUN_RETRIES
     resources:
         mem_mb=rc('ani.mem_mb', 8000, config=config),
         runtime=runtime_min('ani.runtime', 60, config=config)
@@ -1534,6 +1546,7 @@ rule run_aai_batch:
         tkn=AAI_COMPUTE_TOKEN
     group: "aai"
     threads: rc('aai.threads', 8, config=config)
+    retries: RUN_RETRIES
     resources:
         mem_mb=rc('aai.mem_mb', 8000, config=config),
         runtime=runtime_min('aai.runtime', 60, config=config)
@@ -1590,6 +1603,7 @@ rule run_closest_organisms_batch:
         tkn=CLOSEST_COMPUTE_TOKEN
     group: "closest"
     threads: rc('closest.threads', 2, config=config)
+    retries: RUN_RETRIES
     resources:
         mem_mb=rc('closest.mem_mb', 4000, config=config),
         runtime=runtime_min('closest.runtime', 30, config=config)
@@ -1688,17 +1702,22 @@ GTDBTK_CLASSIFY = rc_bool('margie_sb.gtdbtk.classify', False, config=config)
 
 
 def _gtdbtk_resource(leaf: str, index: int):
-    """GTDB-Tk's threads, memory or run time: the saved setting, else the step's own default."""
-    default = (GTDBTK_CLASSIFY_RESOURCES if GTDBTK_CLASSIFY else TOOL_RESOURCES['gtdbtk'])[index]
+    """GTDB-Tk's threads, memory or run time. The identify step takes the saved gtdbtk setting, else
+    its default; the full classification takes margie_sb.gtdbtk_classify.<leaf>, else its own
+    default, so a setting saved for the identify step does not shrink it."""
+    if GTDBTK_CLASSIFY:
+        return rc(f'margie_sb.gtdbtk_classify.{leaf}', GTDBTK_CLASSIFY_RESOURCES[index], config=config)
+    default = TOOL_RESOURCES['gtdbtk'][index]
     return rc(f'margie_sb.gtdbtk.{leaf}', rc(f'gtdbtk.{leaf}', default, config=config), config=config)
 
 
 def _gtdbtk_partition() -> str:
-    """The full classification needs a high-memory node; the identify step runs where the tools do."""
+    """The full classification needs a high-memory node (margie_sb.gtdbtk_classify.partition, else
+    highmem); the identify step runs where the tools do, or on its saved partition."""
+    if GTDBTK_CLASSIFY:
+        return str(rc('margie_sb.gtdbtk_classify.partition', '', config=config) or '').strip() or 'highmem'
     saved = str(rc('margie_sb.gtdbtk.partition', rc('gtdbtk.partition', '', config=config), config=config) or '').strip()
-    if saved:
-        return saved
-    return 'highmem' if GTDBTK_CLASSIFY else tool_partition('gtdbtk', 2)
+    return saved or tool_partition('gtdbtk', 2)
 
 
 rule run_gtdbtk_batch:
@@ -2535,7 +2554,13 @@ rule run_kegg:
         echo "=== MARGIE_SB PHASE 4: KEGG ({wildcards.genome}) ==="
         DOMAIN=$(awk -F'\\t' 'NR==1{{for(i=1;i<=NF;i++) if($i=="GTDBTK_domain") c=i}} NR==2{{print $c}}' {input.gtdbtk_results})
         if [ -s {input.faa} ]; then
-            /usr/local/bin/run -i {input.faa} -o {params.output_dir} -d {params.db} -t {threads} --organism-name {wildcards.genome} --domain "$DOMAIN"
+            # KofamScan keeps its working files in ./tmp: it starts in a folder of this genome's own,
+            # so KEGG jobs running at once do not share one.
+            FAA=$(realpath -s {input.faa}); OUT=$(realpath -m -s {params.output_dir}); DB=$(realpath -s {params.db})
+            WORK="$OUT/{wildcards.genome}/kofamscan-work"
+            mkdir -p "$WORK"
+            (cd "$WORK" && /usr/local/bin/run -i "$FAA" -o "$OUT" -d "$DB" -t {threads} --organism-name {wildcards.genome} --domain "$DOMAIN")
+            rm -rf "$WORK"
             SRC={params.output_dir}/{wildcards.genome}
         else
             SRC=/nonexistent/protein-cache  # every protein's rows come from the cache
@@ -3312,6 +3337,7 @@ rule run_signalp4:
         results=SIGNALP4_RESULTS,
         tkn=SIGNALP4_COMPUTE_TOKEN
     threads: rc('signalp4.threads', 2, config=config)
+    retries: RUN_RETRIES
     resources:
         mem_mb=rc('signalp4.mem_mb', 2000, config=config),
         runtime=runtime_min('signalp4.runtime', 30, config=config),
