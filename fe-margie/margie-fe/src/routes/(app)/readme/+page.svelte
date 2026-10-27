@@ -1,14 +1,18 @@
 <script lang="ts">
 	import { ArrowRight, Download, MonitorDown } from 'lucide-svelte';
 	import { DESKTOP_URL } from '$lib/crisp/about';
+	import { HOSTED } from '$lib/hosted';
 	import ReadingPage from '$lib/crisp/ReadingPage.svelte';
-	import README from '$lib/crisp/readme.md?raw';
+	import FULL_README from '$lib/crisp/readme.md?raw';
 	import Markdown from '$lib/workspace/viewers/Markdown.svelte';
 
 	/**
 	 * README: what MARGIE is and how to use this site, one card per section of the README. The title
-	 * and tagline open the page; the code card (the Code page) stands where the README marks it.
+	 * and tagline open the page; the code card (the Code page) stands where the README marks it, on the
+	 * website (the desktop app ships no code).
 	 */
+	/** The desktop app's FAQ has no code, so its README leaves the code out of the FAQ's summary. */
+	const README = HOSTED ? FULL_README : FULL_README.replace(' and the code that does it', '');
 	const [HEAD, ...REST] = README.split(/^## /m);
 	const TAGLINE = HEAD.match(/^\*\*(.+)\*\*$/m)?.[1] ?? '';
 	const INTRO = HEAD.replace(/^# .*\n+/, '').replace(/^\*\*.+\*\*\n+/m, '');
@@ -45,7 +49,7 @@
 		<section class="rp-sec" id={s.id} data-toc={s.title} data-copy={s.id === 'how-to-cite' ? '' : undefined}>
 			<h2>{s.title}</h2>
 			{#each s.parts as part, k (k)}
-				{#if k > 0}
+				{#if k > 0 && HOSTED}
 					<a class="rp-link" href="/code">
 						<span class="rp-link-text">
 							<b>The code behind each step</b>

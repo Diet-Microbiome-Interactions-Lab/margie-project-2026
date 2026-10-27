@@ -4,12 +4,14 @@
 	import { LAB } from './about';
 	import { FAQS, GROUPS, REFS, type Faq } from './faq';
 	import FaqCode from './FaqCode.svelte';
+	import { HOSTED } from '$lib/hosted';
 	import { LockedError, alreadyOpen, openLocked, relock, type LockedPage } from './locked';
 
 	/**
 	 * The FAQ (its own page, /faq): how MARGIE works, question by question. Each answer names the papers it
 	 * rests on and can show the code that does what it says; a thesis panel (under embargo) opens
-	 * with the password. A link to #<question id> opens that question.
+	 * with the password. A link to #<question id> opens that question. The desktop app ships no code and
+	 * no locked pages, so it leaves out the code, the thesis panels and the text marked fq-web (faq.ts).
 	 */
 	let query = $state('');
 	let opened = $state<Record<string, boolean>>({});
@@ -64,7 +66,7 @@
 	});
 </script>
 
-<div class="fq-list">
+<div class="fq-list" class:fq-desktop={!HOSTED}>
 	<div class="fq-bar">
 		<label class="fq-search">
 			<Search size={16} />
@@ -90,14 +92,14 @@
 					<div class="fq-a">
 						<div class="fq-text">{#each f.a as p, i (i)}{@html p}{/each}</div>
 
-						{#if f.code.length}
+						{#if f.code.length && HOSTED}
 							<div class="fq-part">
 								<h3>The code</h3>
 								{#each f.code as c (c.path + c.symbol)}<FaqCode code={c} />{/each}
 							</div>
 						{/if}
 
-						{#if f.thesis}
+						{#if f.thesis && HOSTED}
 							<div class="fq-part fq-thesis">
 								<h3>From the thesis</h3>
 								{#if thesis?.sections[f.id]}
@@ -370,6 +372,9 @@
 		font-weight: 700;
 		letter-spacing: 0.05em;
 		text-transform: uppercase;
+	}
+	.fq-desktop :global(.fq-web) {
+		display: none;
 	}
 	.fq-thesis {
 		padding: 14px 16px;

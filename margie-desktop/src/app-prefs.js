@@ -14,8 +14,8 @@ const FILE = path.join(DATA_DIR, 'desktop-prefs.json');
 const DEFAULTS = {
 	/** 'hidden' puts the traffic lights over MARGIE's own header; 'native' keeps a title bar. */
 	titleBar: 'hidden',
-	/** macOS translucency behind the window, visible where the page lets it through. */
-	vibrancy: true,
+	/** macOS translucency behind the window, visible where the page lets it through; off, so pages look as on the website. */
+	vibrancy: false,
 	/** The menu bar status item. */
 	tray: true,
 	/** Notifies when a run finishes or fails. */

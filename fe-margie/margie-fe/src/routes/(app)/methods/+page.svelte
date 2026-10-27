@@ -1,12 +1,14 @@
 <script lang="ts">
 	import { ArrowRight } from 'lucide-svelte';
 	import { api } from '$lib/api';
+	import { HOSTED } from '$lib/hosted';
 	import ReadingPage from '$lib/crisp/ReadingPage.svelte';
 	import { FAQS } from '$lib/crisp/faq';
 
 	/**
 	 * Methods: what MARGIE does, phase by phase (margie_sb.smk). The FAQ, which explains each step with
-	 * its references and code, is on its own page (/faq).
+	 * its references and code, is on its own page (/faq). The desktop app ships no code, so its Methods
+	 * leaves out the scripts and the Code page.
 	 */
 	type Phase = { n: string; step: string; tools: string[]; does: string; more?: { href: string; label: string } };
 	const STAGES: { title: string; blurb: string; phases: Phase[] }[] = [
@@ -252,6 +254,7 @@
 	}
 	let code = $state<CodeStep[]>([]);
 	$effect(() => {
+		if (!HOSTED) return;
 		api<{ steps: CodeStep[] }>('/code').then(
 			(r) => (code = r.steps),
 			() => (code = [])
@@ -277,7 +280,7 @@
 	</section>
 
 	<a class="rp-link" href="/faq">
-		<span class="rp-link-text"><b>Frequently asked questions</b><span>{FAQS.length} answers on how each step works, with the papers it rests on and the code that does it.</span></span>
+		<span class="rp-link-text"><b>Frequently asked questions</b><span>{FAQS.length} answers on how each step works, with the papers it rests on{HOSTED ? ' and the code that does it' : ''}.</span></span>
 		<ArrowRight size={20} />
 	</a>
 
@@ -356,45 +359,49 @@
 				</tbody>
 			</table>
 		</div>
-		<h3>The scripts</h3>
-		<ul class="rp-plain">
-			{#each HASH_CODE as c (c.path)}
-				<li>
-					<a class="mt-file" href="/code?file={encodeURIComponent(c.path)}">
-						<span class="mg-mono">{c.path.split('/').pop()}</span><span class="mt-lines">{c.what}</span><ArrowRight size={16} />
-					</a>
-				</li>
-			{/each}
-		</ul>
+		{#if HOSTED}
+			<h3>The scripts</h3>
+			<ul class="rp-plain">
+				{#each HASH_CODE as c (c.path)}
+					<li>
+						<a class="mt-file" href="/code?file={encodeURIComponent(c.path)}">
+							<span class="mg-mono">{c.path.split('/').pop()}</span><span class="mt-lines">{c.what}</span><ArrowRight size={16} />
+						</a>
+					</li>
+				{/each}
+			</ul>
+		{/if}
 	</section>
 
-	<section class="rp-sec" id="code" data-toc="The code behind each step">
-		<h2>The code behind each step</h2>
-		<p>MARGIE's own steps are Python scripts. Each one opens on the Code page as the server runs it, highlighted, with line numbers.</p>
-		{#if code.length}
-			<div class="mt-code">
-				{#each code as c (c.key)}
-					<div class="mt-code-step">
-						<b>{c.title}</b>
-						<p class="rp-note">{c.what}</p>
-						<ul class="rp-plain">
-							{#each c.files as f (f.path)}
-								<li>
-									<a class="mt-file" href="/code?file={encodeURIComponent(f.path)}">
-										<span class="mg-mono">{f.name}</span><span class="mt-lines">{f.lines} lines</span><ArrowRight size={16} />
-									</a>
-								</li>
-							{/each}
-						</ul>
-					</div>
-				{/each}
-			</div>
-		{/if}
-		<a class="rp-link" href="/code">
-			<span class="rp-link-text"><b>Open the Code page</b><span>Each script, with copy and download, and its place on GitHub.</span></span>
-			<ArrowRight size={20} />
-		</a>
-	</section>
+	{#if HOSTED}
+		<section class="rp-sec" id="code" data-toc="The code behind each step">
+			<h2>The code behind each step</h2>
+			<p>MARGIE's own steps are Python scripts. Each one opens on the Code page as the server runs it, highlighted, with line numbers.</p>
+			{#if code.length}
+				<div class="mt-code">
+					{#each code as c (c.key)}
+						<div class="mt-code-step">
+							<b>{c.title}</b>
+							<p class="rp-note">{c.what}</p>
+							<ul class="rp-plain">
+								{#each c.files as f (f.path)}
+									<li>
+										<a class="mt-file" href="/code?file={encodeURIComponent(f.path)}">
+											<span class="mg-mono">{f.name}</span><span class="mt-lines">{f.lines} lines</span><ArrowRight size={16} />
+										</a>
+									</li>
+								{/each}
+							</ul>
+						</div>
+					{/each}
+				</div>
+			{/if}
+			<a class="rp-link" href="/code">
+				<span class="rp-link-text"><b>Open the Code page</b><span>Each script, with copy and download, and its place on GitHub.</span></span>
+				<ArrowRight size={20} />
+			</a>
+		</section>
+	{/if}
 </ReadingPage>
 
 <style>

@@ -164,8 +164,8 @@ async function lockBuildFiles(when) {
 
 /** Height of the draggable strip reserved for the traffic lights when the title bar is hidden. */
 const TITLEBAR = 34;
-/** Height of MARGIE's own header (the Modern interface), where the traffic lights sit. */
-const HEADER = 48;
+/** Height of MARGIE's own header (AppShell's header.mg-appbar), where the traffic lights sit. */
+const HEADER = 78;
 
 /** The hidden title bar and the translucent background are macOS's alone. */
 const IS_MAC = process.platform === 'darwin';
@@ -201,14 +201,14 @@ async function dressWindow(target) {
 		// The Modern header is the drag region, padded for the traffic lights except in full
 		// screen (html.mg-fullscreen). Pages without it get a TITLEBAR-high strip, exposed as --mg-titlebar.
 		css.push(`
-			.crisp > header.bar {
+			.crisp > header.mg-appbar {
 				-webkit-app-region: drag;
 				padding-left: 86px !important;
 			}
-			html.mg-fullscreen .crisp > header.bar {
+			html.mg-fullscreen .crisp > header.mg-appbar {
 				padding-left: 16px !important;
 			}
-			.crisp > header.bar :is(a, button, input, select, textarea, label, [role='menu'], [role='menuitem'], .hist, .jumps) {
+			.crisp > header.mg-appbar :is(a, button, input, select, textarea, label, [role='menu'], [role='menuitem'], .hist, .jumps) {
 				-webkit-app-region: no-drag;
 			}
 			/* A drag region stays draggable under whatever covers it, so a full-screen view, a dialog or a
@@ -216,23 +216,23 @@ async function dressWindow(target) {
 			:fullscreen, dialog, [role='dialog'], [role='alertdialog'], [aria-modal='true'], [role='menu'], [role='listbox'], [role='tooltip'], [popover] {
 				-webkit-app-region: no-drag;
 			}
-			html:has(:fullscreen) .crisp > header.bar {
+			html:has(:fullscreen) .crisp > header.mg-appbar {
 				-webkit-app-region: no-drag;
 			}
 			html:has(:fullscreen) body::before {
 				display: none;
 			}
-			body:not(:has(.crisp > header.bar)) {
+			body:not(:has(.crisp > header.mg-appbar)) {
 				--mg-titlebar: ${TITLEBAR}px;
 			}
-			body:not(:has(.crisp > header.bar)) [data-mg-root] {
+			body:not(:has(.crisp > header.mg-appbar)) [data-mg-root] {
 				box-sizing: border-box !important;
 				padding-top: ${TITLEBAR}px !important;
 			}
 			body:not(:has([data-mg-root])) {
 				padding-top: ${TITLEBAR}px !important;
 			}
-			body:not(:has(.crisp > header.bar))::before {
+			body:not(:has(.crisp > header.mg-appbar))::before {
 				content: '';
 				position: fixed;
 				top: 0;
@@ -279,7 +279,7 @@ function createWindow() {
 		title: 'MARGIE',
 		// With the title bar hidden the traffic lights sit over MARGIE's own header.
 		titleBarStyle: hiddenBar ? 'hiddenInset' : 'default',
-		// Centred on MARGIE's header row (48px); the lights are about 14px tall.
+		// Centred on MARGIE's header row; the lights are about 14px tall.
 		...(hiddenBar ? { trafficLightPosition: { x: 16, y: Math.round((HEADER - 14) / 2) } } : {}),
 		// Vibrancy shows through where the injected CSS makes the shell translucent.
 		...(vibrancy ? { vibrancy: 'sidebar', visualEffectState: 'followWindow' } : {}),
