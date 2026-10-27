@@ -7,7 +7,7 @@
 
 	/**
 	 * Statement dialog before the first installation, database download or database setup of a place,
-	 * with the licences to read and a note on citing. Mounted once per shell; installLock.confirm()
+	 * with the sentences accepted, the licences and a note on citing. Mounted once per shell; installLock.confirm()
 	 * opens it and resolves to the statement or null. Once typed, the place keeps it.
 	 */
 	let password = $state('');
@@ -20,7 +20,8 @@
 		if (!req) return;
 		password = '';
 		wrong = '';
-		tick().then(() => field?.focus());
+		// The dialog opens at its top, on what is accepted.
+		tick().then(() => field?.focus({ preventScroll: true }));
 	});
 
 	async function go(e: SubmitEvent) {
@@ -49,9 +50,9 @@
 					<li>Cite the original developers of every tool you use, and MARGIE.</li>
 				</ul>
 			</div>
+			<LicenceReading open label="The licences" />
 			<p class="type-it">Type this statement exactly as shown (pasting is not allowed):</p>
 			<blockquote class="statement" oncopy={(e) => e.preventDefault()}>{INSTALL_STATEMENT}</blockquote>
-			<LicenceReading />
 			<input
 				bind:this={field}
 				class="mg-input"
