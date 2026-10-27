@@ -1592,17 +1592,27 @@ def _dane_wf_command(workflow: str, genome_path: str, output_dir: str, selected_
     )
 
 
-def _ran_without_cache(conn, work_dir: str | None) -> bool:
-    """Whether a job ran without the cache, from the command saved beside its results (Resume and
-    Restart run it the same way)."""
+def _saved_command_has(conn, work_dir: str | None, text: str) -> bool:
+    """Whether the command saved beside a job's results holds text (Resume and Restart run a job
+    the way it was run)."""
     if not work_dir:
         return False
     path = shlex.quote(f"{work_dir.rstrip('/')}/{COMMAND_FILE}")
     try:
-        _, out = _run_remote_check(conn, f"grep -q 'use_cache: false' {path} 2>/dev/null && echo NOCACHE")
+        _, out = _run_remote_check(conn, f"grep -qF {shlex.quote(text)} {path} 2>/dev/null && echo FOUND")
     except Exception:
         return False
-    return "NOCACHE" in out
+    return "FOUND" in out
+
+
+def _ran_without_cache(conn, work_dir: str | None) -> bool:
+    """Whether a job ran without the cache, from its saved command."""
+    return _saved_command_has(conn, work_dir, "use_cache: false")
+
+
+def _ran_with_full_operon_map(conn, work_dir: str | None) -> bool:
+    """Whether a job drew the full operon map, from its saved command."""
+    return _saved_command_has(conn, work_dir, "run_full_operon_map: true")
 
 
 def _with_usage_report(command: str, job_id: str, output_dir: str) -> str:
@@ -3099,6 +3109,7 @@ def resume_job(job_id: str, current_user: dict = Depends(get_current_user)):
         slurm_account=slurm_account, slurm_partition=slurm_partition,
         slurm_walltime=slurm_walltime,
         relaunched_from=job_id, copy_from_work_dir=work_dir,
+        run_full_operon_map=_ran_with_full_operon_map(conn, work_dir),
         use_cache=not _ran_without_cache(conn, work_dir),
     )
 
@@ -3142,6 +3153,7 @@ def restart_job(job_id: str, current_user: dict = Depends(get_current_user)):
         slurm_account=slurm_account, slurm_partition=slurm_partition,
         slurm_walltime=slurm_walltime,
         relaunched_from=job_id,
+        run_full_operon_map=_ran_with_full_operon_map(conn, original.get("work_dir")),
         use_cache=not _ran_without_cache(conn, original.get("work_dir")),
     )
 

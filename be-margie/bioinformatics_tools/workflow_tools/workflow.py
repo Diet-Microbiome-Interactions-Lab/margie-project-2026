@@ -32,7 +32,7 @@ from bioinformatics_tools.workflow_tools import cache_report, protein_cache
 from bioinformatics_tools.workflow_tools.programs import ProgramBase
 from bioinformatics_tools.workflow_tools.workflow_helpers import (
     discover_genomes, genome_stem, get_workflow_prefix_for, WORKFLOW_PATH_DEFAULTS, genome_calls, gene_call_files,
-    GTDBTK_EARLY, identify_calls, read_early_calls, write_early_calls)
+    GTDBTK_EARLY, identify_calls, read_early_calls, rc_bool, write_early_calls)
 from bioinformatics_tools.workflow_tools.workflow_registry import (
     HIDDEN_TOOLS,
     MARGIE_SB_PHASED_TOOLS,
@@ -813,13 +813,15 @@ class WorkflowBase(ProgramBase):
         '''
         # As do_margie_sb: a domain or genetic code the config names is the config's.
         calls = genome_calls(genome_files, {'run_gtdbtk': True, 'margie_sb': self._margie_sb_dict()})
+        # With the full classification on, cached identify-step results (no classification) run again.
+        classify = rc_bool('margie_sb.gtdbtk.classify', False, config={'margie_sb': self._margie_sb_dict()})
         gtdbtk, rasttk = {}, {}
         for genome, fasta_path in genome_files.items():
             prefix = get_workflow_prefix_for(genome, smk_config)
             results, table, token = WorkflowBase._gtdbtk_split_paths(genome, smk_config)
             gtdbtk[genome] = restore(db_path, fasta_path, 'gtdbtk', [results, table], optional=[token])
-            if gtdbtk[genome] and not WorkflowBase._names_classification(results):
-                LOGGER.info("Cached GTDB-Tk results for %s name only the domain -- GTDB-Tk runs again", genome)
+            if gtdbtk[genome] and not WorkflowBase._names_classification(results, classified=classify):
+                LOGGER.info("Cached GTDB-Tk results for %s name no classification -- GTDB-Tk runs again", genome)
                 for path in (results, table, token):
                     Path(path).unlink(missing_ok=True)
                 gtdbtk[genome] = False
@@ -844,11 +846,18 @@ class WorkflowBase(ProgramBase):
             return 3
 
     @staticmethod
-    def _names_classification(results: str) -> bool:
-        '''Whether a gtdbtk_results.tsv has the GTDBTK_classification column.'''
+    def _names_classification(results: str, classified: bool = False) -> bool:
+        '''Whether a gtdbtk_results.tsv has the GTDBTK_classification column; with classified, also a
+        classification in it (the identify step leaves the column empty).'''
         try:
             with open(results) as fh:
-                return 'GTDBTK_classification' in fh.readline().rstrip('\n').split('\t')
+                header = fh.readline().rstrip('\n').split('\t')
+                if 'GTDBTK_classification' not in header:
+                    return False
+                if not classified:
+                    return True
+                col = header.index('GTDBTK_classification')
+                return any(len(f) > col and f[col].strip() for f in (line.rstrip('\n').split('\t') for line in fh))
         except OSError:
             return False
 
