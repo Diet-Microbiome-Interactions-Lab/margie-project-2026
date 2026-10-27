@@ -30,14 +30,14 @@ class Backend {
 		if (!this.cluster) this.host = this.user = '';
 	}
 
-	/** Ends the session and goes to the sign-in page, where "Run MARGIE on this computer" also is. */
+	/** Ends the session and goes to where it signs in: the website's sign-in page, or the desktop app's start page (this computer or the HPC). */
 	signOut() {
 		try {
 			localStorage.removeItem(TOKEN_KEY);
 		} catch {
 			// nothing stored to remove
 		}
-		window.location.assign(HOSTED ? '/signin' : '/login');
+		window.location.assign(HOSTED ? '/signin' : '/start');
 	}
 
 	/** "this computer" or "the cluster": how a sentence names where work runs. */

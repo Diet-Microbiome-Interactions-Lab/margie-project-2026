@@ -18,11 +18,11 @@ function detailOf(data: unknown): string | null {
 	return null;
 }
 
-/** Clears the token, redirects to /login and throws a 401. */
+/** Clears the token, goes to where it signs in (/signin, or /start in the desktop app) and throws a 401. */
 function signedOut(): never {
 	clearToken();
 	backend.refresh();
-	goto(HOSTED ? '/signin' : '/login');
+	goto(HOSTED ? '/signin' : '/start');
 	throw new ApiError('Your sign-in has ended. Sign in again to reach the cluster.', 401);
 }
 
