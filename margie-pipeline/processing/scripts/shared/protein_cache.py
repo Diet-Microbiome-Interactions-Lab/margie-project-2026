@@ -190,7 +190,7 @@ def key(tool: str, parts: list[str]) -> str:
             described.append([p, 0 if q.is_dir() else st.st_size, int(st.st_mtime)])
         except OSError:
             described.append([p])
-    return hashlib.sha256(json.dumps({'schema': 1, 'tool': tool, 'parts': described}).encode()).hexdigest()[:32]
+    return hashlib.sha256(json.dumps({'schema': 1, 'tool': tool, 'parts': described}).encode()).hexdigest()
 
 
 def split(db: str, faa: str, work: str, genome: str, tool: str, tkey: str) -> tuple[int, int]:
