@@ -149,14 +149,20 @@ def evaluate_accession_tool(
     stat_col: str,
     gate_note_suffix: str = "",
     confirmatory: bool = False,
+    rank_by_score: bool = False,
 ) -> ToolEvaluation:
-    """Evaluates an accession-keyed tool ranked by e-value: picks the best hit and builds its gate note."""
+    """Evaluates an accession-keyed tool: picks the best hit and builds its gate note.
+
+    Hits are ranked by lowest e-value, or with rank_by_score by highest score (shown as reported).
+    """
     hits = parse_all_hits(row, id_col, desc_col, stat_col)
     if not hits:
         return _no_hit(tool_name, confirmatory)
 
-    chosen, overrode = select_best_hit(hits, rank_mode="min")
-    stat_norm = normalize_evalue(chosen.stat)
+    rank_mode, stat_name = ("max", "score") if rank_by_score else ("min", "evalue")
+    fmt = (lambda v: v) if rank_by_score else normalize_evalue
+    chosen, overrode = select_best_hit(hits, rank_mode=rank_mode)
+    stat_norm = fmt(chosen.stat)
 
     # Uninformative hits fail pass 1; no description falls back to the accession.
     desc_norm = chosen.description.strip().lower()
@@ -169,13 +175,18 @@ def evaluate_accession_tool(
 
     all_ids = ";".join(h.hit_id for h in hits)
     all_descs = "; ".join(f"{h.hit_id}: {h.description}" for h in hits) if len(hits) > 1 else chosen.description
-    all_stats = "; ".join(f"{h.hit_id}: {normalize_evalue(h.stat)}" for h in hits) if len(hits) > 1 else stat_norm
+    all_stats = "; ".join(f"{h.hit_id}: {fmt(h.stat)}" for h in hits) if len(hits) > 1 else stat_norm
 
-    note = f"evalue={stat_norm}"
+    note = f"{stat_name}={stat_norm}"
     if overrode:
-        literal_best = min(hits, key=lambda h: safe_float(h.stat, float("inf")))
-        note += (f" (used {chosen.hit_id} over lower-evalue-but-uninformative "
-                f"{literal_best.hit_id}, evalue={normalize_evalue(literal_best.stat)})")
+        if rank_by_score:
+            literal_best = max(hits, key=lambda h: safe_float(h.stat, float("-inf")))
+            better = "higher-score"
+        else:
+            literal_best = min(hits, key=lambda h: safe_float(h.stat, float("inf")))
+            better = "lower-evalue"
+        note += (f" (used {chosen.hit_id} over {better}-but-uninformative "
+                f"{literal_best.hit_id}, {stat_name}={fmt(literal_best.stat)})")
     if effective_desc != chosen.description:
         note += f" (description missing; accession used as fallback label)"
     if gate_note_suffix:
@@ -200,8 +211,12 @@ def eval_tigrfam(row: dict[str, str]) -> ToolEvaluation:
 
 # ─── STEP 3: HAMAP ───────────────────────────────────────────────────────────────
 def eval_hamap(row: dict[str, str]) -> ToolEvaluation:
-    """Evaluates InterPro HAMAP hits (InterProScan cutoff applied upstream)."""
-    return evaluate_accession_tool(row, "HAMAP", "INTERPRO_HAMAP_id", "INTERPRO_HAMAP_description", "INTERPRO_HAMAP_evalue")
+    """Evaluates InterPro HAMAP hits (InterProScan cutoff applied upstream).
+
+    INTERPRO_HAMAP_evalue holds HAMAP's profile score (higher is better), so hits rank highest first.
+    """
+    return evaluate_accession_tool(row, "HAMAP", "INTERPRO_HAMAP_id", "INTERPRO_HAMAP_description",
+                                   "INTERPRO_HAMAP_evalue", rank_by_score=True)
 
 
 # ─── STEP 4: NCBIFAM ─────────────────────────────────────────────────────────────
