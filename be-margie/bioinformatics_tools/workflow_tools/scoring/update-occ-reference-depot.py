@@ -110,7 +110,7 @@ def main() -> None:
 
         after = len(ref.get("organisms_added", set()))
         # The reference's size now, for Results (a genome scored against fewer can be scored again).
-        Path(str(reference_path) + ".summary.json").write_text(json.dumps({
+        c3_occ.write_text_atomic(Path(str(reference_path) + ".summary.json"), json.dumps({
             "genomes": after, "updated_at": datetime.now(timezone.utc).isoformat(timespec="seconds")}) + "\n")
         added = after - before
         status = (f"already_present_as={same_genome}" if same_genome else

@@ -7,8 +7,12 @@ organisms are added or subtracted (leave-one-out) exactly; finalize_reference()
 derives per-pair reliabilities before scoring.
 """
 import csv
+import os
 import re
+import secrets
+import stat
 from collections import defaultdict
+from pathlib import Path
 
 import numpy as np
 from scipy.stats import beta as _beta
@@ -296,15 +300,44 @@ def finalize_reference(ref):
     return ref
 
 
-def save_reference(ref, path):
-    """Writes the reference (counts and derived tables) to disk with pickle."""
-    import pickle
-    from pathlib import Path
+def write_atomic(path, write, binary=False):
+    """Writes through write(fh) to a temporary file beside path, then os.replace()s it into place.
+
+    Readers see the old file or the new one, not a partial write; the new file keeps the old one's
+    permission bits. Returns the path.
+    """
     path = Path(path)
     path.parent.mkdir(parents=True, exist_ok=True)
-    with open(path, "wb") as fh:
-        pickle.dump(ref, fh, protocol=pickle.HIGHEST_PROTOCOL)
+    tmp = path.with_name(f".{path.name}.{os.getpid()}.{secrets.token_hex(4)}.tmp")
+    try:
+        with (open(tmp, "xb") if binary else open(tmp, "x", newline="")) as fh:
+            write(fh)
+            fh.flush()
+            os.fsync(fh.fileno())
+        try:
+            os.chmod(tmp, stat.S_IMODE(os.stat(path).st_mode))
+        except FileNotFoundError:
+            pass
+        os.replace(tmp, path)
+    except BaseException:
+        try:
+            os.unlink(tmp)
+        except OSError:
+            pass
+        raise
     return path
+
+
+def write_text_atomic(path, text):
+    """Writes text to path with write_atomic()."""
+    return write_atomic(path, lambda fh: fh.write(text))
+
+
+def save_reference(ref, path):
+    """Writes the reference (counts and derived tables) to disk with pickle, atomically."""
+    import pickle
+    return write_atomic(path, lambda fh: pickle.dump(ref, fh, protocol=pickle.HIGHEST_PROTOCOL),
+                        binary=True)
 
 
 def load_reference(path):
@@ -321,7 +354,6 @@ def load_reference(path):
 # ---- Members sidecar: genome fingerprint -> organism token (leave-one-out) ----
 def members_sidecar_path(reference_path):
     """Returns the members sidecar path, <reference>.members.tsv."""
-    from pathlib import Path
     return Path(str(reference_path) + ".members.tsv")
 
 
@@ -338,19 +370,19 @@ def load_members(reference_path):
 
 
 def record_member(reference_path, fingerprint, organism):
-    """Upserts fingerprint -> organism in the members sidecar; the caller holds the reference lock."""
+    """Upserts fingerprint -> organism in the members sidecar (atomic write); the caller holds the reference lock."""
     if not fingerprint:
         return
     members = load_members(reference_path)
     if members.get(fingerprint) == organism:
         return
     members[fingerprint] = organism
-    p = members_sidecar_path(reference_path)
-    p.parent.mkdir(parents=True, exist_ok=True)
-    with open(p, "w", newline="") as fh:
+
+    def _write(fh):
         w = csv.writer(fh, delimiter="\t")
         for fp, org in sorted(members.items(), key=lambda x: (x[1], x[0])):
             w.writerow([fp, org])
+    write_atomic(members_sidecar_path(reference_path), _write)
 
 
 # ---- Pool-stats sidecar: per-genome tallies keyed by organism token ----
@@ -360,7 +392,6 @@ POOL_STAT_COLS = ("total_genes", "operonic_genes", "singleton_genes",
 
 def pool_stats_sidecar_path(reference_path):
     """Returns the pool-stats sidecar path, <reference>.genome_stats.tsv."""
-    from pathlib import Path
     return Path(str(reference_path) + ".genome_stats.tsv")
 
 
@@ -380,7 +411,7 @@ def load_pool_stats(reference_path):
 
 
 def record_pool_stats(reference_path, fingerprint, organism, stats):
-    """Upserts one genome's POOL_STAT_COLS stats in the pool-stats sidecar."""
+    """Upserts one genome's POOL_STAT_COLS stats in the pool-stats sidecar (atomic write)."""
     if not organism:
         return
     p = pool_stats_sidecar_path(reference_path)
@@ -393,14 +424,15 @@ def record_pool_stats(reference_path, fingerprint, organism, stats):
                     existing[o] = row
     existing[organism] = dict(fingerprint=fingerprint or "", organism=organism,
                               **{c: int(stats.get(c, 0)) for c in POOL_STAT_COLS})
-    p.parent.mkdir(parents=True, exist_ok=True)
-    with open(p, "w", newline="") as fh:
+
+    def _write(fh):
         w = csv.writer(fh, delimiter="\t")
         w.writerow(("fingerprint", "organism") + POOL_STAT_COLS)
         for o in sorted(existing):
             r = existing[o]
             w.writerow([r.get("fingerprint", ""), o]
                        + [int(float(r.get(c, 0) or 0)) for c in POOL_STAT_COLS])
+    write_atomic(p, _write)
 
 
 def build_reference(genes, run_root, params=None):
