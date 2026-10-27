@@ -257,7 +257,7 @@
 		"kind": "truefalse",
 		"statement": "PSORTb's results are kept in MARGIE's protein-level cache, since a protein's predicted location depends on its sequence alone.",
 		"answer": false,
-		"explain": "PSORTb and DeepSig run with the genome's inferred envelope type (monoderm or diderm), so their answer depends on the genome as well as the protein. The protein-level cache covers tools whose answer depends on the protein alone, such as COG, KEGG, Pfam, Phobius and TMbed."
+		"explain": "PSORTb and DeepSig run with the genome's inferred envelope type (monoderm or diderm), so their answer depends on the genome as well as the protein. The protein-level cache covers tools whose answer depends on the protein alone, such as COG, KEGG and Pfam."
 	},
 	{
 		"id": "margie-018",
@@ -303,7 +303,7 @@
 		"topic": "margie",
 		"level": "intermediate",
 		"kind": "case",
-		"scenario": "A researcher installs MARGIE and starts a run from the command line inside a batch job, with no terminal attached, before accepting MARGIE's licensing terms. Several of the tools MARGIE runs, SignalP 6 among them, are licensed by their authors for particular uses only.",
+		"scenario": "A researcher installs MARGIE and starts a run from the command line inside a batch job, with no terminal attached, before accepting MARGIE's licensing terms. Several of the tools MARGIE runs, MEROPS among them, are licensed by their authors for particular uses only.",
 		"parts": [
 			{
 				"question": "What does MARGIE do with this first run?",
@@ -317,12 +317,12 @@
 				"explain": "With the terms yet to be accepted and the batch job detached from a terminal, MARGIE stops with a message to accept the terms once in an interactive terminal, or through the web app, which records the acceptance."
 			},
 			{
-				"question": "In an interactive terminal they accept the terms, choose academic use and answer that they do not hold a SignalP 6 licence. What happens on their runs?",
+				"question": "In an interactive terminal they accept the terms, choose academic use and answer that they do not hold a MEROPS licence. What happens on their runs?",
 				"options": [
-					"SignalP 6 runs anyway, since academic use covers each gated tool",
-					"The run stops until a SignalP 6 licence file is placed in its folder",
-					"SignalP 6 runs, and its results are hidden from the final tables",
-					"SignalP 6 is turned off, and the tools they may use run as usual"
+					"MEROPS runs anyway, since academic use covers each gated tool",
+					"The run stops until a MEROPS licence file is placed in its folder",
+					"MEROPS runs, and its results are hidden from the final tables",
+					"MEROPS is turned off, and the tools they may use run as usual"
 				],
 				"answer": 3,
 				"explain": "Tools whose licence the user has to obtain are asked about one by one, and MARGIE runs only those the user holds a licence for, disabling the rest. For commercial use, MARGIE also asks about the tools whose licences restrict commercial use."
@@ -779,11 +779,11 @@
 		"options": [
 			"Its envelope type, which sets the model the localisation tools run with",
 			"Its Gram stain from GTDB-Tk, which sets the gene caller of phase 3",
-			"Its envelope type, which sets the models of Phobius, TMbed and SignalP 6",
+			"Its envelope type, which sets the databases phase 4 searches",
 			"Its membrane lipids, which set the operon pool its genes are scored against"
 		],
 		"answer": 0,
-		"explain": "Phase 7 reads marker genes in the TIGRFAM, PGAP, Pfam and UniProt results and calls the genome monoderm, diderm or archaeal. PSORTb and DeepSig then run with that model; Phobius, TMbed and SignalP 6 run with the same model for each genome."
+		"explain": "Phase 7 reads marker genes in the TIGRFAM, PGAP, Pfam and UniProt results and calls the genome monoderm, diderm or archaeal. PSORTb and DeepSig then run with that model; the other tools run the same way for each genome."
 	},
 	{
 		"id": "margie-045",

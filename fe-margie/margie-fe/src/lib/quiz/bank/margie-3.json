@@ -907,13 +907,13 @@
 			{
 				"question": "Which of W's tools run with a model set by the envelope call?",
 				"options": [
-					"Phobius, TMbed and SignalP 6",
+					"COG, Pfam and KEGG",
 					"Each tool of phases 4 to 8",
 					"UniOP, whose operons depend on the envelope",
 					"PSORTb and DeepSig, the localisation tools"
 				],
 				"answer": 3,
-				"explain": "PSORTb runs with -k n, p or a and DeepSig with GRAM-, GRAM+ or ARCH, while Phobius, TMbed and SignalP 6 run with the same model for each genome, whatever its envelope."
+				"explain": "PSORTb runs with -k n, p or a and DeepSig with GRAM-, GRAM+ or ARCH, while the other tools run the same way for each genome, whatever its envelope."
 			}
 		],
 		"explain": "Phase 7's envelope call sets the model of the phase 8 localisation tools and travels into each gene's row."

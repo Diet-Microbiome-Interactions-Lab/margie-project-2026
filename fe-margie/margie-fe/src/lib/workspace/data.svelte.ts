@@ -242,8 +242,8 @@ const IDLE_POLL = 15_000;
 
 /**
  * Recommended: the phase 4 annotation tools, which the envelope stage and scoring read. Phase 4's
- * licensed or restricted ones (MEROPS, TCDB) and the later localisation tools (Phobius, PSORTb,
- * SignalP and the like) are left for a user to add.
+ * licensed or restricted ones (MEROPS, TCDB) and the later localisation tools (PSORTb, DeepSig) are
+ * left for a user to add.
  */
 export const STANDARD_TOOLS = ['cog', 'kegg', 'eggnog', 'uniprot', 'pfam', 'tigrfam', 'dbcan', 'pgap', 'geneprop', 'interpro'];
 /** What the envelope stage reads, run whenever a gram-dependent tool is chosen. */

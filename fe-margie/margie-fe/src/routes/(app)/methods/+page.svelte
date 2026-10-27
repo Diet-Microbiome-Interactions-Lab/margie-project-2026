@@ -47,7 +47,6 @@
 					does: 'Pairwise operon probabilities between neighbouring genes, from intergenic distance, which group the genes into operons.',
 					more: { href: '/faq#operons', label: 'How operons are called' }
 				},
-				{ n: '6', step: 'Membrane topology', tools: ['Phobius', 'TMbed', 'SignalP 6'], does: 'Transmembrane helices and signal peptides. Phobius and SignalP 6 run once the user records a licence for them.' },
 				{
 					n: '7',
 					step: 'Envelope',

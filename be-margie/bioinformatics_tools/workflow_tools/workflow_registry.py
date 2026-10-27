@@ -174,14 +174,16 @@ MARGIE_SB_PHASED_TOOLS = [
     {'key': 'geneprop', 'label': 'GeneProp', 'phase': 4, 'sif': 'geneprop.sif', 'purpose': 'Gene property annotation (after TIGRFAM)', 'database': True},
     {'key': 'interpro', 'label': 'InterPro', 'phase': 4, 'sif': 'interpro.sif', 'purpose': 'Domain/signature annotation', 'database': True},
     {'key': 'operon', 'label': 'Operon', 'phase': 5, 'sif': 'operon.sif', 'purpose': 'Operon prediction'},
-    {'key': 'phobius', 'label': 'Phobius', 'phase': 6, 'sif': 'phobius.sif', 'purpose': 'Signal peptide and topology prediction'},
-    {'key': 'tmbed', 'label': 'TMbed', 'phase': 6, 'sif': 'tmbed.sif', 'purpose': 'Transmembrane topology prediction', 'database': True},
+    # 'hidden': left out of the website's lists, Settings and the licence list, and off in each run; its
+    # rule stays in margie_sb.smk. Phase 6's tools are hidden: their licences (Phobius and SignalP:
+    # academic, no redistribution; TMbed: ProtT5 weights CC-BY-NC-SA) do not let MARGIE offer them freely.
+    {'key': 'phobius', 'label': 'Phobius', 'phase': 6, 'sif': 'phobius.sif', 'purpose': 'Signal peptide and topology prediction', 'hidden': True},
+    {'key': 'tmbed', 'label': 'TMbed', 'phase': 6, 'sif': 'tmbed.sif', 'purpose': 'Transmembrane topology prediction', 'database': True, 'hidden': True},
     # SignalP 4 and 6 run from the cluster's modules (envmodules:), so there is no .sif.
-    {'key': 'signalp6', 'label': 'SignalP6', 'phase': 6, 'sif': 'signalp6.sif', 'purpose': 'Signal peptide prediction (HPC module, no envelope dependency)', 'uses_container': False},
+    {'key': 'signalp6', 'label': 'SignalP6', 'phase': 6, 'sif': 'signalp6.sif', 'purpose': 'Signal peptide prediction (HPC module, no envelope dependency)', 'uses_container': False, 'hidden': True},
     {'key': 'envelope', 'label': 'Envelope', 'phase': 7, 'sif': 'envelope.sif', 'purpose': 'Gram envelope type inference'},
     {'key': 'psortb', 'label': 'PSORTb', 'phase': 8, 'sif': 'psortb.sif', 'purpose': 'Subcellular localization'},
     {'key': 'deepsig', 'label': 'DeepSig', 'phase': 8, 'sif': 'deepsig.sif', 'purpose': 'Signal peptide prediction'},
-    # 'hidden': left out of the website's lists and off in each run; its rule stays in margie_sb.smk.
     {'key': 'signalp4', 'label': 'SignalP4', 'phase': 8, 'sif': 'signalP4.sif', 'purpose': 'Signal peptide prediction (HPC module; kept until SignalP6 is confirmed)', 'uses_container': False, 'hidden': True},
     {'key': 'consolidation', 'label': 'Consolidation', 'phase': 9, 'sif': 'consolidation.sif', 'purpose': 'Consolidate upstream outputs', 'uses_container': False},
     {'key': 'labeling', 'label': 'Labeling', 'phase': 10, 'sif': 'labeling.sif', 'purpose': 'Label assignment', 'uses_container': False},
@@ -235,12 +237,12 @@ HIDDEN_TOOLS = frozenset(tool['key'] for tool in MARGIE_SB_PHASED_TOOLS if tool.
 def margie_sb_sif_files(selected_tool_keys: set[str] | None = None) -> list[tuple]:
     """Returns the SIF entries to validate for a margie_sb run.
 
-    Skips tools with uses_container=False and, when selected_tool_keys is given,
-    tools outside that subset.
+    Skips tools with uses_container=False, hidden tools (off in each run) and, when
+    selected_tool_keys is given, tools outside that subset.
     """
     return [
         (tool['sif'], 'latest') for tool in MARGIE_SB_PHASED_TOOLS
-        if tool.get('uses_container', True)
+        if tool.get('uses_container', True) and not tool.get('hidden')
         and (selected_tool_keys is None or tool['key'] in selected_tool_keys)
     ]
 
@@ -253,7 +255,7 @@ def _margie_sb_location_params() -> list[dict]:
         'default': '',
         'description': f"{tool['label']} database folder; empty means <Databases folder>/{tool['key']}",
         'type': 'path',
-    } for tool in MARGIE_SB_PHASED_TOOLS if tool.get('database')]
+    } for tool in MARGIE_SB_PHASED_TOOLS if tool.get('database') and not tool.get('hidden')]
     # The language models, beside the other databases; the built-in genome chat uses the trained one when
     # its folder holds a model, else the base one (api/services/cluster_llm.py).
     params.extend({
@@ -686,12 +688,6 @@ WORKFLOWS: dict[str, WorkflowKey] = {
                 'param': 'margie_sb.phase5.partition',
                 'default': 'cpu',
                 'description': 'Default SLURM partition for phase5 tools',
-                'type': 'string'
-            },
-            {
-                'param': 'margie_sb.phase6.partition',
-                'default': 'cpu',
-                'description': 'Default SLURM partition for phase6 tools',
                 'type': 'string'
             },
             {

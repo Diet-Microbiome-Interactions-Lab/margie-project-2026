@@ -93,7 +93,7 @@
 		"scenario": "A scientist at a biotech company sets up MARGIE for commercial work. Before the first run they read the terms and each tool's licence details, accept them, choose commercial use and name TCDB as the one licence-required tool they hold a licence for.",
 		"parts": [
 			{
-				"question": "In MARGIE's licence catalogue, which tier holds Phobius | SignalP 6.0 | the MEROPS database?",
+				"question": "In MARGIE's licence catalogue, which tier holds the MEROPS database?",
 				"options": [
 					"attribution",
 					"commercial_restricted",
@@ -101,18 +101,18 @@
 					"permissive"
 				],
 				"answer": 2,
-				"explain": "These three are blocked: their licences let only the provider distribute them, so a user obtains them from the provider. MARGIE runs them for a user who holds that licence and disables them for the run otherwise."
+				"explain": "MEROPS is blocked: its licence lets only the provider distribute it, so a user obtains it from the provider. MARGIE runs it for a user who holds that licence and disables it for the run otherwise."
 			},
 			{
 				"question": "For commercial use, which of these also needs the user's own licence?",
 				"options": [
 					"Pfam-A 37.0 | TIGRFAMs 15.0 | the eggNOG database",
-					"TMbed's ProtT5 weights | the full KEGG database",
+					"TCDB | the full KEGG database",
 					"GTDB r232 | the COG 2024 database",
 					"UniProt Swiss-Prot 2025_05 | the dbCAN database v13"
 				],
 				"answer": 1,
-				"explain": "For commercial use, TMbed's ProtT5 weights (CC-BY-NC-SA 4.0) | TCDB | the full KEGG database also need the user's own licence. MARGIE uses the public KOfam subset of KEGG."
+				"explain": "For commercial use, TCDB | the full KEGG database also need the user's own licence. MARGIE uses the public KOfam subset of KEGG."
 			},
 			{
 				"question": "When the scientist publishes results, what do MARGIE's terms ask of them?",
@@ -211,11 +211,11 @@
 				"options": [
 					"-k GRAM-, its model for diderm genomes",
 					"-k ARCH, its model for archaeal genomes",
-					"One model for each genome, as TMbed does",
+					"The same model for each genome, whatever its envelope",
 					"-k GRAM+, its model for monoderm genomes"
 				],
 				"answer": 3,
-				"explain": "DeepSig runs with -k GRAM- | GRAM+ | ARCH, and PSORTb (-k n | p | a) follows the envelope type in the same way. Phobius | TMbed | SignalP 6 run with the same model for each genome."
+				"explain": "DeepSig runs with -k GRAM- | GRAM+ | ARCH, and PSORTb (-k n | p | a) follows the envelope type in the same way."
 			},
 			{
 				"question": "Which envelope type and PSORTb model does genome Q get?",
@@ -327,10 +327,6 @@
 			{
 				"left": "Several database hits for one gene",
 				"right": "Joined in one cell as key: value pairs, keyed by accession"
-			},
-			{
-				"left": "Several TMbed segments for one gene",
-				"right": "Joined in one cell, keyed by each segment's start–end range"
 			},
 			{
 				"left": "A gene outside a tool's hits",
