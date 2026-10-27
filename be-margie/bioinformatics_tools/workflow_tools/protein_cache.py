@@ -213,6 +213,10 @@ def _carry_over(conn, tool: str, cfg: dict, key: str) -> None:
     if (tool, key) in _carried:
         return
     _carried.add((tool, key))
+    # A tool whose answer depends on its settings keeps entries made under other settings apart:
+    # an earlier key there can name another E-value, identity or set of InterProScan analyses.
+    if TOOL_PARAMS.get(tool) or tool == 'interpro':
+        return
     older = [k for k, _ in conn.execute(
         'SELECT tool_key, max(cached_at) FROM protein_cache WHERE tool = ? AND tool_key != ? GROUP BY tool_key ORDER BY 2 DESC',
         (tool, key))]
@@ -651,14 +655,17 @@ def _localization(prefix: str) -> dict[str, dict[str, str]]:
     put = lambda fid, slot, value: value and out.setdefault(fid, {}).__setitem__(slot, value)  # noqa: E731
     for fid, rows in _rows_by_feature(Path(f'{prefix}signalp6/signalp6_results.tsv')).items():
         r = rows[0]
-        site = (r.get('SIGNALP6_cleavage_site') or '').strip()
-        put(fid, 'SIGNALP6', (r.get('SIGNALP6_prediction') or '').strip() + (f'; cleavage {site}' if site else ''))
+        # process_signalp6.py writes lower-case signalp6_ columns.
+        site = (r.get('signalp6_cs_position') or r.get('SIGNALP6_cleavage_site') or '').strip()
+        call = (r.get('signalp6_prediction') or r.get('SIGNALP6_prediction') or '').strip()
+        put(fid, 'SIGNALP6', call + (f'; cleavage {site}' if call and site else ''))
     for fid, rows in _rows_by_feature(Path(f'{prefix}phobius/phobius_results.tsv')).items():
         tm = sum(1 for r in rows if 'TRANSMEM' in (r.get('phobius_segment_type') or '').upper())
         sp = (rows[0].get('phobius_has_signal_peptide') or '').strip().lower() in ('true', 'yes', '1', 'y')
         put(fid, 'PHOBIUS', f'{tm} TM segment{"" if tm == 1 else "s"}; signal peptide: {"yes" if sp else "no"}')
     for fid, rows in _rows_by_feature(Path(f'{prefix}tmbed/tmbed_results.tsv')).items():
-        put(fid, 'TMBED', (rows[0].get('TMBED_topology') or '').strip())
+        # The whole protein's topology string, rather than its first segment's.
+        put(fid, 'TMBED', (rows[0].get('TMBED_topology_string') or rows[0].get('TMBED_topology') or '').strip())
     for fid, rows in _rows_by_feature(Path(f'{prefix}psortb/psortb_results.tsv')).items():
         r = rows[0]
         envelope = (r.get('PSORTB_gram_class') or r.get('ENVELOPE_envelope_type') or '').strip()

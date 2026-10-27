@@ -28,6 +28,46 @@ WORKFLOW_PATH_DEFAULTS: dict[str, dict[str, str]] = {
 }
 
 
+# Each tool's default threads, memory (MB) and run time (minutes), set from what MARGIE's runs used
+# (SLURM accounting, October 2026: CPU efficiency, peak memory, run time). A failed attempt runs once
+# more with twice the memory and time (margie_sb.smk, tool_mem and tool_runtime). Settings shows these
+# as margie_sb.<tool>.threads|mem_mb|runtime, and a saved value wins.
+TOOL_RESOURCES = {
+    'quast': (2, 4000, 120),
+    'gtdbtk': (16, 32000, 120),  # the identify step; margie_sb.gtdbtk.classify uses GTDBTK_CLASSIFY_RESOURCES
+    'rasttk': (2, 4000, 120),
+    'prodigal': (1, 4000, 60),
+    'cog': (4, 4000, 60),
+    'kegg': (8, 8000, 90),
+    'eggnog': (16, 64000, 180),
+    'uniprot': (4, 4000, 60),
+    'pfam': (4, 4000, 120),
+    'tigrfam': (4, 4000, 60),
+    'merops': (4, 4000, 30),
+    'tcdb': (4, 4000, 30),
+    'dbcan': (8, 8000, 60),
+    'pgap': (4, 4000, 90),
+    'geneprop': (1, 2000, 30),
+    'interpro': (8, 16000, 300),
+    'operon': (2, 2000, 30),
+    'phobius': (2, 2000, 60),
+    'tmbed': (8, 48000, 1440),
+    'signalp6': (8, 6000, 180),
+    'envelope': (1, 1000, 30),
+    'deepsig': (2, 2000, 60),
+    'psortb': (2, 2000, 180),
+    'consolidation': (1, 4000, 30),
+    'labeling': (1, 4000, 30),
+    'scoring_heuristic': (1, 6000, 30),
+    'fingerprint': (1, 4000, 30),
+    'fingerprint_database': (1, 4000, 15),
+}
+# GTDB-Tk's full classification (classify_wf with species placement), when margie_sb.gtdbtk.classify is on.
+GTDBTK_CLASSIFY_RESOURCES = (64, 460000, 240)
+# Partitions other than the cluster default: TMbed's ProtT5 runs for hours on CPU.
+TOOL_PARTITIONS = {'tmbed': 'highmem', 'llm': 'gpu'}
+
+
 # A tool's resource settings, as Settings writes them under margie_sb.<tool>.
 _TOOL_RESOURCE_LEAVES = ('threads', 'mem_mb', 'runtime', 'partition')
 

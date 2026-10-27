@@ -834,6 +834,13 @@ class WorkflowBase(ProgramBase):
                 LOGGER.info("Cache HIT for rasttk (genome=%s) — skipping recomputation", genome)
         return gtdbtk, rasttk
 
+    def _rasttk_at_once(self) -> int:
+        '''RASTtk (BV-BRC) jobs at once: margie_sb.phase3.max_parallel_genomes, default 3.'''
+        try:
+            return max(1, int(self._margie_sb_dict().get('phase3', {}).get('max_parallel_genomes', 3)))
+        except (TypeError, ValueError):
+            return 3
+
     @staticmethod
     def _names_classification(results: str) -> bool:
         '''Whether a gtdbtk_results.tsv has the GTDBTK_classification column.'''
@@ -958,7 +965,11 @@ class WorkflowBase(ProgramBase):
             LOGGER.info('Phase4+ cache restore deferred to per-genome pre-Stage-2 (after rasttk outputs are fresh)')
             # gtdbtk/rasttk are not in cache_map_fn: genome by genome here, before Stage 1.
             if run_gtdbtk_enabled:
-                gtdbtk_restored, rasttk_restored = self._restore_gene_calls(db_path, genome_files, smk_config, prodigal_genomes)
+                # A busy or failing database leaves the genomes to compute (as each cache read does).
+                gene_calls_back = _safely('Restoring GTDB-Tk and RASTtk from the MARGIE database',
+                                          self._restore_gene_calls, db_path, genome_files, smk_config, prodigal_genomes)
+                if gene_calls_back is not _FAILED:
+                    gtdbtk_restored, rasttk_restored = gene_calls_back
                 gtdbtk_stored |= {g for g, hit in gtdbtk_restored.items() if hit}
                 gtdbtk_loaded |= {g for g in gtdbtk_stored if Path(self._gtdbtk_split_paths(g, smk_config)[2]).exists()}
             # A genome bound for Prodigal takes RASTtk's gene calls when its sequence has them in the
@@ -1064,8 +1075,8 @@ class WorkflowBase(ProgramBase):
             calls = identify_calls(early_file.parent, newer_than=batch_started - 60)
             return {g: c for g, c in calls.items() if g in waiting}
 
-        # Stage 1 runs at the account's job limit; RASTtk alone goes one at a time (the
-        # margie_sb_bvbrc slot, and the rule's own lock across runs), so BV-BRC sees one submission.
+        # Stage 1 runs at the account's job limit; RASTtk goes up to margie_sb.phase3.max_parallel_genomes
+        # at a time (the margie_sb_bvbrc resource, and the rule's own lock slots across runs).
         def _launch_wave(targets: list[str], label: str, calls: dict | None = None):
             if calls:
                 write_early_calls(early_file, {**read_early_calls(early_file), **calls})
@@ -2055,8 +2066,8 @@ class WorkflowBase(ProgramBase):
             'margie_sb_phase8_slot': max_parallel_phase8,
             # One database load at a time (margie_sb.smk, load_minutes).
             'margie_sb_db_writer': 1,
-            # One RASTtk (BV-BRC) job at a time (margie_sb.smk, run_rasttk).
-            'margie_sb_bvbrc': 1,
+            # RASTtk (BV-BRC) jobs at once (margie_sb.smk, run_rasttk; margie_sb.phase3.max_parallel_genomes).
+            'margie_sb_bvbrc': self._rasttk_at_once(),
         }
 
         # Set by resume_job's relaunch; mtime-only triggers treat copied outputs as done.
