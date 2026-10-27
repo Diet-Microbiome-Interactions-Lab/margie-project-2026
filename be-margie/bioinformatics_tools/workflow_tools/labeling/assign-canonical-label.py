@@ -265,12 +265,8 @@ def eval_uniprot(row: dict[str, str]) -> ToolEvaluation:
 
 # ─── STEP 7: PFAM ────────────────────────────────────────────────────────────────
 def eval_pfam(row: dict[str, str]) -> ToolEvaluation:
-    """Evaluates PFAM hits (--cut_ga upstream); a hit qualifies even when all its domains are DUF/UPF."""
-    ev = evaluate_accession_tool(row, "PFAM", "PFAM_id", "PFAM_description", "PFAM_full_seq_evalue")
-    if ev.hit_id and not ev.qualifies:
-        return ev._replace(qualifies=True,
-                           gate_note=ev.gate_note + " (uninformative, e.g. DUF -- kept anyway)")
-    return ev
+    """Evaluates PFAM hits (--cut_ga upstream); like the other tools, an uninformative hit (e.g. a DUF) does not qualify."""
+    return evaluate_accession_tool(row, "PFAM", "PFAM_id", "PFAM_description", "PFAM_full_seq_evalue")
 
 
 # ─── STEP 8: CDD ─────────────────────────────────────────────────────────────────
