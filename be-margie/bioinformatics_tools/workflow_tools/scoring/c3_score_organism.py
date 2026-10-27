@@ -176,9 +176,17 @@ def build_partner_consensus(ref):
 
 
 def descriptor_conflict(descriptor, neigh_descriptors, partners):
-    """Returns the strongest contradiction (0-1) of a descriptor by its mates' consensus partners."""
+    """Returns the strongest contradiction (0-1) of a descriptor by its mates' consensus partners.
+
+    Descriptors are compared lower-cased (c3_occ._norm), as the reference keys them; a mate with
+    the same descriptor is skipped, as the reference holds no pair of a descriptor with itself.
+    """
+    descriptor = c3_occ._norm(descriptor)
     worst = 0.0
     for a in neigh_descriptors:
+        a = c3_occ._norm(a)
+        if not a or a == descriptor:
+            continue
         pc = partners.get(a)
         if not pc:
             continue
