@@ -115,7 +115,9 @@ def run_ssh_task(job_id: str, command: str, connection: SSHConnection,
                  reattach: bool = False, in_slurm: bool = True,
                  driver_account: str | None = None,
                  driver_partition: str | None = None,
-                 driver_time: str | None = None):
+                 driver_time: str | None = None,
+                 copy_from: str | None = None,
+                 copy_to: str | None = None):
     """Runs an SSH command, parsing its log for SLURM jobs, containers and progress.
 
     reattach=True replays the log of a run already going (after a dane-api
@@ -155,6 +157,7 @@ def run_ssh_task(job_id: str, command: str, connection: SSHConnection,
                                              driver_account=driver_account,
                                              driver_partition=driver_partition,
                                              driver_time=driver_time,
+                                             copy_from=copy_from, copy_to=copy_to,
                                              # A cancelled run stops being watched, freeing its thread.
                                              stop=lambda: job_store.get_status(job_id) == "cancelled"):
             log_bytes += len(line) + 1
@@ -267,6 +270,11 @@ def run_ssh_task(job_id: str, command: str, connection: SSHConnection,
                 genome_index, genome_total = genome_match.groups()
                 job_store.update(job_id, genome_index=int(genome_index), genome_total=int(genome_total))
 
+            # Resume's copy job (ssh_slurm.build_copy_script) writes the log before the driver starts.
+            if line.startswith("Resume: "):
+                job_store.update(job_id, phase="Starting the run" if "the run starts next" in line
+                                 else "Copying the earlier run's results")
+
             # Update phase based on output
             if "snakemake" in line.lower():
                 job_store.update(job_id, phase="Running Snakemake")
@@ -328,10 +336,14 @@ def submit_job(job_id: str, command: str, connection: SSHConnection,
                reattach: bool = False, in_slurm: bool = True,
                driver_account: str | None = None,
                driver_partition: str | None = None,
-               driver_time: str | None = None):
+               driver_time: str | None = None,
+               copy_from: str | None = None,
+               copy_to: str | None = None):
     """Submits a job to the thread pool executor.
 
     in_slurm=False keeps the run on the login node, for the quick self-test workflows.
+    copy_from and copy_to (Resume): the earlier run's folder is copied into the new one on a
+    compute node before the run starts (ssh_slurm.build_driver_launch).
     """
     executor.submit(
         run_ssh_task,
@@ -343,6 +355,8 @@ def submit_job(job_id: str, command: str, connection: SSHConnection,
         driver_account,
         driver_partition,
         driver_time,
+        copy_from,
+        copy_to,
     )
 
 

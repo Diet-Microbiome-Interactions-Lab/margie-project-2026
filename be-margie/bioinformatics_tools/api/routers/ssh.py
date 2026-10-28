@@ -1709,8 +1709,9 @@ def _launch_job(
     run_full_operon_map: bool = False,
     use_cache: bool = True,
 ) -> dict:
-    """Generates job_id and output_dir, optionally copies a previous run's output
-    forward (Resume, with margie_sb.resume: true), records the job and submits dane_wf.
+    """Generates job_id and output_dir, records the job and submits dane_wf; for a Resume
+    (margie_sb.resume: true) a job of its own first copies the previous run's output forward on a
+    compute node, so the request returns at once and Stop cancels the copy too.
 
     Pre-flight validation is left to the callers.
     """
@@ -1719,14 +1720,6 @@ def _launch_job(
     job_id = str(uuid.uuid4())
     timestamp = datetime.now().strftime('%Y-%m-%d-%H%M')
     output_dir = _claim_run_folder(conn, f"{base_output_dir.rstrip('/')}/{timestamp}")
-
-    if copy_from_work_dir:
-        ssh_sftp.copy_remote_directory(copy_from_work_dir, output_dir, connection=conn)
-        try:
-            ssh_sftp.rewrite_path_references(output_dir, copy_from_work_dir, output_dir, connection=conn)
-        except Exception as exc:
-            # Cosmetic provenance cleanup; a failure never blocks the launch.
-            LOGGER.warning("Could not rewrite stale path references for resumed job: %s", exc)
 
     job_store.create(
         job_id, genome_path, user_id=current_user["user_id"],
@@ -1780,6 +1773,8 @@ def _launch_job(
         driver_account=slurm_account,
         driver_partition=slurm_partition,
         driver_time=slurm_walltime,
+        copy_from=copy_from_work_dir,
+        copy_to=output_dir if copy_from_work_dir else None,
     )
 
     return {"success": True, "job_id": job_id, "output_dir": output_dir, "message": "Job submitted successfully"}
@@ -3046,8 +3041,8 @@ def cancel_slurm_job(slurm_id: str, current_user: dict = Depends(get_current_use
 
 @router.post("/resume_job/{job_id}")
 def resume_job(job_id: str, current_user: dict = Depends(get_current_user)):
-    """Resumes a failed or stale job: copies its work_dir into a new timestamped
-    folder and relaunches with margie_sb.resume: true, so completed steps are skipped."""
+    """Resumes a failed or stale job: a job on a compute node copies its work_dir into a new
+    timestamped folder, then the run starts with margie_sb.resume: true, so completed steps are skipped."""
     _require_current_terms(current_user)
     conn = _build_connection(current_user)
     original = _load_job_for_action(job_id, current_user, conn)
