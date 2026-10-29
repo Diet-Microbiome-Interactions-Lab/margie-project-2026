@@ -214,13 +214,13 @@ def test_a_different_core_descriptor_replaces_and_moves_the_core_fingerprint(tmp
     assert second["cog"] == "COG2 — COG two" and second["core_fingerprint"] != first["core_fingerprint"]
 
 
-def test_a_tool_restored_from_the_cache_is_not_compared_again(tmp_path):
+def test_a_tool_restored_from_the_cache_adds_nothing(tmp_path):
     db = str(tmp_path / "margie.db")
     faa, pre = _genome(tmp_path, "A", [("a1", "MKVLAAG")], hits={"a1": "COG0abc"})
     protein_cache.store(db, faa, pre, "cog", {}, genome="A")
-    # The genome's results came back from the MARGIE database: its cached proteins stay as they are.
+    # The genome's results came back from the MARGIE database: the cache stays as it is.
     faa, pre = _genome(tmp_path, "B", [("b9", "MKVLAAG"), ("b10", "MSTNPKP")], hits={"b9": "COG0abd"})
-    assert protein_cache.store(db, faa, pre, "cog", {}, genome="B", ran=False) == 1
+    assert protein_cache.store(db, faa, pre, "cog", {}, genome="B", ran=False) == 0
     lines, _, genome = _entry(db, "MKVLAAG")
     assert "COG0abc" in lines and genome == "A"
-    assert _entry(db, "MSTNPKP")[2] == "B"
+    assert _entry(db, "MSTNPKP") is None

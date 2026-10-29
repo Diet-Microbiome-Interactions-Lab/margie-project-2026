@@ -478,9 +478,11 @@ def _reheader(conn, tool: str, key: str, filename: str, old: str, new: str) -> i
 
 def store(db: str, faa: str, prefix: str, tool: str, cfg: dict, genome: str = '', ran: bool = True) -> int:
     """Adds the genome's uncached proteins from the tool's final results, each with the genome it
-    came from; returns the count. `ran`: the tool ran in this run (not restored from the cache), so
-    the proteins it computed again are compared with their cached rows. Only the writes take the
-    database's write turn (db_turn)."""
+    came from; returns the count. A tool restored from the MARGIE database (`ran` False) adds none:
+    its results came from an earlier run, and adding a genome's proteins one by one to the cache
+    takes minutes per tool on a large database. Only the writes take the database's write turn (db_turn)."""
+    if not ran:
+        return 0
     key = tool_key(tool, cfg)
     files = tool_files(tool, cfg)
     folder = Path(f'{prefix}{tool}')
@@ -495,7 +497,7 @@ def store(db: str, faa: str, prefix: str, tool: str, cfg: dict, genome: str = ''
         _carry_over(conn, tool, cfg, key)
         cached = _cached_hashes(conn, tool, key, files[0][0], sorted(first))
         new = sorted(set(first) - cached)
-        again = sorted(cached & _computed_here(prefix, tool, proteins)) if ran else []
+        again = sorted(cached & _computed_here(prefix, tool, proteins))
         if not new and not again:
             return 0
         tables = {}
