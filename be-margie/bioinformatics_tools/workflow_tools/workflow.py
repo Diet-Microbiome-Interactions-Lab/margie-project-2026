@@ -169,6 +169,16 @@ def _chatter(line: str) -> bool:
     return bool(_SNAKEMAKE_CHATTER.match(line))
 
 
+def _gtdbtk_batch_targets(batch_done: str, tokens: dict[str, str], restored: set[str]) -> list[str]:
+    """Stage 1's GTDB-Tk wave: each pending genome's database token ({genome: token}), and the
+    batch's own target while one of them is not restored. A genome whose GTDB-Tk results came
+    back from the MARGIE database without their token needs only its load; the batch leaves
+    restored genomes out (CACHED_GTDBTK in margie_sb.smk), so it would run over none."""
+    if not tokens or not batch_done:
+        return []
+    return ([batch_done] if any(g not in restored for g in tokens) else []) + list(tokens.values())
+
+
 # A cache read or write that failed (_safely), told apart from a None result.
 _FAILED = object()
 
@@ -1075,9 +1085,10 @@ class WorkflowBase(ProgramBase):
                     len(gtdbtk_ready), len(gtdbtk_pending), len(known))
 
         # The batch, its results split and loaded genome by genome; the gene calling goes on beside it.
-        batch_targets = ([f"{output_dir_for_batch}/original_container_outputs/gtdbtk/gtdbtk_batch.done"]
-                         + [f"{get_workflow_prefix_for(g, smk_config)}gtdbtk/gtdbtk_db.tkn" for g in gtdbtk_pending]
-                         if gtdbtk_pending and output_dir_for_batch else [])
+        batch_targets = _gtdbtk_batch_targets(
+            f"{output_dir_for_batch}/original_container_outputs/gtdbtk/gtdbtk_batch.done" if output_dir_for_batch else '',
+            {g: f"{get_workflow_prefix_for(g, smk_config)}gtdbtk/gtdbtk_db.tkn" for g in gtdbtk_pending},
+            {g for g, hit in gtdbtk_restored.items() if hit})
         batch_started = time.time()
 
         def _early() -> dict:
@@ -1406,7 +1417,8 @@ class WorkflowBase(ProgramBase):
                     continue
                 slot['pc_stored'].add(t)
                 try:
-                    added = protein_cache.store(db_path, slot['pc_faa_path'], pc_prefix, t, pc_cfg, genome=genome)
+                    added = protein_cache.store(db_path, slot['pc_faa_path'], pc_prefix, t, pc_cfg, genome=genome,
+                                                ran=not slot['restored'].get(t, False))
                     if added:
                         LOGGER.info('Protein cache: %d new protein(s) of %s kept for %s', added, genome, t)
                 except Exception as exc:

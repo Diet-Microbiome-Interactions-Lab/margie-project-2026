@@ -78,10 +78,38 @@ def test_a_load_waits_for_the_turn(tmp_path):
 
 def test_the_run_s_cache_writes_take_the_turn_for_a_while_at_most():
     for fn in (output_cache.store, output_cache.store_all, output_cache.log_workflow_run,
-               protein_cache.store, protein_cache.link_genome, protein_cache.record_fingerprints,
-               protein_cache.record_proteins):
+               protein_cache.link_genome, protein_cache.record_fingerprints, protein_cache.record_proteins):
         assert fn.__wrapped__, fn
     assert db_turn.CONTROLLER_WAIT == 600.0
+
+
+def test_the_protein_cache_compares_without_the_turn_and_writes_in_it(tmp_path, monkeypatch):
+    """protein_cache.store reads and compares a genome's proteins first, which can take minutes for a
+    large genome; loads in other genomes and runs go on meanwhile, and only its writes wait their turn."""
+    db = tmp_path / 'main.db'
+    faa = tmp_path / 'A.faa'
+    faa.write_text('>a1 p\nMKVLAAG\n')
+    (tmp_path / 'A' / 'cog').mkdir(parents=True)
+    (tmp_path / 'A' / 'cog' / 'cog_results.tsv').write_text(
+        'organism_name\tfeature_id\tCOG_id\nA\ta1\tCOG0001\n')
+    path = db_turn.turn_path(db)
+    held_while = {}
+    real_computed = protein_cache._computed_here
+
+    def computed(prefix, tool, proteins):
+        held_while['comparing'] = path in db_turn._held
+        return real_computed(prefix, tool, proteins)
+
+    monkeypatch.setattr(protein_cache, '_computed_here', computed)
+    real_turn = db_turn.turn
+
+    def turn(db_path, wait=None):
+        held_while['writing'] = True
+        return real_turn(db_path, wait=wait)
+
+    monkeypatch.setattr(protein_cache.db_turn, 'turn', turn)
+    assert protein_cache.store(str(db), str(faa), f'{tmp_path / "A"}/', 'cog', {}, genome='A') == 1
+    assert held_while == {'comparing': False, 'writing': True}
 
 
 def test_a_cache_write_runs_in_the_turn(tmp_path, monkeypatch):

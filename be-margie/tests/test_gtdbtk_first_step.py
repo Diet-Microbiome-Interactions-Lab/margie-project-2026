@@ -205,3 +205,12 @@ def test_a_run_without_the_cache_restores_nothing(mock_sleep, mock_locate, mock_
          patch(f'{W}.protein_cache.split', side_effect=AssertionError('proteins restored')):
         wf._run_pipeline_batch_sequential('margie_sb', smk_config, {'g1': '/g1.fa'},
                                           cache_map_fn=lambda s: {'cog': [str(out / 'g1' / 'cog' / 'cog_results.tsv')]}, mode='dev')
+
+
+def test_restored_genomes_missing_only_their_token_are_loaded_without_the_batch():
+    tokens = {'g1': 'out/g1/gtdbtk/gtdbtk_db.tkn', 'g2': 'out/g2/gtdbtk/gtdbtk_db.tkn'}
+    batch = 'out/original_container_outputs/gtdbtk/gtdbtk_batch.done'
+    assert workflow_module._gtdbtk_batch_targets(batch, tokens, {'g1', 'g2'}) == list(tokens.values())
+    assert workflow_module._gtdbtk_batch_targets(batch, tokens, {'g1'}) == [batch, *tokens.values()]
+    assert workflow_module._gtdbtk_batch_targets(batch, {}, set()) == []
+    assert workflow_module._gtdbtk_batch_targets('', tokens, set()) == []

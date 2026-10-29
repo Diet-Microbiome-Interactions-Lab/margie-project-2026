@@ -1892,7 +1892,7 @@ localrules: gtdbtk_from_cache
 
 
 rule load_gtdbtk_to_db:
-    """Loads GTDB-Tk results into main_database, in a group of its own (GTDB-Tk runs on highmem)."""
+    """Loads GTDB-Tk results into main_database."""
     localrule: True
     input:
         results=GTDBTK_RESULTS,

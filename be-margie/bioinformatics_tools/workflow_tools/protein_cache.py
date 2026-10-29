@@ -476,10 +476,11 @@ def _reheader(conn, tool: str, key: str, filename: str, old: str, new: str) -> i
     return len(rows)
 
 
-@db_turn.writes(wait=db_turn.CONTROLLER_WAIT)
-def store(db: str, faa: str, prefix: str, tool: str, cfg: dict, genome: str = '') -> int:
+def store(db: str, faa: str, prefix: str, tool: str, cfg: dict, genome: str = '', ran: bool = True) -> int:
     """Adds the genome's uncached proteins from the tool's final results, each with the genome it
-    came from; returns the count."""
+    came from; returns the count. `ran`: the tool ran in this run (not restored from the cache), so
+    the proteins it computed again are compared with their cached rows. Only the writes take the
+    database's write turn (db_turn)."""
     key = tool_key(tool, cfg)
     files = tool_files(tool, cfg)
     folder = Path(f'{prefix}{tool}')
@@ -494,7 +495,7 @@ def store(db: str, faa: str, prefix: str, tool: str, cfg: dict, genome: str = ''
         _carry_over(conn, tool, cfg, key)
         cached = _cached_hashes(conn, tool, key, files[0][0], sorted(first))
         new = sorted(set(first) - cached)
-        again = sorted(cached & _computed_here(prefix, tool, proteins))
+        again = sorted(cached & _computed_here(prefix, tool, proteins)) if ran else []
         if not new and not again:
             return 0
         tables = {}
@@ -527,7 +528,7 @@ def store(db: str, faa: str, prefix: str, tool: str, cfg: dict, genome: str = ''
                        != _answer(tables[f][0], tables[f][1].get(first[h], []), kind) for f, kind in files):
                     changed.append(h)
         stamp = datetime.now(timezone.utc).isoformat()
-        with conn:
+        with db_turn.turn(db, wait=db_turn.CONTROLLER_WAIT), conn:
             for filename, (header, _) in tables.items():
                 if not header:
                     continue
