@@ -258,6 +258,14 @@ class JobStore:
             self.update(job_id, status="cancelled", phase="Cancelled by user")
             LOGGER.info("Cancelled job %s", job_id)
 
+    def discard(self, job_id: str) -> None:
+        """Forgets a job that was not started (its launch was refused before anything was submitted)."""
+        self._jobs.pop(job_id, None)
+        self._persistence.pop(job_id, None)
+        self._last_checkpoint.pop(job_id, None)
+        with self._log_lock:
+            self._log_parts.pop(job_id, None)
+
 
 # Module-level singleton
 job_store = JobStore()

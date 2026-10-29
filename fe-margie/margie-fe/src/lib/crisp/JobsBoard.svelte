@@ -312,17 +312,31 @@
 
 	/**
 	 * Run again (a failed step's popup): a running annotation takes the genome back into its queue
-	 * from the failed step; an ended one is resumed, which runs its failed steps again.
+	 * from the failed step; an ended one is resumed for that genome alone, which runs its failed
+	 * steps again and keeps its finished ones. One request at a time.
 	 */
 	async function rerunGenome(g: string) {
-		if (!shown) return;
-		if (!going) return relaunch(shown, 'resume');
+		if (!shown || busy) return;
+		if (!going) {
+			ui.notify(`Starting ${g} again on its own…`, 'info');
+			busy = 'resume';
+			const ok = await ws.resume(shown, [g]);
+			busy = '';
+			if (ok) {
+				picked = null;
+				ui.notify(`${g} runs again as a new job: its finished steps are kept.`, 'ok');
+			}
+			return;
+		}
 		ui.notify(`Asking the run to run ${g} again…`, 'info');
+		busy = 'rerun';
 		try {
 			const r = await call<{ state: 'taken' | 'declined' | 'waiting'; note: string }>('POST', '/v1/ssh/rerun-genome', { run_id: shown.id, genome: g });
 			ui.notify(r.note, r.state === 'declined' ? 'error' : r.state === 'taken' ? 'ok' : 'info');
 		} catch (e) {
 			ui.notify(e instanceof Error ? e.message : 'The request could not be sent.', 'error');
+		} finally {
+			busy = '';
 		}
 	}
 
@@ -635,6 +649,7 @@
 				{elapsedOf}
 				onLog={showLog}
 				onRerun={backend.cluster && shown.kind === 'annotate' && shown.outputDir ? rerunGenome : undefined}
+				rerunning={!!busy}
 			/>
 		{/if}
 		<div class="term-wrap" style="height: {logHeight}px" bind:this={logEl}>

@@ -8,7 +8,7 @@ from bioinformatics_tools.api.services import job_history
 
 
 def _columns(db_path: str) -> set[str]:
-    conn = sqlite3.connect(db_path)
+    conn = sqlite3.connect(job_history.history_path(db_path))
     try:
         return {row[1] for row in conn.execute("PRAGMA table_info(api_jobs)")}
     finally:
@@ -186,3 +186,77 @@ class TestOwnershipFiltering:
             owner_cluster_username="alice",
         )
         assert [r["job_id"] for r in rows] == ["legacy-a"]
+
+
+class TestOwnFile:
+    """The history has a file of its own beside main_database, made once from main_database's rows."""
+
+    def _old_main(self, tmp_path, n=3):
+        db_path = str(tmp_path / "margie.db")
+        conn = sqlite3.connect(db_path)
+        conn.execute("CREATE TABLE api_jobs (job_id TEXT PRIMARY KEY, workflow TEXT NOT NULL, status TEXT NOT NULL, "
+                     "work_dir TEXT, created_at TEXT NOT NULL, updated_at TEXT NOT NULL)")
+        conn.executemany("INSERT INTO api_jobs VALUES (?, 'margie_sb', 'completed', NULL, ?, ?)",
+                         [(f"old-{i}", f"t{i}", f"t{i}") for i in range(n)])
+        conn.execute("CREATE TABLE cog (gene TEXT)")
+        conn.commit()
+        conn.close()
+        return db_path
+
+    def test_a_new_history_writes_nothing_into_main_database(self, tmp_path):
+        db_path = str(tmp_path / "margie.db")
+        assert job_history.record_job_created(db_path, "job-1", "margie_sb", None, None) is True
+        assert not (tmp_path / "margie.db").exists()
+        assert job_history.history_path(db_path).endswith("-job-history.db")
+        assert [r["job_id"] for r in job_history.list_jobs(db_path)] == ["job-1"]
+
+    def test_the_rows_main_database_held_come_along_once(self, tmp_path):
+        db_path = self._old_main(tmp_path)
+        assert sorted(r["job_id"] for r in job_history.list_jobs(db_path)) == ["old-0", "old-1", "old-2"]
+        job_history.record_job_created(db_path, "new-1", "margie_sb", None, None)
+        job_history.record_job_updated(db_path, "old-0", status="cancelled")
+        assert job_history.count_jobs(db_path) == 4
+        assert job_history.get_job(db_path, "old-0")["status"] == "cancelled"
+        conn = sqlite3.connect(db_path)
+        try:
+            assert conn.execute("SELECT count(*) FROM api_jobs").fetchone()[0] == 3
+            assert conn.execute("SELECT status FROM api_jobs WHERE job_id = 'old-0'").fetchone()[0] == "completed"
+        finally:
+            conn.close()
+
+    def test_the_jobs_are_read_while_main_database_is_being_written(self, tmp_path):
+        db_path = self._old_main(tmp_path)
+        job_history.list_jobs(db_path)  # the history's file is made
+        writer = sqlite3.connect(db_path, timeout=0)
+        writer.execute("BEGIN EXCLUSIVE")
+        writer.execute("INSERT INTO cog VALUES ('g1')")
+        try:
+            assert job_history.count_jobs(db_path) == 3
+            assert job_history.record_job_created(db_path, "during", "margie_sb", None, None) is True
+        finally:
+            writer.rollback()
+            writer.close()
+
+    def test_two_first_reads_make_one_history(self, tmp_path):
+        import threading
+        db_path = self._old_main(tmp_path, n=50)
+        counts = []
+        threads = [threading.Thread(target=lambda: counts.append(job_history.count_jobs(db_path))) for _ in range(6)]
+        for t in threads:
+            t.start()
+        for t in threads:
+            t.join()
+        assert counts == [50] * 6
+        assert sorted(p.name for p in tmp_path.iterdir()) == sorted(["margie.db", job_history.history_path(db_path).rsplit("/", 1)[1]])
+
+    def test_without_either_file_nothing_is_made_by_a_read(self, tmp_path):
+        db_path = str(tmp_path / "margie.db")
+        assert job_history.list_jobs(db_path) == []
+        assert job_history.get_job(db_path, "x") is None
+        assert list(tmp_path.iterdir()) == []
+
+    def test_the_create_action_reports_whether_the_row_was_written(self, tmp_path):
+        db_path = str(tmp_path / "margie.db")
+        assert job_history.dispatch("create", {"db_path": db_path, "job_id": "j", "workflow": "margie_sb"}) == {"recorded": True}
+        bad = str(tmp_path / "missing-folder" / "margie.db")
+        assert job_history.dispatch("create", {"db_path": bad, "job_id": "j", "workflow": "margie_sb"}) == {"recorded": False}

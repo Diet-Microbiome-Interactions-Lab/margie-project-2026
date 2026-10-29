@@ -294,6 +294,44 @@ def stage_selected_genomes(
     return out
 
 
+def stage_genome_links(
+    links: dict[str, str],
+    connection: SSHConnection,
+    label: str = '',
+) -> str:
+    """Builds a folder of symlinks, {link name: absolute target}, and returns its absolute path:
+    stage_selected_genomes for genomes picked from a run, whose files may sit in several folders.
+
+    Raises ValueError for a name that is not a plain file name or a target that is not an
+    absolute path, and RuntimeError if the remote command fails.
+    """
+    if not links:
+        raise ValueError('No genomes were selected.')
+    for name, target in links.items():
+        if not name or '/' in name or name in ('.', '..'):
+            raise ValueError(f'Not a genome file name: {name!r}')
+        if not target.startswith('/') or '\n' in target:
+            raise ValueError(f'Not a genome file: {target!r}')
+
+    stamp = time.strftime('%Y%m%d-%H%M%S')
+    suffix = f"-{re.sub(r'[^A-Za-z0-9]+', '-', label).strip('-')}" if label else ''
+    rel = f'.margie/selections/{stamp}{suffix}'
+    made = ' && '.join(f'ln -sfn {shlex.quote(t)} "$d"/{shlex.quote(n)}' for n, t in links.items())
+    cmd = f'd="$HOME"/{shlex.quote(rel)} && mkdir -p "$d" && {made} && printf %s "$d"'
+
+    ssh = connection.connect()
+    LOGGER.info('Staging %d genome(s) picked from a run', len(links))
+    _, stdout, stderr = ssh.exec_command(cmd)
+    out = stdout.read().decode('utf-8', errors='replace').strip()
+    exit_code = stdout.channel.recv_exit_status()
+    if exit_code != 0 or not out:
+        err = stderr.read().decode('utf-8', errors='replace')
+        raise RuntimeError(
+            f'Could not stage the genomes on the cluster (exit {exit_code}): {err or "no path returned"}'
+        )
+    return out
+
+
 def read_remote_file_page(
     remote_path: str,
     start_row: int,

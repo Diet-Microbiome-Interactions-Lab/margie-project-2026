@@ -465,9 +465,9 @@ async function stopRun(id: string) {
 	return { ok: true };
 }
 
-/** Resumes (after what finished) or restarts a failed or stopped job. */
-async function relaunchRun(id: string, how: 'resume' | 'restart') {
-	await call('POST', `/v1/ssh/${how}_job/${q(id)}`);
+/** Resumes (after what finished) or restarts a failed or stopped job; a resume with genomes runs only those. */
+async function relaunchRun(id: string, how: 'resume' | 'restart', genomes?: string[]) {
+	await call('POST', `/v1/ssh/${how}_job/${q(id)}`, how === 'resume' && genomes?.length ? { genomes } : undefined);
 	jobs.drop();
 	return { ok: true };
 }
@@ -868,7 +868,7 @@ async function settingsList(): Promise<{ settings: Setting[]; configMissing: boo
 	const [w, cfg] = await Promise.all([workflow(), config.get()]);
 	const toolLabel = new Map(w.tools.filter((t) => t.key).map((t) => [t.key as string, t.name]));
 	const params: Param[] = [
-		{ param: 'main_database', default: '', description: 'The main MARGIE database on the cluster: every run’s results, cached tool outputs and the job history.', type: 'path' },
+		{ param: 'main_database', default: '', description: 'The main MARGIE database on the cluster: every run’s results and cached tool outputs; the job history sits beside it.', type: 'path' },
 		...w.configurable_params
 	];
 	const settings: Setting[] = params.map((p) => {
@@ -1430,7 +1430,7 @@ export async function clusterApi<T = any>(path: string, init: RequestInit = {}):
 			if (run[2] === 'command') return get(`/v1/ssh/job_command/${q(id)}`);
 			// Where each step's results came from: the run's cache report, or its job log for an older run.
 			if (run[2] === 'sources') return get(`/v1/ssh/job_sources/${q(id)}`);
-			if (run[2] === 'resume' || run[2] === 'restart') return relaunchRun(id, run[2]);
+			if (run[2] === 'resume' || run[2] === 'restart') return relaunchRun(id, run[2], body?.genomes);
 			// One finished job leaves the list, after a backup of it (job-history-backups).
 			if (method === 'DELETE') {
 				const cleared = await call('POST', '/v1/ssh/job_history/clear', { job_ids: [id] });

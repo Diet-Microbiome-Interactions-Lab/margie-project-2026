@@ -25,9 +25,11 @@ from pathlib import Path
 from urllib.parse import unquote
 
 try:
+    from bioinformatics_tools.workflow_tools import db_turn
     from bioinformatics_tools.workflow_tools.genome_identity import genome_hash, legacy_file_hash, normalise_protein, read_fasta
     from bioinformatics_tools.workflow_tools.load_to_db import _ensure_run_log as ensure_run_log
 except ImportError:  # imported from margie_sb.smk, with this folder on sys.path
+    import db_turn
     from genome_identity import genome_hash, legacy_file_hash, normalise_protein, read_fasta
     from load_to_db import _ensure_run_log as ensure_run_log
 
@@ -466,6 +468,7 @@ def cached_when(db_path: str, input_file: str) -> dict[str, str]:
         return {}
 
 
+@db_turn.writes(wait=db_turn.CONTROLLER_WAIT)
 def store(db_path: str, input_file: str, tool_name: str,
           output_paths: list[str], genes: dict[str, str] | None = None) -> None:
     """Read each output file and INSERT OR REPLACE into output_cache.
@@ -545,6 +548,7 @@ def restore_all(db_path: str, input_file: str,
     return results
 
 
+@db_turn.writes(wait=db_turn.CONTROLLER_WAIT)
 def store_all(db_path: str, input_file: str,
               build_filepaths_map: dict[str, list[str]], genes: dict[str, str] | None = None) -> None:
     """Store outputs for every tool in *build_filepaths_map* into the DB."""
@@ -559,6 +563,7 @@ def store_all(db_path: str, input_file: str,
 # run_log is load_to_db's table: one definition, one row per genome and tool.
 
 
+@db_turn.writes(wait=db_turn.CONTROLLER_WAIT)
 def log_workflow_run(db_path: str, run_id: str, input_file: str, workflow_name: str,
                      rules_completed: int = 0, status: str = 'success') -> None:
     """Insert a run_log row for this workflow execution.

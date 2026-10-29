@@ -111,16 +111,30 @@ print(f'Resume: the earlier folder\\'s path is replaced in {changed} of {len(fil
 
 
 def build_copy_script(src: str, dst: str, keep: tuple[str, ...] = COPY_KEEP,
-                      python: str = REMOTE_PYTHON) -> str:
+                      python: str = REMOTE_PYTHON, only: list[str] | None = None) -> str:
     """Returns the copy job's shell: the earlier run's folder into the new one, then its paths fixed.
 
     Each top-level entry (a genome's folder, or a file) is its own rsync, $SLURM_CPUS_PER_TASK at a
     time; .snakemake/ (it holds the old absolute path and is made again), the tools' per-run stage
-    folders and `keep` stay out. Exits non-zero when a copy fails, so the run does not start.
+    folders and `keep` stay out. `only`, paths inside the folder, copies those that exist and
+    nothing else (one genome run again). Exits non-zero when a copy fails, so the run does not start.
     """
     q_src, q_dst = shlex.quote(src.rstrip('/')), shlex.quote(dst.rstrip('/'))
     skip = ' '.join(f'! -name {shlex.quote(k)}' for k in keep)
     kept = ' '.join(shlex.quote(k) for k in keep)
+    rsync = ("rsync -a --exclude=.snakemake --exclude='original_container_outputs/*/stage'")
+    if only is not None:
+        for rel in only:
+            if not rel or rel.startswith('/') or '..' in rel.split('/') or '\n' in rel:
+                raise ValueError(f'Not a path inside the run folder: {rel!r}')
+        listed = ' '.join(shlex.quote(rel) for rel in only)
+        what = 'the chosen genomes\' folders of the earlier run'
+        entries = (f'for p in {listed}; do if [ -e "$p" ]; then printf \'%s\\0\' "$p"; fi; done \\\n'
+                   f'  | xargs -0 -r -P "$n" -I{{}} {rsync} -R ./{{}} "$dst"/ \\\n')
+    else:
+        what = 'the earlier run\'s folder'
+        entries = (f'find . -mindepth 1 -maxdepth 1 ! -name .snakemake {skip} -print0 \\\n'
+                   f'  | xargs -0 -r -P "$n" -I{{}} {rsync} {{}} "$dst"/ \\\n')
     return (
         '#!/bin/bash\n'
         'set -o pipefail\n'
@@ -128,12 +142,10 @@ def build_copy_script(src: str, dst: str, keep: tuple[str, ...] = COPY_KEEP,
         f'dst={q_dst}\n'
         'n=${SLURM_CPUS_PER_TASK:-4}\n'
         'start=$SECONDS\n'
-        'echo "Resume: copying the earlier run\'s folder $src into $dst, $n folders at a time, on $(hostname)"\n'
+        f'echo "Resume: copying {what} $src into $dst, $n folders at a time, on $(hostname)"\n'
         'cd "$src" || { echo "Resume: the earlier run\'s folder is missing: $src"; exit 1; }\n'
         'mkdir -p "$dst" || exit 1\n'
-        f'find . -mindepth 1 -maxdepth 1 ! -name .snakemake {skip} -print0 \\\n'
-        '  | xargs -0 -r -P "$n" -I{} rsync -a --exclude=.snakemake '
-        "--exclude='original_container_outputs/*/stage' {} \"$dst\"/ \\\n"
+        f'{entries}'
         '  || { echo "Resume: the copy failed, so the run does not start"; exit 1; }\n'
         'echo "Resume: copied in $(( (SECONDS - start) / 60 )) min"\n'
         f'{python} - "$src" "$dst" "$n" {kept} <<\'MARGIE_REWRITE_EOF\'\n'
@@ -249,7 +261,8 @@ def build_driver_launch(cmd: str, base: str, safe: str, log: str, rcf: str,
                         cpus: int = DRIVER_CPUS,
                         mem_mb: int = DRIVER_MEM_MB,
                         copy_from: str | None = None,
-                        copy_to: str | None = None) -> str:
+                        copy_to: str | None = None,
+                        copy_only: list[str] | None = None) -> str:
     """Returns the shell that writes the driver's two scripts and submits the batch job.
 
     The workflow command goes into its own file via a quoted heredoc, since it
@@ -258,7 +271,7 @@ def build_driver_launch(cmd: str, base: str, safe: str, log: str, rcf: str,
 
     With copy_from (Resume), a copy job (build_copy_script) goes first, working in copy_to so
     Stop's sweep of the run's folder cancels it, and the driver waits for it (afterok) and is
-    cancelled when it fails. Both write the run's log.
+    cancelled when it fails. Both write the run's log. copy_only: the paths it copies, when not all.
     """
     sbatch_directives = [
         f'#SBATCH --job-name=margie-{safe}',
@@ -295,7 +308,7 @@ def build_driver_launch(cmd: str, base: str, safe: str, log: str, rcf: str,
             copy_directives.insert(1, f'#SBATCH --account={account}')
         copy_files = (
             f"cat > {base}.copy.sh <<'MARGIE_COPY_EOF'\n"
-            f'{build_copy_script(copy_from, copy_to)}'
+            f'{build_copy_script(copy_from, copy_to, only=copy_only)}'
             f'MARGIE_COPY_EOF\n'
             f"cat > {base}.copy.sbatch <<'MARGIE_COPY_SBATCH_EOF'\n"
             f'#!/bin/bash\n'
@@ -346,11 +359,12 @@ def submit_ssh_job(
     stop=None,
     copy_from: str | None = None,
     copy_to: str | None = None,
+    copy_only: list[str] | None = None,
 ):
     '''Runs a workflow command detached and streams its log.
 
-    copy_from and copy_to (Resume): the earlier run's folder is copied into the new one by a
-    job of its own, which the driver waits for (build_driver_launch).
+    copy_from and copy_to (Resume): the earlier run's folder (copy_only: those paths in it) is
+    copied into the new one by a job of its own, which the driver waits for (build_driver_launch).
 
     The command is started with setsid + nohup (or as a SLURM driver job),
     writing to a log file and its exit status to a sentinel, so closing the GUI
@@ -380,7 +394,7 @@ def submit_ssh_job(
                 partition=(driver_partition or DRIVER_PARTITION),
                 account=(driver_account if driver_account is not None else DRIVER_ACCOUNT),
                 time_limit=(_valid_driver_time(driver_time) or DRIVER_TIME),
-                copy_from=copy_from, copy_to=copy_to,
+                copy_from=copy_from, copy_to=copy_to, copy_only=copy_only,
             )
             _in, _out, _err = ssh.exec_command(launch)
             driver_job = ''

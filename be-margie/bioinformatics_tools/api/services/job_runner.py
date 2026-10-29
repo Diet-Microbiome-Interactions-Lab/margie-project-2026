@@ -117,7 +117,8 @@ def run_ssh_task(job_id: str, command: str, connection: SSHConnection,
                  driver_partition: str | None = None,
                  driver_time: str | None = None,
                  copy_from: str | None = None,
-                 copy_to: str | None = None):
+                 copy_to: str | None = None,
+                 copy_only: list[str] | None = None):
     """Runs an SSH command, parsing its log for SLURM jobs, containers and progress.
 
     reattach=True replays the log of a run already going (after a dane-api
@@ -157,7 +158,7 @@ def run_ssh_task(job_id: str, command: str, connection: SSHConnection,
                                              driver_account=driver_account,
                                              driver_partition=driver_partition,
                                              driver_time=driver_time,
-                                             copy_from=copy_from, copy_to=copy_to,
+                                             copy_from=copy_from, copy_to=copy_to, copy_only=copy_only,
                                              # A cancelled run stops being watched, freeing its thread.
                                              stop=lambda: job_store.get_status(job_id) == "cancelled"):
             log_bytes += len(line) + 1
@@ -338,12 +339,13 @@ def submit_job(job_id: str, command: str, connection: SSHConnection,
                driver_partition: str | None = None,
                driver_time: str | None = None,
                copy_from: str | None = None,
-               copy_to: str | None = None):
+               copy_to: str | None = None,
+               copy_only: list[str] | None = None):
     """Submits a job to the thread pool executor.
 
     in_slurm=False keeps the run on the login node, for the quick self-test workflows.
-    copy_from and copy_to (Resume): the earlier run's folder is copied into the new one on a
-    compute node before the run starts (ssh_slurm.build_driver_launch).
+    copy_from and copy_to (Resume): the earlier run's folder (copy_only: those paths in it) is
+    copied into the new one on a compute node before the run starts (ssh_slurm.build_driver_launch).
     """
     executor.submit(
         run_ssh_task,
@@ -357,6 +359,7 @@ def submit_job(job_id: str, command: str, connection: SSHConnection,
         driver_time,
         copy_from,
         copy_to,
+        copy_only,
     )
 
 

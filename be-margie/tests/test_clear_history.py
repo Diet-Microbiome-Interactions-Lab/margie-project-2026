@@ -20,6 +20,9 @@ def db(tmp_path):
 
 
 def _ids(path):
+    """The job ids in a backup file, or (for main_database) in the history beside it."""
+    if path.endswith("margie.db"):
+        path = jh.history_path(path)
     return sorted(r[0] for r in sqlite3.connect(path).execute("SELECT job_id FROM api_jobs"))
 
 

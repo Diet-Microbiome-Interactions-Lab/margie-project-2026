@@ -8,6 +8,7 @@ validated by get_current_user(), which returns the user's cluster credentials.
 _build_connection() decrypts the stored private key and builds a per-user
 SSHConnection for each request.
 """
+import contextlib
 import copy
 import csv
 import io
@@ -20,7 +21,7 @@ import threading
 import time
 import uuid
 import zlib
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 
 import pandas as pd
 import yaml
@@ -1698,6 +1699,13 @@ def _claim_run_folder(conn, wanted: str) -> str:
     return claimed if claimed == wanted or claimed.startswith(f"{wanted}-") else wanted
 
 
+def _in_history(conn, main_db: str, job_id: str, current_user: dict) -> bool:
+    """Whether the job history holds this run (read back from the cluster)."""
+    return bool(job_history_client.get_job(
+        conn, main_db, job_id, owner_username=current_user["username"],
+        owner_cluster_username=current_user["cluster_username"]))
+
+
 def _launch_job(
     *, genome_path: str, workflow: str, base_output_dir: str,
     selected_tools: list[str] | None, current_user: dict, conn, main_db: str | None,
@@ -1706,16 +1714,28 @@ def _launch_job(
     slurm_walltime: str | None = None,
     relaunched_from: str | None = None,
     copy_from_work_dir: str | None = None,
+    copy_only: list[str] | None = None,
     run_full_operon_map: bool = False,
     use_cache: bool = True,
 ) -> dict:
     """Generates job_id and output_dir, records the job and submits dane_wf; for a Resume
     (margie_sb.resume: true) a job of its own first copies the previous run's output forward on a
-    compute node, so the request returns at once and Stop cancels the copy too.
+    compute node (copy_only: those paths in it), so the request returns at once and Stop cancels
+    the copy too. A run that is not in the job history afterwards is not started (503).
 
     Pre-flight validation is left to the callers.
     """
     selected_tools_csv = ",".join(selected_tools) if selected_tools is not None else None
+
+    # The job history is written by the account's own clone of the repository, so one not set up
+    # yet (or still an older checkout) is set up first.
+    if workflow == 'margie_sb':
+        try:
+            if sync_remote_dane_wf(conn) in ('unprovisioned', 'not-a-git-checkout', 'other-repo'):
+                provision_in_background(conn)
+                wait_provisioned(conn)
+        except Exception as exc:
+            LOGGER.warning("dane_wf version-sync check raised unexpectedly, ignoring: %s", exc)
 
     job_id = str(uuid.uuid4())
     timestamp = datetime.now().strftime('%Y-%m-%d-%H%M')
@@ -1729,6 +1749,13 @@ def _launch_job(
         persist_owner_cluster_username=current_user["cluster_username"],
         persist_db_path=main_db, persist_connection=conn,
     )
+    # A run missing from the history would go on where Jobs cannot show or stop it.
+    if main_db and not _in_history(conn, main_db, job_id, current_user):
+        job_store.discard(job_id)
+        _run_remote_check(conn, f"rmdir -- {shlex.quote(output_dir)} 2>/dev/null; true")
+        raise HTTPException(status_code=503, detail=(
+            "MARGIE could not write this run into your job history, so it did not start it "
+            "(nothing was sent to SLURM). Try again in a minute."))
     job_store.update(job_id, work_dir=output_dir)
 
     # Passes the verified acceptance so the CLI licence gate does not re-prompt.
@@ -1740,17 +1767,7 @@ def _launch_job(
         ("MARGIE_LICENSED_TOOLS", _lic_csv),
     ]
     license_env = "".join(f"{k}='{v}' " for k, v in license_pairs)
-    # Uses the editable install, not `uvx --from`, which is slow and may be stale.
-    if workflow == 'margie_sb':
-        try:
-            # A run uses the account's own clone of the repository, so one not set up yet
-            # (or still an older checkout) is set up first.
-            if sync_remote_dane_wf(conn) in ('unprovisioned', 'not-a-git-checkout', 'other-repo'):
-                provision_in_background(conn)
-                wait_provisioned(conn)
-        except Exception as exc:
-            LOGGER.warning("dane_wf version-sync check raised unexpectedly, ignoring: %s", exc)
-
+    # Uses the editable install (synced above), not `uvx --from`, which is slow and may be stale.
     command = _dane_wf_command(
         workflow, genome_path, output_dir, selected_tools_csv,
         resume=bool(copy_from_work_dir), full_operon_map=run_full_operon_map, license_env=license_env,
@@ -1775,6 +1792,7 @@ def _launch_job(
         driver_time=slurm_walltime,
         copy_from=copy_from_work_dir,
         copy_to=output_dir if copy_from_work_dir else None,
+        copy_only=copy_only if copy_from_work_dir else None,
     )
 
     return {"success": True, "job_id": job_id, "output_dir": output_dir, "message": "Job submitted successfully"}
@@ -2025,7 +2043,8 @@ def job_report_status(run_id: str, current_user: dict = Depends(get_current_user
 
 # ---- A failed step: run its genome again, and find where it failed in the logs ----
 
-_GENOME_NAME = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._-]*$")
+# A run's genome name: <file stem>--fa1:<8 hex>, as its folder is named.
+_GENOME_NAME = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._:-]*$")
 _RULE_NAME = re.compile(r"^[A-Za-z0-9_]+$")
 
 
@@ -3039,10 +3058,84 @@ def cancel_slurm_job(slurm_id: str, current_user: dict = Depends(get_current_use
     read_cache.drop(current_user["user_id"], "cluster")
     return {"cancelled": slurm_id, "run": None}
 
+# Runs being resumed or restarted by a request under way.
+_RELAUNCHING: set[str] = set()
+_RELAUNCHING_LOCK = threading.Lock()
+# A new run still 'pending' this long after its last change is taken as one that never started.
+_PENDING_FOR = timedelta(minutes=15)
+
+
+@contextlib.contextmanager
+def _one_relaunch(job_id: str):
+    """Lets one resume or restart of a run through at a time; a second request meanwhile gets 409."""
+    with _RELAUNCHING_LOCK:
+        if job_id in _RELAUNCHING:
+            raise HTTPException(status_code=409, detail=(
+                "This run is being resumed or restarted already; the new run shows on Jobs in a moment."))
+        _RELAUNCHING.add(job_id)
+    try:
+        yield
+    finally:
+        with _RELAUNCHING_LOCK:
+            _RELAUNCHING.discard(job_id)
+
+
+def _refuse_if_relaunched(conn, main_db: str | None, job_id: str, current_user: dict) -> None:
+    """Raises 409 when a run resumed or restarted from job_id is still going (checked on the cluster)."""
+    if not main_db:
+        return
+    rows, _ = job_history_client.list_jobs_and_count(
+        conn, main_db, limit=50, offset=0, owner_username=current_user["username"],
+        owner_cluster_username=current_user["cluster_username"])
+    children = [r for r in rows if isinstance(r, dict) and r.get("relaunched_from") == job_id]
+    _reconcile_running(conn, main_db, children, current_user["cluster_username"])
+    for r in children:
+        status = (r.get("status") or "").lower()
+        age = _row_age_seconds(r)
+        if status == "running" or (status == "pending" and age is not None and age < _PENDING_FOR.total_seconds()):
+            folder = (r.get("work_dir") or r.get("output_dir") or "").rstrip("/").rsplit("/", 1)[-1]
+            raise HTTPException(status_code=409, detail=(
+                f"This run was resumed or restarted already as {str(r.get('job_id'))[:8]}"
+                f"{f' ({folder})' if folder else ''}, which is still going. Stop that run first "
+                "to start this one again."))
+
+
+def _stage_run_genomes(conn, work_dir: str, genomes: list[str], label: str) -> str:
+    """Stages the genome files of a run's genomes (found through its .margie-input links) under
+    file names that give the same genome names; returns the staged folder."""
+    links: dict[str, str] = {}
+    for g in genomes:
+        found = shlex.quote(f"{work_dir.rstrip('/')}/.margie-input/{g}")
+        _, out = _run_remote_check(
+            conn, f'for f in {found}.*; do [ -e "$f" ] && printf "%s\\t%s\\n" "${{f##*/}}" "$(readlink -f -- "$f")"; done; true')
+        name, _, target = next((line for line in out.splitlines() if "\t" in line), "").partition("\t")
+        if not target.strip():
+            raise HTTPException(status_code=400, detail=f"The genome file of {g} is not in the run's folder ({work_dir}/.margie-input).")
+        stem = re.sub(r"--(fa1:[0-9a-f]+|[0-9a-f]{8})$", "", g)
+        links[f"{stem}{name[len(g):]}"] = target.strip()
+    try:
+        return ssh_sftp.stage_genome_links(links, conn, label=label)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    except RuntimeError as exc:
+        raise HTTPException(status_code=502, detail=str(exc)) from exc
+
+
 @router.post("/resume_job/{job_id}")
-def resume_job(job_id: str, current_user: dict = Depends(get_current_user)):
+def resume_job(job_id: str, body: dict | None = None, current_user: dict = Depends(get_current_user)):
     """Resumes a failed or stale job: a job on a compute node copies its work_dir into a new
-    timestamped folder, then the run starts with margie_sb.resume: true, so completed steps are skipped."""
+    timestamped folder, then the run starts with margie_sb.resume: true, so completed steps are skipped.
+
+    body {"genomes": [the run's genome names]} (Run again on an ended run): only those genomes run,
+    from copies of their own folders. A second resume while one is starting or going gets 409."""
+    genomes = list(dict.fromkeys(str(g).strip() for g in ((body or {}).get("genomes") or [])))
+    if any(not _GENOME_NAME.match(g) for g in genomes):
+        raise HTTPException(status_code=400, detail="Which genomes?")
+    with _one_relaunch(job_id):
+        return _resume_job(job_id, genomes, current_user)
+
+
+def _resume_job(job_id: str, genomes: list[str], current_user: dict) -> dict:
     _require_current_terms(current_user)
     conn = _build_connection(current_user)
     original = _load_job_for_action(job_id, current_user, conn)
@@ -3096,6 +3189,12 @@ def resume_job(job_id: str, current_user: dict = Depends(get_current_user)):
 
     selected_tools_csv = original.get("selected_tools")
     selected_tools = selected_tools_csv.split(",") if selected_tools_csv else None
+    _refuse_if_relaunched(conn, main_db, job_id, current_user)
+
+    copy_only = None
+    if genomes:
+        genome_path = _stage_run_genomes(conn, work_dir, genomes, current_user["username"])
+        copy_only = [p for g in genomes for p in (g, f"original_container_outputs/{g}")]
 
     return _launch_job(
         genome_path=genome_path, workflow=workflow,
@@ -3103,7 +3202,7 @@ def resume_job(job_id: str, current_user: dict = Depends(get_current_user)):
         current_user=current_user, conn=conn, main_db=main_db,
         slurm_account=slurm_account, slurm_partition=slurm_partition,
         slurm_walltime=slurm_walltime,
-        relaunched_from=job_id, copy_from_work_dir=work_dir,
+        relaunched_from=job_id, copy_from_work_dir=work_dir, copy_only=copy_only,
         run_full_operon_map=_ran_with_full_operon_map(conn, work_dir),
         use_cache=not _ran_without_cache(conn, work_dir),
     )
@@ -3112,7 +3211,13 @@ def resume_job(job_id: str, current_user: dict = Depends(get_current_user)):
 @router.post("/restart_job/{job_id}")
 def restart_job(job_id: str, current_user: dict = Depends(get_current_user)):
     """Restarts a job from scratch with the same genome_path/workflow/selected_tools
-    in a new timestamped folder. Works from any status."""
+    in a new timestamped folder. Works from any status; a second restart or resume while one is
+    starting or going gets 409."""
+    with _one_relaunch(job_id):
+        return _restart_job(job_id, current_user)
+
+
+def _restart_job(job_id: str, current_user: dict) -> dict:
     _require_current_terms(current_user)
     conn = _build_connection(current_user)
     original = _load_job_for_action(job_id, current_user, conn)
@@ -3140,6 +3245,7 @@ def restart_job(job_id: str, current_user: dict = Depends(get_current_user)):
 
     selected_tools_csv = original.get("selected_tools")
     selected_tools = selected_tools_csv.split(",") if selected_tools_csv else None
+    _refuse_if_relaunched(conn, main_db, job_id, current_user)
 
     return _launch_job(
         genome_path=genome_path, workflow=workflow,
