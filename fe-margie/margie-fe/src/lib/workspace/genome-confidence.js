@@ -3,8 +3,9 @@
  * A film for Home's opening, about what MARGIE does (about 9 s): a stretch of genome with its genes
  * on both strands; evidence from the annotation databases lands on each gene, which takes the colour
  * of its confidence tier as the evidence gathers; operons join their genes and lift a weak member;
- * the stretch closes into a circular genome map, coloured by confidence as on Results, with the MARGIE
- * wordmark in the middle. The tier colours are the site's (--mg-tier-*), so palettes apply.
+ * the stretch closes into a circular genome map, coloured by confidence as on Results, on the band of the
+ * logo's double helix, and blends into the MARGIE logo, the image Home's first opening shows. The tier
+ * colours are the site's (--mg-tier-*), so palettes apply.
  * The same code runs in animations/genome-confidence.html.
  */
 
@@ -30,19 +31,23 @@ const easeOut = (x) => 1 - Math.pow(1 - x, 3);
 const easeIO = (x) => (x < 0.5 ? 4 * x * x * x : 1 - Math.pow(-2 * x + 2, 3) / 2);
 
 // ---------- Timeline, in seconds at 1x
-const T = { line: 0, genes: 0.25, chips: 0.6, ev: 1.15, chipsOut: 3.95, operon: 4.35, lift: 5.05, bend: 6.0, word: 7.6, end: 8.8 };
-const DUR = { line: 0.8, gene: 0.35, chips: 0.45, fly: 0.55, chipsOut: 0.45, operon: 0.7, lift: 0.7, bend: 1.8, word: 1.0 };
+const T = { line: 0, genes: 0.25, chips: 0.6, ev: 1.15, chipsOut: 3.95, operon: 4.35, lift: 5.05, bend: 6.0, blend: 7.7, end: 9.3 };
+const DUR = { line: 0.8, gene: 0.35, chips: 0.45, fly: 0.55, chipsOut: 0.45, operon: 0.7, lift: 0.7, bend: 1.8, blend: 1.5 };
+/** The turn the closed map makes as it becomes the logo (radians). */
+const TURN = (24 * Math.PI) / 180;
 export const STAGES = [
   { t: 0, name: 'Genes', note: 'A stretch of genome: its protein-coding genes on both strands.' },
   { t: T.ev, name: 'Evidence', note: 'Each annotation database reports what it finds for each gene.' },
   { t: T.ev + 1.2, name: 'Confidence', note: 'A gene takes the colour of its confidence tier as the evidence gathers: blue highest, then green, yellow, orange and red.' },
   { t: T.operon, name: 'Operons', note: 'Genes in one operon are joined, and a conserved operon lifts its weaker members.' },
-  { t: T.bend, name: 'Genome map', note: 'The genome closes into its map, coloured by confidence, as on Results.' }
+  { t: T.bend, name: 'Genome map', note: 'The genome closes into its map, coloured by confidence as on Results.' },
+  { t: T.blend, name: 'MARGIE', note: "The map turns into the logo's double helix: the MARGIE logo." }
 ];
 
 // ---------- The genome, in units of the box's height: the ring's middle radius, a gene's
-// thickness and its gap from the backbone
-const RR = 0.36, TH = 0.056, GAP = 0.013;
+// thickness and its gap from the backbone. The ring lies on the logo's helix band (0.28 to 0.42 of
+// the logo's size from its centre), so the map becomes the logo in place.
+const RR = 0.348, TH = 0.054, GAP = 0.013;
 const L = TAU * RR;
 const SOURCES = ['COG', 'KEGG', 'eggNOG', 'UniProt', 'Pfam', 'TIGRFAM', 'PGAP'];
 /** Tiers by the number of sources with evidence (0 highest ... 4 low; 5 no tier). */
@@ -146,7 +151,7 @@ function mix(a, b, f) { const A = hexRgb(a), B = hexRgb(b); return `rgb(${A.map(
 function withAlpha(h, a) { const [r, g, b] = hexRgb(h); return `rgba(${r},${g},${b},${a})`; }
 
 // ---------- The bend: the straight stretch closes into a ring of radius RR
-let K = 0, SC = 1, CX = 0, CY = 0, SHIFT = 0;
+let K = 0, SC = 1, CX = 0, CY = 0, SHIFT = 0, ROT = 0, FADE = 1;
 /** Screen position of a point s along the stretch, y toward the ring's centre (both in box heights). */
 function place(s, y, out) {
   let x, yy;
@@ -156,8 +161,9 @@ function place(s, y, out) {
     x = sn / k - y * sn;
     yy = (1 - cs) / k + y * cs - SHIFT;
   }
-  out[0] = CX + x * VH * SC;
-  out[1] = CY + yy * VH * SC;
+  const c = Math.cos(ROT), n = Math.sin(ROT);
+  out[0] = CX + (x * c - yy * n) * VH * SC;
+  out[1] = CY + (x * n + yy * c) * VH * SC;
   return out;
 }
 function setView(t) {
@@ -176,6 +182,9 @@ function setView(t) {
   CX = VW / 2;
   // The stretch sits a little low, under the sources; the ring is centred.
   CY = VH / 2 + (1 - K) * VH * 0.06;
+  const b = smooth(prog(t, T.blend, DUR.blend));
+  ROT = TURN * smooth(prog(t, T.blend - 0.3, DUR.blend + 0.3));
+  FADE = 1 - b;
 }
 
 // ---------- Drawing
@@ -328,31 +337,24 @@ function drawOperons(t) {
   }
   ctx.restore();
 }
-// The logo's wordmark in the middle of the closed map.
+// The logo: the closed map turns into it, at the size and place of Home's first opening.
 const logo = typeof Image === 'undefined' ? null : new Image();
-function drawWordmark(t) {
-  const a = smooth(prog(t, T.word, DUR.word));
+function drawLogo(t) {
+  const a = smooth(prog(t, T.blend, DUR.blend));
   if (a <= 0) return;
-  const inner = (RR - GAP - TH) * VH * SC;
-  const clip = inner - VH * 0.012, half = clip / 0.555;
+  const half = (VH * SC) / 2, sc = 1 + 0.05 * (1 - a), turn = ROT - TURN;
   ctx.save();
-  // A soft glow inside the ring.
-  const gr = ctx.createRadialGradient(CX, CY, 0, CX, CY, inner);
-  gr.addColorStop(0, PAL.glow);
-  gr.addColorStop(1, 'rgba(0,0,0,0)');
   ctx.globalAlpha = a;
-  ctx.fillStyle = gr;
-  ctx.beginPath(); ctx.arc(CX, CY, inner, 0, TAU); ctx.fill();
+  ctx.translate(CX, CY);
+  ctx.rotate(turn);
   if (logo && logo.complete && logo.naturalWidth) {
-    ctx.beginPath(); ctx.arc(CX, CY, clip, 0, TAU); ctx.clip();
-    const sc = 1 + 0.04 * (1 - a);
-    ctx.drawImage(logo, CX - half * sc, CY - half * sc, 2 * half * sc, 2 * half * sc);
+    ctx.drawImage(logo, -half * sc, -half * sc, 2 * half * sc, 2 * half * sc);
   } else {
     ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
     ctx.fillStyle = '#FF8A1F'; ctx.font = `900 ${Math.round(half * 0.11)}px Lato, sans-serif`;
-    ctx.fillText('B S P', CX, CY - half * 0.13);
+    ctx.fillText('B S P', 0, -half * 0.13);
     ctx.fillStyle = '#1F6BFF'; ctx.font = `900 ${Math.round(half * 0.22)}px Lato, sans-serif`;
-    ctx.fillText('MARGIE', CX, CY + half * 0.08);
+    ctx.fillText('MARGIE', 0, half * 0.08);
   }
   ctx.restore();
 }
@@ -362,11 +364,16 @@ function render(t) {
   ctx.clearRect(0, 0, VW, VH);
   setView(t);
   drawChips(t);
-  drawBackbone(t);
-  drawOperons(t);
-  drawGenes(t);
-  drawEvidence(t);
-  drawWordmark(t);
+  // The map fades as the logo comes in on the same band.
+  ctx.globalAlpha = FADE;
+  if (FADE > 0.001) {
+    drawBackbone(t);
+    drawOperons(t);
+    drawGenes(t);
+    drawEvidence(t);
+  }
+  ctx.globalAlpha = 1;
+  drawLogo(t);
 }
 
 /**
