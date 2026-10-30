@@ -7,7 +7,7 @@
 	import TabPicture from './home/TabPicture.svelte';
 	import LogoPuzzle from '../LogoPuzzle.svelte';
 	import MargieLogo from '../MargieLogo.svelte';
-	import DnaFormation from '../DnaFormation.svelte';
+	import OpeningFilm from '../OpeningFilm.svelte';
 	import { LOGO_PUZZLE } from '$lib/features';
 
 	/**
@@ -38,7 +38,9 @@
 	/** The openings Home offers, picked with the dots under it and kept with the account (ui prefs). */
 	const OPENINGS = [
 		{ id: 'logo', label: 'The MARGIE logo' },
-		{ id: 'dna', label: 'DNA forming into the MARGIE logo' }
+		{ id: 'dna', label: 'DNA forming, then bending into the MARGIE logo' },
+		{ id: 'circular', label: 'DNA forming on a circle into the MARGIE logo' },
+		{ id: 'confidence', label: 'Genes gathering evidence and confidence, closing into a genome map' }
 	] as const;
 	const opening = $derived(ui.prefs.homeAnimation);
 
@@ -76,11 +78,13 @@
 <div class="home">
 	<section class="hero">
 		<!-- The opening, as picked with the dots: the logo, which turns in and turns again under the pointer
-		     (with LOGO_PUZZLE on, a click breaks it into a jigsaw), or the DNA film that forms it. One box for both,
-		     so the page keeps its place when the pick changes. -->
+		     (with LOGO_PUZZLE on, a click breaks it into a jigsaw), or one of the films that end on it. One box for
+		     all, so the page keeps its place when the pick changes. -->
 		<div class="opening" style="--logo: {LOGO}">
-			{#if opening === 'dna'}
-				<h1 class="opening-box film"><DnaFormation /><span class="hidden-text">MARGIE</span></h1>
+			{#if opening !== 'logo'}
+				<h1 class="opening-box film">
+					{#key opening}<OpeningFilm film={opening} />{/key}<span class="hidden-text">MARGIE</span>
+				</h1>
 			{:else if LOGO_PUZZLE}
 				<div class="opening-box"><LogoPuzzle size={LOGO} /></div>
 			{:else}

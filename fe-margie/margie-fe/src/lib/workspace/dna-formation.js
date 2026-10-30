@@ -1,10 +1,9 @@
 // @ts-nocheck
 /**
- * The DNA film on Home: atoms form bases, sugars and phosphates, which join into nucleotides, two
- * strands, a double helix and a circular genome that closes into the MARGIE logo (about 15 s).
- * Ported from the stand-alone page in the animations folder: its drawing as it was, on a canvas
- * the page passes in, with the page's background and text colours. mount() plays it once and
- * holds the last frame; still shows the last frame at once (reduced motion).
+ * A film for Home's opening: atoms form bases, sugars and phosphates, which join into nucleotides,
+ * two strands and a double helix that bends into a circular genome, the MARGIE logo (about 15 s).
+ * Ported from animations/dna-formation.html (its drawing as it is) with the site's background and
+ * text colours; mount() plays it once and holds the last frame.
  */
 // ---------- Random numbers: a fixed seed, so each run is the same film
 function mulberry32(a) {
@@ -855,24 +854,26 @@ function render(t, now) {
 }
 
 /**
- * Plays the film on `el` (its parent sets the size). Returns replay(), retheme() (after a theme
- * change) and destroy().
+ * Plays the film on `el` (its parent sets the size), at rate() times its own speed, read on each
+ * frame (the site's motion and speed settings; 0 shows the last frame). Returns replay(), seek(t),
+ * retheme() (after a theme change) and destroy().
  * @param {HTMLCanvasElement} el
- * @param {{ logoSrc: string, dark?: () => boolean, still?: boolean, onEnd?: () => void }} options
- * @returns {{ replay(): void, retheme(): void, destroy(): void }}
+ * @param {{ logoSrc: string, dark?: () => boolean, rate?: () => number, onEnd?: () => void }} options
+ * @returns {{ replay(): void, seek(t: number): void, retheme(): void, destroy(): void, end: number }}
  */
-export function mount(el, { logoSrc, dark = () => false, still = false, onEnd = () => {} } = {}) {
+export function mount(el, { logoSrc, dark = () => false, rate = () => 1, onEnd = () => {} }) {
   canvas = el;
   ctx = el.getContext('2d');
   stageEl = el.parentElement;
   isDark = dark;
-  logo.src = logoSrc;
+  if (logoSrc) logo.src = logoSrc;
   readTheme();
   resize();
-  let time = still ? T.end : 0, raf = 0, last = 0;
+  let time = 0, raf = 0, last = 0;
   const frame = () => render(time, performance.now());
   function tick(now) {
-    time = Math.min(T.end, time + Math.min(0.05, (now - last) / 1000));
+    const r = rate();
+    time = r > 0 ? Math.min(T.end, time + Math.min(0.05, (now - last) / 1000) * r) : T.end;
     last = now;
     frame();
     if (time < T.end) raf = requestAnimationFrame(tick);
@@ -887,10 +888,11 @@ export function mount(el, { logoSrc, dark = () => false, still = false, onEnd = 
   ro.observe(stageEl);
   // The wordmark appears in the last frame once the logo has loaded.
   logo.addEventListener('load', frame);
-  if (still) frame();
-  else play();
+  play();
   return {
+    end: T.end,
     replay() { time = 0; play(); },
+    seek(t) { cancelAnimationFrame(raf); time = Math.max(0, Math.min(T.end, t)); frame(); },
     retheme() { readTheme(); frame(); },
     destroy() { cancelAnimationFrame(raf); ro.disconnect(); logo.removeEventListener('load', frame); }
   };
