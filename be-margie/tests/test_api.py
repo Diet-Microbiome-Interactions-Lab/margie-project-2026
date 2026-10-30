@@ -939,12 +939,12 @@ class TestResumeAndRestartJob:
         persisted = mock_sftp.write_remote_yaml.call_args[0][1]
         assert persisted["main_database"] == "/home/testuser/testuser-my-db-v1.db"
 
-        mock_sftp.copy_remote_directory.assert_called_once()
-        copy_args = mock_sftp.copy_remote_directory.call_args[0]
-        assert copy_args[0] == "/remote/work/2026-06-21-1118"
-
+        # The copy is a job of its own on the cluster, which the driver waits for.
         mock_runner.submit_job.assert_called_once()
-        command = mock_runner.submit_job.call_args[0][1]
+        submit = mock_runner.submit_job.call_args
+        assert submit.kwargs["copy_from"] == "/remote/work/2026-06-21-1118"
+        assert submit.kwargs["copy_to"] == body["output_dir"]
+        command = submit[0][1]
         assert "margie_sb.resume: true" in command
         assert "margie_sb.selected_tools: quast,gtdbtk" in command
 
@@ -953,12 +953,13 @@ class TestResumeAndRestartJob:
         assert new_job["selected_tools"] == "quast,gtdbtk"
 
     @patch("bioinformatics_tools.api.routers.ssh._build_connection")
+    @patch("bioinformatics_tools.api.routers.ssh.job_runner")
     @patch("bioinformatics_tools.api.routers.ssh.ssh_sftp")
-    def test_resume_job_rejects_completed_status(self, mock_sftp, mock_build_conn, authed_client):
+    def test_resume_job_rejects_completed_status(self, mock_sftp, mock_runner, mock_build_conn, authed_client):
         jid = self._create_job(status="completed")
         resp = authed_client.post(f"/v1/ssh/resume_job/{jid}")
         assert resp.status_code == 400
-        mock_sftp.copy_remote_directory.assert_not_called()
+        mock_runner.submit_job.assert_not_called()
 
     @patch("bioinformatics_tools.api.routers.ssh._build_connection")
     @patch("bioinformatics_tools.api.routers.ssh.ssh_slurm")
@@ -978,9 +979,10 @@ class TestResumeAndRestartJob:
 
     @patch("bioinformatics_tools.api.routers.ssh._build_connection")
     @patch("bioinformatics_tools.api.routers.ssh.ssh_slurm")
+    @patch("bioinformatics_tools.api.routers.ssh.job_runner")
     @patch("bioinformatics_tools.api.routers.ssh.ssh_sftp")
     def test_resume_job_rejects_when_still_genuinely_active(
-        self, mock_sftp, mock_slurm, mock_build_conn, authed_client,
+        self, mock_sftp, mock_runner, mock_slurm, mock_build_conn, authed_client,
     ):
         jid = self._create_job(status="running")
         mock_sftp.read_remote_yaml.return_value = {"main_database": "~/my-db.db"}
@@ -988,7 +990,7 @@ class TestResumeAndRestartJob:
 
         resp = authed_client.post(f"/v1/ssh/resume_job/{jid}")
         assert resp.status_code == 400
-        mock_sftp.copy_remote_directory.assert_not_called()
+        mock_runner.submit_job.assert_not_called()
 
     @patch("bioinformatics_tools.api.routers.ssh._build_connection")
     @patch("bioinformatics_tools.api.routers.ssh.job_runner")
@@ -1005,7 +1007,7 @@ class TestResumeAndRestartJob:
         body = resp.json()
         assert body["job_id"] != jid
 
-        mock_sftp.copy_remote_directory.assert_not_called()
+        assert mock_runner.submit_job.call_args.kwargs["copy_from"] is None
         command = mock_runner.submit_job.call_args[0][1]
         assert "margie_sb.resume: true" not in command
         assert "margie_sb.selected_tools: quast" in command

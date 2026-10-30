@@ -1,5 +1,5 @@
 """
-Unit tests for the log-parsing regexes in bioinformatics_tools.api.services.job_runner.
+Unit tests for the log parsing in bioinformatics_tools.api.services.job_runner.
 """
 from bioinformatics_tools.api.services.job_runner import (
     SLURM_SUBMIT_RE, RULE_NAME_FROM_LOG_PATH_RE, SEQUENTIAL_GENOME_RE)
@@ -76,3 +76,33 @@ class TestSequentialGenomeRegex:
     def test_no_match_on_unrelated_line(self):
         line = "5 of 20 steps (25%) done"
         assert SEQUENTIAL_GENOME_RE.search(line) is None
+
+
+class TestResumeCopyPhase:
+    """A Resume's copy job writes the run's log before the driver starts: the copy settings reach
+    the launch, and the run's phase says the earlier results are being copied."""
+
+    def test_the_copy_reaches_the_launch_and_shows_as_a_phase(self):
+        from unittest.mock import MagicMock, patch
+
+        from bioinformatics_tools.api.services import job_runner, run_mail
+        from bioinformatics_tools.api.services.job_store import job_store
+
+        job_store.create('copy-1', '/g', user_id=7)
+        seen = []
+
+        def lines(**kw):
+            seen.append(kw)
+            yield '__LAUNCHED__'
+            yield "Resume: copying the earlier run's folder /a into /b, 16 folders at a time, on a001"
+            seen.append(job_store.get('copy-1')['phase'])
+            yield 'Resume: done in 3 min; the run starts next'
+            seen.append(job_store.get('copy-1')['phase'])
+            yield '__EXIT_CODE__:0'
+
+        with patch.object(job_runner.ssh_slurm, 'submit_ssh_job', side_effect=lines), \
+                patch.object(job_runner, '_slurm_status_checker'), patch.object(run_mail, 'notify'):
+            job_runner.run_ssh_task('copy-1', 'dane_wf margie sb', MagicMock(), copy_from='/a', copy_to='/b')
+
+        assert seen[0]['copy_from'] == '/a' and seen[0]['copy_to'] == '/b'
+        assert seen[1:] == ["Copying the earlier run's results", 'Starting the run']

@@ -1,13 +1,11 @@
-"""The database loads (load_*_to_db in margie_sb.smk): SLURM time from load_minutes (10 minutes, plus
-input and database size, doubled on each retry), one at a time within a run (margie_sb_db_writer,
-capped at 1 by workflow.py), retried twice; deletes go through an organism_name index (load_to_db)."""
+"""The database loads (load_*_to_db in margie_sb.smk): local rules, so each runs in the run's own SLURM
+job without a time limit of its own; one at a time within a run (margie_sb_db_writer, capped at 1 by
+workflow.py) and across runs (load_to_db takes the write turn, db_turn.py), retried twice; deletes go
+through an organism_name index (load_to_db)."""
 
-import math
-import os
 import re
 import sqlite3
 from pathlib import Path
-from types import SimpleNamespace
 
 from bioinformatics_tools.workflow_tools import load_to_db
 
@@ -16,52 +14,24 @@ SMK = Path(__file__).resolve().parents[1] / 'bioinformatics_tools' / 'workflow_t
 
 def _load_rules():
     text = SMK.read_text()
-    blocks = re.split(r'\n(?=rule |localrules|checkpoint )', text)
+    # The commented template for a new tool at the end is not a rule.
+    blocks = re.split(r'\n(?=rule |localrules|checkpoint |# ─+ Template)', text)
     # A load rule calls the loader; load_consolidation_to_db only marks consolidation done.
     return {m.group(1): b for b in blocks if (m := re.match(r'rule (load_\w+_to_db):', b)) and 'LOADER_PYTHON' in b}
 
 
-def _load_minutes(db_path):
-    """margie_sb.smk's load_minutes, with its defaults and db_path as main_database."""
-    src = SMK.read_text()
-    start = src.index('def load_minutes')
-    end = src.index('\n\n', src.index('return math.ceil', start))
-    scope = {'math': math, 'os': os, 'MAIN_DATABASE': str(db_path), 'LOAD_RUNTIME': 10,
-             'LOAD_INPUT_MB_PER_MINUTE': 50.0, 'LOAD_DB_GB_PER_MINUTE': 10.0}
-    exec(src[start:end], scope)
-    return scope['load_minutes']
-
-
-def test_the_default_load_time_is_ten_minutes_and_scales():
-    text = SMK.read_text()
-    assert re.search(r"^LOAD_RUNTIME = int\(rc\('load_db\.runtime', 10, config=config\)\)$", text, re.M)
-    assert "rc('load_db.input_mb_per_minute', 50, config=config)" in text
-    assert "rc('load_db.db_gb_per_minute', 10, config=config)" in text
-
-
-def test_the_time_grows_with_input_database_and_attempt(tmp_path):
-    db = tmp_path / 'main.db'
-    with open(db, 'wb') as fh:
-        fh.truncate(20 * 10**9)                          # 20 GB, sparse
-    minutes = _load_minutes(db)
-    assert minutes(None, SimpleNamespace(size_mb=0), 1) == 12
-    assert minutes(None, SimpleNamespace(size_mb=100), 1) == 14
-    assert minutes(None, SimpleNamespace(size_mb=100), 2) == 28
-    assert minutes(None, SimpleNamespace(size_mb=100), 3) == 56
-
-
-def test_without_a_database_the_time_is_the_base(tmp_path):
-    minutes = _load_minutes(tmp_path / 'none.db')
-    assert minutes(None, SimpleNamespace(size_mb=0), 1) == 10
-
-
-def test_each_load_rule_has_the_limit_the_slot_and_retries():
+def test_each_load_rule_is_local_with_the_slot_and_retries():
     rules = _load_rules()
     assert len(rules) >= 29
     for name, block in rules.items():
-        assert 'runtime=load_minutes' in block, name
+        assert 'localrule: True' in block, name
+        assert 'runtime=' not in block and 'group:' not in block, name
         assert 'margie_sb_db_writer=1' in block, name
         assert 'retries: LOAD_RETRIES' in block, name
+
+
+def test_the_loads_have_no_slurm_time_of_their_own():
+    assert 'load_minutes' not in SMK.read_text()
 
 
 def test_steps_that_run_again_on_each_run_are_not_loaded():

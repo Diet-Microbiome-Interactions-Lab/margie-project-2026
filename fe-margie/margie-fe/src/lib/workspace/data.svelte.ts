@@ -1098,8 +1098,9 @@ class Workspace {
 	 * the first one finished, so it picks up where it stopped. A cluster
 	 * resumes the job itself.
 	 */
-	async resume(run: Run): Promise<boolean> {
-		if (backend.cluster) return this.#relaunch(run, 'resume');
+	/** Resumes a run; on the cluster, `only` (its genome names) runs only those again. */
+	async resume(run: Run, only?: string[]): Promise<boolean> {
+		if (backend.cluster) return this.#relaunch(run, 'resume', only);
 		const present = new Set(this.genomes.map((g) => g.name));
 		const genomes = (run.files ?? []).filter((n) => present.has(n));
 		const tools = run.tools ?? [];
@@ -1118,9 +1119,9 @@ class Workspace {
 		return this.#relaunch(run, 'restart');
 	}
 
-	async #relaunch(run: Run, how: 'resume' | 'restart'): Promise<boolean> {
+	async #relaunch(run: Run, how: 'resume' | 'restart', genomes?: string[]): Promise<boolean> {
 		try {
-			await post(`/runs/${encodeURIComponent(run.id)}/${how}`);
+			await post(`/runs/${encodeURIComponent(run.id)}/${how}`, genomes?.length ? { genomes } : undefined);
 			await this.loadRuns();
 			return true;
 		} catch (e) {

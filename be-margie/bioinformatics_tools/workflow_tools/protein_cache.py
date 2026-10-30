@@ -32,9 +32,11 @@ from datetime import datetime, timezone
 from pathlib import Path
 
 try:
+    from bioinformatics_tools.workflow_tools import db_turn
     from bioinformatics_tools.workflow_tools.genome_identity import protein_hash, read_fasta
     from bioinformatics_tools.workflow_tools.workflow_helpers import db_path as tool_db_path, rc, sif_path
 except ImportError:  # imported from margie_sb.smk, with this folder on sys.path
+    import db_turn
     from genome_identity import protein_hash, read_fasta
     from workflow_helpers import db_path as tool_db_path, rc, sif_path
 
@@ -474,9 +476,13 @@ def _reheader(conn, tool: str, key: str, filename: str, old: str, new: str) -> i
     return len(rows)
 
 
-def store(db: str, faa: str, prefix: str, tool: str, cfg: dict, genome: str = '') -> int:
+def store(db: str, faa: str, prefix: str, tool: str, cfg: dict, genome: str = '', ran: bool = True) -> int:
     """Adds the genome's uncached proteins from the tool's final results, each with the genome it
-    came from; returns the count."""
+    came from; returns the count. A tool restored from the MARGIE database (`ran` False) adds none:
+    its results came from an earlier run, and adding a genome's proteins one by one to the cache
+    takes minutes per tool on a large database. Only the writes take the database's write turn (db_turn)."""
+    if not ran:
+        return 0
     key = tool_key(tool, cfg)
     files = tool_files(tool, cfg)
     folder = Path(f'{prefix}{tool}')
@@ -524,7 +530,7 @@ def store(db: str, faa: str, prefix: str, tool: str, cfg: dict, genome: str = ''
                        != _answer(tables[f][0], tables[f][1].get(first[h], []), kind) for f, kind in files):
                     changed.append(h)
         stamp = datetime.now(timezone.utc).isoformat()
-        with conn:
+        with db_turn.turn(db, wait=db_turn.CONTROLLER_WAIT), conn:
             for filename, (header, _) in tables.items():
                 if not header:
                     continue
@@ -603,6 +609,7 @@ def install_merge_script(folder: str) -> str:
 
 # ---- which genome each protein and gene belongs to ----
 
+@db_turn.writes(wait=db_turn.CONTROLLER_WAIT)
 def link_genome(db: str, faa: str, genome_hash: str, name: str = '', genes: dict[str, str] | None = None) -> int:
     """Records the genome's proteins by hash (protein_genomes), its protein set (a hash of its sorted
     protein hashes, in genome_proteomes) and, with `genes` ({feature id: gene hash}), its genes
@@ -638,6 +645,7 @@ def link_genome(db: str, faa: str, genome_hash: str, name: str = '', genes: dict
     return len(hashes)
 
 
+@db_turn.writes(wait=db_turn.CONTROLLER_WAIT)
 def record_fingerprints(db: str, genome_hash: str, hash_label_tsv: str, genes: dict[str, str]) -> int:
     """Adds each gene's fingerprint (its pattern hash, from the fingerprint step's hash-label table)
     to genome_genes, and each protein's, with its label, to protein_fingerprints; returns how many
@@ -727,6 +735,7 @@ def _position(tool: str) -> int:
     return 100 + (EXTRA_TOOLS.index(base) if base in EXTRA_TOOLS else len(EXTRA_TOOLS))
 
 
+@db_turn.writes(wait=db_turn.CONTROLLER_WAIT)
 def record_proteins(db: str, labeled_tsv: str, prefix: str, genome_hash: str = '') -> int:
     """Adds each protein's descriptors to its record (protein_descriptors, read through
     protein_records): each tool's ids and descriptions from the labeled genes, and the localization

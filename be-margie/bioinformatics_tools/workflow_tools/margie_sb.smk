@@ -3,7 +3,6 @@
 MARGIE's rules: quality, taxonomy, gene calling, annotation, localisation and scoring, genome by genome.
 """
 
-import math
 import os
 import re
 import sys
@@ -161,29 +160,12 @@ def _llm_mem_mb() -> int:
     return int(min(sizes) * 0.8) if sizes else 32000
 
 
-# Database loads (load_*_to_db): one at a time within a run (margie_sb_db_writer), retried twice. A
-# load's SLURM time (load_minutes) grows with its input and with main_database: load_db.runtime
-# minutes, plus one for each load_db.input_mb_per_minute MB of input and each load_db.db_gb_per_minute
-# GB of database, doubled on each retry. Each table loads in one transaction, so a retry loads what an
-# attempt did not finish and skips what it did; deletes go through an organism_name index (load_to_db).
-LOAD_RUNTIME = int(rc('load_db.runtime', 10, config=config))
-LOAD_INPUT_MB_PER_MINUTE = float(rc('load_db.input_mb_per_minute', 50, config=config) or 50)
-LOAD_DB_GB_PER_MINUTE = float(rc('load_db.db_gb_per_minute', 10, config=config) or 10)
+# Database loads (load_*_to_db): local rules, so each runs in the run's own SLURM job and waiting for
+# the database takes no time limit; one at a time within a run (margie_sb_db_writer) and across the
+# account's runs (load_to_db takes the database's write turn, db_turn.py), retried twice. Each table
+# loads in one transaction, so a retry loads what an attempt did not finish and skips what it did;
+# deletes go through an organism_name index (load_to_db).
 LOAD_RETRIES = 2
-
-
-def load_minutes(wildcards, input, attempt):
-    """A database load's SLURM time in minutes, from its input, the database's size and the attempt."""
-    try:
-        input_mb = float(input.size_mb)
-    except Exception:
-        input_mb = 0.0
-    try:
-        db_gb = os.path.getsize(MAIN_DATABASE) / 1e9
-    except (OSError, TypeError):
-        db_gb = 0.0
-    minutes = LOAD_RUNTIME + input_mb / LOAD_INPUT_MB_PER_MINUTE + db_gb / LOAD_DB_GB_PER_MINUTE
-    return math.ceil(minutes * 2 ** (max(1, attempt) - 1))
 
 # Lock that lets one RASTtk job at a time submit to BV-BRC, across the account's runs.
 RASTTK_BVBRC_LOCK = _resolve_shared_dir(
@@ -1416,6 +1398,7 @@ rule run_llm:
 
 rule load_llm_to_db:
     """Loads the LLM summary into main_database and builds the LLM publication table."""
+    localrule: True
     input:
         summary=LLM_SUMMARY,
         compute_tkn=LLM_COMPUTE_TOKEN,
@@ -1425,7 +1408,6 @@ rule load_llm_to_db:
         tkn=LLM_TOKEN
     retries: LOAD_RETRIES
     resources:
-        runtime=load_minutes,
         margie_sb_db_writer=1
     params:
         db=MAIN_DATABASE,
@@ -1517,15 +1499,14 @@ rule run_ani_batch:
 
 rule load_ani_to_db:
     """Loads ANI results into main_database."""
+    localrule: True
     input:
         results=ANI_RESULTS,
         compute_tkn=ANI_COMPUTE_TOKEN
     output:
         tkn=ANI_TOKEN
-    group: "ani"
     retries: LOAD_RETRIES
     resources:
-        runtime=load_minutes,
         margie_sb_db_writer=1
     params:
         db=MAIN_DATABASE,
@@ -1571,15 +1552,14 @@ rule run_aai_batch:
 
 rule load_aai_to_db:
     """Loads AAI results into main_database."""
+    localrule: True
     input:
         results=AAI_RESULTS,
         compute_tkn=AAI_COMPUTE_TOKEN
     output:
         tkn=AAI_TOKEN
-    group: "aai"
     retries: LOAD_RETRIES
     resources:
-        runtime=load_minutes,
         margie_sb_db_writer=1
     params:
         db=MAIN_DATABASE,
@@ -1626,15 +1606,14 @@ rule run_closest_organisms_batch:
 
 rule load_closest_to_db:
     """Loads closest-organisms results into main_database."""
+    localrule: True
     input:
         results=CLOSEST_RESULTS,
         compute_tkn=CLOSEST_COMPUTE_TOKEN
     output:
         tkn=CLOSEST_TOKEN
-    group: "closest"
     retries: LOAD_RETRIES
     resources:
-        runtime=load_minutes,
         margie_sb_db_writer=1
     params:
         db=MAIN_DATABASE,
@@ -1677,15 +1656,14 @@ rule run_quast:
 
 rule load_quast_to_db:
     """Loads QUAST results into main_database."""
+    localrule: True
     input:
         results=QUAST_RESULTS,
         fasta=lambda wildcards: GENOMES[wildcards.genome]
     output:
         tkn=QUAST_TOKEN
-    group: "quast"
     retries: LOAD_RETRIES
     resources:
-        runtime=load_minutes,
         margie_sb_db_writer=1
     params:
         db=MAIN_DATABASE,
@@ -1914,7 +1892,8 @@ localrules: gtdbtk_from_cache
 
 
 rule load_gtdbtk_to_db:
-    """Loads GTDB-Tk results into main_database, in a group of its own (GTDB-Tk runs on highmem)."""
+    """Loads GTDB-Tk results into main_database."""
+    localrule: True
     input:
         results=GTDBTK_RESULTS,
         fasta=lambda wildcards: GENOMES[wildcards.genome]
@@ -1922,7 +1901,6 @@ rule load_gtdbtk_to_db:
         tkn=GTDBTK_TOKEN
     retries: LOAD_RETRIES
     resources:
-        runtime=load_minutes,
         margie_sb_db_writer=1
     params:
         db=MAIN_DATABASE,
@@ -2136,6 +2114,7 @@ localrules: rasttk_from_cache
 
 rule load_rasttk_to_db:
     """Loads RASTtk results into main_database."""
+    localrule: True
     input:
         results=RASTTK_RESULTS,
         fasta=lambda wildcards: GENOMES[wildcards.genome]
@@ -2143,7 +2122,6 @@ rule load_rasttk_to_db:
         tkn=RASTTK_TOKEN
     retries: LOAD_RETRIES
     resources:
-        runtime=load_minutes,
         margie_sb_db_writer=1
     params:
         db=MAIN_DATABASE,
@@ -2156,6 +2134,7 @@ rule load_rasttk_to_db:
 
 rule load_prodigal_to_db:
     """Loads Prodigal's gene table into main_database."""
+    localrule: True
     input:
         results=PRODIGAL_RESULTS,
         fasta=lambda wildcards: GENOMES[wildcards.genome]
@@ -2163,7 +2142,6 @@ rule load_prodigal_to_db:
         tkn=PRODIGAL_TOKEN
     retries: LOAD_RETRIES
     resources:
-        runtime=load_minutes,
         margie_sb_db_writer=1
     params:
         gene_caller=gene_caller,
@@ -2216,6 +2194,7 @@ rule run_cog:
 
 rule load_cog_to_db:
     """Loads COG results into main_database."""
+    localrule: True
     input:
         results=PHASE4_RESULTS['cog'],
         fasta=lambda wildcards: GENOMES[wildcards.genome]
@@ -2223,7 +2202,6 @@ rule load_cog_to_db:
         tkn=PHASE4_TOKENS['cog']
     retries: LOAD_RETRIES
     resources:
-        runtime=load_minutes,
         margie_sb_db_writer=1
     params:
         gene_caller=gene_caller,
@@ -2274,6 +2252,7 @@ rule run_pfam:
 
 rule load_pfam_to_db:
     """Loads Pfam results into main_database."""
+    localrule: True
     input:
         results=PHASE4_RESULTS['pfam'],
         fasta=lambda wildcards: GENOMES[wildcards.genome]
@@ -2281,7 +2260,6 @@ rule load_pfam_to_db:
         tkn=PHASE4_TOKENS['pfam']
     retries: LOAD_RETRIES
     resources:
-        runtime=load_minutes,
         margie_sb_db_writer=1
     params:
         gene_caller=gene_caller,
@@ -2333,6 +2311,7 @@ rule run_tigrfam:
 
 rule load_tigrfam_to_db:
     """Loads TIGRFAMs results into main_database."""
+    localrule: True
     input:
         results=PHASE4_RESULTS['tigrfam'],
         fasta=lambda wildcards: GENOMES[wildcards.genome]
@@ -2340,7 +2319,6 @@ rule load_tigrfam_to_db:
         tkn=PHASE4_TOKENS['tigrfam']
     retries: LOAD_RETRIES
     resources:
-        runtime=load_minutes,
         margie_sb_db_writer=1
     params:
         gene_caller=gene_caller,
@@ -2391,6 +2369,7 @@ rule run_merops:
 
 rule load_merops_to_db:
     """Loads MEROPS results into main_database."""
+    localrule: True
     input:
         results=PHASE4_RESULTS['merops'],
         fasta=lambda wildcards: GENOMES[wildcards.genome]
@@ -2398,7 +2377,6 @@ rule load_merops_to_db:
         tkn=PHASE4_TOKENS['merops']
     retries: LOAD_RETRIES
     resources:
-        runtime=load_minutes,
         margie_sb_db_writer=1
     params:
         gene_caller=gene_caller,
@@ -2450,6 +2428,7 @@ rule run_tcdb:
 
 rule load_tcdb_to_db:
     """Loads TCDB results into main_database."""
+    localrule: True
     input:
         results=PHASE4_RESULTS['tcdb'],
         fasta=lambda wildcards: GENOMES[wildcards.genome]
@@ -2457,7 +2436,6 @@ rule load_tcdb_to_db:
         tkn=PHASE4_TOKENS['tcdb']
     retries: LOAD_RETRIES
     resources:
-        runtime=load_minutes,
         margie_sb_db_writer=1
     params:
         gene_caller=gene_caller,
@@ -2509,6 +2487,7 @@ rule run_uniprot:
 
 rule load_uniprot_to_db:
     """Loads UniProt results into main_database."""
+    localrule: True
     input:
         results=PHASE4_RESULTS['uniprot'],
         fasta=lambda wildcards: GENOMES[wildcards.genome]
@@ -2516,7 +2495,6 @@ rule load_uniprot_to_db:
         tkn=PHASE4_TOKENS['uniprot']
     retries: LOAD_RETRIES
     resources:
-        runtime=load_minutes,
         margie_sb_db_writer=1
     params:
         gene_caller=gene_caller,
@@ -2572,6 +2550,7 @@ rule run_kegg:
 
 rule load_kegg_to_db:
     """Loads KEGG results into main_database."""
+    localrule: True
     input:
         results=PHASE4_RESULTS['kegg'],
         fasta=lambda wildcards: GENOMES[wildcards.genome]
@@ -2579,7 +2558,6 @@ rule load_kegg_to_db:
         tkn=PHASE4_TOKENS['kegg']
     retries: LOAD_RETRIES
     resources:
-        runtime=load_minutes,
         margie_sb_db_writer=1
     params:
         gene_caller=gene_caller,
@@ -2629,6 +2607,7 @@ rule run_eggnog:
 
 rule load_eggnog_to_db:
     """Loads eggNOG results into main_database."""
+    localrule: True
     input:
         results=PHASE4_RESULTS['eggnog'],
         fasta=lambda wildcards: GENOMES[wildcards.genome]
@@ -2636,7 +2615,6 @@ rule load_eggnog_to_db:
         tkn=PHASE4_TOKENS['eggnog']
     retries: LOAD_RETRIES
     resources:
-        runtime=load_minutes,
         margie_sb_db_writer=1
     params:
         gene_caller=gene_caller,
@@ -2687,6 +2665,7 @@ rule run_dbcan:
 
 rule load_dbcan_to_db:
     """Loads dbCAN results into main_database."""
+    localrule: True
     input:
         results=PHASE4_RESULTS['dbcan'],
         fasta=lambda wildcards: GENOMES[wildcards.genome]
@@ -2694,7 +2673,6 @@ rule load_dbcan_to_db:
         tkn=PHASE4_TOKENS['dbcan']
     retries: LOAD_RETRIES
     resources:
-        runtime=load_minutes,
         margie_sb_db_writer=1
     params:
         gene_caller=gene_caller,
@@ -2744,6 +2722,7 @@ rule run_pgap:
 
 rule load_pgap_to_db:
     """Loads PGAP results into main_database."""
+    localrule: True
     input:
         results=PHASE4_RESULTS['pgap'],
         fasta=lambda wildcards: GENOMES[wildcards.genome]
@@ -2751,7 +2730,6 @@ rule load_pgap_to_db:
         tkn=PHASE4_TOKENS['pgap']
     retries: LOAD_RETRIES
     resources:
-        runtime=load_minutes,
         margie_sb_db_writer=1
     params:
         gene_caller=gene_caller,
@@ -2810,6 +2788,7 @@ rule run_interpro:
 
 rule load_interpro_to_db:
     """Loads the unified InterProScan table into main_database."""
+    localrule: True
     input:
         results=PHASE4_RESULTS['interpro'],
         fasta=lambda wildcards: GENOMES[wildcards.genome]
@@ -2817,7 +2796,6 @@ rule load_interpro_to_db:
         tkn=PHASE4_TOKENS['interpro']
     retries: LOAD_RETRIES
     resources:
-        runtime=load_minutes,
         margie_sb_db_writer=1,
         mem_mb=rc('interpro.load_mem_mb', 2000, config=config)
     params:
@@ -2832,6 +2810,7 @@ rule load_interpro_to_db:
 
 rule load_interpro_perdb_to_db:
     """Loads one InterProScan per-database TSV into its own table (interpro_{db})."""
+    localrule: True
     input:
         results=lambda wildcards: INTERPRO_PERDB_RESULTS[wildcards.db].format(genome=wildcards.genome),
         fasta=lambda wildcards: GENOMES[wildcards.genome]
@@ -2841,7 +2820,6 @@ rule load_interpro_perdb_to_db:
         db="|".join(INTERPRO_DB_BASENAMES)
     retries: LOAD_RETRIES
     resources:
-        runtime=load_minutes,
         margie_sb_db_writer=1,
         mem_mb=rc('interpro.load_mem_mb', 2000, config=config)
     params:
@@ -2888,6 +2866,7 @@ rule run_geneprop:
 
 rule load_geneprop_to_db:
     """Loads Genome Properties results into main_database."""
+    localrule: True
     input:
         results=PHASE4_RESULTS['geneprop'],
         fasta=lambda wildcards: GENOMES[wildcards.genome]
@@ -2895,7 +2874,6 @@ rule load_geneprop_to_db:
         tkn=PHASE4_TOKENS['geneprop']
     retries: LOAD_RETRIES
     resources:
-        runtime=load_minutes,
         margie_sb_db_writer=1
     params:
         gene_caller=gene_caller,
@@ -2940,6 +2918,7 @@ rule run_operon:
 
 rule load_operon_to_db:
     """Loads operon results into main_database."""
+    localrule: True
     input:
         results=OPERON_RESULTS,
         fasta=lambda wildcards: GENOMES[wildcards.genome]
@@ -2947,7 +2926,6 @@ rule load_operon_to_db:
         tkn=OPERON_TOKEN
     retries: LOAD_RETRIES
     resources:
-        runtime=load_minutes,
         margie_sb_db_writer=1
     params:
         gene_caller=gene_caller,
@@ -2995,6 +2973,7 @@ rule run_phobius:
 
 rule load_phobius_to_db:
     """Loads Phobius results into main_database."""
+    localrule: True
     input:
         results=PHOBIUS_RESULTS,
         fasta=lambda wildcards: GENOMES[wildcards.genome]
@@ -3002,7 +2981,6 @@ rule load_phobius_to_db:
         tkn=PHOBIUS_TOKEN
     retries: LOAD_RETRIES
     resources:
-        runtime=load_minutes,
         margie_sb_db_writer=1
     params:
         gene_caller=gene_caller,
@@ -3059,6 +3037,7 @@ rule run_tmbed:
 
 rule load_tmbed_to_db:
     """Loads TMbed results into main_database."""
+    localrule: True
     input:
         results=TMBED_RESULTS,
         fasta=lambda wildcards: GENOMES[wildcards.genome]
@@ -3066,7 +3045,6 @@ rule load_tmbed_to_db:
         tkn=TMBED_TOKEN
     retries: LOAD_RETRIES
     resources:
-        runtime=load_minutes,
         margie_sb_db_writer=1
     params:
         gene_caller=gene_caller,
@@ -3128,6 +3106,7 @@ rule run_signalp6:
 
 rule load_signalp6_to_db:
     """Loads SignalP6 results into main_database."""
+    localrule: True
     input:
         results=SIGNALP6_RESULTS,
         fasta=lambda wildcards: GENOMES[wildcards.genome]
@@ -3135,7 +3114,6 @@ rule load_signalp6_to_db:
         tkn=SIGNALP6_TOKEN
     retries: LOAD_RETRIES
     resources:
-        runtime=load_minutes,
         margie_sb_db_writer=1
     params:
         gene_caller=gene_caller,
@@ -3191,6 +3169,7 @@ rule run_envelope:
 
 rule load_envelope_to_db:
     """Loads envelope results into main_database."""
+    localrule: True
     input:
         results=ENVELOPE_RESULTS,
         fasta=lambda wildcards: GENOMES[wildcards.genome]
@@ -3198,7 +3177,6 @@ rule load_envelope_to_db:
         tkn=ENVELOPE_TOKEN
     retries: LOAD_RETRIES
     resources:
-        runtime=load_minutes,
         margie_sb_db_writer=1
     params:
         gene_caller=gene_caller,
@@ -3247,6 +3225,7 @@ rule run_deepsig:
 
 rule load_deepsig_to_db:
     """Adds the ENVELOPE_* columns to DeepSig results on the host, then loads them."""
+    localrule: True
     input:
         results=DEEPSIG_RESULTS,
         envelope_summary=ENVELOPE_SUMMARY,
@@ -3255,7 +3234,6 @@ rule load_deepsig_to_db:
         tkn=DEEPSIG_TOKEN
     retries: LOAD_RETRIES
     resources:
-        runtime=load_minutes,
         margie_sb_db_writer=1
     params:
         gene_caller=gene_caller,
@@ -3306,6 +3284,7 @@ rule run_psortb:
 
 rule load_psortb_to_db:
     """Adds the ENVELOPE_* columns to PSORTb results on the host, then loads them."""
+    localrule: True
     input:
         results=PSORTB_RESULTS,
         envelope_summary=ENVELOPE_SUMMARY,
@@ -3314,7 +3293,6 @@ rule load_psortb_to_db:
         tkn=PSORTB_TOKEN
     retries: LOAD_RETRIES
     resources:
-        runtime=load_minutes,
         margie_sb_db_writer=1
     params:
         gene_caller=gene_caller,
@@ -3379,6 +3357,7 @@ rule run_signalp4:
 
 rule load_signalp4_to_db:
     """Adds the ENVELOPE_* columns to SignalP4 results on the host, then loads them."""
+    localrule: True
     input:
         results=SIGNALP4_RESULTS,
         envelope_summary=ENVELOPE_SUMMARY,
@@ -3387,7 +3366,6 @@ rule load_signalp4_to_db:
         tkn=SIGNALP4_TOKEN
     retries: LOAD_RETRIES
     resources:
-        runtime=load_minutes,
         margie_sb_db_writer=1
     params:
         gene_caller=gene_caller,
@@ -3403,8 +3381,8 @@ rule load_signalp4_to_db:
 
 # ─────────────────────── Template ─────────────────────── #
 # A new tool, as Dane designed it: its paths with the others, a run rule, then a load rule.
-# Add its token to _phase4_8_targets_for_genome, gated by run_<tool>. A rule on another
-# SLURM partition gets a group apart from its load rule.
+# Add its token to _phase4_8_targets_for_genome, gated by run_<tool>. The load rule is a local
+# rule, run in the run's own SLURM job (see LOAD_RETRIES).
 #
 # # Newtool outputs
 # NEWTOOL_RESULTS = f"{GENOME_PREFIX}newtool/newtool_results.tsv"
@@ -3417,7 +3395,6 @@ rule load_signalp4_to_db:
 #         faa=GENE_FAA
 #     output:
 #         results=NEWTOOL_RESULTS
-#     group: "newtool"
 #     threads: rc('newtool.threads', 4, config=config)
 #     resources:
 #         mem_mb=rc('newtool.mem_mb', 4000, config=config),
@@ -3435,11 +3412,14 @@ rule load_signalp4_to_db:
 #
 # rule load_newtool_to_db:
 #     """Load newtool TSV output into SQLite database"""
+#     localrule: True
 #     input:
 #         results=NEWTOOL_RESULTS
 #     output:
 #         tkn=NEWTOOL_TOKEN
-#     group: "newtool"
+#     retries: LOAD_RETRIES
+#     resources:
+#         margie_sb_db_writer=1
 #     params:
 #         db=MAIN_DATABASE,
 #         script=LOAD_SCRIPT

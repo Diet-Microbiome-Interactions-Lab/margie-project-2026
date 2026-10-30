@@ -64,7 +64,7 @@ def test_a_rule_runs_to_the_next_rule(client):
     got = client.get('/v1/code/snippet', params={'path': 'margie_sb.smk', 'symbol': 'rule:load_cog_to_db'}).json()
     assert got['text'].startswith('rule load_cog_to_db:') or got['text'].startswith('#')
     assert 'rule ' not in got['text'].split('\n', 1)[1]
-    assert 'runtime=load_minutes' in got['text']
+    assert 'localrule: True' in got['text']
 
 
 @pytest.mark.parametrize('path,symbol', [('workflow.py', 'WorkflowRunner'), ('../api/auth.py', 'get_current_user'),

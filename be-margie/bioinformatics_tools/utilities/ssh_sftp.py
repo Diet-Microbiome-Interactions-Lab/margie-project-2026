@@ -249,38 +249,6 @@ def write_remote_text_file(
     LOGGER.info('Wrote remote text file to %s', remote_path)
 
 
-def copy_remote_directory(
-    src_path: str,
-    dest_path: str,
-    connection: SSHConnection,
-) -> None:
-    """Copies a remote directory tree to a new path with one rsync on the cluster.
-
-    Excludes .snakemake/ (it embeds the old absolute path and is regenerated)
-    and original_container_outputs/*/stage/ (per-run scratch). Creates dest_path
-    if needed; raises RuntimeError if rsync exits non-zero.
-    """
-    ssh = connection.connect()
-    try:
-        quoted_src = shlex.quote(src_path.rstrip('/') + '/')
-        quoted_dest = shlex.quote(dest_path)
-        cmd = (
-            f'mkdir -p {quoted_dest} && '
-            f'rsync -a '
-            f"--exclude='.snakemake' "
-            f"--exclude='original_container_outputs/*/stage' "
-            f'{quoted_src} {quoted_dest}'
-        )
-        LOGGER.info('Copying remote directory %s -> %s', src_path, dest_path)
-        _, stdout, stderr = ssh.exec_command(cmd)
-        exit_code = stdout.channel.recv_exit_status()
-        if exit_code != 0:
-            err = stderr.read().decode('utf-8', errors='replace')
-            raise RuntimeError(f'rsync failed (exit {exit_code}) copying {src_path} to {dest_path}: {err}')
-    finally:
-        pass  # pooled client: closing it would defeat SSHConnection's pool
-
-
 def stage_selected_genomes(
     source_dir: str,
     names: list[str],
@@ -326,66 +294,42 @@ def stage_selected_genomes(
     return out
 
 
-def _build_path_rewrite_script(directory: str, old_path: str, new_path: str) -> str:
-    """Builds the Python source that rewrite_path_references() runs remotely.
-
-    Paths are embedded via repr() and replaced with a literal str.replace(), so
-    no escaping is needed. Kept separate so tests can run the script locally.
-    """
-    return (
-        "import os\n"
-        f"old = {old_path!r}\n"
-        f"new = {new_path!r}\n"
-        "modified = 0\n"
-        f"for root, _, files in os.walk({directory!r}):\n"
-        "    for name in files:\n"
-        "        path = os.path.join(root, name)\n"
-        "        try:\n"
-        "            with open(path, 'r', encoding='utf-8') as f:\n"
-        "                content = f.read()\n"
-        "        except (UnicodeDecodeError, OSError):\n"
-        "            continue\n"
-        "        if old not in content:\n"
-        "            continue\n"
-        "        try:\n"
-        "            with open(path, 'w', encoding='utf-8') as f:\n"
-        "                f.write(content.replace(old, new))\n"
-        "            modified += 1\n"
-        "        except OSError:\n"
-        "            continue\n"
-        "print(modified)\n"
-    )
-
-
-def rewrite_path_references(
-    directory: str,
-    old_path: str,
-    new_path: str,
+def stage_genome_links(
+    links: dict[str, str],
     connection: SSHConnection,
-) -> int:
-    """Replaces every literal old_path with new_path in text files under directory.
+    label: str = '',
+) -> str:
+    """Builds a folder of symlinks, {link name: absolute target}, and returns its absolute path:
+    stage_selected_genomes for genomes picked from a run, whose files may sit in several folders.
 
-    Used after copy_remote_directory() on Resume to fix provenance paths some
-    tools write into their outputs. Runs as an embedded Python script over SSH
-    to avoid sed escaping; binary files and per-file errors are skipped.
-
-    Returns the number of files modified.
+    Raises ValueError for a name that is not a plain file name or a target that is not an
+    absolute path, and RuntimeError if the remote command fails.
     """
+    if not links:
+        raise ValueError('No genomes were selected.')
+    for name, target in links.items():
+        if not name or '/' in name or name in ('.', '..'):
+            raise ValueError(f'Not a genome file name: {name!r}')
+        if not target.startswith('/') or '\n' in target:
+            raise ValueError(f'Not a genome file: {target!r}')
+
+    stamp = time.strftime('%Y%m%d-%H%M%S')
+    suffix = f"-{re.sub(r'[^A-Za-z0-9]+', '-', label).strip('-')}" if label else ''
+    rel = f'.margie/selections/{stamp}{suffix}'
+    made = ' && '.join(f'ln -sfn {shlex.quote(t)} "$d"/{shlex.quote(n)}' for n, t in links.items())
+    cmd = f'd="$HOME"/{shlex.quote(rel)} && mkdir -p "$d" && {made} && printf %s "$d"'
+
     ssh = connection.connect()
-    try:
-        script = _build_path_rewrite_script(directory, old_path, new_path)
-        remote_python = '~/bioinformatics-tools/.venv/bin/python'
-        cmd = f'{remote_python} -c {shlex.quote(script)}'
-        _, stdout, stderr = ssh.exec_command(cmd)
-        out = stdout.read().decode().strip()
-        exit_code = stdout.channel.recv_exit_status()
-        if exit_code != 0:
-            err = stderr.read().decode('utf-8', errors='replace')
-            LOGGER.warning('rewrite_path_references failed (exit %d) for %s: %s', exit_code, directory, err)
-            return 0
-        return int(out) if out.isdigit() else 0
-    finally:
-        pass  # pooled client: closing it would defeat SSHConnection's pool
+    LOGGER.info('Staging %d genome(s) picked from a run', len(links))
+    _, stdout, stderr = ssh.exec_command(cmd)
+    out = stdout.read().decode('utf-8', errors='replace').strip()
+    exit_code = stdout.channel.recv_exit_status()
+    if exit_code != 0 or not out:
+        err = stderr.read().decode('utf-8', errors='replace')
+        raise RuntimeError(
+            f'Could not stage the genomes on the cluster (exit {exit_code}): {err or "no path returned"}'
+        )
+    return out
 
 
 def read_remote_file_page(

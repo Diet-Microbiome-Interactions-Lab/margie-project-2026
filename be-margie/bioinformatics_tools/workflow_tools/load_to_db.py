@@ -30,8 +30,10 @@ from datetime import datetime, timezone
 from pathlib import Path
 
 try:
+    from bioinformatics_tools.workflow_tools import db_turn
     from bioinformatics_tools.workflow_tools.genome_identity import genome_hash, genome_hashes
 except ImportError:  # run as a script, or imported from margie_sb.smk
+    import db_turn
     from genome_identity import genome_hash, genome_hashes
 
 # Sequence and command_used fields exceed csv's 131072-byte default limit.
@@ -63,7 +65,7 @@ def _retry_operation(func, max_retries: int = 12, initial_delay: float = 2.0):
                     print(f"[load_to_db] database busy (attempt {attempt + 1}/{max_retries}): {e}. "
                           f"Retrying in {delay:.1f}s...", file=sys.stderr)
                     time.sleep(delay)
-                    delay *= 2
+                    delay = min(delay * 2, 30.0)
             else:
                 raise
     raise last_error
@@ -662,6 +664,14 @@ def main():
         print(f"ERROR: Input file not found: {args.input_file}", file=sys.stderr)
         sys.exit(1)
 
+    # One load at a time across the account's genomes and runs (db_turn); the wait is in the run's
+    # own SLURM job, as the loads are local rules (margie_sb.smk).
+    with db_turn.turn(args.db_path):
+        _load(args)
+
+
+def _load(args) -> None:
+    """Loads one tool's results, with the database's write turn held."""
     label = args.source_tool if args.format == "gff" else args.table_name
     # Looked up under both hashes, recorded under the sequence hash.
     hashes = fasta_hashes(args.fasta) if getattr(args, "fasta", None) else []

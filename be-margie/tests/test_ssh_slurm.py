@@ -239,3 +239,88 @@ class TestDriverInSlurm:
         assert ssh_slurm.is_replayable(
             {"has_log": True, "exit_code": None, "log_idle": 99999.0,
              "driver_state": None}) is False
+
+
+class TestResumeCopyJob:
+    """Tests Resume's copy of the earlier run's folder: a job of its own on a compute node, which
+    the driver waits for, so the request returns at once and Stop cancels it."""
+
+    BASE = "$HOME/.local/share/bsp/jobs/j2"
+
+    def _launch(self, copy_from="/scratch/u/margie-output/2026-10-27-1233",
+                copy_to="/scratch/u/margie-output/2026-10-28-0747"):
+        b = self.BASE
+        return ssh_slurm.build_driver_launch(
+            cmd="dane_wf margie sb", base=b, safe="j2", log=f"{b}.log", rcf=f"{b}.rc",
+            jobidf=f"{b}.jobid", driversh=f"{b}.driver.sh", account="lab",
+            copy_from=copy_from, copy_to=copy_to)
+
+    def test_the_copy_is_its_own_job_and_the_driver_waits_for_it(self):
+        s = self._launch()
+        copy = s.split("<<'MARGIE_COPY_SBATCH_EOF'\n", 1)[1].split("\nMARGIE_COPY_SBATCH_EOF\n", 1)[0]
+        assert f"#SBATCH --cpus-per-task={ssh_slurm.COPY_CPUS}" in copy
+        assert "#SBATCH --account=lab" in copy
+        # Working in the new folder, so Stop's sweep of the run's folder cancels it.
+        assert "#SBATCH --chdir=/scratch/u/margie-output/2026-10-28-0747" in copy
+        assert f"bash {self.BASE}.copy.sh > {self.BASE}.log 2>&1" in copy
+        assert '--dependency=afterok:"$copyid" --kill-on-invalid-dep=yes' in s
+        # The driver's id is the one line the launch prints.
+        assert s.rstrip().endswith(f"{self.BASE}.sbatch | tee {self.BASE}.jobid")
+
+    def test_the_driver_appends_to_the_log_the_copy_started(self):
+        assert f"nohup bash {self.BASE}.driver.sh >> {self.BASE}.log 2>&1" in self._launch()
+
+    def test_a_launch_without_a_copy_is_unchanged(self):
+        s = self._launch(copy_from=None, copy_to=None)
+        assert "--dependency" not in s and "copy.sh" not in s
+        assert f"nohup bash {self.BASE}.driver.sh > {self.BASE}.log 2>&1" in s
+        assert f"sbatch --parsable {self.BASE}.sbatch | tee {self.BASE}.jobid" in s
+
+    def test_the_copy_runs_folders_in_parallel_and_leaves_out_per_run_files(self):
+        s = ssh_slurm.build_copy_script("/old/run", "/new/run")
+        assert 'xargs -0 -r -P "$n"' in s
+        assert "! -name .snakemake ! -name run-command.sh" in s
+        assert "--exclude=.snakemake --exclude='original_container_outputs/*/stage'" in s
+
+    def test_paths_with_spaces_are_quoted(self):
+        s = ssh_slurm.build_copy_script("/old run/x", "/new run/y")
+        assert "src='/old run/x'" in s and "dst='/new run/y'" in s
+
+    @pytest.mark.skipif(not __import__("shutil").which("rsync"), reason="needs rsync")
+    def test_the_script_copies_fixes_paths_and_keeps_the_new_command(self, tmp_path):
+        import subprocess
+        import sys
+
+        old, new = tmp_path / "2026-10-27-1233", tmp_path / "2026-10-28-0747"
+        (old / "genome" / "kegg").mkdir(parents=True)
+        (old / "genome" / "kegg" / "kegg_results.tsv").write_text(f"in\t{old}/genome/rasttk/rast.faa\n")
+        (old / "genome" / "original_container_outputs" / "kegg" / "stage").mkdir(parents=True)
+        (old / "genome" / "original_container_outputs" / "kegg" / "stage" / "tmp.txt").write_text("x")
+        (old / ".snakemake").mkdir()
+        (old / "run-command.sh").write_text("old command\n")
+        (old / "blob.bin").write_bytes(b"\xff\xfe\x00 not utf-8 \xfa")
+        new.mkdir()
+        (new / "run-command.sh").write_text(f"new command in {new}\n")
+
+        script = tmp_path / "copy.sh"
+        script.write_text(ssh_slurm.build_copy_script(str(old), str(new), python=sys.executable))
+        r = subprocess.run(["bash", str(script)], capture_output=True, text=True,
+                           env={"PATH": "/usr/bin:/bin:/usr/local/bin:/opt/homebrew/bin", "SLURM_CPUS_PER_TASK": "3"})
+
+        assert r.returncode == 0, r.stdout + r.stderr
+        assert (new / "genome" / "kegg" / "kegg_results.tsv").read_text() == f"in\t{new}/genome/rasttk/rast.faa\n"
+        assert not (new / ".snakemake").exists()
+        assert not (new / "genome" / "original_container_outputs" / "kegg" / "stage").exists()
+        assert (new / "run-command.sh").read_text() == f"new command in {new}\n"
+        assert (new / "blob.bin").read_bytes() == (old / "blob.bin").read_bytes()
+        assert "replaced in 1 of" in r.stdout
+
+    def test_a_missing_earlier_folder_stops_the_copy(self, tmp_path):
+        import subprocess
+        import sys
+
+        script = tmp_path / "copy.sh"
+        script.write_text(ssh_slurm.build_copy_script(str(tmp_path / "gone"), str(tmp_path / "new"), python=sys.executable))
+        r = subprocess.run(["bash", str(script)], capture_output=True, text=True)
+        assert r.returncode == 1
+        assert "folder is missing" in r.stdout

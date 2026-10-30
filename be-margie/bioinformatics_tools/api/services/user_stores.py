@@ -92,7 +92,7 @@ STORES: list[dict] = [
     {
         'id': 'job_db',
         'label': 'MARGIE database',
-        'note': 'The main MARGIE database (SQLite): every run’s results, cached tool outputs and the job history.',
+        'note': 'The main MARGIE database (SQLite): every run’s results and cached tool outputs; the job history sits beside it.',
         'kind': 'file',
         'base_rel': 'sqlite/margie-thesis-22-prokaryotes-base.db',
         'depot_sub': 'sqlite',

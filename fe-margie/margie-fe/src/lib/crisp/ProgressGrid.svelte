@@ -24,7 +24,8 @@
 		reported = true,
 		elapsedOf = () => '',
 		onLog,
-		onRerun
+		onRerun,
+		rerunning = false
 	}: {
 		prog: Progress;
 		/** Whether the run is still going (times left, steps under way). */
@@ -41,6 +42,8 @@
 		onLog?: (g: string, t: string, rules: string[]) => void;
 		/** Runs a failed step's genome again from that step. */
 		onRerun?: (g: string, t: string) => void;
+		/** A Run again (or Resume, Restart) is under way, so Run again waits. */
+		rerunning?: boolean;
 	} = $props();
 
 	/** The rules a failed step ran: its failed SLURM jobs', else its own rule names. */
@@ -295,8 +298,9 @@
 						<button
 							type="button"
 							class="mg-btn small primary"
-							title="Runs this step again, then the genome's steps after it; its finished steps are kept"
-							onclick={() => { const at = [row.g, c.t] as const; pick = null; onRerun?.(...at); }}>Run again</button
+							disabled={rerunning}
+							title={going ? "Runs this step again, then the genome's steps after it; its finished steps are kept" : 'Runs this genome again on its own, as a new job: its failed steps run, its finished steps are kept'}
+							onclick={() => { const at = [row.g, c.t] as const; pick = null; onRerun?.(...at); }}>{rerunning ? 'Starting…' : 'Run again'}</button
 						>
 					{/if}
 					{#if c.href}

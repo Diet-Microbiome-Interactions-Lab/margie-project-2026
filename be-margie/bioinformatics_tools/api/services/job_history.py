@@ -1,14 +1,18 @@
 """
-Persistent job history in the user's main_database SQLite file (table api_jobs),
-keyed on the API's job_id and kept in sync with the in-memory job_store.
+Persistent job history (table api_jobs), keyed on the API's job_id and kept in sync with the
+in-memory job_store. It has a SQLite file of its own beside main_database (history_path), made
+the first time from the rows main_database held until then: a run's writes to main_database hold
+its readers, and the Jobs page reads the history.
 Runs on the cluster account, called over SSH as `python -m ... job_history <action>`
-with JSON on stdin/stdout (see job_history_client.py).
+with JSON on stdin/stdout (see job_history_client.py). Each action takes main_database's path.
 """
+import getpass
 import json
 import logging
 import os
 import sqlite3
 import sys
+import threading
 from datetime import datetime, timezone
 from pathlib import Path
 
@@ -35,6 +39,10 @@ CREATE TABLE IF NOT EXISTS api_jobs (
 );
 """
 
+_ALL_COLUMNS = ("job_id", "owner_username", "owner_cluster_username", "workflow", "genome_path",
+                "output_dir", "work_dir", "status", "phase", "selected_tools", "relaunched_from",
+                "logs", "slurm_jobs", "containers", "created_at", "updated_at")
+
 # Added after the first release; older databases get them via ALTER TABLE.
 _ADDED_COLUMNS = (
     "owner_username",
@@ -60,12 +68,60 @@ def _get_connection(db_path: str, timeout: float = 30.0) -> sqlite3.Connection:
     return conn
 
 
+def history_path(db_path: str) -> str:
+    """The history's own file, in main_database's folder: <account>-job-history.db."""
+    folder = os.path.dirname(os.path.expanduser(db_path))
+    return os.path.join(folder, f"{getpass.getuser()}-job-history.db")
+
+
+def _history(db_path: str, create: bool = True) -> str | None:
+    """Returns the history's file. The first time, it is made from main_database's api_jobs rows
+    and then put in place whole, so no reader sees it half made. A folder the account cannot write
+    to keeps the history in main_database. None when neither exists and `create` is False."""
+    main = os.path.expanduser(db_path)
+    path = history_path(db_path)
+    if os.path.exists(path):
+        return path
+    folder = os.path.dirname(path)
+    if not os.access(folder or ".", os.W_OK):
+        return main if os.path.exists(main) or create else None
+    if not create and not os.path.exists(main):
+        return None
+    tmp = f"{path}.{os.getpid()}-{threading.get_ident()}.new"
+    try:
+        conn = _get_connection(tmp, timeout=120.0)
+        try:
+            conn.execute(CREATE_API_JOBS_SQL)
+            conn.commit()
+            if os.path.exists(main):
+                conn.execute("ATTACH DATABASE ? AS m", (main,))
+                if conn.execute("SELECT 1 FROM m.sqlite_master WHERE type = 'table' AND name = 'api_jobs'").fetchone():
+                    have = {r[1] for r in conn.execute("PRAGMA m.table_info(api_jobs)")}
+                    cols = ", ".join(f'"{c}"' for c in _ALL_COLUMNS if c in have)
+                    conn.execute(f"INSERT OR REPLACE INTO main.api_jobs ({cols}) SELECT {cols} FROM m.api_jobs")
+                    conn.commit()
+                conn.execute("DETACH DATABASE m")
+        finally:
+            conn.close()
+        try:
+            os.link(tmp, path)
+        except FileExistsError:
+            pass  # another call made it first
+        except OSError:
+            if not os.path.exists(path):
+                os.rename(tmp, path)
+    finally:
+        if os.path.exists(tmp):
+            os.remove(tmp)
+    return path
+
+
 def ensure_table(db_path: str) -> None:
     """Creates api_jobs if needed and adds any missing later columns."""
     if not db_path:
         return
     try:
-        conn = _get_connection(db_path)
+        conn = _get_connection(_history(db_path))
         try:
             conn.execute(CREATE_API_JOBS_SQL)
             existing_cols = {row[1] for row in conn.execute("PRAGMA table_info(api_jobs)")}
@@ -84,14 +140,14 @@ def record_job_created(db_path: str, job_id: str, workflow: str,
                        owner_username: str | None = None,
                        owner_cluster_username: str | None = None,
                        selected_tools: str | None = None,
-                       relaunched_from: str | None = None) -> None:
-    """Inserts a new pending job row."""
+                       relaunched_from: str | None = None) -> bool:
+    """Inserts a new pending job row; returns whether it was written."""
     if not db_path:
-        return
+        return False
     ensure_table(db_path)
     now = datetime.now(timezone.utc).isoformat()
     try:
-        conn = _get_connection(db_path)
+        conn = _get_connection(_history(db_path))
         try:
             conn.execute(
                 "INSERT OR REPLACE INTO api_jobs "
@@ -114,8 +170,10 @@ def record_job_created(db_path: str, job_id: str, workflow: str,
             conn.commit()
         finally:
             conn.close()
-    except sqlite3.Error as exc:
+    except (sqlite3.Error, OSError) as exc:
         LOGGER.warning("Could not record job %s in history: %s", job_id, exc)
+        return False
+    return True
 
 
 def record_job_updated(db_path: str, job_id: str, **fields) -> None:
@@ -132,7 +190,7 @@ def record_job_updated(db_path: str, job_id: str, **fields) -> None:
     set_clause = ", ".join(f"{k} = ?" for k in relevant)
     values = list(relevant.values()) + [datetime.now(timezone.utc).isoformat(), job_id]
     try:
-        conn = _get_connection(db_path)
+        conn = _get_connection(_history(db_path))
         try:
             conn.execute(
                 f"UPDATE api_jobs SET {set_clause}, updated_at = ? WHERE job_id = ?",
@@ -141,7 +199,7 @@ def record_job_updated(db_path: str, job_id: str, **fields) -> None:
             conn.commit()
         finally:
             conn.close()
-    except sqlite3.Error as exc:
+    except (sqlite3.Error, OSError) as exc:
         LOGGER.warning("Could not update job %s in history: %s", job_id, exc)
 
 
@@ -183,10 +241,11 @@ def get_job(db_path: str, job_id: str,
             owner_username: str | None = None,
             owner_cluster_username: str | None = None) -> dict | None:
     """Returns one job row the owner may see, or None."""
-    if not db_path or not Path(os.path.expanduser(db_path)).exists():
-        return None
     try:
-        conn = _get_connection(db_path)
+        path = _history(db_path, create=False) if db_path else None
+        if path is None:
+            return None
+        conn = _get_connection(path)
         try:
             conn.row_factory = sqlite3.Row
             where_ownership, owner_params = _ownership_where(owner_username, owner_cluster_username)
@@ -199,7 +258,7 @@ def get_job(db_path: str, job_id: str,
             return _decode_row(dict(row)) if row else None
         finally:
             conn.close()
-    except sqlite3.Error as exc:
+    except (sqlite3.Error, OSError) as exc:
         LOGGER.warning("Could not read job %s from history: %s", job_id, exc)
         return None
 
@@ -213,10 +272,11 @@ def list_jobs(db_path: str, workflow: str | None = None, limit: int = 100,
               owner_cluster_username: str | None = None) -> list[dict]:
     """Returns one page of jobs, newest first, optionally for one workflow.
     Returns an empty list when the database or table does not exist yet."""
-    if not db_path or not Path(os.path.expanduser(db_path)).exists():
-        return []
     try:
-        conn = _get_connection(db_path)
+        path = _history(db_path, create=False) if db_path else None
+        if path is None:
+            return []
+        conn = _get_connection(path)
         try:
             conn.row_factory = sqlite3.Row
             where_ownership, owner_params = _ownership_where(owner_username, owner_cluster_username)
@@ -243,7 +303,7 @@ def list_jobs(db_path: str, workflow: str | None = None, limit: int = 100,
             return [_decode_row(dict(r)) for r in rows]
         finally:
             conn.close()
-    except sqlite3.Error as exc:
+    except (sqlite3.Error, OSError) as exc:
         LOGGER.warning("Could not list jobs from history at %s: %s", db_path, exc)
         return []
 
@@ -275,10 +335,11 @@ def count_jobs(db_path: str, workflow: str | None = None,
                owner_username: str | None = None,
                owner_cluster_username: str | None = None) -> int:
     """Returns the number of jobs matching the workflow filter and owner."""
-    if not db_path or not Path(os.path.expanduser(db_path)).exists():
-        return 0
     try:
-        conn = _get_connection(db_path)
+        path = _history(db_path, create=False) if db_path else None
+        if path is None:
+            return 0
+        conn = _get_connection(path)
         try:
             where_ownership, owner_params = _ownership_where(owner_username, owner_cluster_username)
             conditions: list[str] = []
@@ -294,7 +355,7 @@ def count_jobs(db_path: str, workflow: str | None = None,
             return row[0] if row else 0
         finally:
             conn.close()
-    except sqlite3.Error as exc:
+    except (sqlite3.Error, OSError) as exc:
         LOGGER.warning("Could not count jobs from history at %s: %s", db_path, exc)
         return 0
 
@@ -319,7 +380,7 @@ def clear_jobs(db_path: str, backup_path: str, owner_username: str | None = None
     if os.path.exists(backup):
         raise ValueError(f"backup already exists: {backup_path}")
     Path(backup).parent.mkdir(parents=True, exist_ok=True)
-    conn = _get_connection(db_path)
+    conn = _get_connection(_history(db_path))
     try:
         conn.execute("ATTACH DATABASE ? AS b", (backup,))
         n = conn.execute(f"SELECT count(*) FROM main.api_jobs WHERE {where}", params).fetchone()[0]
@@ -347,16 +408,15 @@ def _count_going(conn: sqlite3.Connection, ownership: str, owner_params: list) -
 # ---- CLI: <action> argument, JSON payload on stdin, JSON result on stdout ----
 
 def dispatch(action: str, payload: dict):
-    """Runs one action for the CLI or the in-process client; returns None for create/update."""
+    """Runs one action for the CLI or the in-process client; returns None for update."""
     db_path = payload.get("db_path")
     if action == "create":
-        record_job_created(
+        return {"recorded": record_job_created(
             db_path, payload["job_id"], payload["workflow"],
             payload.get("genome_path"), payload.get("output_dir"),
             payload.get("owner_username"), payload.get("owner_cluster_username"),
             payload.get("selected_tools"), payload.get("relaunched_from"),
-        )
-        return None
+        )}
     if action == "update":
         record_job_updated(db_path, payload["job_id"], **payload.get("fields", {}))
         return None
@@ -393,7 +453,7 @@ def _main() -> int:
     except ValueError as exc:
         print(str(exc), file=sys.stderr)
         return 2
-    if action not in ("create", "update"):
+    if action != "update":
         print(json.dumps(result))
     return 0
 

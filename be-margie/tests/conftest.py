@@ -146,3 +146,15 @@ def _no_scratch_copies(monkeypatch):
     """Tests run without the working folder's copies (scratch_cache): their connections are fakes."""
     from bioinformatics_tools.api.services import scratch_cache
     monkeypatch.setattr(scratch_cache, "backup", lambda *args, **kwargs: None)
+
+
+@pytest.fixture(autouse=True)
+def _launches_recorded(monkeypatch):
+    """A launched run reads back from the job history (ssh._in_history): the connections are fakes.
+    test_relaunch_guards tests the check itself."""
+    from bioinformatics_tools.api.routers import ssh
+
+    def recorded(*args, **kwargs):
+        return True
+    recorded.real = ssh._in_history
+    monkeypatch.setattr(ssh, "_in_history", recorded)
