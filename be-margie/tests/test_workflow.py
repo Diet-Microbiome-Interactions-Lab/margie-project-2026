@@ -389,20 +389,25 @@ def _fake_launchers(wf, *, stage2_returncodes=(), stage1_running_until=None):
     the commands it was asked to run:
 
       rec['stage1']  Stage 1 wave launches (_start_background_subprocess, no target_genome)
-      rec['stage2']  per-genome Stage 2 launches (target_genome=<name>), in start order
+      rec['stage2']  per-genome Stage 2 compute passes (target_genome=<name>, the database
+                     loads left out with --omit-from), in start order
+      rec['loads']   their loads passes (the same target, nothing left out), in start order
       rec['run']     _run_subprocess calls (Stage 3 llm_all and the finalize targets)
 
-    Stage 2 launch n exits with stage2_returncodes[n] (0 when not given); a
-    non-zero one carries a snakemake-style "Error in rule" stderr. Stage 1
+    Stage 2 compute pass n exits with stage2_returncodes[n] (0 when not given); a
+    non-zero one carries a snakemake-style "Error in rule" stderr. A loads pass exits 0. Stage 1
     waves exit at once unless stage1_running_until is given. The real
     _Stage1Waves drives the waves; it is only subclassed to record instances so
     its thread can be joined before the patches are undone."""
-    rec = {'stage1': [], 'stage2': [], 'run': []}
+    rec = {'stage1': [], 'stage2': [], 'loads': [], 'run': []}
 
     def fake_start_background(cmd):
         if _target_genome_of(cmd) is None:
             rec['stage1'].append(cmd)
             return _FakeBackground(running_until=stage1_running_until)
+        if '--omit-from' not in cmd:
+            rec['loads'].append(cmd)
+            return _FakeBackground()
         index = len(rec['stage2'])
         rec['stage2'].append(cmd)
         rc = stage2_returncodes[index] if index < len(stage2_returncodes) else 0
@@ -471,10 +476,17 @@ class TestRunPipelineBatchSequential:
         assert any(tok.endswith('/genome1/gtdbtk/gtdbtk_db.tkn') for tok in stage1_cmd)
         assert 'rasttk_all' not in stage1_cmd
 
-        # Stage 2: one process for the one genome.
+        # Stage 2: the genome's compute, its database loads left out, then its loads.
         assert len(rec['stage2']) == 1
         assert 'phase4_12_one_genome' in rec['stage2'][0]
         assert _target_genome_of(rec['stage2'][0]) == 'genome1'
+        compute = rec['stage2'][0]
+        omitted = compute[compute.index('--omit-from') + 1:]
+        omitted = omitted[:next(i for i, t in enumerate(omitted) if t.startswith('-'))]
+        assert {'load_pfam_to_db', 'load_interpro_perdb_to_db', 'load_scoring_to_db', 'load_fingerprint_to_db'} <= set(omitted)
+        assert all(r.startswith('load_') and r.endswith('_to_db') for r in omitted)
+        assert len(rec['loads']) == 1 and _target_genome_of(rec['loads'][0]) == 'genome1'
+        assert 'phase4_12_one_genome' in rec['loads'][0]
 
         # LLM off: no Stage 3; the finalize targets follow Stage 2.
         assert not any('llm_all' in cmd for cmd in rec['run'])
@@ -557,6 +569,9 @@ class TestRunPipelineBatchSequential:
                                                      cache_map_fn=lambda s: {}, mode='dev')
 
         assert len(rec['stage2']) == 3
+        # The failed genome's loads are left out: they would run its failed step again first.
+        assert sorted(_target_genome_of(c) for c in rec['loads']) == sorted(
+            _target_genome_of(c) for i, c in enumerate(rec['stage2']) if i != 1)
         assert rec['run'] == []  # no run-wide finalize with a gap
         assert ret is None  # finished(), not failed()
         assert not wf.report.status.indicates_failure
@@ -595,18 +610,24 @@ class TestRunPipelineBatchSequential:
 
 
 class _SlowStage2:
-    """A Stage 2 process that runs for `polls` polls, counting how many are running together."""
+    """A Stage 2 pass ('compute' or 'loads') that runs for `polls` polls, counting how many of its
+    kind, and of both, are running together."""
 
-    running = 0
-    most = 0
+    running: dict = {}
+    most: dict = {}
 
-    def __init__(self, polls: int = 3):
+    def __init__(self, kind: str, polls: int = 3):
         self.proc = MagicMock(returncode=0)
         self.stdout_lines: list[str] = []
         self.stderr_lines: list[str] = []
         self._left = polls
-        _SlowStage2.running += 1
-        _SlowStage2.most = max(_SlowStage2.most, _SlowStage2.running)
+        self._kind = kind
+        self._count(+1)
+
+    def _count(self, step):
+        for key in (self._kind, 'both'):
+            _SlowStage2.running[key] = _SlowStage2.running.get(key, 0) + step
+            _SlowStage2.most[key] = max(_SlowStage2.most.get(key, 0), _SlowStage2.running[key])
 
     def poll(self):
         if self._left > 0:
@@ -614,7 +635,7 @@ class _SlowStage2:
             return None
         if self._left == 0:
             self._left = -1
-            _SlowStage2.running -= 1
+            self._count(-1)
         return 0
 
     def wait(self):
@@ -628,15 +649,16 @@ class TestStage2AtOnce:
     SMK_CONFIG = {'output_dir': '/tmp/seqtest', 'main_database': ''}
 
     def _run(self, wf, at_once):
-        _SlowStage2.running = _SlowStage2.most = 0
+        _SlowStage2.running, _SlowStage2.most = {}, {}
         genome_files = {f'genome{k}': f'/g{k}.fa' for k in range(1, 6)}
         started = []
 
         def fake_start_background(cmd):
             if _target_genome_of(cmd) is None:
                 return _FakeBackground()
-            started.append(_target_genome_of(cmd))
-            return _SlowStage2()
+            kind = 'compute' if '--omit-from' in cmd else 'loads'
+            started.append((_target_genome_of(cmd), kind))
+            return _SlowStage2(kind)
 
         config = {**self.SMK_CONFIG, 'margie_sb.stage2.at_once': at_once}
         with patch('bioinformatics_tools.workflow_tools.workflow.cache_sif_files'), \
@@ -653,14 +675,25 @@ class TestStage2AtOnce:
 
     def test_three_genomes_go_through_stage2_together(self, wf):
         started = self._run(wf, 3)
-        assert sorted(started) == [f'genome{k}' for k in range(1, 6)]
-        assert _SlowStage2.most == 3
+        genomes = [f'genome{k}' for k in range(1, 6)]
+        assert sorted(g for g, kind in started if kind == 'compute') == genomes
+        assert sorted(g for g, kind in started if kind == 'loads') == genomes
+        # Each genome computes, then loads.
+        assert all(started.index((g, 'compute')) < started.index((g, 'loads')) for g in genomes)
+        assert _SlowStage2.most['compute'] == 3 and _SlowStage2.most['loads'] <= 3
         assert wf.report.status.indicates_success
         assert wf.report.data['genomes_processed'] == 5
 
     def test_one_at_a_time_when_set_to_one(self, wf):
         self._run(wf, 1)
-        assert _SlowStage2.most == 1
+        assert _SlowStage2.most['compute'] == 1 and _SlowStage2.most['loads'] == 1
+
+    def test_a_loading_genome_gives_its_place_to_the_next(self, wf):
+        """One place: the next genome computes while the one before it loads, and the run counts a
+        genome processed once its loads are in."""
+        self._run(wf, 1)
+        assert _SlowStage2.most['both'] == 2
+        assert wf.report.data['genomes_processed'] == 5
 
 
 # ---- do_margie_sb ----

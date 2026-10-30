@@ -45,6 +45,8 @@ csv.field_size_limit(10_000_000)
 def _get_connection(db_path: str, timeout: float = 120.0) -> sqlite3.Connection:
     conn = sqlite3.connect(db_path, timeout=timeout)
     conn.execute(f"PRAGMA busy_timeout={int(timeout * 1000)}")
+    # The index pages a load's delete and inserts share stay in memory (256 MiB; the default is 2 MB).
+    conn.execute("PRAGMA cache_size=-262144")
     return conn
 
 
@@ -431,6 +433,11 @@ def safe_float(value: str | None) -> float | None:
 
 def load_gff_to_db(gff_path: str, db_path: str, source_tool: str) -> int:
     """Parse a GFF3 file and insert rows into the annotations table."""
+    return _write_gff(db_path, _read_gff(gff_path, source_tool))
+
+
+def _read_gff(gff_path: str, source_tool: str) -> list[tuple]:
+    """A GFF3 file's rows for the annotations table."""
     rows = []
     with open(gff_path) as fh:
         for line in fh:
@@ -461,7 +468,11 @@ def load_gff_to_db(gff_path: str, db_path: str, source_tool: str) -> int:
                 safe_float(attrs.get("gc_cont")),
                 safe_float(attrs.get("conf")),
             ))
+    return rows
 
+
+def _write_gff(db_path: str, rows: list[tuple]) -> int:
+    """Inserts rows read by _read_gff into the annotations table."""
     def _insert() -> None:
         conn = _get_connection(db_path)
         try:
@@ -519,12 +530,18 @@ def load_csv_to_db(csv_path: str, db_path: str, table_name: str,
     - With `genome_hash`, each row carries the genome's sequence hash (genome_hash), which names
       the genome in the table; organism_name stays as its label.
     """
+    return _write_csv(db_path, _read_csv(csv_path, table_name, delimiter, genome_hash))
+
+
+def _read_csv(csv_path: str, table_name: str, delimiter: str = ",",
+              genome_hash: str | None = None) -> tuple | None:
+    """A delimited file's table (name, headers, column types, typed rows), None with no rows."""
     with open(csv_path, newline="") as fh:
         reader = csv.reader(fh, delimiter=delimiter)
         # An empty file (no header, as an InterProScan analysis with no hits can leave) loads no rows.
         first = next(reader, None)
         if first is None:
-            return 0
+            return None
         headers = [h.strip() for h in first]
         data_rows = list(reader)
     if genome_hash and "genome_hash" not in headers:
@@ -533,7 +550,7 @@ def load_csv_to_db(csv_path: str, db_path: str, table_name: str,
         data_rows = [(r + [""] * (n - len(r)))[:n] + [genome_hash] for r in data_rows]
 
     if not data_rows:
-        return 0
+        return None
 
     # Infer types from multiple sample rows (up to first 10) for better accuracy
     sample_size = min(10, len(data_rows))
@@ -553,20 +570,6 @@ def load_csv_to_db(csv_path: str, db_path: str, table_name: str,
                     elif col_type == "REAL" and inferred == "INTEGER":
                         inferred = "REAL"
         col_types.append(inferred)
-
-    quoted_headers = [f'"{h}"' for h in headers]
-    col_defs = ",\n    ".join(
-        f'"{h}" {t}' for h, t in zip(headers, col_types)
-    )
-    create_sql = f"""
-    CREATE TABLE IF NOT EXISTS {table_name} (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        {col_defs}
-    );
-    """
-
-    placeholders = ", ".join("?" for _ in headers)
-    insert_sql = f"INSERT INTO {table_name} ({', '.join(quoted_headers)}) VALUES ({placeholders});"
 
     # Casts to inferred types, falling back when a later row does not fit.
     def cast_row(row):
@@ -592,7 +595,27 @@ def load_csv_to_db(csv_path: str, db_path: str, table_name: str,
                 result.append(val)
         return tuple(result)
 
-    rows = [cast_row(r) for r in data_rows]
+    return table_name, headers, col_types, [cast_row(r) for r in data_rows]
+
+
+def _write_csv(db_path: str, table: tuple | None) -> int:
+    """Inserts a table read by _read_csv, creating it or adding its new columns first."""
+    if table is None:
+        return 0
+    table_name, headers, col_types, rows = table
+    quoted_headers = [f'"{h}"' for h in headers]
+    col_defs = ",\n    ".join(
+        f'"{h}" {t}' for h, t in zip(headers, col_types)
+    )
+    create_sql = f"""
+    CREATE TABLE IF NOT EXISTS {table_name} (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        {col_defs}
+    );
+    """
+
+    placeholders = ", ".join("?" for _ in headers)
+    insert_sql = f"INSERT INTO {table_name} ({', '.join(quoted_headers)}) VALUES ({placeholders});"
 
     def _insert() -> None:
         conn = _get_connection(db_path)
@@ -664,14 +687,14 @@ def main():
         print(f"ERROR: Input file not found: {args.input_file}", file=sys.stderr)
         sys.exit(1)
 
-    # One load at a time across the account's genomes and runs (db_turn); the wait is in the run's
-    # own SLURM job, as the loads are local rules (margie_sb.smk).
-    with db_turn.turn(args.db_path):
-        _load(args)
+    _load(args)
 
 
 def _load(args) -> None:
-    """Loads one tool's results, with the database's write turn held."""
+    """Loads one tool's results. One load writes at a time across the account's genomes and runs
+    (db_turn), the wait being in the run's own SLURM job as the loads are local rules
+    (margie_sb.smk): the file is hashed, checked against the database and read before the write
+    turn is taken, and the turn holds the delete, the insert and the record of the load."""
     label = args.source_tool if args.format == "gff" else args.table_name
     # Looked up under both hashes, recorded under the sequence hash.
     hashes = fasta_hashes(args.fasta) if getattr(args, "fasta", None) else []
@@ -697,28 +720,28 @@ def _load(args) -> None:
             Path(args.token).write_text(f"0 rows loaded from {label} (already current)\n")
         return
 
-    # Clears this organism's existing rows first.
-    if organism_name:
-        deleted = _delete_stale_organism_rows(args.db_path, label, organism_name,
-                                              fasta_hash=hashes)
-        if deleted:
-            print(f"Deleted {deleted} stale rows from {label} (pre-delete before reload)")
-        # RASTtk's gene calls replace Prodigal's.
-        if label == "rasttk":
-            replaced = _delete_stale_organism_rows(args.db_path, "prodigal", organism_name, fasta_hash=hashes)
-            if replaced:
-                print(f"Deleted {replaced} rows of Prodigal's gene calls for this genome (RASTtk's replace them)")
-
     if args.format == "gff":
-        n = load_gff_to_db(args.input_file, args.db_path, args.source_tool)
-    elif args.format == "tsv":
-        n = load_csv_to_db(args.input_file, args.db_path, args.table_name,
-                           delimiter="\t", genome_hash=fasta_hash)
+        rows = _read_gff(args.input_file, args.source_tool)
     else:
-        n = load_csv_to_db(args.input_file, args.db_path, args.table_name, genome_hash=fasta_hash)
+        rows = _read_csv(args.input_file, args.table_name, "\t" if args.format == "tsv" else ",", genome_hash=fasta_hash)
 
-    _record_load(args.db_path, input_hash, label, args.input_file, n,
-                 fasta_hash=fasta_hash, organism_name=organism_name, gene_caller=gene_caller)
+    with db_turn.turn(args.db_path):
+        # Clears this organism's existing rows first.
+        if organism_name:
+            deleted = _delete_stale_organism_rows(args.db_path, label, organism_name,
+                                                  fasta_hash=hashes)
+            if deleted:
+                print(f"Deleted {deleted} stale rows from {label} (pre-delete before reload)")
+            # RASTtk's gene calls replace Prodigal's.
+            if label == "rasttk":
+                replaced = _delete_stale_organism_rows(args.db_path, "prodigal", organism_name, fasta_hash=hashes)
+                if replaced:
+                    print(f"Deleted {replaced} rows of Prodigal's gene calls for this genome (RASTtk's replace them)")
+
+        n = _write_gff(args.db_path, rows) if args.format == "gff" else _write_csv(args.db_path, rows)
+
+        _record_load(args.db_path, input_hash, label, args.input_file, n,
+                     fasta_hash=fasta_hash, organism_name=organism_name, gene_caller=gene_caller)
     print(f"Loaded {n} rows from {label} into {args.db_path}")
 
     if args.token:

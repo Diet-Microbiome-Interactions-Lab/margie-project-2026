@@ -59,6 +59,20 @@ CREATE TABLE IF NOT EXISTS output_cache_when (
 );
 """
 
+# Each cached file's SHA-256, so a store of the same file again writes nothing (store()).
+CREATE_OUTPUT_CACHE_DIGESTS_SQL = """
+CREATE TABLE IF NOT EXISTS output_cache_digests (
+    input_hash TEXT NOT NULL,
+    tool TEXT NOT NULL,
+    filename TEXT NOT NULL,
+    sha256 TEXT NOT NULL,
+    PRIMARY KEY (input_hash, tool, filename)
+) WITHOUT ROWID;
+"""
+
+# SQLite's page cache per connection, KiB (256 MiB; the default is 2 MB).
+CACHE_KIB = 262144
+
 
 def _get_connection(db_path: str, timeout: float = 120.0) -> sqlite3.Connection:
     """Create a SQLite connection configured for network filesystems.
@@ -75,6 +89,8 @@ def _get_connection(db_path: str, timeout: float = 120.0) -> sqlite3.Connection:
     # Busy timeout (milliseconds): waits as long as `timeout` for the lock
     # This is critical for NFS where lock operations are slow
     conn.execute(f"PRAGMA busy_timeout={int(timeout * 1000)}")
+    # The index pages a call's lookups share stay in memory.
+    conn.execute(f"PRAGMA cache_size=-{CACHE_KIB}")
 
     return conn
 
@@ -139,11 +155,28 @@ def _ensure_table(conn: sqlite3.Connection) -> None:
     # A read first: CREATE ... IF NOT EXISTS takes the write lock even when the table is there,
     # and on a busy database that wait is what failed.
     have = {r[0] for r in conn.execute(
-        "SELECT name FROM sqlite_master WHERE type='table' AND name IN ('output_cache', 'output_cache_when')")}
+        "SELECT name FROM sqlite_master WHERE type='table' AND name IN ('output_cache', 'output_cache_when', 'output_cache_digests')")}
     if 'output_cache' not in have:
         conn.execute(CREATE_OUTPUT_CACHE_SQL)
     if 'output_cache_when' not in have:
         conn.execute(CREATE_OUTPUT_CACHE_WHEN_SQL)
+    if 'output_cache_digests' not in have:
+        conn.execute(CREATE_OUTPUT_CACHE_DIGESTS_SQL)
+
+
+def _digests(conn: sqlite3.Connection, input_hash: str, tool: str) -> dict[str, tuple[str, int]]:
+    """The cached files of a genome and tool with a digest, {filename: (sha256, bytes)}. A blob's
+    length comes from its row's header, without reading the blob."""
+    try:
+        sums = dict(conn.execute("SELECT filename, sha256 FROM output_cache_digests WHERE input_hash = ? AND tool = ?",
+                                 (input_hash, tool)))
+    except sqlite3.OperationalError:  # no digests yet
+        return {}
+    if not sums:
+        return {}
+    sizes = dict(conn.execute("SELECT filename, length(content) FROM output_cache WHERE input_hash = ? AND tool = ?",
+                              (input_hash, tool)))
+    return {f: (s, sizes[f]) for f, s in sums.items() if f in sizes}
 
 
 # ───────────────────────── single-tool helpers ───────────────────────── #
@@ -468,13 +501,15 @@ def cached_when(db_path: str, input_file: str) -> dict[str, str]:
         return {}
 
 
-@db_turn.writes(wait=db_turn.CONTROLLER_WAIT)
 def store(db_path: str, input_file: str, tool_name: str,
           output_paths: list[str], genes: dict[str, str] | None = None) -> None:
     """Read each output file and INSERT OR REPLACE into output_cache.
 
     Missing files are skipped (handles partial workflow success). With `genes` ({gene id: gene
     hash}), each table names its genes by hash, so it comes back under any gene caller numbering.
+    The files are read and compared with the cached ones (by SHA-256 and length) before the
+    database's write turn is taken, and only those that differ are written: a genome stored again
+    (a resumed or repeated run) writes nothing.
     """
     input_hash = genome_hash(input_file)
     now = datetime.now(timezone.utc).isoformat()
@@ -483,32 +518,43 @@ def store(db_path: str, input_file: str, tool_name: str,
     db_path_obj = Path(db_path).expanduser()
     db_path_obj.parent.mkdir(parents=True, exist_ok=True)
 
+    files = []
+    for path in output_paths:
+        p = Path(path)
+        if not p.exists():
+            LOGGER.debug("Skipping cache store for missing file: %s", path)
+            continue
+        size_mb = p.stat().st_size / (1024 * 1024)
+        if size_mb > 1:
+            LOGGER.info("  Reading %s (%.1f MB)...", p.name, size_mb)
+        blob = p.read_bytes()
+        if genes:
+            blob = _to_gene_hashes(blob, genes)
+        files.append((p.name, blob, hashlib.sha256(blob).hexdigest()))
+
     conn = _get_connection(str(db_path_obj))
     try:
-        _ensure_table(conn)
-        for path in output_paths:
-            p = Path(path)
-            if not p.exists():
-                LOGGER.debug("Skipping cache store for missing file: %s", path)
-                continue
-            file_size = p.stat().st_size
-            size_mb = file_size / (1024 * 1024)
-            if size_mb > 1:
-                LOGGER.info("  Reading %s (%.1f MB)...", p.name, size_mb)
-            blob = p.read_bytes()
-            if genes:
-                blob = _to_gene_hashes(blob, genes)
-            conn.execute(
-                "INSERT OR REPLACE INTO output_cache "
-                "(input_hash, tool, filename, content, size_bytes, cached_at) "
-                "VALUES (?, ?, ?, ?, ?, ?)",
-                (input_hash, tool_name, p.name, blob, len(blob), now),
-            )
-            if size_mb > 1:
-                LOGGER.info("  ✓ Stored %s", p.name)
-        conn.execute("INSERT OR REPLACE INTO output_cache_when (input_hash, tool, cached_at) VALUES (?, ?, ?)",
-                     (input_hash, tool_name, now))
-        conn.commit()
+        held = _digests(conn, input_hash, tool_name)
+        changed = [(name, blob, sha) for name, blob, sha in files if held.get(name) != (sha, len(blob))]
+        if files and not changed:
+            LOGGER.info("  %s: cached as it is already", tool_name)
+            return
+        with db_turn.turn(str(db_path_obj), wait=db_turn.CONTROLLER_WAIT):
+            _ensure_table(conn)
+            for name, blob, sha in changed:
+                conn.execute(
+                    "INSERT OR REPLACE INTO output_cache "
+                    "(input_hash, tool, filename, content, size_bytes, cached_at) "
+                    "VALUES (?, ?, ?, ?, ?, ?)",
+                    (input_hash, tool_name, name, blob, len(blob), now),
+                )
+                conn.execute("INSERT OR REPLACE INTO output_cache_digests (input_hash, tool, filename, sha256) VALUES (?, ?, ?, ?)",
+                             (input_hash, tool_name, name, sha))
+                if len(blob) > 1024 * 1024:
+                    LOGGER.info("  ✓ Stored %s", name)
+            conn.execute("INSERT OR REPLACE INTO output_cache_when (input_hash, tool, cached_at) VALUES (?, ?, ?)",
+                         (input_hash, tool_name, now))
+            conn.commit()
     finally:
         conn.close()
 
@@ -548,10 +594,10 @@ def restore_all(db_path: str, input_file: str,
     return results
 
 
-@db_turn.writes(wait=db_turn.CONTROLLER_WAIT)
 def store_all(db_path: str, input_file: str,
               build_filepaths_map: dict[str, list[str]], genes: dict[str, str] | None = None) -> None:
-    """Store outputs for every tool in *build_filepaths_map* into the DB."""
+    """Store outputs for every tool in *build_filepaths_map* into the DB, each tool's writes in a
+    write turn of their own (store())."""
     total_tools = len(build_filepaths_map)
     LOGGER.info("Storing outputs to cache for %d tools...", total_tools)
     for idx, (tool_name, output_paths) in enumerate(build_filepaths_map.items(), 1):
@@ -563,7 +609,6 @@ def store_all(db_path: str, input_file: str,
 # run_log is load_to_db's table: one definition, one row per genome and tool.
 
 
-@db_turn.writes(wait=db_turn.CONTROLLER_WAIT)
 def log_workflow_run(db_path: str, run_id: str, input_file: str, workflow_name: str,
                      rules_completed: int = 0, status: str = 'success') -> None:
     """Insert a run_log row for this workflow execution.
@@ -602,8 +647,10 @@ def log_workflow_run(db_path: str, run_id: str, input_file: str, workflow_name: 
             finally:
                 conn.close()
 
-        # Retry on transient I/O errors (NFS, lock contention, etc.)
-        _retry_operation(_log_run, max_retries=3, initial_delay=0.5)
+        # Retry on transient I/O errors (NFS, lock contention, etc.); the genome's hash is read
+        # before the database's write turn is taken.
+        with db_turn.turn(db_path, wait=db_turn.CONTROLLER_WAIT):
+            _retry_operation(_log_run, max_retries=3, initial_delay=0.5)
 
         LOGGER.info("Logged workflow run: %s run_id=%s status=%s rules_completed=%d (hash %s...)",
                     workflow_name, run_id, status, rules_completed, input_hash[:12])

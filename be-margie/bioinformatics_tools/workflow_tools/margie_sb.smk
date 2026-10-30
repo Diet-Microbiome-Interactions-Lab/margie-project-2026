@@ -609,6 +609,23 @@ def _phase4_8_targets_for_genome(genome):
     return targets
 
 
+def _phase4_8_results_for_genome(genome):
+    """Returns one genome's selected phase4-8 results files, the ones their loads read: consolidation
+    merges these files, so it goes on while the loads wait their turn for the database."""
+    if not genome:
+        return []
+    files = [PHASE4_RESULTS[t] for t in PHASE4_TOOLS if rc_bool(f'run_{t}', True, config=config)]
+    if rc_bool('run_interpro', True, config=config):
+        files.extend(INTERPRO_PERDB_RESULTS[db] for db in INTERPRO_DB_BASENAMES)
+    for key, default, path in (('operon', True, OPERON_RESULTS), ('phobius', True, PHOBIUS_RESULTS),
+                               ('tmbed', True, TMBED_RESULTS), ('signalp6', True, SIGNALP6_RESULTS),
+                               ('envelope', True, ENVELOPE_RESULTS), ('deepsig', True, DEEPSIG_RESULTS),
+                               ('psortb', True, PSORTB_RESULTS), ('signalp4', False, SIGNALP4_RESULTS)):
+        if rc_bool(f'run_{key}', default, config=config):
+            files.append(path)
+    return [f.format(genome=genome) for f in files]
+
+
 def _phase9_12_targets_for_genome(genome, include_llm=True):
     """Returns one genome's selected phase9-15 targets; include_llm=False leaves out the LLM."""
     if not genome:
@@ -699,7 +716,7 @@ rule llm_all:
 rule run_consolidation:
     """Phase9: merges the phase4-8 results.tsv files into one row per gene, plus a no-stat view."""
     input:
-        phase4_8=lambda wildcards: _phase4_8_targets_for_genome(wildcards.genome),
+        phase4_8=lambda wildcards: _phase4_8_results_for_genome(wildcards.genome),
         gtdbtk_results=GENOME_INFO
     output:
         detected_columns=CONSOLIDATION_DETECTED_COLUMNS,
@@ -1130,7 +1147,7 @@ rule publish_final_annotation_to_depot:
 rule run_report_figures_one_genome:
     """Writes per-organism report figures to <genome>/scoring/figures/; errors are logged and skipped."""
     input:
-        scoring_tkn=SCORING_TOKEN
+        scoring_tkn=SCORING_COMPUTE_TOKEN
     output:
         tkn=REPORT_FIGURES_ORGANISM_TOKEN
     params:
@@ -1162,7 +1179,7 @@ rule run_report_figures_one_genome:
 rule run_genome_viewer_one_genome:
     """Builds the HTML genome viewer and the circular map; errors are logged and skipped."""
     input:
-        scoring_tkn=SCORING_TOKEN,
+        scoring_tkn=SCORING_COMPUTE_TOKEN,
         final_with_confidence=SCORING_FINAL_ANNOTATION_WITH_CONFIDENCE,
         merged=CONSOLIDATION_MERGED
     output:
@@ -1193,7 +1210,7 @@ rule run_genome_viewer_one_genome:
 rule run_full_operon_map_one_genome:
     """Draws all multi-gene operons (run_full_operon_map, off by default); errors are logged and skipped."""
     input:
-        scoring_tkn=SCORING_TOKEN
+        scoring_tkn=SCORING_COMPUTE_TOKEN
     output:
         tkn=COMPLETE_OPERON_MAP_TOKEN
     params:
@@ -1307,7 +1324,7 @@ rule make_annotation_gff:
     input:
         final=FINAL_ANNOTATED_PUBLICATION,
         rast_gff=GENE_GFF,
-        scoring_tkn=SCORING_TOKEN
+        scoring_tkn=SCORING_COMPUTE_TOKEN
     output:
         gff=ANNOTATION_GFF
     retries: RUN_RETRIES

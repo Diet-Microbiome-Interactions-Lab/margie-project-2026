@@ -220,11 +220,20 @@ def _carry_over(conn, tool: str, cfg: dict, key: str) -> None:
     # an earlier key there can name another E-value, identity or set of InterProScan analyses.
     if TOOL_PARAMS.get(tool) or tool == 'interpro':
         return
-    older = [k for k, _ in conn.execute(
-        'SELECT tool_key, max(cached_at) FROM protein_cache WHERE tool = ? AND tool_key != ? GROUP BY tool_key ORDER BY 2 DESC',
-        (tool, key))]
+    # The tool's keys, one seek each along the primary key (tool, tool_key, ...): a GROUP BY read
+    # every entry of the tool, its current key's too, which took minutes a tool on a large cache.
+    keys, after = [], ''
+    while row := conn.execute('SELECT tool_key FROM protein_cache WHERE tool = ? AND tool_key > ? ORDER BY tool_key LIMIT 1',
+                              (tool, after)).fetchone():
+        after = row[0]
+        keys.append(after)
+    older = [k for k in keys if k != key]
     if not older:
         return
+    # Newest first.
+    newest = {k: conn.execute('SELECT max(cached_at) FROM protein_cache WHERE tool = ? AND tool_key = ?', (tool, k)).fetchone()[0] or ''
+              for k in older}
+    older.sort(key=lambda k: newest[k], reverse=True)
     moved = 0
     with conn:
         for old in older:
@@ -256,6 +265,9 @@ def clear(prefix: str, tool: str) -> None:
 def _connect(db: str) -> sqlite3.Connection:
     conn = sqlite3.connect(db, timeout=120)
     conn.execute('PRAGMA busy_timeout=120000')
+    # The index pages a call's lookups share stay in memory (SQLite keeps 2 MB by default); each
+    # page read again is a trip to the cluster's storage.
+    conn.execute(f'PRAGMA cache_size=-{CACHE_KIB}')
     conn.executescript(CREATE_SQL)
     have = {r[1] for r in conn.execute('PRAGMA table_info(protein_fingerprints)')}
     for col in ('core_fingerprint', 'extra_fingerprint'):
@@ -276,6 +288,11 @@ def _connect(db: str) -> sqlite3.Connection:
 # writer waiting for the database's turn (a load, another of the run's caches) gets it.
 STORE_CHUNK = 500
 STORE_PAUSE = 0.3
+# Proteins read in one query outside the write turn: a short read, so a writer's commit, which waits
+# for the readers, waits little.
+READ_CHUNK = 100
+# SQLite's page cache per connection, KiB (256 MiB).
+CACHE_KIB = 262144
 
 
 def _chunks(items: list, n: int = 500):
@@ -625,11 +642,13 @@ def install_merge_script(folder: str) -> str:
 
 # ---- which genome each protein and gene belongs to ----
 
-@db_turn.writes(wait=db_turn.CONTROLLER_WAIT)
 def link_genome(db: str, faa: str, genome_hash: str, name: str = '', genes: dict[str, str] | None = None) -> int:
     """Records the genome's proteins by hash (protein_genomes), its protein set (a hash of its sorted
     protein hashes, in genome_proteomes) and, with `genes` ({feature id: gene hash}), its genes
-    (genome_genes); returns the number of distinct proteins."""
+    (genome_genes); returns the number of distinct proteins. What is linked already is read first,
+    outside the database's write turn, and only what is new or different is written, so a genome
+    linked before (a resumed or repeated run) writes nothing; last_linked is when its links last
+    changed."""
     proteins = _proteins(faa)
     hashes = sorted({h for _, h, _, _ in proteins})
     if not genome_hash or not hashes:
@@ -638,34 +657,38 @@ def link_genome(db: str, faa: str, genome_hash: str, name: str = '', genes: dict
     stamp = datetime.now(timezone.utc).isoformat()
     conn = _connect(db)
     try:
-        with conn:
-            conn.executemany('INSERT OR IGNORE INTO protein_genomes (aa_hash, genome_hash) VALUES (?, ?)',
-                             [(h, genome_hash) for h in hashes])
-            row = conn.execute('SELECT names FROM genome_proteomes WHERE genome_hash = ?', (genome_hash,)).fetchone()
-            names = json.loads(row[0]) if row else []
-            if name and name not in names:
-                names.append(name)
+        linked = {r[0] for r in conn.execute('SELECT aa_hash FROM protein_genomes WHERE genome_hash = ?', (genome_hash,))}
+        new_proteins = [(h, genome_hash) for h in hashes if h not in linked]
+        row = conn.execute('SELECT proteins, protein_set, names FROM genome_proteomes WHERE genome_hash = ?', (genome_hash,)).fetchone()
+        names = json.loads(row[2]) if row else []
+        if name and name not in names:
+            names.append(name)
+        proteome = (len(hashes), protein_set, json.dumps(names))
+        new_genes: list[tuple[str, str, str]] = []
+        if genes:
+            by_fid = {fid: h for fid, h, _, _ in proteins}
+            held = dict(conn.execute('SELECT gene_hash, aa_hash FROM genome_genes WHERE genome_hash = ?', (genome_hash,)))
+            new_genes = [(genome_hash, g, by_fid.get(fid, '')) for fid, g in genes.items() if held.get(g) != by_fid.get(fid, '')]
+        if not new_proteins and not new_genes and row and tuple(row) == proteome:
+            return len(hashes)
+        with db_turn.turn(db, wait=db_turn.CONTROLLER_WAIT), conn:
+            conn.executemany('INSERT OR IGNORE INTO protein_genomes (aa_hash, genome_hash) VALUES (?, ?)', new_proteins)
             if row:
                 conn.execute('UPDATE genome_proteomes SET proteins = ?, protein_set = ?, names = ?, last_linked = ? WHERE genome_hash = ?',
-                             (len(hashes), protein_set, json.dumps(names), stamp, genome_hash))
+                             (*proteome, stamp, genome_hash))
             else:
-                conn.execute('INSERT INTO genome_proteomes VALUES (?, ?, ?, ?, ?, ?)',
-                             (genome_hash, len(hashes), protein_set, json.dumps(names), stamp, stamp))
-            if genes:
-                by_fid = {fid: h for fid, h, _, _ in proteins}
-                conn.executemany('INSERT INTO genome_genes (genome_hash, gene_hash, aa_hash) VALUES (?, ?, ?) '
-                                 'ON CONFLICT (genome_hash, gene_hash) DO UPDATE SET aa_hash = excluded.aa_hash',
-                                 [(genome_hash, g, by_fid.get(fid, '')) for fid, g in genes.items()])
+                conn.execute('INSERT INTO genome_proteomes VALUES (?, ?, ?, ?, ?, ?)', (genome_hash, *proteome, stamp, stamp))
+            conn.executemany('INSERT INTO genome_genes (genome_hash, gene_hash, aa_hash) VALUES (?, ?, ?) '
+                             'ON CONFLICT (genome_hash, gene_hash) DO UPDATE SET aa_hash = excluded.aa_hash', new_genes)
     finally:
         conn.close()
     return len(hashes)
 
 
-@db_turn.writes(wait=db_turn.CONTROLLER_WAIT)
 def record_fingerprints(db: str, genome_hash: str, hash_label_tsv: str, genes: dict[str, str]) -> int:
     """Adds each gene's fingerprint (its pattern hash, from the fingerprint step's hash-label table)
     to genome_genes, and each protein's, with its label, to protein_fingerprints; returns how many
-    genes got one."""
+    genes got one. As link_genome, it reads first and writes only what differs."""
     path = Path(hash_label_tsv)
     if not genome_hash or not genes or not path.is_file():
         return 0
@@ -685,15 +708,30 @@ def record_fingerprints(db: str, genome_hash: str, hash_label_tsv: str, genes: d
     stamp = datetime.now(timezone.utc).isoformat()
     conn = _connect(db)
     try:
-        with conn:
-            conn.executemany('UPDATE genome_genes SET fingerprint = ? WHERE genome_hash = ? AND gene_hash = ?', found)
-            # A protein's fingerprint: kept while a later genome gives the same, replaced when it differs.
-            rows = conn.execute("SELECT DISTINCT aa_hash, fingerprint FROM genome_genes "
-                                "WHERE genome_hash = ? AND aa_hash != '' AND fingerprint != ''", (genome_hash,)).fetchall()
-            conn.executemany('INSERT INTO protein_fingerprints (aa_hash, fingerprint, label, recorded_at) VALUES (?, ?, ?, ?) '
-                             'ON CONFLICT (aa_hash) DO UPDATE SET fingerprint = excluded.fingerprint, label = excluded.label, '
-                             'recorded_at = excluded.recorded_at WHERE protein_fingerprints.fingerprint != excluded.fingerprint',
-                             [(h, fp, labels.get(fp, ''), stamp) for h, fp in rows])
+        held = {g: [aa, fp] for g, aa, fp in conn.execute(
+            'SELECT gene_hash, aa_hash, fingerprint FROM genome_genes WHERE genome_hash = ?', (genome_hash,))}
+        genes_set = []
+        for fp, _, gene in found:
+            if gene in held and held[gene][1] != fp:
+                genes_set.append((fp, genome_hash, gene))
+                held[gene][1] = fp
+        # A protein's fingerprint: kept while a later genome gives the same, replaced when it differs.
+        pairs = sorted({(aa, fp) for aa, fp in held.values() if aa and fp})
+        kept: dict[str, str] = {}
+        for chunk in _chunks(sorted({aa for aa, _ in pairs}), READ_CHUNK):
+            kept.update(conn.execute(f'SELECT aa_hash, fingerprint FROM protein_fingerprints WHERE aa_hash IN ({",".join("?" * len(chunk))})', chunk))
+        prints = []
+        for aa, fp in pairs:
+            if kept.get(aa) != fp:
+                prints.append((aa, fp, labels.get(fp, ''), stamp))
+                kept[aa] = fp
+        if genes_set or prints:
+            with db_turn.turn(db, wait=db_turn.CONTROLLER_WAIT), conn:
+                conn.executemany('UPDATE genome_genes SET fingerprint = ? WHERE genome_hash = ? AND gene_hash = ?', genes_set)
+                conn.executemany('INSERT INTO protein_fingerprints (aa_hash, fingerprint, label, recorded_at) VALUES (?, ?, ?, ?) '
+                                 'ON CONFLICT (aa_hash) DO UPDATE SET fingerprint = excluded.fingerprint, label = excluded.label, '
+                                 'recorded_at = excluded.recorded_at WHERE protein_fingerprints.fingerprint != excluded.fingerprint',
+                                 prints)
     finally:
         conn.close()
     return len(found)
@@ -751,13 +789,24 @@ def _position(tool: str) -> int:
     return 100 + (EXTRA_TOOLS.index(base) if base in EXTRA_TOOLS else len(EXTRA_TOOLS))
 
 
-@db_turn.writes(wait=db_turn.CONTROLLER_WAIT)
+def _prints(have: dict[str, str]) -> tuple[str, str]:
+    """A protein's core and additional fingerprints from its descriptors ({tool: value})."""
+    core = _sha256(' | '.join(f'{t}: {have.get(t, "")}' for t in CORE_TOOLS))
+    extra_tools = sorted((t for t in have if _position(t) >= 100), key=lambda t: (_position(t), t))
+    extra = _sha256(' | '.join(f'{t}: {have[t]}' for t in extra_tools)) if extra_tools else ''
+    return core, extra
+
+
 def record_proteins(db: str, labeled_tsv: str, prefix: str, genome_hash: str = '') -> int:
     """Adds each protein's descriptors to its record (protein_descriptors, read through
     protein_records): each tool's ids and descriptions from the labeled genes, and the localization
     tools' answers. A tool the record lacks is added, the same answer stays, a different one replaces
     it; the core and additional fingerprints follow. PSORTb's and DeepSig's answers go under the
-    genome hash and protein hash (genome_protein_descriptors). Returns the number of proteins."""
+    genome hash and protein hash (genome_protein_descriptors). Returns the number of proteins.
+
+    The records are read first, outside the database's write turn; the turn is taken only for the
+    proteins with something new or different, whose fingerprints are then made from their records as
+    they stand in it (another genome can share a protein). A genome recorded before writes nothing."""
     path = Path(labeled_tsv)
     if not path.is_file():
         return 0
@@ -780,35 +829,51 @@ def record_proteins(db: str, labeled_tsv: str, prefix: str, genome_hash: str = '
     if not found and not per_genome:
         return 0
     proteins = sorted({h for h, _ in found})
+    ours: dict[str, dict[str, str]] = {}
+    for (h, tool), value in found.items():
+        ours.setdefault(h, {})[tool] = value
     stamp = datetime.now(timezone.utc).isoformat()
+    in_ = lambda chunk: ",".join("?" * len(chunk))  # noqa: E731
     conn = _connect(db)
     try:
-        with conn:
-            if genome_hash:
+        genome_rows = []
+        if genome_hash and per_genome:
+            kept = {(h, tool): value for h, tool, value in conn.execute(
+                'SELECT aa_hash, tool, value FROM genome_protein_descriptors WHERE genome_hash = ?', (genome_hash,))}
+            genome_rows = [(genome_hash, h, tool, value, stamp) for (h, tool), value in per_genome.items() if kept.get((h, tool)) != value]
+        held: dict[str, dict[str, str]] = {}
+        prints_held: dict[str, tuple[str, str]] = {}
+        for chunk in _chunks(proteins, READ_CHUNK):
+            for h, tool, value in conn.execute(f'SELECT aa_hash, tool, value FROM protein_descriptors WHERE aa_hash IN ({in_(chunk)})', chunk):
+                held.setdefault(h, {})[tool] = value
+            for h, core, extra in conn.execute(
+                    f'SELECT aa_hash, core_fingerprint, extra_fingerprint FROM protein_fingerprints WHERE aa_hash IN ({in_(chunk)})', chunk):
+                prints_held[h] = (core, extra)
+        # A protein is touched when one of its descriptors is new or different, or its fingerprints
+        # are not those of its record with ours in it.
+        touched = [h for h in proteins
+                   if any(held.get(h, {}).get(t) != v for t, v in ours[h].items())
+                   or prints_held.get(h) != _prints({**held.get(h, {}), **ours[h]})]
+        if genome_rows:
+            with db_turn.turn(db, wait=db_turn.CONTROLLER_WAIT), conn:
                 conn.executemany('INSERT INTO genome_protein_descriptors (genome_hash, aa_hash, tool, value, recorded_at) '
                                  'VALUES (?, ?, ?, ?, ?) ON CONFLICT (genome_hash, aa_hash, tool) DO UPDATE SET '
                                  'value = excluded.value, recorded_at = excluded.recorded_at '
-                                 'WHERE genome_protein_descriptors.value != excluded.value',
-                                 [(genome_hash, h, tool, value, stamp) for (h, tool), value in per_genome.items()])
-            conn.executemany('INSERT INTO protein_descriptors (aa_hash, tool, position, value, recorded_at) VALUES (?, ?, ?, ?, ?) '
-                             'ON CONFLICT (aa_hash, tool) DO UPDATE SET value = excluded.value, recorded_at = excluded.recorded_at '
-                             'WHERE protein_descriptors.value != excluded.value',
-                             [(h, tool, _position(tool), value, stamp) for (h, tool), value in found.items()])
-            prints = []
-            for chunk in _chunks(proteins):
-                held: dict[str, dict[str, str]] = {}
-                for h, tool, value in conn.execute(
-                        f'SELECT aa_hash, tool, value FROM protein_descriptors WHERE aa_hash IN ({",".join("?" * len(chunk))})', chunk):
-                    held.setdefault(h, {})[tool] = value
-                for h in chunk:
-                    have = held.get(h, {})
-                    core = _sha256(' | '.join(f'{t}: {have.get(t, "")}' for t in CORE_TOOLS))
-                    extra_tools = sorted((t for t in have if _position(t) >= 100), key=lambda t: (_position(t), t))
-                    extra = _sha256(' | '.join(f'{t}: {have[t]}' for t in extra_tools)) if extra_tools else ''
-                    prints.append((h, stamp, core, extra))
-            conn.executemany("INSERT INTO protein_fingerprints (aa_hash, fingerprint, label, recorded_at, core_fingerprint, extra_fingerprint) "
-                             "VALUES (?, '', '', ?, ?, ?) ON CONFLICT (aa_hash) DO UPDATE SET "
-                             "core_fingerprint = excluded.core_fingerprint, extra_fingerprint = excluded.extra_fingerprint", prints)
+                                 'WHERE genome_protein_descriptors.value != excluded.value', genome_rows)
+        for chunk in _chunks(touched, STORE_CHUNK):
+            with db_turn.turn(db, wait=db_turn.CONTROLLER_WAIT), conn:
+                conn.executemany('INSERT INTO protein_descriptors (aa_hash, tool, position, value, recorded_at) VALUES (?, ?, ?, ?, ?) '
+                                 'ON CONFLICT (aa_hash, tool) DO UPDATE SET value = excluded.value, recorded_at = excluded.recorded_at '
+                                 'WHERE protein_descriptors.value != excluded.value',
+                                 [(h, tool, _position(tool), value, stamp) for h in chunk for tool, value in ours[h].items()])
+                now: dict[str, dict[str, str]] = {}
+                for h, tool, value in conn.execute(f'SELECT aa_hash, tool, value FROM protein_descriptors WHERE aa_hash IN ({in_(chunk)})', chunk):
+                    now.setdefault(h, {})[tool] = value
+                conn.executemany("INSERT INTO protein_fingerprints (aa_hash, fingerprint, label, recorded_at, core_fingerprint, extra_fingerprint) "
+                                 "VALUES (?, '', '', ?, ?, ?) ON CONFLICT (aa_hash) DO UPDATE SET "
+                                 "core_fingerprint = excluded.core_fingerprint, extra_fingerprint = excluded.extra_fingerprint",
+                                 [(h, stamp, *_prints(now.get(h, {}))) for h in chunk])
+            time.sleep(STORE_PAUSE)
     finally:
         conn.close()
     return len(proteins)

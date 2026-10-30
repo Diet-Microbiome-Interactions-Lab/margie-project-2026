@@ -335,7 +335,7 @@ class WorkflowBase(ProgramBase):
 
     def build_executable(self, key: WorkflowKey, config_overrides: dict = None, mode='slurm', compute_config: dict = None,
                           extra_resources: dict = None, rerun_triggers: str = None, target: str = None,
-                          max_jobs_override: int = None) -> list[str]:
+                          max_jobs_override: int = None, omit_from: list[str] | None = None) -> list[str]:
         '''
         Build snakemake command from workflow key and config.
 
@@ -354,6 +354,8 @@ class WorkflowBase(ProgramBase):
                 and Stage 2 run concurrently on disjoint rules in one directory.
             max_jobs_override: --jobs value that wins over compute_config's
                 max_jobs (QUAST's own run uses it).
+            omit_from: rules left out with everything after them (--omit-from): Stage 2's compute
+                pass leaves out the database loads.
         '''
         smk_path = WORKFLOW_DIR / key.snakemake_file
 
@@ -396,6 +398,9 @@ class WorkflowBase(ProgramBase):
             core_command.append('--nolock')
             # A list means explicit file targets (Stage 1 subsets, see _Stage1Waves).
             core_command.extend([target] if isinstance(target, str) else list(target))
+        if omit_from:
+            # An option follows, which ends the rule list.
+            core_command.extend(['--omit-from', *omit_from])
 
         # Check for dry-run/test mode (from config or command line)
         if self.conf.get('dry_run', False) or self.conf.get('test_only', False):
@@ -1209,10 +1214,15 @@ class WorkflowBase(ProgramBase):
         _requests_open(True)
 
         # Stage 2 takes up to `at_once` genomes at a time (margie_sb.stage2.at_once): a genome starts
-        # once its gene calls are in and a place is free, and its own steps run as before. Their
-        # database loads take turns through SQLite's lock (the load rules wait and retry), and the
-        # shared operon and fingerprint references are written under their own file locks.
+        # once its gene calls are in and a place is free. It goes in two passes: its compute (the
+        # tools and the steps after them, its database loads left out), then its loads, which take
+        # their turns for the database (db_turn); its place goes to the next genome while it loads.
+        # A genome is finished once its loads are in, as the caches later genomes read are filled
+        # from them; up to `at_once` genomes load at a time, and a computed genome waits in its
+        # place for one. The shared operon and fingerprint references are written under their own
+        # file locks.
         at_once = self._stage2_at_once(smk_config)
+        load_rules = re.findall(r'^rule (load_\w+_to_db):', (WORKFLOW_DIR / selected_wf.snakemake_file).read_text(), re.M)
         active: list[dict] = []
         last = {'proc': None}
 
@@ -1395,42 +1405,70 @@ class WorkflowBase(ProgramBase):
             stage2_command = self.build_executable(selected_wf, config_overrides=stage2_config, mode=mode,
                                                     compute_config=compute_config, extra_resources=extra_resources,
                                                     rerun_triggers=rerun_triggers, target=stage2_target)
+            compute_command = self.build_executable(selected_wf, config_overrides=stage2_config, mode=mode,
+                                                     compute_config=compute_config, extra_resources=extra_resources,
+                                                     rerun_triggers=rerun_triggers, target=stage2_target,
+                                                     omit_from=load_rules) if load_rules else None
             if genome in asked_again:
                 # Run again: a step stopped part way starts afresh.
-                stage2_command.append('--rerun-incomplete')
-            LOGGER.info('Starting Stage 2 (%s) for %s: %s', stage2_target, genome, ' '.join(stage2_command))
-            stage2_proc = self._start_background_subprocess(stage2_command)
+                for cmd in (stage2_command, compute_command or []):
+                    cmd.append('--rerun-incomplete')
+            first = compute_command or stage2_command
+            LOGGER.info('Starting Stage 2 (%s) for %s: %s', stage2_target, genome, ' '.join(first))
+            stage2_proc = self._start_background_subprocess(first)
 
-            return {'genome': genome, 'proc': stage2_proc, 'command': stage2_command, 'pc_prefix': pc_prefix,
+            return {'genome': genome, 'proc': stage2_proc, 'command': first, 'phase': 'compute' if compute_command else 'loads',
+                    'loads_command': stage2_command, 'pc_prefix': pc_prefix,
                     'pc_faa_path': pc_faa_path, 'pc_tools': pc_tools, 'pc_stored': pc_stored,
                     'cache_map': cache_map_fn(genome), 'restored': restored.get(genome, {}), 'stored': set(),
                     'genes': genes, 'genome_hash': genome_hash}
 
-        # Protein-cache saves run on a thread of their own, one at a time and in the order asked: a
-        # large genome's proteins take minutes to write, and the controller goes on starting and
-        # finishing genomes meanwhile. The run waits for the saves before it ends.
-        pc_saves: Queue = Queue()
+        # The run's own writes to the MARGIE database (each tool's cache and proteins once it is
+        # loaded, a finished genome's records) run on a thread of their own, one at a time and in the
+        # order asked: they take minutes on a large database, and the controller goes on starting,
+        # loading and finishing genomes meanwhile. The run waits for them before it ends.
+        db_work: Queue = Queue()
 
-        def _save_proteins() -> None:
+        def _write() -> None:
             while True:
-                job = pc_saves.get()
+                job = db_work.get()
                 try:
                     if job is None:
                         return
-                    genome, faa, prefix, tool, ran = job
-                    added = protein_cache.store(db_path, faa, prefix, tool, pc_cfg, genome=genome, ran=ran)
-                    if added:
-                        LOGGER.info('Protein cache: %d new protein(s) of %s kept for %s', added, genome, tool)
+                    job()
                 except Exception as exc:
-                    LOGGER.warning('Protein cache store failed for %s / %s: %s', job[0], job[3], exc)
+                    LOGGER.warning('A write to the MARGIE database failed (the run goes on without it): %s', exc)
                 finally:
-                    pc_saves.task_done()
+                    db_work.task_done()
 
-        saver = threading.Thread(target=_save_proteins, name='protein-cache-saves', daemon=True)
-        saver.start()
+        writer = threading.Thread(target=_write, name='margie-database-writes', daemon=True)
+        writer.start()
+
+        def _save_proteins(genome: str, faa: str, prefix: str, tool: str, ran: bool) -> None:
+            try:
+                added = protein_cache.store(db_path, faa, prefix, tool, pc_cfg, genome=genome, ran=ran)
+                if added:
+                    LOGGER.info('Protein cache: %d new protein(s) of %s kept for %s', added, genome, tool)
+            except Exception as exc:
+                LOGGER.warning('Protein cache store failed for %s / %s: %s', genome, tool, exc)
+
+        def _cache_tool(slot: dict, tool: str, paths: list[str]) -> None:
+            genome, pc_prefix = slot['genome'], slot['pc_prefix']
+            # Consolidation is done, so every table it merged is final.
+            name = cache_name(tool, merged_inputs_fingerprint(pc_prefix)) if input_keyed(tool) else tool
+            if _safely(f'Caching {tool} for {genome}', store, db_path, genome_files[genome], name, paths,
+                       genes=slot['genes']) is _FAILED:
+                # Asked again at the next look; after five tries the step stays uncached this time.
+                slot.setdefault('tries', {})[tool] = slot.get('tries', {}).get(tool, 0) + 1
+                if slot['tries'][tool] < 5:
+                    slot['stored'].discard(tool)
+                return
+            LOGGER.info('Cached %s for %s as soon as its own db token appeared '
+                        '(Stage 2 still running)', tool, genome)
 
         def _store_ready(slot: dict) -> None:
-            """Stores each of a genome's tools once its outputs and db token (written last) exist."""
+            """Stores each of a genome's tools once its outputs and db token (written last) exist,
+            on the writes' thread."""
             if not db_path:
                 return
             genome, pc_prefix = slot['genome'], slot['pc_prefix']
@@ -1440,23 +1478,37 @@ class WorkflowBase(ProgramBase):
                 if t in slot['pc_stored'] or not Path(f"{pc_prefix}{t}/{t}_db.tkn").exists():
                     continue
                 slot['pc_stored'].add(t)
-                pc_saves.put((genome, slot['pc_faa_path'], pc_prefix, t, not slot['restored'].get(t, False)))
+                db_work.put(lambda t=t: _save_proteins(genome, slot['pc_faa_path'], pc_prefix, t, not slot['restored'].get(t, False)))
             for tool, paths in slot['cache_map'].items():
                 if tool in slot['stored'] or slot['restored'].get(tool, False):
                     continue
                 if all(Path(p).exists() for p in paths):
-                    # Consolidation is done, so every table it merged is final.
-                    name = cache_name(tool, merged_inputs_fingerprint(pc_prefix)) if input_keyed(tool) else tool
-                    if _safely(f'Caching {tool} for {genome}', store, db_path, genome_files[genome], name, paths,
-                               genes=slot['genes']) is _FAILED:
-                        # Asked again at the next look; after five tries the step stays uncached this time.
-                        slot.setdefault('tries', {})[tool] = slot.get('tries', {}).get(tool, 0) + 1
-                        if slot['tries'][tool] >= 5:
-                            slot['stored'].add(tool)
-                        continue
                     slot['stored'].add(tool)
-                    LOGGER.info('Cached %s for %s as soon as its own db token appeared '
-                                '(Stage 2 still running)', tool, genome)
+                    db_work.put(lambda tool=tool, paths=paths: _cache_tool(slot, tool, paths))
+
+        def _record(slot: dict, completed: int) -> None:
+            """A finished genome's records, on the writes' thread after its tools' stores: the tools
+            not stored yet, its run log row, its genes' fingerprints and its proteins' records."""
+            genome = slot['genome']
+            tools_to_store = {tool: paths for tool, paths in slot['cache_map'].items()
+                              if tool not in slot['stored'] and not slot['restored'].get(tool, False)}
+            if genome in prodigal_genomes:
+                LOGGER.info('%s: Prodigal genes, so its results stay out of the MARGIE caches', genome)
+            elif tools_to_store:
+                merged_fp = merged_inputs_fingerprint(slot['pc_prefix'])
+                _safely(f'Caching the rest of {genome}', store_all, db_path, genome_files[genome],
+                        {cache_name(t, merged_fp): p for t, p in tools_to_store.items()}, genes=slot['genes'])
+            else:
+                LOGGER.info('All outputs were already cached incrementally or were cache hits for %s', genome)
+            _safely(f'Recording {genome} in the run log table', log_workflow_run, db_path, run_id, genome_files[genome],
+                    key_name, completed, status='success')
+            if genome not in prodigal_genomes:
+                # Each gene's fingerprint, beside its gene hash.
+                _safely(f'Recording the fingerprints of {genome}', protein_cache.record_fingerprints, db_path, slot['genome_hash'],
+                        f"{slot['pc_prefix']}fingerprint/labeled-genes-fingerprint-hash-label.tsv", slot['genes'])
+                # Each protein's record: its descriptors tool by tool, and its core and additional fingerprints.
+                _safely(f'Recording the proteins of {genome}', protein_cache.record_proteins, db_path,
+                        f"{slot['pc_prefix']}labeling/labeled-genes.tsv", slot['pc_prefix'], slot['genome_hash'])
 
         def _finish(slot: dict) -> None:
             """Wraps up a genome whose Stage 2 has ended: its last tools stored, its record and report."""
@@ -1477,32 +1529,15 @@ class WorkflowBase(ProgramBase):
                 provenance.write()
                 LOGGER.info(provenance.summary(genome))
                 if db_path:
-                    _safely(f'Recording {genome} in the run log table', log_workflow_run, db_path, run_id,
-                            genome_files[genome], key_name, result['rules_summary'].get('completed', 0), status='failed')
+                    completed = result['rules_summary'].get('completed', 0) + slot.get('computed_rules', 0)
+                    db_work.put(lambda: _safely(f'Recording {genome} in the run log table', log_workflow_run, db_path, run_id,
+                                                genome_files[genome], key_name, completed, status='failed'))
                 failed.append(genome)
                 return
             finished.append(genome)
-            prodigal = genome in prodigal_genomes
             if db_path:
-                tools_to_store = {tool: paths for tool, paths in slot['cache_map'].items()
-                                  if tool not in slot['stored'] and not slot['restored'].get(tool, False)}
-                if prodigal:
-                    LOGGER.info('%s: Prodigal genes, so its results stay out of the MARGIE caches', genome)
-                elif tools_to_store:
-                    merged_fp = merged_inputs_fingerprint(slot['pc_prefix'])
-                    _safely(f'Caching the rest of {genome}', store_all, db_path, genome_files[genome],
-                            {cache_name(t, merged_fp): p for t, p in tools_to_store.items()}, genes=slot['genes'])
-                else:
-                    LOGGER.info('All outputs were already cached incrementally or were cache hits for %s', genome)
-                _safely(f'Recording {genome} in the run log table', log_workflow_run, db_path, run_id, genome_files[genome],
-                        key_name, self._build_result(key_name, proc)['rules_summary'].get('completed', 0), status='success')
-                if not prodigal:
-                    # Each gene's fingerprint, beside its gene hash.
-                    _safely(f'Recording the fingerprints of {genome}', protein_cache.record_fingerprints, db_path, slot['genome_hash'],
-                            f"{slot['pc_prefix']}fingerprint/labeled-genes-fingerprint-hash-label.tsv", slot['genes'])
-                    # Each protein's record: its descriptors tool by tool, and its core and additional fingerprints.
-                    _safely(f'Recording the proteins of {genome}', protein_cache.record_proteins, db_path,
-                            f"{slot['pc_prefix']}labeling/labeled-genes.tsv", slot['pc_prefix'], slot['genome_hash'])
+                completed = self._build_result(key_name, proc)['rules_summary'].get('completed', 0) + slot.get('computed_rules', 0)
+                db_work.put(lambda: _record(slot, completed))
             LOGGER.info(provenance.summary(genome))
 
         def _cache_gtdbtk() -> None:
@@ -1531,15 +1566,33 @@ class WorkflowBase(ProgramBase):
                     queue.append(genome)
                     if db_path:
                         if genome not in prodigal_genomes and not rasttk_restored.get(genome, False):
-                            _safely(f'Caching RASTtk for {genome}', store, db_path, genome_files[genome], 'rasttk',
-                                    self._rasttk_paths(genome, smk_config))
+                            paths = self._rasttk_paths(genome, smk_config)
+                            db_work.put(lambda genome=genome, paths=paths: _safely(
+                                f'Caching RASTtk for {genome}', store, db_path, genome_files[genome], 'rasttk', paths))
 
-            # The genomes in Stage 2: finished tools stored, ended ones wrapped up.
+            # The genomes in Stage 2: finished tools stored, a computed genome's loads started once a
+            # place to load is free, ended ones wrapped up. A failed compute leaves the loads out: they
+            # would run its failed step again first; Run again or Resume loads what it made.
             for slot in list(active):
                 _store_ready(slot)
-                if slot['proc'] is None or slot['proc'].poll() is not None:
-                    active.remove(slot)
-                    _finish(slot)
+                p = slot['proc']
+                rc = None if p is None else p.poll()
+                if p is not None and rc is None:
+                    continue
+                if slot['phase'] == 'compute' and rc == 0:
+                    slot['phase'] = 'computed'
+                    slot['computed_rules'] = self._parse_snakemake_output('\n'.join(p.stderr_lines)).get('completed', 0)
+                if slot['phase'] == 'computed':
+                    if sum(s['phase'] == 'loads' for s in active) >= at_once:
+                        continue
+                    LOGGER.info('Loading %s into the MARGIE database (Stage 2, its place goes to the next genome): %s',
+                                slot['genome'], ' '.join(slot['loads_command']))
+                    slot.update(phase='loads', command=slot['loads_command'],
+                                proc=self._start_background_subprocess(slot['loads_command']))
+                    if slot['proc'] is not None:
+                        continue
+                active.remove(slot)
+                _finish(slot)
 
             # Run again: a failed genome asked for from the Jobs page goes back in the queue.
             for genome in _asks():
@@ -1578,7 +1631,8 @@ class WorkflowBase(ProgramBase):
                         g, self._genome_stage2_progress(g, genome_files[g], smk_config)),
                     reverse=True,
                 )
-            while queue and len(active) < at_once:
+            # A loading genome has given up its place.
+            while queue and sum(s['phase'] != 'loads' for s in active) < at_once:
                 genome = queue.pop(0)
                 processed += 1
                 LOGGER.info('=== STAGE 2: genome %d/%d (%s) phase4-12 starting, up to %d at a time ===',
@@ -1590,10 +1644,10 @@ class WorkflowBase(ProgramBase):
                 time.sleep(10)
 
         _requests_open(False)
-        if pc_saves.unfinished_tasks:
-            LOGGER.info('Waiting for %d protein-cache save(s) to finish', pc_saves.unfinished_tasks)
-        pc_saves.put(None)
-        pc_saves.join()
+        if db_work.unfinished_tasks:
+            LOGGER.info('Waiting for %d write(s) to the MARGIE database to finish', db_work.unfinished_tasks)
+        db_work.put(None)
+        db_work.join()
         last_proc = last['proc']
 
         # Stage 3: LLM for all genomes at once; --keep-going lets one failure pass.
