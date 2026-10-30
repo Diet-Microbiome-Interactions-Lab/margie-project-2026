@@ -158,14 +158,29 @@ def close_user_connections(host: str, username: str) -> None:
 
 
 def remove_margie_files(conn: 'SSHConnection', timeout: float = 300.0) -> str:
-    """Removes what the website keeps in the account's home: the stored keys
-    (~/.config/bioinformatics-tools/secrets, the language-model API keys) and its copy of MARGIE
-    (~/margie-project-2026, with the ~/bioinformatics-tools link to it). config.yaml, databases and
-    results stay. Returns '' when done, else what went wrong."""
-    command = f'''repo="$HOME/{_CLONE_DIR}"; link="$HOME/bioinformatics-tools"
+    """Removes what the website keeps in the cluster account's home: the stored language-model keys
+    (~/.config/bioinformatics-tools/secrets) and the copy of MARGIE (~/margie-project-2026, with the
+    ~/bioinformatics-tools link to it). config.yaml, databases and results stay.
+
+    Every MARGIE account on this cluster account, on the website or in the desktop app, runs from
+    that copy, so nothing is removed while a MARGIE run of the cluster account is in SLURM or the
+    desktop app's server is running (its ~/.local/share/bsp/api-endpoint.json). The copy is renamed
+    aside at once and deleted in the background, so a removal cut short leaves no half-deleted copy.
+    Returns '' when done, else what stopped it."""
+    command = f'''repo="$HOME/{_CLONE_DIR}"; link="$HOME/bioinformatics-tools"; advert="$HOME/.local/share/bsp/api-endpoint.json"
+if squeue -h -u "$USER" -o %j 2>/dev/null | grep -q '^margie-'; then
+    echo "A MARGIE run of this cluster account is in SLURM; stop it, or wait for it to end, first."; exit 5
+fi
+if [ -f "$advert" ]; then
+    echo "The desktop app's MARGIE server is running on this cluster account ($(cat "$advert" 2>/dev/null)); close the desktop app first."; exit 6
+fi
 rm -rf -- "$HOME/.config/bioinformatics-tools/secrets" || exit 1
 if [ -L "$link" ] && [ "$(readlink -f "$link")" = "$(readlink -f "$repo/{_BACKEND_DIR}")" ]; then rm -f -- "$link" || exit 1; fi
-rm -rf -- "$repo" || exit 1
+if [ -e "$repo" ]; then
+    gone="$HOME/.margie-removed-$(date +%Y%m%d-%H%M%S)-$$"
+    mv -- "$repo" "$gone" || exit 1
+    (nohup rm -rf -- "$gone" >/dev/null 2>&1 &)
+fi
 echo REMOVED'''
     try:
         ssh = conn.connect()

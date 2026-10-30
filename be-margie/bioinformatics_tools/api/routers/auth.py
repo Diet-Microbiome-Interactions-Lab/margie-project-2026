@@ -44,6 +44,7 @@ from bioinformatics_tools.utilities.ssh_connection import (
     ensure_remote_dane_wf,
     make_user_connection,
     remove_margie_files,
+    runs_here,
 )
 
 LOGGER = logging.getLogger(__name__)
@@ -354,40 +355,60 @@ def save_look(body: dict, current_user: dict = Depends(get_current_user)):
 def delete_account(body: DeleteAccount, request: Request, current_user: dict = Depends(get_current_user)):
     """
     Deletes the MARGIE account: its sign-in, profile, stored cluster key and licence acceptances
-    (revoked, with the revocation recorded beside the acceptance records), and in the cluster
-    account's home the stored language-model keys and the copy of MARGIE (remove_margie_files);
-    config.yaml, databases and results stay. Those files stay too while another MARGIE account
-    uses the same cluster account, and in local mode. Asks for the password again, waits while
-    a run is going, and deletes nothing when the files cannot be removed.
+    (revoked, with the revocation recorded beside the acceptance records). The cluster account's
+    home stays as it is: other MARGIE accounts, on the website or in the desktop app, can use the
+    same cluster account and its copy of MARGIE, and neither can see the other's accounts;
+    remove-cluster-copy removes that copy on its own. Asks for the password again and waits while
+    a run is going.
     """
-    with get_db() as db:
-        row = db.execute('SELECT password_hash FROM users WHERE id = ?', (current_user['user_id'],)).fetchone()
-    if row is None or not verify_password(body.password, row['password_hash']):
-        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail='That password does not match this account.')
+    _check_password(current_user, body.password)
     going = job_store.going_for(current_user['user_id'])
     if going:
         raise HTTPException(status_code=status.HTTP_409_CONFLICT,
                             detail=f'A run is going ({going[0]}): stop it, or wait for it to finish, before deleting the account.')
-    host, cluster_user = current_user['cluster_host'], current_user['cluster_username']
-    with get_db() as db:
-        shared = db.execute('SELECT count(*) FROM users WHERE cluster_host = ? AND cluster_username = ? AND id != ?',
-                            (host, cluster_user, current_user['user_id'])).fetchone()[0]
-    removed = False
-    if not shared and not is_local_mode():
-        conn = make_user_connection(host, cluster_user, decrypt_private_key(current_user['private_key_encrypted']))
-        problem = remove_margie_files(conn)
-        if problem:
-            raise HTTPException(status_code=status.HTTP_502_BAD_GATEWAY,
-                                detail=f"Could not remove MARGIE's files from your home on the cluster ({problem}). Nothing was deleted; try again.")
-        removed = True
     revoke_on_record(current_user, request, 'account deleted')
     with get_db() as db:
         db.execute('DELETE FROM users WHERE id = ?', (current_user['user_id'],))
         db.commit()
     read_cache.drop(current_user['user_id'])
-    close_user_connections(host, cluster_user)
-    LOGGER.info('Deleted the account %r (files in the cluster home %s)', current_user['username'], 'removed' if removed else 'kept')
-    return {'deleted': True, 'cluster_files_removed': removed}
+    close_user_connections(current_user['cluster_host'], current_user['cluster_username'])
+    LOGGER.info('Deleted the account %r (the cluster home stays as it is)', current_user['username'])
+    return {'deleted': True}
+
+
+@router.post('/remove-cluster-copy')
+def remove_cluster_copy(body: DeleteAccount, current_user: dict = Depends(get_current_user)):
+    """
+    Removes MARGIE's copy (~/margie-project-2026 and the ~/bioinformatics-tools link) and the stored
+    language-model keys from the cluster account's home (remove_margie_files), with the password
+    again. Refused while a MARGIE run of the cluster account is in SLURM or the desktop app's server
+    is running, and from a server that itself runs from that copy. MARGIE sets the copy up again
+    before the next run.
+    """
+    _check_password(current_user, body.password)
+    if is_local_mode():
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail='This computer runs MARGIE itself; there is no cluster copy to remove.')
+    going = job_store.going_for(current_user['user_id'])
+    if going:
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT,
+                            detail=f'A run is going ({going[0]}): stop it, or wait for it to finish, first.')
+    conn = make_user_connection(current_user['cluster_host'], current_user['cluster_username'],
+                                decrypt_private_key(current_user['private_key_encrypted']))
+    if runs_here(conn):
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT,
+                            detail='This MARGIE server runs from that copy; remove it from the website, or from a shell on the cluster.')
+    problem = remove_margie_files(conn)
+    if problem:
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=f"MARGIE's copy was not removed: {problem}")
+    LOGGER.info("Removed MARGIE's copy from the cluster home of %r", current_user['username'])
+    return {'removed': True}
+
+
+def _check_password(current_user: dict, password: str) -> None:
+    with get_db() as db:
+        row = db.execute('SELECT password_hash FROM users WHERE id = ?', (current_user['user_id'],)).fetchone()
+    if row is None or not verify_password(password, row['password_hash']):
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail='That password does not match this account.')
 
 
 @router.put('/update-credentials')
