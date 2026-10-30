@@ -16,6 +16,7 @@ import time
 import uuid
 from datetime import datetime
 from pathlib import Path
+from queue import Queue
 
 import yaml
 
@@ -1405,6 +1406,29 @@ class WorkflowBase(ProgramBase):
                     'cache_map': cache_map_fn(genome), 'restored': restored.get(genome, {}), 'stored': set(),
                     'genes': genes, 'genome_hash': genome_hash}
 
+        # Protein-cache saves run on a thread of their own, one at a time and in the order asked: a
+        # large genome's proteins take minutes to write, and the controller goes on starting and
+        # finishing genomes meanwhile. The run waits for the saves before it ends.
+        pc_saves: Queue = Queue()
+
+        def _save_proteins() -> None:
+            while True:
+                job = pc_saves.get()
+                try:
+                    if job is None:
+                        return
+                    genome, faa, prefix, tool, ran = job
+                    added = protein_cache.store(db_path, faa, prefix, tool, pc_cfg, genome=genome, ran=ran)
+                    if added:
+                        LOGGER.info('Protein cache: %d new protein(s) of %s kept for %s', added, genome, tool)
+                except Exception as exc:
+                    LOGGER.warning('Protein cache store failed for %s / %s: %s', job[0], job[3], exc)
+                finally:
+                    pc_saves.task_done()
+
+        saver = threading.Thread(target=_save_proteins, name='protein-cache-saves', daemon=True)
+        saver.start()
+
         def _store_ready(slot: dict) -> None:
             """Stores each of a genome's tools once its outputs and db token (written last) exist."""
             if not db_path:
@@ -1416,13 +1440,7 @@ class WorkflowBase(ProgramBase):
                 if t in slot['pc_stored'] or not Path(f"{pc_prefix}{t}/{t}_db.tkn").exists():
                     continue
                 slot['pc_stored'].add(t)
-                try:
-                    added = protein_cache.store(db_path, slot['pc_faa_path'], pc_prefix, t, pc_cfg, genome=genome,
-                                                ran=not slot['restored'].get(t, False))
-                    if added:
-                        LOGGER.info('Protein cache: %d new protein(s) of %s kept for %s', added, genome, t)
-                except Exception as exc:
-                    LOGGER.warning('Protein cache store failed for %s / %s: %s', genome, t, exc)
+                pc_saves.put((genome, slot['pc_faa_path'], pc_prefix, t, not slot['restored'].get(t, False)))
             for tool, paths in slot['cache_map'].items():
                 if tool in slot['stored'] or slot['restored'].get(tool, False):
                     continue
@@ -1572,6 +1590,10 @@ class WorkflowBase(ProgramBase):
                 time.sleep(10)
 
         _requests_open(False)
+        if pc_saves.unfinished_tasks:
+            LOGGER.info('Waiting for %d protein-cache save(s) to finish', pc_saves.unfinished_tasks)
+        pc_saves.put(None)
+        pc_saves.join()
         last_proc = last['proc']
 
         # Stage 3: LLM for all genomes at once; --keep-going lets one failure pass.

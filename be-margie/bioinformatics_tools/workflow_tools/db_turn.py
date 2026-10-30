@@ -17,15 +17,22 @@ import threading
 import time
 
 # Seconds between tries while another writer has the turn.
-POLL = 1.0
+POLL = 0.2
 # Seconds the run's controller waits for the turn to write a genome's caches, at most; it looks
 # after every genome of the run, so then the write goes ahead on SQLite's lock.
 CONTROLLER_WAIT = 600.0
 
-_lock = threading.RLock()
-# Turns this process holds: turn file -> (descriptor, depth). A POSIX lock belongs to the
-# process, so a nested or concurrent write in the same process shares the one lock.
+_guard = threading.Lock()
+# One lock per turn file for the threads of this process: a POSIX lock belongs to the process, so
+# the threads take turns here first. A thread's nested writes share its turn (depth).
+_threads: dict[str, threading.RLock] = {}
+# Turns this process holds: turn file -> (descriptor, depth).
 _held: dict[str, tuple[int, int]] = {}
+
+
+def _thread_lock(path: str) -> threading.RLock:
+    with _guard:
+        return _threads.setdefault(path, threading.RLock())
 
 
 def turn_path(db_path: str) -> str:
@@ -35,42 +42,47 @@ def turn_path(db_path: str) -> str:
 
 def _take(path: str, wait: float | None) -> bool:
     deadline = None if wait is None else time.monotonic() + wait
-    with _lock:
-        if path in _held:
-            fd, depth = _held[path]
-            _held[path] = (fd, depth + 1)
-            return True
+    mine = _thread_lock(path)
+    if not mine.acquire(timeout=-1 if wait is None else max(0.0, wait)):
+        return False
+    if path in _held:
+        fd, depth = _held[path]
+        _held[path] = (fd, depth + 1)
+        return True
+    try:
+        fd = os.open(path, os.O_RDWR | os.O_CREAT, 0o644)
+    except OSError:
+        mine.release()
+        return False
+    while True:
         try:
-            fd = os.open(path, os.O_RDWR | os.O_CREAT, 0o644)
-        except OSError:
-            return False
-        while True:
-            try:
-                fcntl.lockf(fd, fcntl.LOCK_EX | fcntl.LOCK_NB)
-                _held[path] = (fd, 1)
-                return True
-            except OSError as exc:
-                if exc.errno not in (errno.EACCES, errno.EAGAIN):
-                    # A file system without these locks: the write goes on SQLite's lock alone.
-                    os.close(fd)
-                    return False
-            if deadline is not None and time.monotonic() >= deadline:
+            fcntl.lockf(fd, fcntl.LOCK_EX | fcntl.LOCK_NB)
+            _held[path] = (fd, 1)
+            return True
+        except OSError as exc:
+            if exc.errno not in (errno.EACCES, errno.EAGAIN):
+                # A file system without these locks: the write goes on SQLite's lock alone.
                 os.close(fd)
+                mine.release()
                 return False
-            time.sleep(POLL)
+        if deadline is not None and time.monotonic() >= deadline:
+            os.close(fd)
+            mine.release()
+            return False
+        time.sleep(POLL)
 
 
 def _give(path: str) -> None:
-    with _lock:
-        fd, depth = _held[path]
-        if depth > 1:
-            _held[path] = (fd, depth - 1)
-            return
+    fd, depth = _held[path]
+    if depth > 1:
+        _held[path] = (fd, depth - 1)
+    else:
         del _held[path]
         try:
             fcntl.lockf(fd, fcntl.LOCK_UN)
         finally:
             os.close(fd)
+    _thread_lock(path).release()
 
 
 @contextlib.contextmanager

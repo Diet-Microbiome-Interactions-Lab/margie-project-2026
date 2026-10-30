@@ -123,3 +123,60 @@ def test_a_cache_write_runs_in_the_turn(tmp_path, monkeypatch):
     write(str(db))
     write('')
     assert seen == [True, False]
+
+
+def test_two_threads_of_a_process_take_turns(tmp_path):
+    import threading
+    db = tmp_path / 'main.db'
+    inside, order = threading.Event(), []
+
+    def first():
+        with db_turn.turn(db):
+            inside.set()
+            time.sleep(0.5)
+            order.append('first done')
+
+    t = threading.Thread(target=first)
+    t.start()
+    inside.wait(5)
+    with db_turn.turn(db, wait=0.1) as had:
+        assert not had
+    with db_turn.turn(db) as had:
+        assert had
+        order.append('second')
+    t.join()
+    assert order == ['first done', 'second']
+
+
+def test_the_protein_cache_lets_others_write_between_its_chunks(tmp_path, monkeypatch):
+    import threading
+    monkeypatch.setattr(protein_cache, 'STORE_CHUNK', 2)
+    monkeypatch.setattr(protein_cache, 'STORE_PAUSE', 0.2)
+    db = tmp_path / 'main.db'
+    seqs = ['MKVLAAG', 'MSTNPKP', 'MAAAKKL', 'MPPQQRS', 'MGGHHLL', 'MDDEEFF']
+    faa = tmp_path / 'A.faa'
+    faa.write_text(''.join(f'>a{i} p\n{q}\n' for i, q in enumerate(seqs)))
+    (tmp_path / 'A' / 'cog').mkdir(parents=True)
+    (tmp_path / 'A' / 'cog' / 'cog_results.tsv').write_text(
+        'organism_name\tfeature_id\tCOG_id\n' + ''.join(f'A\ta{i}\tCOG000{i}\n' for i in range(len(seqs))))
+    got_in = []
+
+    def other_writer():
+        time.sleep(0.1)
+        with db_turn.turn(db, wait=5) as had:
+            got_in.append(had)
+
+    t = threading.Thread(target=other_writer)
+    t.start()
+    assert protein_cache.store(str(db), str(faa), f'{tmp_path / "A"}/', 'cog', {}, genome='A') == len(seqs)
+    t.join()
+    assert got_in == [True]
+
+
+def test_the_run_saves_proteins_on_a_thread_and_waits_for_them_before_it_ends():
+    src = (Path(db_turn.__file__).parent / 'workflow.py').read_text()
+    ready = src[src.index('def _store_ready(slot'):src.index('def _finish(slot')]
+    assert 'pc_saves.put((' in ready and 'protein_cache.store(' not in ready
+    loop_end = src.index('_requests_open(False)\n')
+    assert src.index('pc_saves.join()', loop_end) < src.index("target='llm_all'", loop_end)
+    assert "threading.Thread(target=_save_proteins" in src

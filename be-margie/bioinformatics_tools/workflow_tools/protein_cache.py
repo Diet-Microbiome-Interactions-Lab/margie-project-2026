@@ -28,6 +28,7 @@ import os
 import re
 import shutil
 import sqlite3
+import time
 from datetime import datetime, timezone
 from pathlib import Path
 
@@ -269,6 +270,12 @@ def _connect(db: str) -> sqlite3.Connection:
             if 'duplicate column' not in str(exc):
                 raise
     return conn
+
+
+# Proteins written to the cache in one transaction by store(), and the pause after each, in which a
+# writer waiting for the database's turn (a load, another of the run's caches) gets it.
+STORE_CHUNK = 500
+STORE_PAUSE = 0.3
 
 
 def _chunks(items: list, n: int = 500):
@@ -543,13 +550,22 @@ def store(db: str, faa: str, prefix: str, tool: str, cfg: dict, genome: str = ''
                     LOGGER.info('protein cache: %s %s has new columns; %d cached entries moved to them', tool, filename, moved)
                 conn.execute('INSERT OR REPLACE INTO protein_cache_header VALUES (?, ?, ?, ?)',
                              (tool, key, filename, header))
-            for filename, (_, rows) in tables.items():
-                conn.executemany('INSERT OR IGNORE INTO protein_cache (aa_hash, tool, tool_key, filename, lines, cached_at, genome) '
-                                 'VALUES (?, ?, ?, ?, ?, ?, ?)',
-                                 [(h, tool, key, filename, '\n'.join(rows.get(first[h], [])), stamp, genome) for h in new])
-                conn.executemany('UPDATE protein_cache SET lines = ?, cached_at = ?, genome = ? '
-                                 'WHERE tool = ? AND tool_key = ? AND filename = ? AND aa_hash = ?',
-                                 [('\n'.join(rows.get(first[h], [])), stamp, genome, tool, key, filename, h) for h in changed])
+        # The rows go in short transactions, each in the write turn, so loads and the run's other
+        # writes go between them; a store cut short keeps the chunks it wrote.
+        for chunk in _chunks(new, STORE_CHUNK):
+            with db_turn.turn(db, wait=db_turn.CONTROLLER_WAIT), conn:
+                for filename, (_, rows) in tables.items():
+                    conn.executemany('INSERT OR IGNORE INTO protein_cache (aa_hash, tool, tool_key, filename, lines, cached_at, genome) '
+                                     'VALUES (?, ?, ?, ?, ?, ?, ?)',
+                                     [(h, tool, key, filename, '\n'.join(rows.get(first[h], [])), stamp, genome) for h in chunk])
+            time.sleep(STORE_PAUSE)
+        for chunk in _chunks(changed, STORE_CHUNK):
+            with db_turn.turn(db, wait=db_turn.CONTROLLER_WAIT), conn:
+                for filename, (_, rows) in tables.items():
+                    conn.executemany('UPDATE protein_cache SET lines = ?, cached_at = ?, genome = ? '
+                                     'WHERE tool = ? AND tool_key = ? AND filename = ? AND aa_hash = ?',
+                                     [('\n'.join(rows.get(first[h], [])), stamp, genome, tool, key, filename, h) for h in chunk])
+            time.sleep(STORE_PAUSE)
         if changed:
             LOGGER.info('protein cache: %d %s entries replaced, their results differing from the cached ones', len(changed), tool)
         return len(new) + len(changed)

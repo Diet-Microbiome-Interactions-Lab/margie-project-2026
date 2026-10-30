@@ -98,6 +98,34 @@
 		}
 	}
 
+	// ------------------------------------------------ removing MARGIE's copy from the cluster
+	let removing = $state(false);
+	let remPassword = $state('');
+	let remBusy = $state(false);
+	let remError = $state('');
+	let remDone = $state('');
+	async function removeClusterCopy() {
+		remBusy = true;
+		remError = '';
+		remDone = '';
+		try {
+			const res = await fetch(`${API_URL}/v1/auth/remove-cluster-copy`, {
+				method: 'POST',
+				headers: { ...authHeaders(), 'Content-Type': 'application/json' },
+				body: JSON.stringify({ password: remPassword })
+			});
+			const d = await res.json().catch(() => ({}));
+			if (!res.ok) throw new Error(typeof d.detail === 'string' ? d.detail : "MARGIE's copy could not be removed.");
+			removing = false;
+			remPassword = '';
+			remDone = "MARGIE's copy and the stored language-model keys were removed from your cluster home. MARGIE sets the copy up again before your next run.";
+		} catch (e) {
+			remError = e instanceof Error ? e.message : String(e);
+		} finally {
+			remBusy = false;
+		}
+	}
+
 	async function saveCredentials() {
 		credError = '';
 		credDone = '';
@@ -223,10 +251,11 @@
 	<section class="pf-box pf-delete" aria-labelledby="pf-del">
 		<header class="pf-head"><h2 id="pf-del">Delete account</h2></header>
 		<p class="pf-del-text">
-			Deletes your MARGIE account: your sign-in, your details here and the stored cluster key; withdraws your acceptance of the licence
-			terms, recorded with the licence records as acceptances are; and in your home on the cluster, deletes the stored language-model API
-			keys and MARGIE's copy (~/margie-project-2026, with any edits to its workflow). Your config.yaml, databases and results stay. To use
-			MARGIE again, sign up again and accept the terms again.
+			Deletes your MARGIE account: your sign-in, your details here and the stored cluster key, and withdraws your acceptance of the
+			licence terms, recorded with the licence records as acceptances are. Your home on the cluster stays as it is, since other MARGIE
+			accounts (here or in the desktop app) can use the same cluster account: MARGIE's copy, config.yaml, databases and results stay. To
+			remove MARGIE's copy as well, use Remove MARGIE from the cluster below first. To use MARGIE again, sign up again and accept the terms
+			again.
 		</p>
 		{#if deleting}
 			<form
@@ -246,6 +275,36 @@
 			{#if delError}<p class="pf-msg bad" role="alert">{delError}</p>{/if}
 		{:else}
 			<div><button type="button" class="mg-btn small" onclick={() => (deleting = true)}>Delete account…</button></div>
+		{/if}
+	</section>
+
+	<section class="pf-box pf-delete" aria-labelledby="pf-rem">
+		<header class="pf-head"><h2 id="pf-rem">Remove MARGIE from the cluster</h2></header>
+		<p class="pf-del-text">
+			Removes MARGIE's copy from your home on the cluster (~/margie-project-2026, with any edits to its workflow, and the
+			~/bioinformatics-tools link) and the stored language-model API keys. Every MARGIE account on this cluster account, here or in the
+			desktop app, runs from that copy, so MARGIE leaves it in place while one of your runs is in SLURM or the desktop app's server is
+			running. Your config.yaml, databases and results stay, and MARGIE sets the copy up again before your next run.
+		</p>
+		{#if removing}
+			<form
+				class="pf-del-form"
+				onsubmit={(e) => {
+					e.preventDefault();
+					removeClusterCopy();
+				}}
+			>
+				<label>
+					<span>Your MARGIE password</span>
+					<input class="mg-input" type="password" autocomplete="current-password" bind:value={remPassword} disabled={remBusy} />
+				</label>
+				<button type="submit" class="mg-btn small danger" disabled={!remPassword || remBusy}>{remBusy ? 'Removing…' : "Remove MARGIE's copy"}</button>
+				<button type="button" class="mg-btn small" disabled={remBusy} onclick={() => ((removing = false), (remPassword = ''), (remError = ''))}>Cancel</button>
+			</form>
+			{#if remError}<p class="pf-msg bad" role="alert">{remError}</p>{/if}
+		{:else}
+			<div><button type="button" class="mg-btn small" onclick={() => ((removing = true), (remDone = ''))}>Remove MARGIE from the cluster…</button></div>
+			{#if remDone}<p class="pf-msg" role="status">{remDone}</p>{/if}
 		{/if}
 	</section>
 </div>

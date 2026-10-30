@@ -79,6 +79,8 @@ export interface UiPrefs {
 	marks: boolean;
 	/** Crisp: a soft wash of the page's colour behind its head, as Atlas has, or a plain page. */
 	backdrop: 'glow' | 'plain';
+	/** Home's opening: the turning logo, or the DNA film that forms it. */
+	homeAnimation: 'logo' | 'dna';
 	/** How much the next run annotates (Custom uses the hand-picked tools), kept across restarts. */
 	toolDepth: 'quick' | 'standard' | 'licensed' | 'custom';
 	toolPick: string[] | null;
@@ -175,6 +177,7 @@ export const DEFAULT_PREFS: UiPrefs = {
 	recolour: true,
 	marks: false,
 	backdrop: 'plain',
+	homeAnimation: 'logo',
 	toolDepth: 'standard',
 	toolPick: null,
 	quast: false,
@@ -331,6 +334,7 @@ export function sanitizePrefs(raw: unknown, base: UiPrefs = DEFAULT_PREFS): UiPr
 		recolour: typeof r.recolour === 'boolean' ? r.recolour : base.recolour,
 		marks: typeof r.marks === 'boolean' ? r.marks : base.marks,
 		backdrop: oneOf(r.backdrop, ['glow', 'plain'] as const, base.backdrop),
+		homeAnimation: oneOf(r.homeAnimation, ['logo', 'dna'] as const, base.homeAnimation),
 		toolDepth: oneOf(r.toolDepth, ['quick', 'standard', 'licensed', 'custom'] as const, base.toolDepth),
 		quast: typeof r.quast === 'boolean' ? r.quast : base.quast,
 		toolPick: Array.isArray(r.toolPick)
