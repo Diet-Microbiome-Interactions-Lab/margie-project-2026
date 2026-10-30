@@ -392,6 +392,19 @@
 		if (going || !named.size) for (const g of genomeList()) if (g.file && !named.has(g.name) && !bases.has(baseOf(g.name))) named.add(g.name);
 		return [...named].sort((a, b) => a.localeCompare(b));
 	});
+	/** The folders of the runs a run was resumed from, nearest first (a resume of a resume goes further back). */
+	function earlierDirsOf(r: Run): string[] {
+		const dirs: string[] = [];
+		const seen = new Set([r.id]);
+		for (let from = r.from; from && !seen.has(from); ) {
+			seen.add(from);
+			const prev = ws.runs.find((x) => x.id === from);
+			if (!prev) break;
+			if (prev.outputDir) dirs.push(prev.outputDir);
+			from = prev.from;
+		}
+		return dirs;
+	}
 	const prog = $derived(
 		shown?.kind === 'annotate'
 			? buildProgress({
@@ -407,6 +420,7 @@
 					meta: new Map(ws.genomes.map((g) => [stemOf(g.name), g])),
 					setting,
 					outputRoot: ws.resultRoots.outputRoot,
+					earlierDirs: earlierDirsOf(shown),
 					sources: srcRows
 				})
 			: null
