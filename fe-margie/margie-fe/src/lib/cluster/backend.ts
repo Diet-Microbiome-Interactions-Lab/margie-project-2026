@@ -1164,8 +1164,8 @@ const TABLE_NAME = 'FINAL_ANNOTATION_WITH_CONFIDENCE.tsv';
 const EXCEL_NAME = 'FINAL_ANNOTATION_WITH_CONFIDENCE.xlsx';
 const VIEWER_NAME = 'FINAL_GENOME_VIEWER.html';
 const PER_TOOL = 'per-tool-phased-output';
-/** Run-level folders (reorganize_outputs.py's list, and synteny). */
-const RUN_LEVEL = new Set(['scoring', 'sqlite', 'ani', 'aai', 'closest', 'mauve', 'original_container_outputs', 'logs', 'genome_pool', 'synteny']);
+/** Run-level folders (reorganize_outputs.py's list, synteny, and the run's temporary folders). */
+const RUN_LEVEL = new Set(['scoring', 'sqlite', 'ani', 'aai', 'closest', 'mauve', 'original_container_outputs', 'logs', 'genome_pool', 'synteny', 'temp', 'tmp']);
 /** Folders in a genome's results that are steps, not tools. */
 const NOT_TOOLS = new Set(['consolidation', 'labeling', 'scoring', 'fingerprint', 'evidence', 'figures', 'diagrams', PER_TOOL]);
 /** How many of the latest runs Results looks through. */

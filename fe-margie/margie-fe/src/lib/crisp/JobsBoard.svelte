@@ -40,10 +40,13 @@
 		if (r.kind === 'annotate') return r.args.includes('--genes-only') ? 'gene caller only' : 'all tools';
 		return '';
 	}
-	/** One word, and how far a running job has got. */
+	/** One word, and how far a running job has got: the picked job's share of its genome steps done (as its
+	 * bar), another its SLURM steps done (a resumed run's count leaves out the genomes it brought in). */
 	function statusWord(r: Run): string {
 		const word = STATUS[r.status] ?? r.status;
-		return r.status === 'running' && typeof r.progress === 'number' ? `${word} ${Math.round(r.progress)}%` : word;
+		if (r.status !== 'running') return word;
+		const pct = r.id === shown?.id && prog ? prog.overall : r.progress;
+		return typeof pct === 'number' ? `${word} ${Math.round(pct)}%` : word;
 	}
 	/** A job's id as the list shows it: the first block of a long one. */
 	const shortId = (id: string) => (id.length > 12 ? id.split('-')[0] : id);
@@ -384,9 +387,13 @@
 		return () => clearInterval(t);
 	});
 	const setting = (key: string) => ws.settings.find((x) => x.key === key)?.value ?? '';
-	/** Its genomes: those its jobs name, and while it goes those in the input folder too. */
+	/** The genome folders in a run's folder, from Results' listing of the latest runs (undefined for an older run). */
+	const foldersIn = (dir?: string) => (dir ? ws.resultRuns.find((x) => x.dir === dir.replace(/\/$/, ''))?.organisms : undefined);
+	/** Its genomes: those its jobs name and those in its folder (a resumed run's copied genomes start no job),
+	 * and while it goes those in the input folder too. */
 	const jobGenomes = $derived.by(() => {
 		const named = new Set((clock?.started ?? []).map((e) => e.genome).filter(Boolean));
+		for (const o of foldersIn(shown?.outputDir) ?? []) named.add(o.organism);
 		// A file's genome already in the run under <name>--<hash> is not listed again under its file's name.
 		const bases = new Set([...named].map(baseOf));
 		if (going || !named.size) for (const g of genomeList()) if (g.file && !named.has(g.name) && !bases.has(baseOf(g.name))) named.add(g.name);
@@ -405,6 +412,13 @@
 		}
 		return dirs;
 	}
+	/** A run's genome results: those in its folder and in the folders of the runs it resumed, its own last so
+	 * they stand; a run older than Results' listing has each genome's latest. */
+	function resultsOf(r: Run) {
+		const own = foldersIn(r.outputDir);
+		if (!own) return ws.results;
+		return [...earlierDirsOf(r).reverse().flatMap((d) => foldersIn(d) ?? []), ...own];
+	}
 	const prog = $derived(
 		shown?.kind === 'annotate'
 			? buildProgress({
@@ -416,7 +430,7 @@
 					log: live && ws.logOf === shown.id ? ws.log : logText,
 					clock,
 					now: tickAt + (clock ? clock.now - Date.now() : 0),
-					results: ws.results,
+					results: resultsOf(shown),
 					meta: new Map(ws.genomes.map((g) => [stemOf(g.name), g])),
 					setting,
 					outputRoot: ws.resultRoots.outputRoot,
