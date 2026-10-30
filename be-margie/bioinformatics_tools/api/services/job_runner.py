@@ -48,6 +48,8 @@ WILDCARDS_GENOME_RE = re.compile(r'wildcards:.*\bgenome=([^\s,]+)')
 # Sequential orchestrator's per-genome progress; step counts reset per genome.
 # "STAGE 2: genome i/N" as genomes start (older logs say "SEQUENTIAL: genome i/N").
 SEQUENTIAL_GENOME_RE = re.compile(r'(?:SEQUENTIAL|STAGE 2): genome (\d+)/(\d+)')
+# "=== LOADS: <genome> waiting|loading|loaded|not loaded" as Stage 2's genomes load (workflow.py).
+LOADS_RE = re.compile(r'=== LOADS: (\S+) (waiting|loading|loaded|not loaded)')
 
 
 def _slurm_status_checker(job_id: str, connection: SSHConnection):
@@ -152,6 +154,8 @@ def run_ssh_task(job_id: str, command: str, connection: SSHConnection,
         detached = False
         launched = False
         ended_unfinished = False
+        # The genomes waiting for a place to load or loading: {genome: 'waiting' | 'loading'}.
+        loads: dict[str, str] = {}
         for line in ssh_slurm.submit_ssh_job(cmd=command, connection=connection,
                                              job_id=job_id, reattach=reattach,
                                              in_slurm=in_slurm,
@@ -264,6 +268,15 @@ def run_ssh_task(job_id: str, command: str, connection: SSHConnection,
             # Wrapper can exit 0 on a snakefile parse error; never completed.
             if "SyntaxError in file" in line or "Unexpected keyword" in line and "rule definition" in line:
                 saw_snakemake_syntax_error = True
+
+            loads_match = LOADS_RE.search(line)
+            if loads_match:
+                genome, state = loads_match.groups()
+                if state in ("waiting", "loading"):
+                    loads[genome] = state
+                else:
+                    loads.pop(genome, None)
+                job_store.update(job_id, loads=dict(loads))
 
             # Parses the orchestrator's marker as each genome starts Stage 2.
             genome_match = SEQUENTIAL_GENOME_RE.search(line)

@@ -118,6 +118,8 @@ export interface Run {
 	progress?: number;
 	/** Progress as the run reports it, e.g. "62%" or "321 MB fetched". */
 	progressText?: string;
+	/** Its genomes loading into the database or computed and waiting to load, read with its log. */
+	loads?: Record<string, 'waiting' | 'loading'>;
 	/** Failure reason from the run; empty unless it failed. */
 	reason?: string;
 }

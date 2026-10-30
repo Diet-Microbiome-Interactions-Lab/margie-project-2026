@@ -93,6 +93,8 @@ interface JobRow {
 	steps_done?: number | null;
 	steps_total?: number | null;
 	status_note?: string | null;
+	/** The genomes loading into the database or computed and waiting to load (job_runner.py). */
+	loads?: Record<string, 'waiting' | 'loading'> | null;
 	/** Each tool's SLURM job on each genome, as the API tracks them (job_runner.py). */
 	slurm_jobs?: { job_id: string; rule?: string | null; status: string; time?: string; genome?: string | null; source?: string }[] | null;
 }
@@ -266,6 +268,7 @@ function toRun(j: JobRow): Run {
 		from: j.relaunched_from ?? undefined,
 		progress,
 		progressText: [j.phase, steps].filter(Boolean).join(' | ') || undefined,
+		loads: j.loads ?? undefined,
 		reason: status === 'failed' || status === 'cancelled' ? reasonIn(log) || j.phase || '' : ''
 	};
 }

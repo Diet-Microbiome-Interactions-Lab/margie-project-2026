@@ -106,3 +106,33 @@ class TestResumeCopyPhase:
 
         assert seen[0]['copy_from'] == '/a' and seen[0]['copy_to'] == '/b'
         assert seen[1:] == ["Copying the earlier run's results", 'Starting the run']
+
+
+def test_the_genomes_loading_and_waiting_to_load_follow_the_log():
+    """=== LOADS: lines (workflow.py) keep each genome's place in the loads: waiting, loading, and
+    gone once loaded or not loaded."""
+    from unittest.mock import MagicMock, patch
+
+    from bioinformatics_tools.api.services import job_runner, run_mail
+    from bioinformatics_tools.api.services.job_store import job_store
+
+    job_store.create('loads-1', '/g', user_id=7)
+    seen = []
+
+    def lines(**kw):
+        yield '__LAUNCHED__'
+        yield '[10:00:00 INFO w] - === LOADS: gA loading into the MARGIE database; its place goes to the next genome ==='
+        yield '[10:00:05 INFO w] - === LOADS: gB waiting for a place to load (1 genomes loading) ==='
+        seen.append(job_store.get('loads-1')['loads'])
+        yield '[10:01:00 INFO w] - === LOADS: gA loaded: its results are in the MARGIE database ==='
+        yield '[10:01:00 INFO w] - === LOADS: gB loading into the MARGIE database; its place goes to the next genome ==='
+        seen.append(job_store.get('loads-1')['loads'])
+        yield '[10:02:00 INFO w] - === LOADS: gB not loaded: its Stage 2 failed ==='
+        seen.append(job_store.get('loads-1')['loads'])
+        yield '__EXIT_CODE__:0'
+
+    with patch.object(job_runner.ssh_slurm, 'submit_ssh_job', side_effect=lines), \
+            patch.object(job_runner, '_slurm_status_checker'), patch.object(run_mail, 'notify'):
+        job_runner.run_ssh_task('loads-1', 'dane_wf margie sb', MagicMock())
+
+    assert seen == [{'gA': 'loading', 'gB': 'waiting'}, {'gB': 'loading'}, {}]

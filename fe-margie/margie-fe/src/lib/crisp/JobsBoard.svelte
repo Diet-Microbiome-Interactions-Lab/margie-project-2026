@@ -419,6 +419,18 @@
 		if (!own) return ws.results;
 		return [...earlierDirsOf(r).reverse().flatMap((d) => foldersIn(d) ?? []), ...own];
 	}
+	/** The genomes loading into the database and those computed and waiting to load (its log's === LOADS: lines). */
+	const loadsNow = $derived(going && live && ws.logOf === shown?.id && ws.loads ? ws.loads : null);
+	const loadNote = $derived.by(() => {
+		const states = Object.values(loadsNow ?? {});
+		const count = (state: string) => states.filter((s) => s === state).length;
+		const genomes = (k: number) => `${k} genome${k === 1 ? '' : 's'}`;
+		const loading = count('loading');
+		const waiting = count('waiting');
+		return [loading ? `Loading ${genomes(loading)} into the database` : '', waiting ? `${genomes(waiting)} computed and waiting to load` : '']
+			.filter(Boolean)
+			.join(' | ');
+	});
 	/** A resumed run's copied genomes are known from Results' listing; until it is read, its progress waits. */
 	const reading = $derived(!!shown?.from && shown.kind === 'annotate' && !ws.resultsRead);
 	const prog = $derived(
@@ -596,6 +608,7 @@
 					</div>
 				</header>
 				{#if shown.reason}<p class="why" title={shown.reason}>{shown.reason}</p>{/if}
+				{#if loadNote}<p class="loads" title={Object.entries(loadsNow ?? {}).map(([g, s]) => `${g}: ${s}`).join('\n')}>{loadNote}</p>{/if}
 				<!-- One bar, then four tiles of one size: how far, how many steps, how long, and the time left (or when it ended). -->
 				<div class="sum">
 					{#if reading}
@@ -1100,6 +1113,14 @@
 		margin: 0;
 		font-size: var(--cr-fs-meta);
 		color: var(--mg-text-2);
+	}
+	.loads {
+		flex: none;
+		margin: 0;
+		padding: 4px var(--mg-pad);
+		font-size: var(--cr-fs-meta);
+		color: var(--mg-text-2);
+		border-bottom: 1px solid var(--mg-border);
 	}
 	.why {
 		margin: 0;

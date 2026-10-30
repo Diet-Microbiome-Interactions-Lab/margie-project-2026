@@ -310,6 +310,8 @@ class Workspace {
 	log = $state('');
 	/** While an annotation goes (on this computer): when it started each tool on each genome, and each tool's usual time. */
 	clock = $state<ToolClock | null>(null);
+	/** The read run's genomes loading or waiting to load (Run.loads), with its log. */
+	loads = $state<Run['loads'] | null>(null);
 	/** Which run `log` and `clock` are of. */
 	logOf = $state('');
 	#logRun = '';
@@ -624,6 +626,7 @@ class Workspace {
 			this.#logRun = id;
 			this.logOf = id;
 			this.clock = null;
+			this.loads = null;
 			this.#logOffset = 0;
 			this.log = '';
 		}
@@ -633,6 +636,7 @@ class Workspace {
 			);
 			if (d.log.text) this.log = (this.log + d.log.text).slice(-2_000_000);
 			this.clock = d.clock ?? null;
+			this.loads = d.run?.loads ?? null;
 			this.#logOffset = d.log.offset;
 			if (d.log.offset >= d.log.size) return d.run;
 		}
