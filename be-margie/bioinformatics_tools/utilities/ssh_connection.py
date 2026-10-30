@@ -186,8 +186,8 @@ echo REMOVED'''
         ssh = conn.connect()
         _, stdout, stderr = ssh.exec_command(command, timeout=timeout)
         stdout.channel.settimeout(timeout)
-        code = stdout.channel.recv_exit_status()
         out = stdout.read().decode(errors='replace') + stderr.read().decode(errors='replace')
+        code = stdout.channel.recv_exit_status()
     except Exception as exc:
         return str(exc) or type(exc).__name__
     return '' if code == 0 and 'REMOVED' in out else (out.strip() or f'exit {code}')
@@ -374,8 +374,8 @@ echo LINKED
     ssh = conn.connect()
     _, stdout, stderr = ssh.exec_command(command, timeout=timeout)
     stdout.channel.settimeout(timeout)
-    exit_code = stdout.channel.recv_exit_status()
     output = (stdout.read().decode(errors='replace') + stderr.read().decode(errors='replace')).strip()
+    exit_code = stdout.channel.recv_exit_status()
     if exit_code != 0:
         raise RuntimeError(
             f'Could not provision dane_wf on the remote account (exit {exit_code}): {output or "(no output)"}'
@@ -470,8 +470,8 @@ echo "UPDATED $remote_sha"
         ssh = conn.connect()
         _, stdout, stderr = ssh.exec_command(command, timeout=timeout)
         stdout.channel.settimeout(timeout)
-        exit_code = stdout.channel.recv_exit_status()
         output = (stdout.read().decode(errors='replace') + stderr.read().decode(errors='replace')).strip()
+        exit_code = stdout.channel.recv_exit_status()
     except Exception as exc:
         LOGGER.warning('dane_wf version-sync check raised, skipping: %s', exc)
         return f'error: {exc}'

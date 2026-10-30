@@ -197,9 +197,9 @@ def _run(conn, command: str, timeout: float = 60.0) -> tuple[int, str]:
     """Runs a shell command over SSH; returns (exit code, stdout + stderr)."""
     ssh = conn.connect()
     _, stdout, stderr = ssh.exec_command(command, timeout=timeout)
-    code = stdout.channel.recv_exit_status()
+    # Read first: a command with over 2 MB to say waits for it to be read before it ends.
     out = stdout.read().decode(errors='replace') + stderr.read().decode(errors='replace')
-    return code, out
+    return stdout.channel.recv_exit_status(), out
 
 
 def _cfg_get(cfg: dict, dotted: str):

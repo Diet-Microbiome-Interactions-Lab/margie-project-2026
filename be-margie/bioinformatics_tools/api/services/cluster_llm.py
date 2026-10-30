@@ -39,8 +39,9 @@ def _run(conn, command: str, stdin: bytes | None = None, timeout: int = 60) -> t
     if stdin is not None:
         chan_in.write(stdin)
         chan_in.channel.shutdown_write()
-    code = stdout.channel.recv_exit_status()
-    return code, stdout.read().decode(errors='replace') + stderr.read().decode(errors='replace')
+    # Read first: a command with over 2 MB to say waits for it to be read before it ends.
+    out = stdout.read().decode(errors='replace') + stderr.read().decode(errors='replace')
+    return stdout.channel.recv_exit_status(), out
 
 
 def read_config(conn, home: str) -> dict:

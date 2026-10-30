@@ -455,8 +455,10 @@ def _resolve_effective_main_db(current_user: dict, conn, user_config: dict, *, p
 def _run_remote_check(conn, command: str) -> tuple[int, str]:
     ssh = conn.connect()
     _, stdout, stderr = ssh.exec_command(command)
-    exit_code = stdout.channel.recv_exit_status()
+    # The output is read before the exit status: a command with more to say than the SSH window
+    # (about 2 MB) waits for it to be read before it ends.
     output = (stdout.read().decode(errors="replace") + stderr.read().decode(errors="replace")).strip()
+    exit_code = stdout.channel.recv_exit_status()
     return exit_code, output
 
 

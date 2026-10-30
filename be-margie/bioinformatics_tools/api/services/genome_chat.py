@@ -115,8 +115,9 @@ def safe_genome(g) -> str:
 def _run(conn, command: str) -> tuple[int, str]:
     ssh = conn.connect()
     _, stdout, stderr = ssh.exec_command(command, timeout=60)
-    code = stdout.channel.recv_exit_status()
-    return code, stdout.read().decode(errors='replace') + stderr.read().decode(errors='replace')
+    # Read first: a command with over 2 MB to say waits for it to be read before it ends.
+    out = stdout.read().decode(errors='replace') + stderr.read().decode(errors='replace')
+    return stdout.channel.recv_exit_status(), out
 
 
 def _read(conn, path: str, limit: int | None = None) -> bytes | None:
