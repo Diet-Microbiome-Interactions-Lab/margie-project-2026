@@ -112,6 +112,8 @@ export interface Run {
 	files?: string[];
 	/** Output folder of the run. */
 	outputDir?: string;
+	/** The job this one was resumed or restarted from. */
+	from?: string;
 	/** 0-100, parsed from its log. */
 	progress?: number;
 	/** Progress as the run reports it, e.g. "62%" or "321 MB fetched". */

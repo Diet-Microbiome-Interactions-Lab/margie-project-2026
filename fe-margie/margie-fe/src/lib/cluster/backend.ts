@@ -84,6 +84,7 @@ interface JobRow {
 	genome_path?: string | null;
 	workflow?: string | null;
 	work_dir?: string | null;
+	relaunched_from?: string | null;
 	selected_tools?: string | string[] | null;
 	start_time?: string | null;
 	end_time?: string | null;
@@ -262,6 +263,7 @@ function toRun(j: JobRow): Run {
 		tools,
 		files: input ? [baseName(input)] : [],
 		outputDir: j.work_dir ?? undefined,
+		from: j.relaunched_from ?? undefined,
 		progress,
 		progressText: [j.phase, steps].filter(Boolean).join(' | ') || undefined,
 		reason: status === 'failed' || status === 'cancelled' ? reasonIn(log) || j.phase || '' : ''

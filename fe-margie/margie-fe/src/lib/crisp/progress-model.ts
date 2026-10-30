@@ -108,6 +108,9 @@ export interface ProgressInput {
 	current?: { genome: string; tool: string } | null;
 	/** The run's cache report (lib/crisp/cache-report.ts): restored, fresh or partly, per step. */
 	sources?: SourceRow[] | null;
+	/** The folders of the runs this one was resumed from, nearest first: a resume copies their
+	 * genomes' results into its own folder, so those results count as this run's. */
+	earlierDirs?: string[];
 }
 
 /* Every step a genome goes through, by phase. Steps this setup does not run are shown
@@ -165,7 +168,14 @@ export function buildProgress(i: ProgressInput): Progress {
 	// The run's own genome folders: Results lists each genome's latest finished result, which may be
 	// another run's (an earlier run of the same genome, under the same name).
 	const runDir = (i.run?.outputDir ?? '').replace(/\/$/, '');
-	const own = runDir ? i.results.filter((r) => r.folder?.startsWith(`${runDir}/`)) : i.results;
+	const earlier = (i.earlierDirs ?? []).map((d) => d.replace(/\/$/, '')).filter(Boolean);
+	/** A result in this run's folder, or copied into it from a run it resumed (its folder then names the copy). */
+	const ownResult = (r: OrganismResult): OrganismResult | null => {
+		if (!runDir || r.folder?.startsWith(`${runDir}/`)) return r;
+		const from = earlier.find((d) => r.folder?.startsWith(`${d}/`));
+		return from ? { ...r, folder: `${runDir}${r.folder!.slice(from.length)}` } : null;
+	};
+	const own = i.results.map(ownResult).filter((r): r is OrganismResult => r !== null);
 	const results = new Map(own.map((r) => [r.organism, r]));
 	const cells = new Map<string, 'done' | 'partial'>();
 	for (const r of own) for (const t of r.tools) cells.set(`${t.tool}\t${r.organism}`, t.processed ? 'done' : 'partial');
