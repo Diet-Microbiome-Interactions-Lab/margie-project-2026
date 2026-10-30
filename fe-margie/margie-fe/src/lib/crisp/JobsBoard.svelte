@@ -44,7 +44,7 @@
 	 * bar), another its SLURM steps done (a resumed run's count leaves out the genomes it brought in). */
 	function statusWord(r: Run): string {
 		const word = STATUS[r.status] ?? r.status;
-		if (r.status !== 'running') return word;
+		if (r.status !== 'running' || (r.id === shown?.id && reading)) return word;
 		const pct = r.id === shown?.id && prog ? prog.overall : r.progress;
 		return typeof pct === 'number' ? `${word} ${Math.round(pct)}%` : word;
 	}
@@ -419,8 +419,10 @@
 		if (!own) return ws.results;
 		return [...earlierDirsOf(r).reverse().flatMap((d) => foldersIn(d) ?? []), ...own];
 	}
+	/** A resumed run's copied genomes are known from Results' listing; until it is read, its progress waits. */
+	const reading = $derived(!!shown?.from && shown.kind === 'annotate' && !ws.resultsRead);
 	const prog = $derived(
-		shown?.kind === 'annotate'
+		shown?.kind === 'annotate' && !reading
 			? buildProgress({
 					run: shown,
 					going,
@@ -596,7 +598,9 @@
 				{#if shown.reason}<p class="why" title={shown.reason}>{shown.reason}</p>{/if}
 				<!-- One bar, then four tiles of one size: how far, how many steps, how long, and the time left (or when it ended). -->
 				<div class="sum">
-					{#if prog}
+					{#if reading}
+						<p class="reading">Reading the run's folders on the cluster…</p>
+					{:else if prog}
 						<span class="bar" role="progressbar" aria-valuenow={prog.overall} aria-valuemin="0" aria-valuemax="100" aria-label="Progress"><span style="width: {prog.overall}%"></span></span>
 						<div class="stats">
 							<div class="stat"><span class="k">Progress</span><span class="v">{prog.overall}%</span></div>
@@ -1091,6 +1095,11 @@
 	}
 	.job-acts :global(.mg-btn) {
 		gap: 6px;
+	}
+	.reading {
+		margin: 0;
+		font-size: var(--cr-fs-meta);
+		color: var(--mg-text-2);
 	}
 	.why {
 		margin: 0;

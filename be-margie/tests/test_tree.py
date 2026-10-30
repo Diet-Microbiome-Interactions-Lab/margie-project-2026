@@ -3,6 +3,7 @@ with it, in place of a trip to the cluster per folder)."""
 
 from unittest.mock import patch
 
+from bioinformatics_tools.api.auth import create_access_token
 from bioinformatics_tools.api.services import read_cache
 from tests.test_api import FAKE_USER, authed_client, client  # noqa: F401 (fixtures)
 
@@ -31,6 +32,18 @@ def test_the_answer_is_reused(_conn, authed_client):  # noqa: F811
     with patch(f"{SSH}._run_remote_check", return_value=(0, OUT)) as run:
         for _ in range(3):
             authed_client.post("/v1/ssh/tree", json={"paths": ["/r/run2", "/r/run1"]})
+    assert run.call_count == 1
+
+
+@patch(f"{SSH}._build_connection")
+def test_a_signed_in_listing_keeps_the_reads(_conn, authed_client):  # noqa: F811
+    # A POST with a token drops the user's reads (_changes_drop_reads); the listing only reads, so its
+    # answer and the others stand.
+    read_cache.drop(FAKE_USER["user_id"])
+    token = {"Authorization": f"Bearer {create_access_token(FAKE_USER['user_id'], FAKE_USER['username'])}"}
+    with patch(f"{SSH}._run_remote_check", return_value=(0, OUT)) as run:
+        for _ in range(3):
+            assert authed_client.post("/v1/ssh/tree", json={"paths": ["/r/run2", "/r/run1"]}, headers=token).status_code == 200
     assert run.call_count == 1
 
 

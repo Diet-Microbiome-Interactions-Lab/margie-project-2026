@@ -54,10 +54,16 @@ from bioinformatics_tools.workflow_tools.workflow_registry import (
 
 LOGGER = logging.getLogger(__name__)
 
+# POSTs that only read (their folder list is too long for a query string).
+_READ_POSTS = {"/v1/ssh/tree"}
+
+
 def _changes_drop_reads(request: Request):
-    """Anything here that changes something (not a GET) drops the user's short-lived reads
-    (read_cache), before it runs and again after, so the next page reads afresh."""
-    if request.method in ("GET", "HEAD", "OPTIONS"):
+    """Anything here that changes something (not a GET, nor a read in _READ_POSTS) drops the
+    user's short-lived reads (read_cache), before it runs and again after, so the next page reads
+    afresh."""
+    route = getattr(request.scope.get("route"), "path", "")
+    if request.method in ("GET", "HEAD", "OPTIONS") or route in _READ_POSTS:
         yield
         return
     user_id = None

@@ -268,6 +268,8 @@ class Workspace {
 	results = $state<OrganismResult[]>([]);
 	/** Each of the latest runs' genome results, newest run first. */
 	resultRuns = $state<ResultRun[]>([]);
+	/** Results' listing has been read once (a resumed run's progress waits for it). */
+	resultsRead = $state(false);
 	/** The results folder (per-tool output) and the per-genome results folder inside it. */
 	resultRoots = $state({ outputRoot: '', genomesDir: '' });
 	settings = $state<Setting[]>([]);
@@ -584,6 +586,7 @@ class Workspace {
 		const d = await api<{ outputRoot: string; genomesDir: string; organisms: OrganismResult[]; runs?: ResultRun[] }>('/results');
 		this.results = d.organisms;
 		this.resultRuns = d.runs ?? [];
+		this.resultsRead = true;
 		this.resultRoots = { outputRoot: d.outputRoot, genomesDir: d.genomesDir };
 		if (fresh) {
 			this.summaries = {};
