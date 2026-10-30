@@ -7,6 +7,7 @@
 	import TabPicture from './home/TabPicture.svelte';
 	import LogoPuzzle from '../LogoPuzzle.svelte';
 	import MargieLogo from '../MargieLogo.svelte';
+	import DnaFormation from '../DnaFormation.svelte';
 	import { LOGO_PUZZLE } from '$lib/features';
 
 	/**
@@ -31,6 +32,15 @@
 		{ title: 'Read each protein', text: 'The annotation tools compare every protein with their reference databases.' },
 		{ title: 'Weigh the evidence', text: 'Genes are grouped into operons, and each gets a name and a confidence tier.' }
 	];
+
+	/** The opening's height (the logo's size); the DNA film uses the box's width as well. */
+	const LOGO = 'clamp(220px, 24vw, 300px)';
+	/** The openings Home offers, picked with the dots under it and kept with the account (ui prefs). */
+	const OPENINGS = [
+		{ id: 'logo', label: 'The MARGIE logo' },
+		{ id: 'dna', label: 'DNA forming into the MARGIE logo' }
+	] as const;
+	const opening = $derived(ui.prefs.homeAnimation);
 
 	let open = $state<string | null>(null);
 	/** What a run does and what each page does: behind Learn more, open by itself in Guided mode. */
@@ -65,12 +75,31 @@
 
 <div class="home">
 	<section class="hero">
-		<!-- The logo turns in and turns again under the pointer; with LOGO_PUZZLE on, a click breaks it into a jigsaw. -->
-		{#if LOGO_PUZZLE}
-			<LogoPuzzle size="clamp(220px, 24vw, 300px)" />
-		{:else}
-			<h1 class="logo-h1"><MargieLogo size="clamp(220px, 24vw, 300px)" /></h1>
-		{/if}
+		<!-- The opening, as picked with the dots: the logo, which turns in and turns again under the pointer
+		     (with LOGO_PUZZLE on, a click breaks it into a jigsaw), or the DNA film that forms it. One box for both,
+		     so the page keeps its place when the pick changes. -->
+		<div class="opening" style="--logo: {LOGO}">
+			{#if opening === 'dna'}
+				<h1 class="opening-box film"><DnaFormation /><span class="hidden-text">MARGIE</span></h1>
+			{:else if LOGO_PUZZLE}
+				<div class="opening-box"><LogoPuzzle size={LOGO} /></div>
+			{:else}
+				<h1 class="opening-box"><MargieLogo size={LOGO} /></h1>
+			{/if}
+			<div class="picks" role="radiogroup" aria-label="Opening animation">
+				{#each OPENINGS as o (o.id)}
+					<button
+						type="button"
+						role="radio"
+						class="pick"
+						aria-checked={opening === o.id}
+						aria-label={o.label}
+						title={o.label}
+						onclick={() => ui.update({ homeAnimation: o.id })}
+					></button>
+				{/each}
+			</div>
+		</div>
 		<p class="full">Mostly Automated Rapid Genome Inference Environment</p>
 		<p class="motto">Annotate with confidence: a genome-centric, context-dependent approach</p>
 		<div class="cta">
@@ -223,9 +252,71 @@
 	.hero > :nth-child(4) {
 		animation-delay: 200ms;
 	}
-	.logo-h1 {
+	.opening {
+		display: flex;
+		flex-direction: column;
+		align-items: center;
+		gap: 6px;
+		width: 100%;
+	}
+	.opening-box {
+		position: relative;
+		display: flex;
+		align-items: center;
+		justify-content: center;
+		width: min(100%, 720px);
+		height: var(--logo);
 		margin: 0;
 		line-height: 0;
+	}
+	/* The film's strands run wider than the box: its sides fade into the page. */
+	.opening-box.film {
+		mask-image: linear-gradient(to right, transparent, #000 10%, #000 90%, transparent);
+	}
+	.hidden-text {
+		position: absolute;
+		width: 1px;
+		height: 1px;
+		overflow: hidden;
+		clip-path: inset(50%);
+		white-space: nowrap;
+	}
+	.picks {
+		display: flex;
+		gap: 2px;
+	}
+	/* A dot drawn inside a larger target, so it is easy to press. */
+	.pick {
+		display: grid;
+		place-items: center;
+		width: 22px;
+		height: 22px;
+		padding: 0;
+		border: 0;
+		border-radius: 50%;
+		background: none;
+		cursor: pointer;
+	}
+	.pick::after {
+		content: '';
+		width: 8px;
+		height: 8px;
+		border-radius: 50%;
+		background: color-mix(in srgb, var(--mg-text-3) 45%, transparent);
+		transition:
+			background 160ms,
+			transform 160ms;
+	}
+	.pick:hover::after {
+		background: color-mix(in srgb, var(--mg-accent) 60%, transparent);
+	}
+	.pick[aria-checked='true']::after {
+		background: var(--mg-accent);
+		transform: scale(1.15);
+	}
+	.pick:focus-visible {
+		outline: 2px solid var(--mg-accent);
+		outline-offset: -2px;
 	}
 	.full {
 		font-size: 1.15rem;
