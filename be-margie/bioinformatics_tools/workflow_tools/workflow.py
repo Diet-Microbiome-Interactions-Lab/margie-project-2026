@@ -1528,6 +1528,8 @@ class WorkflowBase(ProgramBase):
                 provenance.unfinished(genome)
                 provenance.write()
                 LOGGER.info(provenance.summary(genome))
+                if slot.get('phase') == 'loads' or slot.get('waiting'):
+                    LOGGER.info('=== LOADS: %s not loaded: its Stage 2 failed ===', genome)
                 if db_path:
                     completed = result['rules_summary'].get('completed', 0) + slot.get('computed_rules', 0)
                     db_work.put(lambda: _safely(f'Recording {genome} in the run log table', log_workflow_run, db_path, run_id,
@@ -1535,6 +1537,7 @@ class WorkflowBase(ProgramBase):
                 failed.append(genome)
                 return
             finished.append(genome)
+            LOGGER.info('=== LOADS: %s loaded: its results are in the MARGIE database ===', genome)
             if db_path:
                 completed = self._build_result(key_name, proc)['rules_summary'].get('completed', 0) + slot.get('computed_rules', 0)
                 db_work.put(lambda: _record(slot, completed))
@@ -1582,11 +1585,15 @@ class WorkflowBase(ProgramBase):
                 if slot['phase'] == 'compute' and rc == 0:
                     slot['phase'] = 'computed'
                     slot['computed_rules'] = self._parse_snakemake_output('\n'.join(p.stderr_lines)).get('completed', 0)
+                # The === LOADS: lines say where each genome's loads stand (the Jobs page reads them).
                 if slot['phase'] == 'computed':
                     if sum(s['phase'] == 'loads' for s in active) >= at_once:
+                        if not slot.get('waiting'):
+                            slot['waiting'] = True
+                            LOGGER.info('=== LOADS: %s waiting for a place to load (%d genomes loading) ===', slot['genome'], at_once)
                         continue
-                    LOGGER.info('Loading %s into the MARGIE database (Stage 2, its place goes to the next genome): %s',
-                                slot['genome'], ' '.join(slot['loads_command']))
+                    LOGGER.info('=== LOADS: %s loading into the MARGIE database; its place goes to the next genome ===', slot['genome'])
+                    LOGGER.info('Loads pass for %s: %s', slot['genome'], ' '.join(slot['loads_command']))
                     slot.update(phase='loads', command=slot['loads_command'],
                                 proc=self._start_background_subprocess(slot['loads_command']))
                     if slot['proc'] is not None:

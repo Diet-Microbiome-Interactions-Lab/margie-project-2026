@@ -688,6 +688,15 @@ class TestStage2AtOnce:
         self._run(wf, 1)
         assert _SlowStage2.most['compute'] == 1 and _SlowStage2.most['loads'] == 1
 
+    def test_the_log_says_where_each_genome_s_loads_stand(self, wf, caplog):
+        """=== LOADS: lines, read by the Jobs page: each genome loading, then loaded."""
+        caplog.set_level('INFO', logger='bioinformatics_tools.workflow_tools.workflow')
+        self._run(wf, 1)
+        lines = [r.getMessage() for r in caplog.records if r.getMessage().startswith('=== LOADS: ')]
+        for k in range(1, 6):
+            mine = [line.split()[3] for line in lines if line.split()[2] == f'genome{k}']
+            assert mine == ['loading', 'loaded:'], (k, lines)
+
     def test_a_loading_genome_gives_its_place_to_the_next(self, wf):
         """One place: the next genome computes while the one before it loads, and the run counts a
         genome processed once its loads are in."""
