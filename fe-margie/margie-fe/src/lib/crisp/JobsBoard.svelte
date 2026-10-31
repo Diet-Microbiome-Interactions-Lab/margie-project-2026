@@ -8,7 +8,7 @@
 	import ProgressGrid from '$lib/crisp/ProgressGrid.svelte';
 	import { ui } from '$lib/workspace/ui.svelte';
 	import { page } from '$app/state';
-	import { baseOf, genomeList, stemOf } from '$lib/crisp/genomes';
+	import { baseOf, genomeList, readName, stemOf } from '$lib/crisp/genomes';
 	import { buildProgress, span, toolsOfRun } from '$lib/crisp/progress-model';
 	import type { ToolClock } from '$lib/workspace/data.svelte';
 	import '$lib/workspace/viewers/tools.css';
@@ -126,7 +126,7 @@
 					progressText: run.progressText ?? '',
 					tools: run.tools ?? []
 				},
-				summary: { overall: prog.overall, done: prog.counts.done, all: prog.counts.all, left: going ? prog.left : null, untimed: prog.untimed, genomes: prog.rows.length },
+				summary: { overall: prog.overall, done: prog.counts.done, all: prog.counts.all, left: going ? left : null, untimed: prog.untimed, genomes: prog.rows.length },
 				genomes: prog.rows.map((r) => ({ genome: r.g, state: r.state, pct: r.pct, done: r.done, of: r.of, running: r.running })),
 				columns: prog.columns.map((c) => ({ step: c.t, pct: c.pct, done: c.done, failed: c.failed, of: c.of })),
 				steps: prog.rows.flatMap((r) =>
@@ -421,16 +421,28 @@
 	}
 	/** The genomes loading into the database and those computed and waiting to load (its log's === LOADS: lines). */
 	const loadsNow = $derived(going && live && ws.logOf === shown?.id && ws.loads ? ws.loads : null);
+	const genomes = (k: number) => `${k} genome${k === 1 ? '' : 's'}`;
+	/** Names in a sentence: "A", "A and B", "A, B and C". */
+	const listed = (names: string[]) => (names.length < 2 ? names.join('') : `${names.slice(0, -1).join(', ')} and ${names.at(-1)}`);
 	const loadNote = $derived.by(() => {
-		const states = Object.values(loadsNow ?? {});
-		const count = (state: string) => states.filter((s) => s === state).length;
-		const genomes = (k: number) => `${k} genome${k === 1 ? '' : 's'}`;
-		const loading = count('loading');
-		const waiting = count('waiting');
-		return [loading ? `Loading ${genomes(loading)} into the database` : '', waiting ? `${genomes(waiting)} computed and waiting to load` : '']
+		const entries = Object.entries(loadsNow ?? {});
+		const loading = entries.filter(([, s]) => s === 'loading').map(([g]) => readName(g));
+		const waiting = entries.filter(([, s]) => s === 'waiting').length;
+		return [loading.length ? `Loading ${listed(loading)} into the database` : '', waiting ? `${genomes(waiting)} computed and waiting to load` : '']
 			.filter(Boolean)
 			.join(' | ');
 	});
+	/** The run's pace and its database writes (its log, read by the API: run_pace.py). */
+	const paceNow = $derived(going && live && ws.logOf === shown?.id ? ws.pace : null);
+	/** The genome MARGIE writes to the database's cache, and the genomes still to write, while she writes or once Stage 2 is over. */
+	const writeNote = $derived.by(() => {
+		const p = paceNow;
+		if (!p || p.closing || !(p.writing || (p.draining && p.writes_waiting))) return '';
+		return [p.writing ? `Caching ${readName(p.writing)} for later runs` : '', p.writes_waiting ? `${genomes(p.writes_waiting)} still to cache` : '']
+			.filter(Boolean)
+			.join(' | ');
+	});
+	const closingNote = $derived(paceNow?.closing ? `Finishing the run: ${paceNow.closing.replace(/^FINALIZE: /, '')}` : '');
 	/** How many of its genomes are annotated and in the database (its log's === LOADS: ... loaded lines). */
 	const doneNote = $derived.by(() => {
 		const a = going && live && ws.logOf === shown?.id ? ws.annotated : null;
@@ -465,6 +477,11 @@
 			: null
 	);
 	/** The job's own bar for a job with no genome grid (setting up, installing). */
+	/** Time left: its steps' usual times, or longer when the run's own pace says so (the genomes still to
+	 * start Stage 2, the genomes still to cache: lookups, loads and cache writes the steps leave out). */
+	const left = $derived(
+		prog ? Math.max(prog.left, paceNow?.starts_left_s ?? 0, paceNow?.writes_left_s ?? 0) : 0
+	);
 	const plainPct = $derived(!shown ? 0 : shown.status === 'completed' ? 100 : Math.max(0, Math.min(100, shown.progress ?? 0)));
 
 	/** How long a genome has been going: from its first step's start (only while the job runs). */
@@ -619,10 +636,12 @@
 					</div>
 				</header>
 				{#if shown.reason}<p class="why" title={shown.reason}>{shown.reason}</p>{/if}
-				{#if loadNote || doneNote}
+				{#if loadNote || doneNote || writeNote || closingNote}
 					<div class="loads">
 						{#if loadNote}<p title={Object.entries(loadsNow ?? {}).map(([g, s]) => `${g}: ${s}`).join('\n')}>{loadNote}</p>{/if}
 						{#if doneNote}<p>{doneNote}</p>{/if}
+						{#if writeNote}<p title={paceNow?.write_genome_s ? `One genome with new proteins takes about ${span(paceNow.write_genome_s)} to cache lately` : undefined}>{writeNote}</p>{/if}
+						{#if closingNote}<p>{closingNote}</p>{/if}
 					</div>
 				{/if}
 				<!-- One bar, then four tiles of one size: how far, how many steps, how long, and the time left (or when it ended). -->
@@ -638,8 +657,8 @@
 							{#if going}
 								<div class="stat" title={prog.untimed.length ? `On their first run here, so not in the estimate yet: ${prog.untimed.join(', ')}` : undefined}>
 									<span class="k">Time left</span>
-									<span class="v">{prog.left > 0 ? `about ${span(prog.left)}` : prog.untimed.length ? 'first run here' : 'finishing'}</span>
-									{#if prog.untimed.length && prog.left > 0}<span class="n">+ {prog.untimed.length} step{prog.untimed.length === 1 ? '' : 's'} on a first run</span>{/if}
+									<span class="v">{left > 0 ? `about ${span(left)}` : prog.untimed.length ? 'first run here' : 'finishing'}</span>
+									{#if prog.untimed.length && left > 0}<span class="n">+ {prog.untimed.length} step{prog.untimed.length === 1 ? '' : 's'} on a first run</span>{/if}
 								</div>
 							{:else}
 								<div class="stat"><span class="k">Finished</span><span class="v">{shown.finished ? when(shown.finished) : statusWord(shown)}</span></div>

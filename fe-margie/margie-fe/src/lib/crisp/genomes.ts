@@ -18,6 +18,13 @@ export const stemOf = (file: string) => file.replace(/\.(fna|fa|fasta)$/i, '');
 const HASH_END = /--(fa1:[0-9a-f]{8}|fa1:[0-9a-f]{4}|[0-9a-f]{8})$/;
 /** A run's genome name without its hash: its file's name. */
 export const baseOf = (name: string) => name.replace(HASH_END, '');
+/** A run's genome name to read in a sentence: its file's name without a leading rank (genus__),
+ * its RefSeq or GenBank accession and underscores (genus__Vibrio_alginolyticus_GCF_023650915.1--fa1:… → Vibrio alginolyticus). */
+export const readName = (name: string) =>
+	baseOf(name)
+		.replace(/^(domain|phylum|class|order|family|genus|species)__/, '')
+		.replace(/_GC[AF]_\d+\.\d+$/, '')
+		.replace(/_/g, ' ');
 /** The start of the genome hash a run's name carries (assigned by MARGIE from the genome's DNA); '' without one. */
 export const hashOf = (name: string) => name.match(HASH_END)?.[1] ?? '';
 /** What the genome hash is, where it is shown. */

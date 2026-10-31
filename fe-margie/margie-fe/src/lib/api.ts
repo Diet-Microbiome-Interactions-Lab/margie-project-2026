@@ -95,6 +95,24 @@ export function formatBytes(n: number): string {
 	return `${v.toFixed(v < 10 ? 1 : 0)} ${units[i]}`;
 }
 
+/** A running annotation's pace, read from its log (run_pace.py). */
+export interface RunPace {
+	/** The genome whose results MARGIE is writing to the database's cache; '' when none. */
+	writing: string;
+	/** Its other genomes computed and not written to the cache yet. */
+	writes_waiting: number;
+	/** Seconds one genome with new proteins took to write lately, and the writes left at that pace. */
+	write_genome_s: number | null;
+	writes_left_s: number | null;
+	/** Seconds between its genomes' Stage 2 starts lately, and the starts left at that pace. */
+	start_gap_s: number | null;
+	starts_left_s: number | null;
+	/** Stage 2 is over and the writes are finishing. */
+	draining: boolean;
+	/** Its closing step, e.g. "FINALIZE: generate pangenome report figures"; '' before. */
+	closing: string;
+}
+
 export interface Run {
 	id: string;
 	kind: 'annotate' | 'setup' | 'build';
@@ -122,6 +140,8 @@ export interface Run {
 	loads?: Record<string, 'waiting' | 'loading'>;
 	/** Its genomes annotated and in the database, those not loaded as their Stage 2 failed, and all Stage 2 annotates. */
 	annotated?: { done: number; failed: number; total: number };
+	/** Its pace, the database writer's work and its closing step, read with its log. */
+	pace?: RunPace;
 	/** Failure reason from the run; empty unless it failed. */
 	reason?: string;
 }

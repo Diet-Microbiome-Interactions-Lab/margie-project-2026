@@ -100,6 +100,8 @@ interface JobRow {
 	not_loaded?: number | null;
 	/** The genomes Stage 2 annotates, from its === STAGE 2: genome N/total lines. */
 	genome_total?: number | null;
+	/** Its pace, the database writer's work and its closing step (run_pace.py). */
+	pace?: import('$lib/api').RunPace | null;
 	/** Each tool's SLURM job on each genome, as the API tracks them (job_runner.py). */
 	slurm_jobs?: { job_id: string; rule?: string | null; status: string; time?: string; genome?: string | null; source?: string }[] | null;
 }
@@ -275,6 +277,7 @@ function toRun(j: JobRow): Run {
 		progressText: [j.phase, steps].filter(Boolean).join(' | ') || undefined,
 		loads: j.loads ?? undefined,
 		annotated: j.genome_total ? { done: j.loaded ?? 0, failed: j.not_loaded ?? 0, total: j.genome_total } : undefined,
+		pace: j.pace ?? undefined,
 		reason: status === 'failed' || status === 'cancelled' ? reasonIn(log) || j.phase || '' : ''
 	};
 }

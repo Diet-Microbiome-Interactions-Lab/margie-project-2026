@@ -314,6 +314,8 @@ class Workspace {
 	loads = $state<Run['loads'] | null>(null);
 	/** The read run's genomes annotated and in the database (Run.annotated), with its log. */
 	annotated = $state<Run['annotated'] | null>(null);
+	/** The read run's pace and database writes (Run.pace), with its log. */
+	pace = $state<Run['pace'] | null>(null);
 	/** Which run `log` and `clock` are of. */
 	logOf = $state('');
 	#logRun = '';
@@ -630,6 +632,7 @@ class Workspace {
 			this.clock = null;
 			this.loads = null;
 			this.annotated = null;
+			this.pace = null;
 			this.#logOffset = 0;
 			this.log = '';
 		}
@@ -641,6 +644,7 @@ class Workspace {
 			this.clock = d.clock ?? null;
 			this.loads = d.run?.loads ?? null;
 			this.annotated = d.run?.annotated ?? null;
+			this.pace = d.run?.pace ?? null;
 			this.#logOffset = d.log.offset;
 			if (d.log.offset >= d.log.size) return d.run;
 		}

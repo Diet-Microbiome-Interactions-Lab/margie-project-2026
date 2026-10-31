@@ -24,6 +24,7 @@ from bioinformatics_tools.utilities import ssh_slurm
 from bioinformatics_tools.utilities.ssh_connection import SSHConnection
 from bioinformatics_tools.api.services import hosting_usage, run_mail
 from bioinformatics_tools.api.services.job_store import job_store
+from bioinformatics_tools.api.services.run_pace import RunPace
 from bioinformatics_tools.workflow_tools.usage_report import MARKER as USAGE_REPORT
 
 LOGGER = logging.getLogger(__name__)
@@ -159,6 +160,8 @@ def run_ssh_task(job_id: str, command: str, connection: SSHConnection,
         # The genomes loaded (annotated and in the database), and those not loaded as their Stage 2 failed.
         loaded: set[str] = set()
         not_loaded: set[str] = set()
+        # Its genomes' pace, the database writer's work and its closing step (run_pace.py).
+        pace = RunPace()
         for line in ssh_slurm.submit_ssh_job(cmd=command, connection=connection,
                                              job_id=job_id, reattach=reattach,
                                              in_slurm=in_slurm,
@@ -281,6 +284,8 @@ def run_ssh_task(job_id: str, command: str, connection: SSHConnection,
                     loads.pop(genome, None)
                     (loaded if state == "loaded" else not_loaded).add(genome)
                 job_store.update(job_id, loads=dict(loads), loaded=len(loaded), not_loaded=len(not_loaded))
+            if pace.feed(line):
+                job_store.update(job_id, pace=pace.snapshot())
 
             # Parses the orchestrator's marker as each genome starts Stage 2.
             genome_match = SEQUENTIAL_GENOME_RE.search(line)
