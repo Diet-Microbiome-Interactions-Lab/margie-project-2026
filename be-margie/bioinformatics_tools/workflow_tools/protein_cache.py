@@ -543,10 +543,13 @@ def store(db: str, faa: str, prefix: str, tool: str, cfg: dict, genome: str = ''
         changed: list[str] = []
         for chunk in _chunks(again):
             held: dict[tuple[str, str], str] = {}
-            for h, filename, lines in conn.execute(
-                    'SELECT aa_hash, filename, lines FROM protein_cache WHERE tool = ? AND tool_key = ? '
-                    f'AND aa_hash IN ({",".join("?" * len(chunk))})', (tool, key, *chunk)):
-                held[(h, filename)] = lines
+            # File by file: the whole key goes straight to each protein's entry, where the tool and
+            # its settings alone walk all the tool's entries (minutes to hours for KEGG).
+            for filename, _ in files:
+                for h, lines in conn.execute(
+                        'SELECT aa_hash, lines FROM protein_cache WHERE tool = ? AND tool_key = ? AND filename = ? '
+                        f'AND aa_hash IN ({",".join("?" * len(chunk))})', (tool, key, filename, *chunk)):
+                    held[(h, filename)] = lines
             heads = {f: (r[0] if (r := conn.execute('SELECT header FROM protein_cache_header WHERE tool = ? AND tool_key = ? '
                                                      'AND filename = ?', (tool, key, f)).fetchone()) else None) for f, _ in files}
             for h in chunk:

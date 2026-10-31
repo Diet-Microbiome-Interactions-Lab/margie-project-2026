@@ -55,6 +55,29 @@ def test_different_descriptors_replace_the_cached_entry(tmp_path):
     assert "COG0abd" in lines and genome == "B"
 
 
+def test_reading_a_computed_again_protein_s_entry_goes_straight_to_it(tmp_path, monkeypatch):
+    """store() reads the cached entries it compares by the whole key (tool, settings, file and
+    protein): reading by tool and settings alone walks all the tool's entries for each chunk."""
+    db = str(tmp_path / "margie.db")
+    faa, pre = _genome(tmp_path, "A", [("a1", "MKVLAAG")])
+    protein_cache.store(db, faa, pre, "cog", {}, genome="A")
+    seen = []
+    connect = protein_cache._connect
+
+    def traced(path):
+        conn = connect(path)
+        conn.set_trace_callback(seen.append)
+        return conn
+
+    monkeypatch.setattr(protein_cache, "_connect", traced)
+    faa, pre = _genome(tmp_path, "B", [("b9", "MKVLAAG")], hits={"b9": "COG0abd"})
+    assert protein_cache.store(db, faa, pre, "cog", {}, genome="B") == 1
+    reads = [s for s in seen if s.lstrip().upper().startswith("SELECT") and "FROM protein_cache WHERE" in s and "aa_hash IN" in s]
+    assert len(reads) >= 2
+    plans = [str(sqlite3.connect(db).execute("EXPLAIN QUERY PLAN " + s).fetchall()) for s in reads]
+    assert all("filename=? AND aa_hash=?" in plan for plan in plans), plans
+
+
 def test_a_protein_served_from_the_cache_is_not_compared(tmp_path):
     db = str(tmp_path / "margie.db")
     faa, pre = _genome(tmp_path, "A", [("a1", "MKVLAAG")], hits={"a1": "COG0abc"})
