@@ -110,7 +110,7 @@ class TestResumeCopyPhase:
 
 def test_the_genomes_loading_and_waiting_to_load_follow_the_log():
     """=== LOADS: lines (workflow.py) keep each genome's place in the loads: waiting, loading, and
-    gone once loaded or not loaded."""
+    gone once loaded or not loaded, then counted."""
     from unittest.mock import MagicMock, patch
 
     from bioinformatics_tools.api.services import job_runner, run_mail
@@ -136,3 +136,5 @@ def test_the_genomes_loading_and_waiting_to_load_follow_the_log():
         job_runner.run_ssh_task('loads-1', 'dane_wf margie sb', MagicMock())
 
     assert seen == [{'gA': 'loading', 'gB': 'waiting'}, {'gB': 'loading'}, {}]
+    # Each genome loaded is counted once, those not loaded apart.
+    assert (job_store.get('loads-1')['loaded'], job_store.get('loads-1')['not_loaded']) == (1, 1)

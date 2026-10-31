@@ -120,6 +120,8 @@ export interface Run {
 	progressText?: string;
 	/** Its genomes loading into the database or computed and waiting to load, read with its log. */
 	loads?: Record<string, 'waiting' | 'loading'>;
+	/** Its genomes annotated and in the database, those not loaded as their Stage 2 failed, and all Stage 2 annotates. */
+	annotated?: { done: number; failed: number; total: number };
 	/** Failure reason from the run; empty unless it failed. */
 	reason?: string;
 }

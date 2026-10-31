@@ -431,6 +431,17 @@
 			.filter(Boolean)
 			.join(' | ');
 	});
+	/** How many of its genomes are annotated and in the database (its log's === LOADS: ... loaded lines). */
+	const doneNote = $derived.by(() => {
+		const a = going && live && ws.logOf === shown?.id ? ws.annotated : null;
+		if (!a) return '';
+		return [
+			`${a.done} of ${a.total} genome${a.total === 1 ? '' : 's'} annotated and in the database`,
+			a.failed ? `${a.failed} not loaded as ${a.failed === 1 ? 'its' : 'their'} Stage 2 failed` : ''
+		]
+			.filter(Boolean)
+			.join(' | ');
+	});
 	/** A resumed run's copied genomes are known from Results' listing; until it is read, its progress waits. */
 	const reading = $derived(!!shown?.from && shown.kind === 'annotate' && !ws.resultsRead);
 	const prog = $derived(
@@ -608,7 +619,12 @@
 					</div>
 				</header>
 				{#if shown.reason}<p class="why" title={shown.reason}>{shown.reason}</p>{/if}
-				{#if loadNote}<p class="loads" title={Object.entries(loadsNow ?? {}).map(([g, s]) => `${g}: ${s}`).join('\n')}>{loadNote}</p>{/if}
+				{#if loadNote || doneNote}
+					<div class="loads">
+						{#if loadNote}<p title={Object.entries(loadsNow ?? {}).map(([g, s]) => `${g}: ${s}`).join('\n')}>{loadNote}</p>{/if}
+						{#if doneNote}<p>{doneNote}</p>{/if}
+					</div>
+				{/if}
 				<!-- One bar, then four tiles of one size: how far, how many steps, how long, and the time left (or when it ended). -->
 				<div class="sum">
 					{#if reading}
@@ -1121,6 +1137,9 @@
 		font-size: var(--cr-fs-meta);
 		color: var(--mg-text-2);
 		border-bottom: 1px solid var(--mg-border);
+	}
+	.loads p {
+		margin: 0;
 	}
 	.why {
 		margin: 0;

@@ -156,6 +156,9 @@ def run_ssh_task(job_id: str, command: str, connection: SSHConnection,
         ended_unfinished = False
         # The genomes waiting for a place to load or loading: {genome: 'waiting' | 'loading'}.
         loads: dict[str, str] = {}
+        # The genomes loaded (annotated and in the database), and those not loaded as their Stage 2 failed.
+        loaded: set[str] = set()
+        not_loaded: set[str] = set()
         for line in ssh_slurm.submit_ssh_job(cmd=command, connection=connection,
                                              job_id=job_id, reattach=reattach,
                                              in_slurm=in_slurm,
@@ -276,7 +279,8 @@ def run_ssh_task(job_id: str, command: str, connection: SSHConnection,
                     loads[genome] = state
                 else:
                     loads.pop(genome, None)
-                job_store.update(job_id, loads=dict(loads))
+                    (loaded if state == "loaded" else not_loaded).add(genome)
+                job_store.update(job_id, loads=dict(loads), loaded=len(loaded), not_loaded=len(not_loaded))
 
             # Parses the orchestrator's marker as each genome starts Stage 2.
             genome_match = SEQUENTIAL_GENOME_RE.search(line)
