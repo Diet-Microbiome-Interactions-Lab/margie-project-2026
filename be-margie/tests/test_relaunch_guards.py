@@ -16,6 +16,10 @@ from bioinformatics_tools.api.main import app
 from bioinformatics_tools.api.routers import ssh
 from bioinformatics_tools.api.services.job_store import job_store
 from bioinformatics_tools.utilities import ssh_slurm
+from bioinformatics_tools.workflow_tools import reorganize_outputs
+
+# The script that puts a finished run's genome folders back, run from this checkout.
+REORGANIZE = reorganize_outputs.__file__
 
 USER = {"user_id": 1, "username": "testuser", "cluster_host": "test.cluster.edu",
         "cluster_username": "testuser", "home_dir": "/home/testuser", "private_key_encrypted": "x"}
@@ -176,7 +180,7 @@ def test_the_copy_of_chosen_genomes_copies_only_theirs(tmp_path):
                 f"original_container_outputs/{G}/stage/big.bin", f"{G}/.snakemake/log"):
         (src / rel).parent.mkdir(parents=True, exist_ok=True)
         (src / rel).write_text(f"{src}/{rel}\n")
-    script = ssh_slurm.build_copy_script(str(src), str(dst), python="python3",
+    script = ssh_slurm.build_copy_script(str(src), str(dst), python="python3", reorganize=REORGANIZE,
                                          only=[G, f"original_container_outputs/{G}", "absent--fa1:11111111"])
     run = subprocess.run(["bash", "-c", script], capture_output=True, text=True, env={"PATH": "/usr/bin:/bin:/usr/local/bin:/opt/homebrew/bin", "SLURM_CPUS_PER_TASK": "2"})
     assert run.returncode == 0, run.stdout + run.stderr

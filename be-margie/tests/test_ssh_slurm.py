@@ -6,6 +6,10 @@ import pytest
 from unittest.mock import MagicMock
 
 from bioinformatics_tools.utilities import ssh_slurm
+from bioinformatics_tools.workflow_tools import reorganize_outputs
+
+# The script that puts a finished run's genome folders back, run from this checkout.
+REORGANIZE = reorganize_outputs.__file__
 
 
 def _mock_connection_for_exec(exec_stdout: bytes):
@@ -299,11 +303,15 @@ class TestResumeCopyJob:
         (old / ".snakemake").mkdir()
         (old / "run-command.sh").write_text("old command\n")
         (old / "blob.bin").write_bytes(b"\xff\xfe\x00 not utf-8 \xfa")
+        # A genome of a finished run: its steps under per-tool-phased-output/, put back in the copy.
+        (old / "done" / "per-tool-phased-output" / "cog").mkdir(parents=True)
+        (old / "done" / "per-tool-phased-output" / "cog" / "cog_results.tsv").write_text("cog\n")
+        (old / "done" / "FINAL_GENOME_VIEWER.html").write_text("viewer")
         new.mkdir()
         (new / "run-command.sh").write_text(f"new command in {new}\n")
 
         script = tmp_path / "copy.sh"
-        script.write_text(ssh_slurm.build_copy_script(str(old), str(new), python=sys.executable))
+        script.write_text(ssh_slurm.build_copy_script(str(old), str(new), python=sys.executable, reorganize=REORGANIZE))
         r = subprocess.run(["bash", str(script)], capture_output=True, text=True,
                            env={"PATH": "/usr/bin:/bin:/usr/local/bin:/opt/homebrew/bin", "SLURM_CPUS_PER_TASK": "3"})
 
@@ -314,6 +322,9 @@ class TestResumeCopyJob:
         assert (new / "run-command.sh").read_text() == f"new command in {new}\n"
         assert (new / "blob.bin").read_bytes() == (old / "blob.bin").read_bytes()
         assert "replaced in 1 of" in r.stdout
+        assert (new / "done" / "cog" / "cog_results.tsv").read_text() == "cog\n"
+        assert not (new / "done" / "per-tool-phased-output").exists()
+        assert (old / "done" / "per-tool-phased-output" / "cog" / "cog_results.tsv").is_file()
 
     def test_a_missing_earlier_folder_stops_the_copy(self, tmp_path):
         import subprocess

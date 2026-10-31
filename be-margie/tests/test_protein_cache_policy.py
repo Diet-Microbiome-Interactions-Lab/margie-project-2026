@@ -107,7 +107,7 @@ def test_entries_under_earlier_keys_move_to_the_settings_key(tmp_path):
     conn = protein_cache._connect(db)
     with conn:
         for key, at, hit in (("old-container", "2026-01-01", "PF0old"), ("newer-container", "2026-06-01", "PF0new")):
-            conn.execute("INSERT INTO protein_cache VALUES (?, 'pfam', ?, 'pfam_results.tsv', ?, ?, 'A')",
+            conn.execute("INSERT INTO protein_cache (aa_hash, tool, tool_key, filename, lines, cached_at, genome) VALUES (?, 'pfam', ?, 'pfam_results.tsv', ?, ?, 'A')",
                          (h, key, f"A\ta1\t{hit}\tx\ty", at))
     conn.close()
     protein_cache._carried.clear()
@@ -123,7 +123,7 @@ def test_entries_under_other_settings_stay_apart(tmp_path):
     h = protein_cache.protein_hash("MKVLAAG")
     conn = protein_cache._connect(db)
     with conn:
-        conn.execute("INSERT INTO protein_cache VALUES (?, 'cog', 'evalue-1e-5', 'cog_results.tsv', ?, '2026-06-01', 'A')",
+        conn.execute("INSERT INTO protein_cache (aa_hash, tool, tool_key, filename, lines, cached_at, genome) VALUES (?, 'cog', 'evalue-1e-5', 'cog_results.tsv', ?, '2026-06-01', 'A')",
                      (h, "A\ta1\tCOG0old\tx\ty"))
     conn.close()
     protein_cache._carried.clear()
@@ -247,3 +247,52 @@ def test_a_tool_restored_from_the_cache_adds_nothing(tmp_path):
     lines, _, genome = _entry(db, "MKVLAAG")
     assert "COG0abc" in lines and genome == "A"
     assert _entry(db, "MSTNPKP") is None
+
+
+OLD_TABLE = """CREATE TABLE protein_cache (aa_hash TEXT NOT NULL, tool TEXT NOT NULL, tool_key TEXT NOT NULL,
+    filename TEXT NOT NULL, lines TEXT NOT NULL, cached_at TEXT NOT NULL, genome TEXT NOT NULL DEFAULT '',
+    PRIMARY KEY (tool, tool_key, filename, aa_hash)) WITHOUT ROWID"""
+
+
+def test_a_new_database_numbers_its_protein_cache(tmp_path):
+    db = str(tmp_path / "margie.db")
+    faa, pre = _genome(tmp_path, "A", [("a1", "MKVLAAG"), ("a2", "MTTQRR")])
+    protein_cache.store(db, faa, pre, "cog", {}, genome="A")
+    conn = sqlite3.connect(db)
+    assert protein_cache.numbered(conn)
+    assert conn.execute("SELECT id FROM protein_cache ORDER BY id").fetchall() == [(1,), (2,)]
+    # A protein's rows come back through the key index, by id.
+    plan = str(conn.execute("EXPLAIN QUERY PLAN SELECT id FROM protein_cache WHERE tool = 'cog' AND tool_key = 'k' "
+                            "AND filename = 'f' AND aa_hash IN ('a', 'b')").fetchall())
+    assert "protein_cache_key" in plan
+
+
+def test_a_cache_made_before_is_read_the_same_and_numbered_without_a_change(tmp_path):
+    db = str(tmp_path / "margie.db")
+    conn = sqlite3.connect(db)
+    conn.execute(OLD_TABLE)
+    conn.commit()
+    conn.close()
+    a_faa, a_pre = _genome(tmp_path, "A", [("a1", "MKVLAAG"), ("a2", "MTTQRR")], hits={"a1": "COG0001", "a2": "COG0002"})
+    protein_cache.store(db, a_faa, a_pre, "cog", {}, genome="A")
+    b_faa, b_pre = _genome(tmp_path, "B", [("b1", "MTTQRR"), ("b2", "MPPWWK")], hits={"b1": "COG0002", "b2": "COG0003"})
+    protein_cache.store(db, b_faa, b_pre, "cog", {}, genome="B")
+    assert not protein_cache.numbered(sqlite3.connect(db))
+    c_faa, c_pre = _genome(tmp_path, "C", [("c1", "MKVLAAG"), ("c2", "MPPWWK"), ("c3", "MNEWNE")])
+
+    def served():
+        counts = protein_cache.split(db, c_faa, c_pre, "C", ["cog"], {})
+        return counts, (tmp_path / "C" / "cog" / "protein-cache" / "cached" / "cog_results.tsv").read_text()
+
+    before = served()
+    assert before[0] == {"cog": (2, 1)}
+    rows = sqlite3.connect(db).execute("SELECT aa_hash, tool, tool_key, filename, lines, genome FROM protein_cache").fetchall()
+    assert protein_cache.number_rows(db) == 3
+    conn = sqlite3.connect(db)
+    assert protein_cache.numbered(conn)
+    assert sorted(conn.execute("SELECT aa_hash, tool, tool_key, filename, lines, genome FROM protein_cache").fetchall()) == sorted(rows)
+    # Numbered by tool, settings, file and the genome the rows came from.
+    assert [g for g, in conn.execute("SELECT genome FROM protein_cache ORDER BY id")] == ["A", "A", "B"]
+    assert served() == before
+    # Numbered once: a second call changes nothing.
+    assert protein_cache.number_rows(db) == 3

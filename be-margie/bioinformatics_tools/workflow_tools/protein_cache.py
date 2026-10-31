@@ -47,17 +47,25 @@ SCHEMA = 2
 WORKFLOW = 'margie_sb'
 PC_DIR = 'protein-cache'
 
-CREATE_SQL = """
-CREATE TABLE IF NOT EXISTS protein_cache (
+# The protein cache, numbered: each row has an id in the order it was written, so the rows a tool
+# wrote for a genome sit together and come back by id, in order; its key index finds a protein. A
+# database made before has the table filed by its key (WITHOUT ROWID), which keeps the result
+# lines in the key's own pages, too many to stay in memory, so each lookup read about eight pages
+# from the cluster's file system. It is read the same way until it is numbered (number_rows).
+NUMBERED_SQL = """
+CREATE TABLE IF NOT EXISTS {table} (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
     aa_hash TEXT NOT NULL,
     tool TEXT NOT NULL,
     tool_key TEXT NOT NULL,
     filename TEXT NOT NULL,
     lines TEXT NOT NULL,
     cached_at TEXT NOT NULL,
-    genome TEXT NOT NULL DEFAULT '',
-    PRIMARY KEY (tool, tool_key, filename, aa_hash)
-) WITHOUT ROWID;
+    genome TEXT NOT NULL DEFAULT ''
+);
+"""
+KEY_INDEX_SQL = 'CREATE UNIQUE INDEX IF NOT EXISTS protein_cache_key ON protein_cache (tool, tool_key, filename, aa_hash)'
+CREATE_SQL = """
 CREATE TABLE IF NOT EXISTS protein_cache_header (
     tool TEXT NOT NULL,
     tool_key TEXT NOT NULL,
@@ -268,6 +276,8 @@ def _connect(db: str) -> sqlite3.Connection:
     # The index pages a call's lookups share stay in memory (SQLite keeps 2 MB by default); each
     # page read again is a trip to the cluster's storage.
     conn.execute(f'PRAGMA cache_size=-{CACHE_KIB}')
+    if not conn.execute("SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = 'protein_cache'").fetchone():
+        conn.executescript(NUMBERED_SQL.format(table='protein_cache') + KEY_INDEX_SQL + ';')
     conn.executescript(CREATE_SQL)
     have = {r[1] for r in conn.execute('PRAGMA table_info(protein_fingerprints)')}
     for col in ('core_fingerprint', 'extra_fingerprint'):
@@ -298,6 +308,61 @@ CACHE_KIB = 262144
 def _chunks(items: list, n: int = 500):
     for i in range(0, len(items), n):
         yield items[i:i + n]
+
+
+def numbered(conn) -> bool:
+    """Whether the database's protein cache is numbered (an id a row)."""
+    return any(r[1] == 'id' for r in conn.execute('PRAGMA table_info(protein_cache)'))
+
+
+def _cached_rows(conn, tool: str, key: str, filename: str, hashes: list[str]) -> dict[str, tuple[str, str]]:
+    """{protein hash: (its rows, the genome they came from)} for those of the hashes cached in the file.
+    A numbered cache finds their ids in its key index and reads the rows by id, in order, so the
+    rows a genome's tool wrote together are read together."""
+    rows: dict[str, tuple[str, str]] = {}
+    if not numbered(conn):
+        for chunk in _chunks(hashes, READ_CHUNK):
+            rows.update((h, (lines, src)) for h, lines, src in conn.execute(
+                'SELECT aa_hash, lines, genome FROM protein_cache WHERE tool = ? AND tool_key = ? AND filename = ? '
+                f'AND aa_hash IN ({",".join("?" * len(chunk))})', (tool, key, filename, *chunk)))
+        return rows
+    ids: list[int] = []
+    for chunk in _chunks(hashes, READ_CHUNK):
+        ids += [i for i, in conn.execute(
+            'SELECT id FROM protein_cache WHERE tool = ? AND tool_key = ? AND filename = ? '
+            f'AND aa_hash IN ({",".join("?" * len(chunk))})', (tool, key, filename, *chunk))]
+    for chunk in _chunks(sorted(ids), READ_CHUNK):
+        rows.update((h, (lines, src)) for h, lines, src in conn.execute(
+            f'SELECT aa_hash, lines, genome FROM protein_cache WHERE id IN ({",".join("?" * len(chunk))})', chunk))
+    return rows
+
+
+def number_rows(db: str) -> int:
+    """Numbers the protein cache of a database made before (NUMBERED_SQL): copies its rows into the
+    numbered table by tool, settings, file, the genome they came from and protein, checks the count,
+    and puts the table in its place, in one transaction; returns the rows. It reads the whole table
+    and holds the database meanwhile: on the cluster, run it on a copy in a node's memory."""
+    conn = sqlite3.connect(db, timeout=120, isolation_level=None)
+    try:
+        conn.execute(f'PRAGMA cache_size=-{CACHE_KIB}')
+        if numbered(conn):
+            return conn.execute('SELECT count(*) FROM protein_cache').fetchone()[0]
+        cols = 'aa_hash, tool, tool_key, filename, lines, cached_at, genome'
+        conn.execute('BEGIN IMMEDIATE')
+        conn.execute(NUMBERED_SQL.format(table='protein_cache_numbered'))
+        conn.execute(f'INSERT INTO protein_cache_numbered ({cols}) SELECT {cols} FROM protein_cache '
+                     'ORDER BY tool, tool_key, filename, genome, aa_hash')
+        before, after = (conn.execute(f'SELECT count(*) FROM {t}').fetchone()[0] for t in ('protein_cache', 'protein_cache_numbered'))
+        if before != after:
+            conn.execute('ROLLBACK')
+            raise RuntimeError(f'numbering the protein cache: {after} rows of {before}; nothing changed')
+        conn.execute('DROP TABLE protein_cache')
+        conn.execute('ALTER TABLE protein_cache_numbered RENAME TO protein_cache')
+        conn.execute(KEY_INDEX_SQL)
+        conn.execute('COMMIT')
+        return after
+    finally:
+        conn.close()
 
 
 def _cached_hashes(conn, tool: str, key: str, filename: str, hashes: list[str]) -> set[str]:
@@ -417,14 +482,9 @@ def split(db: str, faa: str, prefix: str, genome: str, tools: list[str], cfg: di
                 row = conn.execute('SELECT header FROM protein_cache_header WHERE tool = ? AND tool_key = ? AND filename = ?',
                                    (tool, key, filename)).fetchone()
                 header = row[0] if row else None
-                stored: dict[str, str] = {}
-                came: dict[str, str] = {}
-                for chunk in _chunks(want, READ_CHUNK):
-                    for h, lines, src in conn.execute(
-                            'SELECT aa_hash, lines, genome FROM protein_cache WHERE tool = ? AND tool_key = ? AND filename = ? '
-                            f'AND aa_hash IN ({",".join("?" * len(chunk))})', (tool, key, filename, *chunk)):
-                        stored[h] = lines
-                        came[h] = src
+                found = _cached_rows(conn, tool, key, filename, want)
+                stored = {h: lines for h, (lines, _) in found.items()}
+                came = {h: src for h, (_, src) in found.items()}
                 cols = _columns(header) if header and kind != 'domtbl' else (None, None)
                 if n == 0 and sources is not None:
                     tally: dict[str, int] = {}
@@ -542,14 +602,10 @@ def store(db: str, faa: str, prefix: str, tool: str, cfg: dict, genome: str = ''
         # Computed again: replaced where any result column differs from the cached one.
         changed: list[str] = []
         for chunk in _chunks(again, READ_CHUNK):
-            held: dict[tuple[str, str], str] = {}
             # File by file: the whole key goes straight to each protein's entry, where the tool and
             # its settings alone walk all the tool's entries (minutes to hours for KEGG).
-            for filename, _ in files:
-                for h, lines in conn.execute(
-                        'SELECT aa_hash, lines FROM protein_cache WHERE tool = ? AND tool_key = ? AND filename = ? '
-                        f'AND aa_hash IN ({",".join("?" * len(chunk))})', (tool, key, filename, *chunk)):
-                    held[(h, filename)] = lines
+            held = {(h, filename): lines for filename, _ in files
+                    for h, (lines, _) in _cached_rows(conn, tool, key, filename, chunk).items()}
             heads = {f: (r[0] if (r := conn.execute('SELECT header FROM protein_cache_header WHERE tool = ? AND tool_key = ? '
                                                      'AND filename = ?', (tool, key, f)).fetchone()) else None) for f, _ in files}
             for h in chunk:
@@ -880,3 +936,13 @@ def record_proteins(db: str, labeled_tsv: str, prefix: str, genome_hash: str = '
     finally:
         conn.close()
     return len(proteins)
+
+
+if __name__ == '__main__':
+    import argparse
+
+    parser = argparse.ArgumentParser(description='The MARGIE protein cache')
+    sub = parser.add_subparsers(dest='command', required=True)
+    sub.add_parser('number', help='Numbers the protein cache of a database made before (number_rows)').add_argument('db')
+    args = parser.parse_args()
+    print(f'protein cache numbered: {number_rows(args.db)} rows')

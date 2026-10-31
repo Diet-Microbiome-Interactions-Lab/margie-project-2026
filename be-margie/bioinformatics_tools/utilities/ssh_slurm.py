@@ -76,6 +76,8 @@ COPY_CPUS = 16
 COPY_MEM_MB = 32000            # ~2 GB per core; the path fix-up reads whole text files
 COPY_TIME = '04:00:00'
 REMOTE_PYTHON = '~/bioinformatics-tools/.venv/bin/python'
+# Puts a finished run's genome folders back as the run made it (standard library only).
+REMOTE_REORGANIZE = '~/bioinformatics-tools/bioinformatics_tools/workflow_tools/reorganize_outputs.py'
 # Files the launch writes into the new folder before the copy; the earlier run's copies stay out.
 COPY_KEEP = ('run-command.sh',)
 
@@ -111,12 +113,14 @@ print(f'Resume: the earlier folder\\'s path is replaced in {changed} of {len(fil
 
 
 def build_copy_script(src: str, dst: str, keep: tuple[str, ...] = COPY_KEEP,
-                      python: str = REMOTE_PYTHON, only: list[str] | None = None) -> str:
+                      python: str = REMOTE_PYTHON, only: list[str] | None = None,
+                      reorganize: str = REMOTE_REORGANIZE) -> str:
     """Returns the copy job's shell: the earlier run's folder into the new one, then its paths fixed.
 
     Each top-level entry (a genome's folder, or a file) is its own rsync, $SLURM_CPUS_PER_TASK at a
     time; .snakemake/ (it holds the old absolute path and is made again), the tools' per-run stage
-    folders and `keep` stay out. `only`, paths inside the folder, copies those that exist and
+    folders and `keep` stay out. A finished run's genome folders are put back as the run made them
+    (`reorganize` --restore), so the run finds its steps. `only`, paths inside the folder, copies those that exist and
     nothing else (one genome run again). Exits non-zero when a copy fails, so the run does not start.
     """
     q_src, q_dst = shlex.quote(src.rstrip('/')), shlex.quote(dst.rstrip('/'))
@@ -148,6 +152,10 @@ def build_copy_script(src: str, dst: str, keep: tuple[str, ...] = COPY_KEEP,
         f'{entries}'
         '  || { echo "Resume: the copy failed, so the run does not start"; exit 1; }\n'
         'echo "Resume: copied in $(( (SECONDS - start) / 60 )) min"\n'
+        # A finished run's genome folders keep their steps under per-tool-phased-output/: back
+        # where the run looks for them.
+        f'{python} {reorganize} --run-root "$dst" --restore \\\n'
+        '  || { echo "Resume: putting the earlier run\'s step folders back failed, so the run does not start"; exit 1; }\n'
         f'{python} - "$src" "$dst" "$n" {kept} <<\'MARGIE_REWRITE_EOF\'\n'
         f'{COPY_REWRITE_PY}'
         'MARGIE_REWRITE_EOF\n'

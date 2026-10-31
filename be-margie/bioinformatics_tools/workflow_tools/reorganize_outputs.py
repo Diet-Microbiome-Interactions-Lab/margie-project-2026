@@ -96,6 +96,35 @@ def reorganize_one(org_dir, figures_dirname: str = "diagrams",
     return result
 
 
+def restore_layout(org_dir, figures_dirname: str = "diagrams") -> dict:
+    """Puts a reorganized organism folder back as the run made it, for a run that resumes it (the
+    reverse of reorganize_one): each entry of per-tool-phased-output/ back at the top, the figures
+    back in scoring/figures and the FINAL tables back in scoring/. An entry already at the top stays."""
+    org = Path(org_dir)
+    ptp = org / PTP
+    scoring = org / "scoring"
+    result = {"organism": org.name, "actions": [], "excel": None, "error": None}
+    try:
+        if ptp.is_dir():
+            for entry in list(ptp.iterdir()):
+                if not (org / entry.name).exists():
+                    shutil.move(str(entry), str(org / entry.name))
+                    result["actions"].append(f"{PTP}/{entry.name} ->")
+            if not any(ptp.iterdir()):
+                ptp.rmdir()
+        diag = org / figures_dirname
+        if diag.is_dir() and scoring.is_dir() and not (scoring / "figures").exists():
+            shutil.move(str(diag), str(scoring / "figures"))
+            result["actions"].append(f"{figures_dirname}/ -> scoring/figures")
+        for name in (FINAL_TSV, FINAL_XLSX):
+            if (org / name).is_file() and scoring.is_dir() and not (scoring / name).exists():
+                shutil.move(str(org / name), str(scoring / name))
+                result["actions"].append(f"{name} -> scoring/")
+    except Exception as exc:  # reported per organism instead of raised into the pool
+        result["error"] = f"{type(exc).__name__}: {exc}"
+    return result
+
+
 def main() -> None:
     """Finds organism folders and reorganizes them with a ThreadPoolExecutor."""
     ap = argparse.ArgumentParser(
@@ -109,6 +138,8 @@ def main() -> None:
                     help="path to make-final-excel.py; if given, a colored .xlsx is generated")
     ap.add_argument("--python", default=None, help="python for the Excel subprocess")
     ap.add_argument("--workers", type=int, default=4, help="organisms reorganized in parallel")
+    ap.add_argument("--restore", action="store_true",
+                    help="put reorganized organism folders back as the run made them, for a run that resumes them")
     args = ap.parse_args()
 
     run = Path(args.run_root)
@@ -129,7 +160,8 @@ def main() -> None:
           f"excel={'on' if args.excel_script else 'off'}; workers={args.workers}")
     ok = 0
     with ThreadPoolExecutor(max_workers=max(1, args.workers)) as ex:
-        futs = {ex.submit(reorganize_one, d, args.figures_dirname, args.excel_script, args.python): d
+        futs = {(ex.submit(restore_layout, d, args.figures_dirname) if args.restore else
+                 ex.submit(reorganize_one, d, args.figures_dirname, args.excel_script, args.python)): d
                 for d in org_dirs}
         for fut in as_completed(futs):
             r = fut.result()
@@ -138,7 +170,7 @@ def main() -> None:
                   f"moves={len(r['actions'])}" + (f"  ERR={r['error']}" if r["error"] else ""))
             if not r["error"]:
                 ok += 1
-    print(f"[reorganize] done: {ok}/{len(org_dirs)} reorganized")
+    print(f"[reorganize] done: {ok}/{len(org_dirs)} {'put back' if args.restore else 'reorganized'}")
 
 
 if __name__ == "__main__":
