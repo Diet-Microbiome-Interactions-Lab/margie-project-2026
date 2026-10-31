@@ -33,7 +33,7 @@ def test_cached_rows_under_the_same_columns_are_appended(tmp_path):
 
 def test_stored_rows_move_to_a_new_header():
     conn = sqlite3.connect(':memory:')
-    conn.executescript(protein_cache.CREATE_SQL)
+    protein_cache._create(conn)
     cols = {r[1] for r in conn.execute('PRAGMA table_info(protein_cache)')}
     extra = ', genome' if 'genome' in cols else ''
     conn.execute(f'INSERT INTO protein_cache (aa_hash, tool, tool_key, filename, lines, cached_at{extra}) '

@@ -270,15 +270,20 @@ def clear(prefix: str, tool: str) -> None:
 
 # ---- database ----
 
+def _create(conn) -> None:
+    """Makes the protein cache's tables where missing, the cache itself numbered."""
+    if not conn.execute("SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = 'protein_cache'").fetchone():
+        conn.executescript(NUMBERED_SQL.format(table='protein_cache') + KEY_INDEX_SQL + ';')
+    conn.executescript(CREATE_SQL)
+
+
 def _connect(db: str) -> sqlite3.Connection:
     conn = sqlite3.connect(db, timeout=120)
     conn.execute('PRAGMA busy_timeout=120000')
     # The index pages a call's lookups share stay in memory (SQLite keeps 2 MB by default); each
     # page read again is a trip to the cluster's storage.
     conn.execute(f'PRAGMA cache_size=-{CACHE_KIB}')
-    if not conn.execute("SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = 'protein_cache'").fetchone():
-        conn.executescript(NUMBERED_SQL.format(table='protein_cache') + KEY_INDEX_SQL + ';')
-    conn.executescript(CREATE_SQL)
+    _create(conn)
     have = {r[1] for r in conn.execute('PRAGMA table_info(protein_fingerprints)')}
     for col in ('core_fingerprint', 'extra_fingerprint'):
         if col not in have:
