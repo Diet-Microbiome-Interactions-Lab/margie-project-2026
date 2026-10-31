@@ -1290,13 +1290,19 @@ rule queue_sqlite_backup_snapshot:
         echo "=== MARGIE_SB: QUEUE SQLITE BACKUP SNAPSHOT ==="
         mkdir -p $(dirname {output.tkn})
         mkdir -p {params.dest_dir}
+        # Without sqlite_backup.account and .partition the snapshot job goes where this rule's job runs:
+        # the cluster asks for a partition.
+        ACCOUNT="{params.account}"
+        PARTITION="{params.partition}"
+        ACCOUNT="${{ACCOUNT:-${{SLURM_JOB_ACCOUNT:-}}}}"
+        PARTITION="${{PARTITION:-${{SLURM_JOB_PARTITION:-}}}}"
         SBATCH_ACCOUNT=""
         SBATCH_PARTITION=""
-        if [ -n "{params.account}" ]; then
-            SBATCH_ACCOUNT="--account={params.account}"
+        if [ -n "$ACCOUNT" ]; then
+            SBATCH_ACCOUNT="--account=$ACCOUNT"
         fi
-        if [ -n "{params.partition}" ]; then
-            SBATCH_PARTITION="--partition={params.partition}"
+        if [ -n "$PARTITION" ]; then
+            SBATCH_PARTITION="--partition=$PARTITION"
         fi
         DEST_DB="{params.dest_dir}/margie.db"
         JOB_ID=$(sbatch --parsable $SBATCH_ACCOUNT $SBATCH_PARTITION --time={params.time_limit} \
