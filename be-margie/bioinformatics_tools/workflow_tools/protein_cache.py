@@ -302,7 +302,7 @@ def _chunks(items: list, n: int = 500):
 
 def _cached_hashes(conn, tool: str, key: str, filename: str, hashes: list[str]) -> set[str]:
     found: set[str] = set()
-    for chunk in _chunks(hashes):
+    for chunk in _chunks(hashes, READ_CHUNK):
         found.update(r[0] for r in conn.execute(
             'SELECT aa_hash FROM protein_cache WHERE tool = ? AND tool_key = ? AND filename = ? '
             f'AND aa_hash IN ({",".join("?" * len(chunk))})', (tool, key, filename, *chunk)))
@@ -419,7 +419,7 @@ def split(db: str, faa: str, prefix: str, genome: str, tools: list[str], cfg: di
                 header = row[0] if row else None
                 stored: dict[str, str] = {}
                 came: dict[str, str] = {}
-                for chunk in _chunks(want):
+                for chunk in _chunks(want, READ_CHUNK):
                     for h, lines, src in conn.execute(
                             'SELECT aa_hash, lines, genome FROM protein_cache WHERE tool = ? AND tool_key = ? AND filename = ? '
                             f'AND aa_hash IN ({",".join("?" * len(chunk))})', (tool, key, filename, *chunk)):
@@ -541,7 +541,7 @@ def store(db: str, faa: str, prefix: str, tool: str, cfg: dict, genome: str = ''
             return 0
         # Computed again: replaced where any result column differs from the cached one.
         changed: list[str] = []
-        for chunk in _chunks(again):
+        for chunk in _chunks(again, READ_CHUNK):
             held: dict[tuple[str, str], str] = {}
             # File by file: the whole key goes straight to each protein's entry, where the tool and
             # its settings alone walk all the tool's entries (minutes to hours for KEGG).
