@@ -38,7 +38,7 @@ def test_the_log_s_writes_to_make_by_genome():
     assert run.config == {'cached_gtdbtk': f'{A},{B}', 'cached_rasttk': A} and run.rerun_triggers == 'mtime'
 
 
-def _finish(tmp_path, log_text):
+def _finish(tmp_path, log_text, margie_sb=None):
     run = tmp_path / 'run'
     log = tmp_path / 'run.log'
     log.write_text(log_text)
@@ -50,7 +50,7 @@ def _finish(tmp_path, log_text):
             (folder / f'{tool}_results.tsv').write_text('x\n')
             (folder / f'{tool}_db.tkn').write_text('')
     wf = WorkflowBase.__new__(WorkflowBase)
-    wf.conf = {}
+    wf.conf = {'margie_sb': margie_sb or {}}
     wf.failed = MagicMock()
     wf.succeeded = MagicMock()
     wf._finalize = MagicMock()
@@ -97,3 +97,14 @@ def test_the_writes_are_made_from_the_run_s_folders_and_the_closing_steps_follow
 def test_a_run_that_began_its_closing_steps_does_not_take_them_again(tmp_path):
     _, wf, _, _ = _finish(tmp_path, LOG + '[19:00:00 INFO w] - === FINALIZE: queue background sqlite snapshot backup ===\n')
     wf._finalize.assert_not_called()
+
+
+def test_the_writes_alone_or_the_closing_steps_alone(tmp_path):
+    (tmp_path / 'writes').mkdir()
+    (tmp_path / 'closing').mkdir()
+    _, wf, calls, _ = _finish(tmp_path / 'writes', LOG, {'finish_closing': 'false'})
+    assert calls['proteins'].call_count == 4
+    wf._finalize.assert_not_called()
+    _, wf, calls, _ = _finish(tmp_path / 'closing', LOG, {'finish_writes': 'false'})
+    assert calls['proteins'].call_count == 0 and calls['records'].call_count == 0
+    wf._finalize.assert_called_once()

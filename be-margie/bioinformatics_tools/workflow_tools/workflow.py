@@ -935,15 +935,19 @@ class WorkflowBase(ProgramBase):
             self.failed('No MARGIE database to write to')
             return 1
         run = read_run_log(Path(log_path).read_text(errors='replace'))
-        LOGGER.info('Writes to make from %s: %d genome(s), %d the writer had not reached',
-                    log_path, len(run.lost), sum(w.whole for w in run.lost.values()))
-        pc_cfg = {**(self.conf or {}), **smk_config}
         node = (self.conf.get('margie_sb', {}) if self.conf else {}) or {}
+        # margie_sb.finish_writes / finish_closing false: the closing steps alone, or the writes alone.
+        writes_on, closing_on = (str(node.get(k, True)).strip().lower() not in ('false', '0', 'no', 'off')
+                                 for k in ('finish_writes', 'finish_closing'))
+        LOGGER.info('Writes to make in %s, from %s: %d genome(s), %d the writer had not reached%s',
+                    db_path, log_path, len(run.lost), sum(w.whole for w in run.lost.values()),
+                    '' if writes_on else ' (not made: closing steps only)')
+        pc_cfg = {**(self.conf or {}), **smk_config}
         use_cache = str(node.get('use_cache', True)).strip().lower() not in ('false', '0', 'no', 'off')
         pc_tools = ([t for t in protein_cache.TOOLS if smk_config.get(f'run_{t}', True) not in (False, 'false', '0', 'no')]
                     if protein_cache.enabled(pc_cfg) and use_cache else [])
         failures = 0
-        for n, (genome, what) in enumerate(sorted(run.lost.items()), 1):
+        for n, (genome, what) in enumerate(sorted(run.lost.items()) if writes_on else [], 1):
             if genome not in genome_files or genome in prodigal_genomes:
                 LOGGER.warning('%s is not a RASTtk genome of this input: its writes are not made', genome)
                 failures += 1
@@ -983,7 +987,7 @@ class WorkflowBase(ProgramBase):
                                     genome_hash, f'{prefix}fingerprint/labeled-genes-fingerprint-hash-label.tsv', genes) is _FAILED
                 failures += _safely(f'Recording the proteins of {genome}', protein_cache.record_proteins, db_path,
                                     f'{prefix}labeling/labeled-genes.tsv', prefix, genome_hash) is _FAILED
-        if not run.closed:
+        if closing_on and not run.closed:
             # The closing steps' Snakemake gets what the run's commands were given.
             smk_config = {**smk_config, **run.config}
             rerun_triggers = run.rerun_triggers or rerun_triggers
@@ -994,8 +998,9 @@ class WorkflowBase(ProgramBase):
         if failures:
             self.failed(f'{failures} of the writes failed (see the warnings above)')
             return 1
-        self.succeeded(msg=f'Made the writes of {len(run.lost)} genome(s) from {log_path}'
-                           f'{"" if run.closed else ", and the closing steps"}')
+        self.succeeded(msg=', and '.join(filter(None, [
+            f'Made the writes of {len(run.lost)} genome(s) from {log_path}' if writes_on else '',
+            'took the closing steps' if closing_on and not run.closed else ''])) or 'Nothing to do')
         return 0
 
     def _finalize(self, selected_wf, smk_config: dict, mode, compute_config, extra_resources, rerun_triggers,
