@@ -30,6 +30,7 @@ from bioinformatics_tools.workflow_tools.output_cache import (
 )
 from bioinformatics_tools.workflow_tools.load_to_db import is_already_processed, PIPELINE_VERSION, fasta_hashes
 from bioinformatics_tools.workflow_tools import cache_report, protein_cache
+from bioinformatics_tools.workflow_tools.lost_writes import lost_writes
 from bioinformatics_tools.workflow_tools.programs import ProgramBase
 from bioinformatics_tools.workflow_tools.workflow_helpers import (
     discover_genomes, genome_stem, get_workflow_prefix_for, WORKFLOW_PATH_DEFAULTS, genome_calls, gene_call_files,
@@ -920,6 +921,59 @@ class WorkflowBase(ProgramBase):
         phase_of = {t.get('key'): t.get('phase', 0) for t in MARGIE_SB_PHASED_TOOLS}
         max_phase = max((phase_of.get(t, 0) for t in done), default=0)
         return (max_phase, len(done))
+
+    def _rewrite_lost_writes(self, log_path: str, smk_config: dict, genome_files: dict[str, str],
+                             cache_map_fn, prodigal_genomes) -> int:
+        '''Writes again, from an earlier run's folder, what that run lost writing to the MARGIE database
+        (its log's warnings, lost_writes.py): tools' proteins and results for the cache, and genomes'
+        gene fingerprints and protein records. Each write reads what the database holds first, so one
+        made since is not made twice.'''
+        db_path = smk_config.get('main_database')
+        if not db_path:
+            self.failed('No MARGIE database to write to')
+            return 1
+        lost = lost_writes(Path(log_path).read_text(errors='replace'))
+        LOGGER.info('Lost writes in %s: %d genome(s)', log_path, len(lost))
+        pc_cfg = {**(self.conf or {}), **smk_config}
+        failures = 0
+        for genome, what in sorted(lost.items()):
+            if genome not in genome_files or genome in prodigal_genomes:
+                LOGGER.warning('%s is not a RASTtk genome of this input: its lost writes stay lost', genome)
+                failures += 1
+                continue
+            top = get_workflow_prefix_for(genome, smk_config)
+            # A finished run keeps the step folders under per-tool-phased-output/ (reorganize_outputs.py).
+            prefix = f'{top}per-tool-phased-output/' if Path(f'{top}per-tool-phased-output').is_dir() else top
+            calls = gene_call_files(prefix, 'rasttk')
+            genome_hash = fasta_hashes(genome_files[genome])[0]
+            genes = gene_hashes(calls['gff'], calls['faa'])
+            for tool in sorted(what.proteins):
+                added = _safely(f'Caching the proteins of {genome} for {tool}', protein_cache.store,
+                                db_path, calls['faa'], prefix, tool, pc_cfg, genome=genome, ran=True)
+                failures += added is _FAILED
+                LOGGER.info('Protein cache: %s new protein(s) of %s kept for %s', 0 if added is _FAILED else added, genome, tool)
+            cache_map = {t: [p.replace(top, prefix, 1) for p in paths] for t, paths in cache_map_fn(genome).items()}
+            tools = {t: p for t, p in cache_map.items()
+                     if (what.every and t not in what.restored) or t in what.results}
+            merged_fp = merged_inputs_fingerprint(prefix)
+            for tool, paths in tools.items():
+                if not all(Path(p).exists() for p in paths):
+                    continue
+                name = cache_name(tool, merged_fp) if input_keyed(tool) else tool
+                if _safely(f'Caching {tool} for {genome}', store, db_path, genome_files[genome], name, paths, genes=genes) is _FAILED:
+                    failures += 1
+                else:
+                    LOGGER.info('Cached %s for %s', tool, genome)
+            if what.records:
+                failures += _safely(f'Recording the fingerprints of {genome}', protein_cache.record_fingerprints, db_path,
+                                    genome_hash, f'{prefix}fingerprint/labeled-genes-fingerprint-hash-label.tsv', genes) is _FAILED
+                failures += _safely(f'Recording the proteins of {genome}', protein_cache.record_proteins, db_path,
+                                    f'{prefix}labeling/labeled-genes.tsv', prefix, genome_hash) is _FAILED
+        if failures:
+            self.failed(f'{failures} of the lost writes failed again (see the warnings above)')
+            return 1
+        self.succeeded(msg=f'Wrote again the lost writes of {len(lost)} genome(s) from {log_path}')
+        return 0
 
     def _run_pipeline_batch_sequential(self, key_name: str, smk_config: dict, genome_files: dict[str, str],
                                         cache_map_fn, mode='slurm', compute_config: dict = None,
@@ -2179,6 +2233,12 @@ class WorkflowBase(ProgramBase):
         # Set by resume_job's relaunch; mtime-only triggers treat copied outputs as done.
         resume_raw = str(self.conf.get('margie_sb', {}).get('resume', '')).strip().lower()
         rerun_triggers = 'mtime' if resume_raw not in ('false', '0', 'no', 'off', '') else None
+
+        # margie_sb.rewrite_from: <an earlier run's log>: writes again what that run lost writing to
+        # the MARGIE database, from its folder (output_dir), and runs nothing.
+        rewrite_from = str((self.conf.get('margie_sb', {}) or {}).get('rewrite_from', '') or '').strip()
+        if rewrite_from:
+            return self._rewrite_lost_writes(rewrite_from, config_overrides, genomes, _genome_cache_map, prodigal_genomes)
 
         self._run_pipeline_batch_sequential('margie_sb', config_overrides, genomes,
                                  cache_map_fn=_genome_cache_map, mode=mode, compute_config=compute_config,
