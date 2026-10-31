@@ -30,7 +30,7 @@ from bioinformatics_tools.workflow_tools.output_cache import (
 )
 from bioinformatics_tools.workflow_tools.load_to_db import is_already_processed, PIPELINE_VERSION, fasta_hashes
 from bioinformatics_tools.workflow_tools import cache_report, protein_cache
-from bioinformatics_tools.workflow_tools.lost_writes import lost_writes
+from bioinformatics_tools.workflow_tools.lost_writes import read_run_log
 from bioinformatics_tools.workflow_tools.programs import ProgramBase
 from bioinformatics_tools.workflow_tools.workflow_helpers import (
     discover_genomes, genome_stem, get_workflow_prefix_for, WORKFLOW_PATH_DEFAULTS, genome_calls, gene_call_files,
@@ -922,39 +922,50 @@ class WorkflowBase(ProgramBase):
         max_phase = max((phase_of.get(t, 0) for t in done), default=0)
         return (max_phase, len(done))
 
-    def _rewrite_lost_writes(self, log_path: str, smk_config: dict, genome_files: dict[str, str],
-                             cache_map_fn, prodigal_genomes) -> int:
-        '''Writes again, from an earlier run's folder, what that run lost writing to the MARGIE database
-        (its log's warnings, lost_writes.py): tools' proteins and results for the cache, and genomes'
-        gene fingerprints and protein records. Each write reads what the database holds first, so one
-        made since is not made twice.'''
+    def _finish_from_log(self, log_path: str, smk_config: dict, genome_files: dict[str, str], cache_map_fn,
+                         prodigal_genomes, mode='slurm', compute_config: dict = None, extra_resources: dict = None,
+                         rerun_triggers: str = None) -> int:
+        '''Finishes a stopped or finished run of these genomes from its folder and log (lost_writes.py):
+        the writes it lost, every write of the genomes its database writer had not reached (each tool's
+        proteins and results for the cache, the run log row, the genes' fingerprints and the proteins'
+        records), then its closing steps when it had not begun them. Each write reads what the database
+        holds first, so one made since is not made twice.'''
         db_path = smk_config.get('main_database')
         if not db_path:
             self.failed('No MARGIE database to write to')
             return 1
-        lost = lost_writes(Path(log_path).read_text(errors='replace'))
-        LOGGER.info('Lost writes in %s: %d genome(s)', log_path, len(lost))
+        run = read_run_log(Path(log_path).read_text(errors='replace'))
+        LOGGER.info('Writes to make from %s: %d genome(s), %d the writer had not reached',
+                    log_path, len(run.lost), sum(w.whole for w in run.lost.values()))
         pc_cfg = {**(self.conf or {}), **smk_config}
+        node = (self.conf.get('margie_sb', {}) if self.conf else {}) or {}
+        use_cache = str(node.get('use_cache', True)).strip().lower() not in ('false', '0', 'no', 'off')
+        pc_tools = ([t for t in protein_cache.TOOLS if smk_config.get(f'run_{t}', True) not in (False, 'false', '0', 'no')]
+                    if protein_cache.enabled(pc_cfg) and use_cache else [])
         failures = 0
-        for genome, what in sorted(lost.items()):
+        for n, (genome, what) in enumerate(sorted(run.lost.items()), 1):
             if genome not in genome_files or genome in prodigal_genomes:
-                LOGGER.warning('%s is not a RASTtk genome of this input: its lost writes stay lost', genome)
+                LOGGER.warning('%s is not a RASTtk genome of this input: its writes are not made', genome)
                 failures += 1
                 continue
+            LOGGER.info('=== WRITES: %s (%d of %d)%s ===', genome, n, len(run.lost), ', all of them' if what.whole else '')
             top = get_workflow_prefix_for(genome, smk_config)
             # A finished run keeps the step folders under per-tool-phased-output/ (reorganize_outputs.py).
             prefix = f'{top}per-tool-phased-output/' if Path(f'{top}per-tool-phased-output').is_dir() else top
             calls = gene_call_files(prefix, 'rasttk')
             genome_hash = fasta_hashes(genome_files[genome])[0]
             genes = gene_hashes(calls['gff'], calls['faa'])
-            for tool in sorted(what.proteins):
+            for tool in (pc_tools if what.whole else sorted(what.proteins)):
+                if what.whole and not Path(f'{prefix}{tool}/{tool}_db.tkn').exists():
+                    continue
                 added = _safely(f'Caching the proteins of {genome} for {tool}', protein_cache.store,
-                                db_path, calls['faa'], prefix, tool, pc_cfg, genome=genome, ran=True)
+                                db_path, calls['faa'], prefix, tool, pc_cfg, genome=genome, ran=tool not in what.restored)
                 failures += added is _FAILED
-                LOGGER.info('Protein cache: %s new protein(s) of %s kept for %s', 0 if added is _FAILED else added, genome, tool)
+                if added is not _FAILED:
+                    LOGGER.info('Protein cache: %d new protein(s) of %s kept for %s', added, genome, tool)
             cache_map = {t: [p.replace(top, prefix, 1) for p in paths] for t, paths in cache_map_fn(genome).items()}
             tools = {t: p for t, p in cache_map.items()
-                     if (what.every and t not in what.restored) or t in what.results}
+                     if ((what.every or what.whole) and t not in what.restored) or t in what.results}
             merged_fp = merged_inputs_fingerprint(prefix)
             for tool, paths in tools.items():
                 if not all(Path(p).exists() for p in paths):
@@ -964,16 +975,107 @@ class WorkflowBase(ProgramBase):
                     failures += 1
                 else:
                     LOGGER.info('Cached %s for %s', tool, genome)
-            if what.records:
+            if what.whole and run.run_id:
+                failures += _safely(f'Recording {genome} in the run log table', log_workflow_run, db_path, run.run_id,
+                                    genome_files[genome], 'margie_sb', 0, status='success') is _FAILED
+            if what.records or what.whole:
                 failures += _safely(f'Recording the fingerprints of {genome}', protein_cache.record_fingerprints, db_path,
                                     genome_hash, f'{prefix}fingerprint/labeled-genes-fingerprint-hash-label.tsv', genes) is _FAILED
                 failures += _safely(f'Recording the proteins of {genome}', protein_cache.record_proteins, db_path,
                                     f'{prefix}labeling/labeled-genes.tsv', prefix, genome_hash) is _FAILED
+        if not run.closed:
+            # The closing steps' Snakemake gets what the run's commands were given.
+            smk_config = {**smk_config, **run.config}
+            rerun_triggers = run.rerun_triggers or rerun_triggers
+            finished = [g for g in run.loaded if g in genome_files]
+            gaps = bool(run.failed) or len(finished) < len(genome_files)
+            self._finalize(WORKFLOWS.get('margie_sb'), smk_config, mode, compute_config, extra_resources, rerun_triggers,
+                           len(finished) + len(run.failed), gaps, finished)
         if failures:
-            self.failed(f'{failures} of the lost writes failed again (see the warnings above)')
+            self.failed(f'{failures} of the writes failed (see the warnings above)')
             return 1
-        self.succeeded(msg=f'Wrote again the lost writes of {len(lost)} genome(s) from {log_path}')
+        self.succeeded(msg=f'Made the writes of {len(run.lost)} genome(s) from {log_path}'
+                           f'{"" if run.closed else ", and the closing steps"}')
         return 0
+
+    def _finalize(self, selected_wf, smk_config: dict, mode, compute_config, extra_resources, rerun_triggers,
+                  processed: int, gaps: bool, finished: list[str]) -> None:
+        '''The run's closing steps once its genomes are through: the database snapshot queued, the
+        pangenome report figures and each finished genome's folder reorganized. A failure only warns.'''
+        run_scoring_enabled = smk_config.get('run_scoring', True) not in (False, 'false', '0', 'no')
+        queue_sqlite_backup_enabled = smk_config.get('run_sqlite_snapshot_queue', True) not in (False, 'false', '0', 'no')
+        if run_scoring_enabled and queue_sqlite_backup_enabled and processed > 0 and not gaps:
+            LOGGER.info('=== FINALIZE: queue background sqlite snapshot backup ===')
+            finalize_command = self.build_executable(
+                selected_wf,
+                config_overrides=smk_config,
+                mode=mode,
+                compute_config=compute_config,
+                extra_resources=extra_resources,
+                rerun_triggers=rerun_triggers,
+                target='queue_sqlite_backup_snapshot',
+            )
+            LOGGER.info('Starting finalize target (queue_sqlite_backup_snapshot): %s', ' '.join(finalize_command))
+            finalize_proc = self._run_subprocess(finalize_command)
+            if finalize_proc is None or finalize_proc.returncode != 0:
+                LOGGER.warning(
+                    'Could not queue sqlite backup snapshot (target queue_sqlite_backup_snapshot, rc=%s). '
+                    'Pipeline outputs are complete; continuing without blocking completion status.',
+                    finalize_proc.returncode if finalize_proc else None,
+                )
+
+        # Pangenome report figures in an isolated subprocess; a failure only warns.
+        report_figures_enabled = smk_config.get('run_report_figures', True) not in (False, 'false', '0', 'no')
+        if run_scoring_enabled and report_figures_enabled and processed > 0 and not gaps:
+            LOGGER.info('=== FINALIZE: generate pangenome report figures ===')
+            figures_command = self.build_executable(
+                selected_wf,
+                config_overrides=smk_config,
+                mode=mode,
+                compute_config=compute_config,
+                extra_resources=extra_resources,
+                rerun_triggers=rerun_triggers,
+                target='run_report_figures_global',
+            )
+            LOGGER.info('Starting finalize target (run_report_figures_global): %s', ' '.join(figures_command))
+            figures_proc = self._run_subprocess(figures_command)
+            if figures_proc is None or figures_proc.returncode != 0:
+                LOGGER.warning(
+                    'Could not generate pangenome report figures (target run_report_figures_global, rc=%s). '
+                    'Pipeline outputs are complete; continuing without blocking completion status.',
+                    figures_proc.returncode if figures_proc else None,
+                )
+
+        # FINALIZE: reorganises organism folders outside the DAG; a failure only warns.
+        reorganize_enabled = smk_config.get('run_reorganize_outputs', True) not in (False, 'false', '0', 'no')
+        output_dir = (smk_config.get('output_dir') or self.conf.get('output_dir', '') or '').rstrip('/')
+        if run_scoring_enabled and reorganize_enabled and finished and output_dir:
+            LOGGER.info('=== FINALIZE: reorganize per-organism output folders ===')
+            reorg_script = str(WORKFLOW_DIR / 'reorganize_outputs.py')
+            excel_script = str(WORKFLOW_DIR / 'fingerprint' / 'make-final-excel.py')
+            reorg_workers = str(min(4, max(1, len(finished))))
+            reorg_command = [
+                sys.executable, reorg_script,
+                '--run-root', output_dir,
+                '--genomes', *finished,
+                '--figures-dirname', 'diagrams',
+                '--excel-script', excel_script,
+                '--python', sys.executable,
+                '--workers', reorg_workers,
+            ]
+            LOGGER.info('Starting finalize step (reorganize_outputs): %s', ' '.join(reorg_command))
+            try:
+                reorg_proc = subprocess.run(reorg_command, capture_output=True, text=True)
+                for line in (reorg_proc.stdout or '').splitlines():
+                    LOGGER.info('[reorganize] %s', line)
+                if reorg_proc.returncode != 0:
+                    LOGGER.warning(
+                        'Output reorganization exited rc=%s (stderr: %s). Pipeline outputs are '
+                        'complete; continuing without blocking completion status.',
+                        reorg_proc.returncode, (reorg_proc.stderr or '').strip()[:500],
+                    )
+            except Exception as reorg_exc:  # never let cleanup fail the run
+                LOGGER.warning('Output reorganization raised %s; continuing.', reorg_exc)
 
     def _run_pipeline_batch_sequential(self, key_name: str, smk_config: dict, genome_files: dict[str, str],
                                         cache_map_fn, mode='slurm', compute_config: dict = None,
@@ -1746,80 +1848,8 @@ class WorkflowBase(ProgramBase):
         # reorganized either way, and a failed genome's stay as they are for a rerun.
         gaps = bool(skipped or failed)
 
-        run_scoring_enabled = smk_config.get('run_scoring', True) not in (False, 'false', '0', 'no')
-        queue_sqlite_backup_enabled = smk_config.get('run_sqlite_snapshot_queue', True) not in (False, 'false', '0', 'no')
-        if run_scoring_enabled and queue_sqlite_backup_enabled and processed > 0 and not gaps:
-            LOGGER.info('=== FINALIZE: queue background sqlite snapshot backup ===')
-            finalize_command = self.build_executable(
-                selected_wf,
-                config_overrides=smk_config,
-                mode=mode,
-                compute_config=compute_config,
-                extra_resources=extra_resources,
-                rerun_triggers=rerun_triggers,
-                target='queue_sqlite_backup_snapshot',
-            )
-            LOGGER.info('Starting finalize target (queue_sqlite_backup_snapshot): %s', ' '.join(finalize_command))
-            finalize_proc = self._run_subprocess(finalize_command)
-            if finalize_proc is None or finalize_proc.returncode != 0:
-                LOGGER.warning(
-                    'Could not queue sqlite backup snapshot (target queue_sqlite_backup_snapshot, rc=%s). '
-                    'Pipeline outputs are complete; continuing without blocking completion status.',
-                    finalize_proc.returncode if finalize_proc else None,
-                )
-
-        # Pangenome report figures in an isolated subprocess; a failure only warns.
-        report_figures_enabled = smk_config.get('run_report_figures', True) not in (False, 'false', '0', 'no')
-        if run_scoring_enabled and report_figures_enabled and processed > 0 and not gaps:
-            LOGGER.info('=== FINALIZE: generate pangenome report figures ===')
-            figures_command = self.build_executable(
-                selected_wf,
-                config_overrides=smk_config,
-                mode=mode,
-                compute_config=compute_config,
-                extra_resources=extra_resources,
-                rerun_triggers=rerun_triggers,
-                target='run_report_figures_global',
-            )
-            LOGGER.info('Starting finalize target (run_report_figures_global): %s', ' '.join(figures_command))
-            figures_proc = self._run_subprocess(figures_command)
-            if figures_proc is None or figures_proc.returncode != 0:
-                LOGGER.warning(
-                    'Could not generate pangenome report figures (target run_report_figures_global, rc=%s). '
-                    'Pipeline outputs are complete; continuing without blocking completion status.',
-                    figures_proc.returncode if figures_proc else None,
-                )
-
-        # FINALIZE: reorganises organism folders outside the DAG; a failure only warns.
-        reorganize_enabled = smk_config.get('run_reorganize_outputs', True) not in (False, 'false', '0', 'no')
-        output_dir = (smk_config.get('output_dir') or self.conf.get('output_dir', '') or '').rstrip('/')
-        if run_scoring_enabled and reorganize_enabled and finished and output_dir:
-            LOGGER.info('=== FINALIZE: reorganize per-organism output folders ===')
-            reorg_script = str(WORKFLOW_DIR / 'reorganize_outputs.py')
-            excel_script = str(WORKFLOW_DIR / 'fingerprint' / 'make-final-excel.py')
-            reorg_workers = str(min(4, max(1, len(finished))))
-            reorg_command = [
-                sys.executable, reorg_script,
-                '--run-root', output_dir,
-                '--genomes', *finished,
-                '--figures-dirname', 'diagrams',
-                '--excel-script', excel_script,
-                '--python', sys.executable,
-                '--workers', reorg_workers,
-            ]
-            LOGGER.info('Starting finalize step (reorganize_outputs): %s', ' '.join(reorg_command))
-            try:
-                reorg_proc = subprocess.run(reorg_command, capture_output=True, text=True)
-                for line in (reorg_proc.stdout or '').splitlines():
-                    LOGGER.info('[reorganize] %s', line)
-                if reorg_proc.returncode != 0:
-                    LOGGER.warning(
-                        'Output reorganization exited rc=%s (stderr: %s). Pipeline outputs are '
-                        'complete; continuing without blocking completion status.',
-                        reorg_proc.returncode, (reorg_proc.stderr or '').strip()[:500],
-                    )
-            except Exception as reorg_exc:  # never let cleanup fail the run
-                LOGGER.warning('Output reorganization raised %s; continuing.', reorg_exc)
+        self._finalize(selected_wf, smk_config, mode, compute_config, extra_resources, rerun_triggers,
+                       processed, gaps, finished)
 
         result = self._build_result(key_name, last_proc) if last_proc else {'workflow': key_name, 'rules_summary': {}}
         stage1_rc = stage1.poll()
@@ -2234,11 +2264,13 @@ class WorkflowBase(ProgramBase):
         resume_raw = str(self.conf.get('margie_sb', {}).get('resume', '')).strip().lower()
         rerun_triggers = 'mtime' if resume_raw not in ('false', '0', 'no', 'off', '') else None
 
-        # margie_sb.rewrite_from: <an earlier run's log>: writes again what that run lost writing to
-        # the MARGIE database, from its folder (output_dir), and runs nothing.
-        rewrite_from = str((self.conf.get('margie_sb', {}) or {}).get('rewrite_from', '') or '').strip()
-        if rewrite_from:
-            return self._rewrite_lost_writes(rewrite_from, config_overrides, genomes, _genome_cache_map, prodigal_genomes)
+        # margie_sb.finish_from: <a stopped or finished run's log>: makes the writes to the MARGIE
+        # database that run left, from its folder (output_dir), then its closing steps, and runs nothing else.
+        finish_from = str((self.conf.get('margie_sb', {}) or {}).get('finish_from', '') or '').strip()
+        if finish_from:
+            return self._finish_from_log(finish_from, config_overrides, genomes, _genome_cache_map, prodigal_genomes,
+                                         mode=mode, compute_config=compute_config, extra_resources=extra_resources,
+                                         rerun_triggers=rerun_triggers)
 
         self._run_pipeline_batch_sequential('margie_sb', config_overrides, genomes,
                                  cache_map_fn=_genome_cache_map, mode=mode, compute_config=compute_config,
