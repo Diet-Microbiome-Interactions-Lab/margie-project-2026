@@ -128,7 +128,7 @@ dane_wf margie sb \
   run_full_operon_map: true
 ```
 
-`--working-directory` and `--config` are optional. Relative paths are read from the working
+The short options are `-i`, `-o`, `-w` and `-c`. `--working-directory` and `--config` are optional. Relative paths are read from the working
 directory, and without `--output` the results go in its `margie-output` folder. `dane_wf --help`
 lists the options. The older form (`input:`, `output_dir:`, `config:`) works too.
 

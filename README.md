@@ -146,13 +146,13 @@ dane_wf margie sb \
 
 | Option | What it takes |
 |---|---|
-| `--input` | A genome file, or a folder of genome files |
-| `--output` | The folder the results go in |
-| `--working-directory` | The folder relative paths are read from; without `--output`, the results go in its `margie-output` folder |
-| `--config` | A config file, read over `~/.config/bioinformatics-tools/config.yaml` |
+| `-i`, `--input` | A genome file, or a folder of genome files |
+| `-o`, `--output` | The folder the results go in |
+| `-w`, `--working-directory` | The folder relative paths are read from; without `--output`, the results go in its `margie-output` folder |
+| `-c`, `--config` | A config file, read over `~/.config/bioinformatics-tools/config.yaml` |
 
 Other settings follow as `key: value`, as below. The older form, `input:` and `output_dir:`, works
-too.
+too. `margie --help` and `dane_wf --help` show the options and an example.
 
 ### The MARGIE command line
 

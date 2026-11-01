@@ -1,5 +1,6 @@
-'''dane_wf's options: --input, --output, --working-directory and --config. Each becomes the key: value
-words the rest of dane_wf reads (input:, output_dir:, config:), so both forms run the same way:
+'''dane_wf's options: --input, --output, --working-directory and --config (-i, -o, -w, -c). Each becomes
+the key: value words the rest of dane_wf reads (input:, output_dir:, config:), so both forms run the
+same way:
 
     dane_wf margie sb --input <genome file or folder> --output <folder> --working-directory <folder> --config <file>
     dane_wf margie sb input: <genome file or folder> output_dir: <folder> config: <file>
@@ -10,19 +11,24 @@ from pathlib import Path
 
 USAGE = ('dane_wf margie sb --input <genome file or folder> --output <folder> '
          '[--working-directory <folder>] [--config <config file>]')
+OPTIONS = '''  -i, --input              a genome file, or a folder of genome files
+  -o, --output             the folder the results go in
+  -w, --working-directory  the folder relative paths are read from; without --output,
+                           the results go in its margie-output folder
+  -c, --config             a config file, read over ~/.config/bioinformatics-tools/config.yaml
+  -h, --help               shows this'''
+EXAMPLE = 'dane_wf margie sb -i genomes/ -o results/ margie_sb.selected_tools: rasttk,cog,kegg,pfam'
 HELP = f'''Usage: {USAGE}
 
-  --input              a genome file, or a folder of genome files
-  --output             the folder the results go in
-  --working-directory  the folder relative paths are read from; without --output,
-                       the results go in its margie-output folder
-  --config             a config file, read over ~/.config/bioinformatics-tools/config.yaml
+{OPTIONS}
 
-Other settings go after them as key: value, for example margie_sb.resume: true.'''
+Other settings go after them as key: value, for example margie_sb.resume: true:
+  {EXAMPLE}'''
 
 # Each option and the word dane_wf reads it as.
 WORDS = {'--input': 'input:', '--output': 'output_dir:', '--config': 'config:'}
 WORKING = '--working-directory'
+SHORT = {'-i': '--input', '-o': '--output', '-w': WORKING, '-c': '--config'}
 OUTPUT_IN_WORKING = 'margie-output'
 
 
@@ -40,15 +46,17 @@ def to_words(argv: list[str], cwd: str | Path | None = None) -> list[str]:
     i = 0
     while i < len(argv):
         arg = argv[i]
-        if not arg.startswith('--'):
+        name, eq, value = arg.partition('=')
+        name = SHORT.get(name, name)
+        if not name.startswith('--'):
             words.append(arg)
             i += 1
             continue
-        name, eq, value = arg.partition('=')
         if name not in WORDS and name != WORKING:
-            raise FlagError(f'unknown option {name}: dane_wf takes --input, --output, --working-directory and --config')
+            raise FlagError(f'unknown option {name}: dane_wf takes -i/--input, -o/--output, '
+                            '-w/--working-directory and -c/--config')
         if not eq:
-            if i + 1 >= len(argv) or argv[i + 1].startswith('--'):
+            if i + 1 >= len(argv) or argv[i + 1].startswith('--') or argv[i + 1].partition('=')[0] in SHORT:
                 raise FlagError(f'{name} needs a value')
             value = argv[i + 1]
             i += 1

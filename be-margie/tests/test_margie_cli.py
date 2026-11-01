@@ -53,3 +53,13 @@ def test_the_prompt_runs_lines_until_exit_and_one_command_runs_without_it(capsys
 def test_the_commands_come_from_beside_this_python():
     assert margie_cli.program('python3') in (os.path.join(os.path.dirname(sys.executable), 'python3'),
                                               __import__('shutil').which('python3'))
+
+
+def test_margie_help_says_how_to_run_margie(capsys):
+    with pytest.raises(SystemExit) as done:
+        margie_cli.main(['--help'])
+    out = capsys.readouterr().out
+    assert done.value.code == 0
+    for words in ('dane_wf margie sb --input', '-i, --input', '-o, --output', '-w, --working-directory',
+                  '-c, --config', 'margie <command>', 'config.yaml'):
+        assert words in out

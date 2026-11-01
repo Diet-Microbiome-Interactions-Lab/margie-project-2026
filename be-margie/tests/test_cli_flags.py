@@ -20,6 +20,18 @@ def test_an_option_may_carry_its_value_after_an_equals_sign():
     assert to_words(['margie', 'sb', '--input=/g', '--output=/o']) == ['margie', 'sb', 'input:', '/g', 'output_dir:', '/o']
 
 
+def test_the_short_options_read_as_the_long_ones(tmp_path):
+    assert to_words(['margie', 'sb', '-i', 'genomes', '-o', '/out', '-c', '/c.yaml', '-w', str(tmp_path)]) == [
+        'margie', 'sb', 'input:', str(tmp_path / 'genomes'), 'output_dir:', '/out', 'config:', '/c.yaml']
+    assert to_words(['margie', 'sb', '-i=/g', '-w', str(tmp_path)]) == [
+        'margie', 'sb', 'input:', '/g', 'output_dir:', str(tmp_path / 'margie-output')]
+
+
+def test_a_value_that_starts_with_a_dash_is_a_value():
+    assert to_words(['margie', 'sb', '--input', '/g', 'margie_sb.offset:', '-1']) == [
+        'margie', 'sb', 'margie_sb.offset:', '-1', 'input:', '/g']
+
+
 def test_the_key_value_form_is_left_as_it_is():
     words = ['margie', 'sb', 'input:', 'genomes', 'output_dir:', 'out', 'margie_sb.selected_tools:', 'rasttk,cog']
     assert to_words(words, cwd='/somewhere') == words
@@ -57,6 +69,9 @@ def test_a_home_path_is_expanded(tmp_path):
     (['margie', 'sb', '--input=', '--output', '/o'], '--input needs a value'),
     (['margie', 'sb', '--input', '/a', '--input', '/b'], '--input is given twice'),
     (['margie', 'sb', '--input', '/a', 'input:', '/b'], '--input and input: are both given'),
+    (['margie', 'sb', '-i', '-o', '/o'], '--input needs a value'),
+    (['margie', 'sb', '-i', '/a', '--input', '/b'], '--input is given twice'),
+    (['margie', 'sb', '-x', '/a', '--genome', '/b'], 'unknown option --genome'),
 ])
 def test_an_option_it_cannot_read_stops_it(argv, says):
     with pytest.raises(FlagError, match=says):
