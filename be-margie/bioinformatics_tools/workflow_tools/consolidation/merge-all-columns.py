@@ -185,12 +185,34 @@ def assert_shared_feature_namespace(all_tables: list[ToolTable]) -> None:
     raise SystemExit(1)
 
 
+ENVELOPE_COLUMNS = ("ENVELOPE_envelope_type", "ENVELOPE_inference_basis", "ENVELOPE_evidence_json")
+
+
+def read_envelope_summary(output_root: Path) -> dict[str, str]:
+    """The genome's envelope call from the envelope stage (envelope/envelope_summary.tsv) as the
+    ENVELOPE_* columns: its type, the basis it rests on and its evidence. Empty when there is none."""
+    try:
+        with open(output_root / "envelope" / "envelope_summary.tsv", newline="") as fh:
+            row = next(csv.DictReader(fh, delimiter="\t"), None)
+    except OSError:
+        return {}
+    if not row or not row.get("envelope_type"):
+        return {}
+    return dict(zip(ENVELOPE_COLUMNS, (row.get("envelope_type", ""), row.get("inference_basis", ""),
+                                       row.get("evidence_json", ""))))
+
+
 def build_merged_rows(
     all_tables: list[ToolTable],
     organism_name_override: str,
     domain_override: str,
+    envelope: dict[str, str] | None = None,
 ) -> tuple[list[dict], list[str]]:
-    """Builds one merged row per feature_id across all tool tables and returns rows plus column order."""
+    """Builds one merged row per feature_id across all tool tables and returns rows plus column order.
+
+    Each gene carries the genome's envelope call (`envelope`, from the envelope stage); a DeepSig,
+    PSORTb or SignalP 4 row that carries its own ENVELOPE_* values takes their place."""
+    envelope = envelope or {}
     by_tool: dict[str, ToolTable] = {t.tool_name: t for t in all_tables}
     rast = gene_table(all_tables)
 
@@ -217,7 +239,7 @@ def build_merged_rows(
     for t in all_tables:
         for col in t.tool_columns:
             register(col)
-    for col in ("ENVELOPE_envelope_type", "ENVELOPE_inference_basis", "ENVELOPE_evidence_json"):
+    for col in ENVELOPE_COLUMNS:
         register(col)
 
     merged_rows: list[dict] = []
@@ -256,8 +278,9 @@ def build_merged_rows(
         if interpro_tables:
             row.update(aggregate_shared_interpro_columns(interpro_tables, fid))
 
-        for col in ("ENVELOPE_envelope_type", "ENVELOPE_inference_basis", "ENVELOPE_evidence_json"):
-            row.setdefault(col, "")
+        for col in ENVELOPE_COLUMNS:
+            if not row.get(col):
+                row[col] = envelope.get(col, "")
         for source_tool in ("deepsig", "psortb", "signalp4"):
             table = by_tool.get(source_tool)
             if not table:
@@ -267,7 +290,7 @@ def build_merged_rows(
                 continue
             r0 = rows[0]
             if r0.get("ENVELOPE_envelope_type"):
-                for col in ("ENVELOPE_envelope_type", "ENVELOPE_inference_basis", "ENVELOPE_evidence_json"):
+                for col in ENVELOPE_COLUMNS:
                     row[col] = r0.get(col, "")
                 break
 
@@ -337,10 +360,13 @@ def main() -> None:
         suffix = f" (filtered {n_before} -> {len(table.rows_by_feature)} feature_ids)" if n_before != len(table.rows_by_feature) else ""
         print(f"    {tool_name:14s} ← {src}  ({len(table.rows_by_feature)} feature_ids, {len(table.tool_columns)} cols){suffix}")
 
+    envelope = read_envelope_summary(output_root)
+    print(f"[merge-all-columns] envelope: {envelope.get('ENVELOPE_envelope_type') or 'no envelope_summary.tsv'}")
     merged_rows, columns = build_merged_rows(
         all_tables,
         organism_name_override=args.organism_name,
         domain_override=args.domain,
+        envelope=envelope,
     )
 
     output_path = Path(args.output)
