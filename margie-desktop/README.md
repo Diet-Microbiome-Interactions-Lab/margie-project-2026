@@ -210,14 +210,25 @@ line in the shell's startup file (`~/.zshrc`, `~/.bash_profile` for bash on macO
 ```text
 margie              the MARGIE command line on the HPC chosen on the start page
 margie <command>    one command there, for example: margie dane_wf margie sb -i genomes/ -o results/
-margie app          opens the app
-margie --help       how to run MARGIE, with every option
+margie-cli          the MARGIE command line on this computer: the app's local pipeline
+margie-cli <command>  one command here, for example: margie-cli dane_wf margie sb -i genomes/ -o results/
+margie app          opens the app (margie-cli app too)
+margie --help       how to run MARGIE, with every option (margie-cli --help for this computer)
 ```
 
-The pipeline runs on the HPC, so paths given to `dane_wf` are paths there. `margie` signs in with
-the app's key and options from `margie.env`, through the app's open connection when there is one,
-so a connected app means no second sign-in. A `margie` that is not the app's stays as it is, and
-the log (`main.log`) names another `margie` that comes first on PATH. `src/cli.js` writes it.
+With `margie`, the pipeline runs on the HPC, so paths given to `dane_wf` are paths there. It
+signs in with the app's key and options from `margie.env`, through the app's open connection when
+there is one, so a connected app means no second sign-in.
+
+`margie-cli` takes the same `dane_wf margie sb -i -o -w -c` and runs the app's local pipeline
+(`annotate.sh`) on this computer. It uses the pipeline folder the app uses, with the app's defaults
+and the settings saved in the app; a `-c` file of `KEY=value` lines goes over them. `-i` is a genome
+file or a folder, `-o` the results folder (left out, the app's results folder), and the pipeline's
+own `--tool`, `--genes-only`, `--prepare-only` and `--list` pass through. At its prompt, `setup` and
+`check` run `setup.sh` and `check.sh`.
+
+A `margie` or `margie-cli` that is not the app's stays as it is, and the log (`main.log`) names
+another `margie` that comes first on PATH. `src/cli.js` writes both, from `src/cli/`.
 
 ## What this needed from `margie-fe`
 

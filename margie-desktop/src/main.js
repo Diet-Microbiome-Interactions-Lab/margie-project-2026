@@ -400,12 +400,13 @@ async function start() {
 	// Before anything spawns git, ssh, docker or container.
 	await restoreUserPath();
 
-	// The margie terminal command: the MARGIE command line on the HPC, and margie app.
+	// The margie and margie-cli terminal commands: the MARGIE command line on the HPC and on this computer.
 	try {
-		const cli = await installCli({ exe: app.getPath('exe'), packaged: app.isPackaged, loginPath: loginPath() });
+		const cli = await installCli({ exe: app.getPath('exe'), packaged: app.isPackaged, loginPath: loginPath(),
+			dataDir: DATA_DIR, pipelineHome: PIPELINE_HOME });
 		if (!cli.file) log.warn(`margie command not written: ${cli.why}`);
 		else if (!cli.written) log.warn(`a margie that is not the app's is at ${cli.file}; it stays as it is`);
-		else log.info(`margie      ${cli.file}${cli.profile ? ` (on PATH from ${cli.profile}, in new terminals)` : cli.onPath ? '' : ' (not on PATH)'}`);
+		else log.info(`margie      ${cli.file} and margie-cli${cli.profile ? ` (on PATH from ${cli.profile}, in new terminals)` : cli.onPath ? '' : ' (not on PATH)'}`);
 		if (cli.before) log.warn(`another margie comes first on PATH: ${cli.before}`);
 	} catch (e) {
 		log.warn(`could not write the margie command: ${e?.message ?? e}`);

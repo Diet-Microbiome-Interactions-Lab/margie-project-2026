@@ -1,12 +1,14 @@
 /**
- * The `margie` terminal command. At each start the app writes it to the user's command folder
- * (~/.local/bin; %LOCALAPPDATA%\MARGIE\bin on Windows, run by Git for Windows' bash) and puts that
- * folder on the user's PATH:
+ * The `margie` and `margie-cli` terminal commands. At each start the app writes them to the user's
+ * command folder (~/.local/bin; %LOCALAPPDATA%\MARGIE\bin on Windows, run by Git for Windows' bash)
+ * and puts that folder on the user's PATH:
  *
  *   margie            the MARGIE command line on the HPC chosen in the app (dane_wf, dane and misc run there)
  *   margie <command>  one command there, for example: margie dane_wf margie sb -i genomes/ -o results/
- *   margie app        opens this app
- *   margie --help     says how to run MARGIE
+ *   margie-cli        the MARGIE command line on this computer: dane_wf margie sb runs the app's local
+ *                     pipeline (src/cli/margie-cli.sh), with setup and check
+ *   margie app        opens this app (margie-cli app too)
+ *   margie --help     says how to run MARGIE (margie-cli --help for this computer)
  *
  * The HPC, the MARGIE folder on it and the key come from ~/.config/margie/margie.env, as for the
  * app's own connection, whose open connection (hpc-connect.sh's socket) it signs in through.
@@ -16,10 +18,20 @@ import { execFile } from 'node:child_process';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
+import { fileURLToPath } from 'node:url';
 
 /** The line that marks a file as the app's, so a `margie` of the user's own stays as it is. */
 export const MARK = 'Written by the MARGIE app';
 const PATH_MARK = '# The margie command (added by the MARGIE app)';
+const CLI_SOURCE = path.join(path.dirname(fileURLToPath(import.meta.url)), 'cli');
+
+/**
+ * margie-cli's defaults for a local run, as margie-fe's lib/server/pipeline.ts (LOCAL_DEFAULTS) gives
+ * them to the pipeline: GTDB-Tk off, and each licence-gated tool not agreed until Settings says so.
+ */
+const LICENCE_TOOLS = ['kegg', 'tigrfam', 'dbcan', 'eggnog', 'merops', 'tcdb', 'uniprot', 'interpro', 'geneprop', 'psortb', 'deepsig'];
+const LOCAL_DEFAULTS = ['export RUN_GTDBTK=0', "export LICENCE_INTENDED_USE=''", "export LICENCE_STATEMENT=''",
+	...LICENCE_TOOLS.map((t) => `export LICENCE_AGREED_${t.toUpperCase()}=0`)].join('\n    ');
 
 const sq = (s) => `'${String(s).replaceAll("'", `'\\''`)}'`;
 
@@ -33,6 +45,7 @@ const HELP = `MARGIE command line
                          margie dane_wf margie sb -i genomes/ -o results/
   margie app           opens the MARGIE app
   margie --help        shows this
+  margie-cli           the same command line on this computer, running the app's local pipeline
 
 Running MARGIE on a genome file or a folder of genomes (paths on the HPC):
   dane_wf margie sb --input <genome file or folder> --output <folder> [--working-directory <folder>] [--config <config file>]
@@ -107,6 +120,22 @@ exec ssh \${SSH_X[@]+"\${SSH_X[@]}"} "$HPC_HOST" \\
 `;
 }
 
+/**
+ * The `margie-cli` script (bash): the MARGIE command line on this computer, running the app's local
+ * pipeline (*pipelineHome*, unless margie.env names another) with the app's settings, read by
+ * *settingsEnv* run as Node with the app's binary *exe*.
+ */
+export function localScript({ openApp, exe, pipelineHome, settingsEnv, platform = process.platform }) {
+	const shellPath = (p) => sq(platform === 'win32' ? gitBashPath(p) : p);
+	return fs.readFileSync(path.join(CLI_SOURCE, 'margie-cli.sh'), 'utf8')
+		.replace('__MARK__', () => MARK)
+		.replace('__APP_EXE__', () => shellPath(exe))
+		.replace('__APP_PIPELINE__', () => shellPath(pipelineHome))
+		.replace('__SETTINGS_ENV__', () => shellPath(settingsEnv))
+		.replace('__APP_DEFAULTS__', () => LOCAL_DEFAULTS)
+		.replace('__OPEN_APP__', () => openApp);
+}
+
 /** Git for Windows' bash.exe, where the app looks for it to reach the HPC; '' when it is not there. */
 function windowsBash(env) {
 	const candidates = [
@@ -163,22 +192,32 @@ function addToWindowsPath(dir) {
  * { file, written, onPath, profile, before } (before: another margie found first on PATH).
  */
 export async function installCli({ platform = process.platform, home = os.homedir(), env = process.env,
-	exe, packaged, loginPath = '' }) {
+	exe, packaged, loginPath = '', dataDir, pipelineHome }) {
 	const openApp = openAppLines({ platform, exe, packaged, appImage: env.APPIMAGE });
-	const script = launcherScript(openApp);
+	// margie-cli reads the app's saved settings with this helper, run as Node by the app's binary.
+	const settingsEnv = path.join(dataDir, 'cli', 'settings-env.cjs');
+	fs.mkdirSync(path.dirname(settingsEnv), { recursive: true });
+	fs.writeFileSync(settingsEnv, fs.readFileSync(path.join(CLI_SOURCE, 'settings-env.cjs')));
+	const scripts = {
+		margie: launcherScript(openApp),
+		'margie-cli': localScript({ openApp, exe, pipelineHome, settingsEnv, platform })
+	};
 	if (platform === 'win32') {
 		const dir = path.join(env.LOCALAPPDATA || path.join(home, 'AppData', 'Local'), 'MARGIE', 'bin');
 		const bash = windowsBash(env);
 		if (!bash) return { file: '', written: false, why: 'Git for Windows (its bash) is not installed' };
-		const file = path.join(dir, 'margie');
-		const written = writeOurs(file, script, 0o755) &&
-			writeOurs(path.join(dir, 'margie.cmd'), `@echo off\r\nrem margie, the MARGIE command line. ${MARK}.\r\n"${bash}" "%~dp0margie" %*\r\n`, 0o755);
+		let written = true;
+		for (const [name, text] of Object.entries(scripts)) {
+			written = writeOurs(path.join(dir, name), text, 0o755) &&
+				writeOurs(path.join(dir, `${name}.cmd`), `@echo off\r\nrem ${name}, the MARGIE command line. ${MARK}.\r\n"${bash}" "%~dp0${name}" %*\r\n`, 0o755) && written;
+		}
 		const onPath = (env.Path || env.PATH || '').split(';').includes(dir) || (await addToWindowsPath(dir));
-		return { file, written, onPath, profile: '' };
+		return { file: path.join(dir, 'margie'), written, onPath, profile: '' };
 	}
 	const dir = path.join(home, '.local', 'bin');
 	const file = path.join(dir, 'margie');
-	const written = writeOurs(file, script, 0o755);
+	let written = true;
+	for (const [name, text] of Object.entries(scripts)) written = writeOurs(path.join(dir, name), text, 0o755) && written;
 	const parts = loginPath.split(':');
 	let profile = '';
 	let onPath = parts.includes(dir) || parts.includes('~/.local/bin');
