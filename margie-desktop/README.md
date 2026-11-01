@@ -195,9 +195,29 @@ exists to prevent exactly that. Hardened-runtime-without-sandbox is both notariz
 | `~/Library/Application Support/MARGIE/state` | `hpc-connect.sh`'s pid, progress, and ssh's pending questions |
 | `~/Library/Logs/MARGIE/main.log` | what the app did — **Help → Open Log Folder** |
 | `~/.config/margie/margie.env` | where MARGIE runs. **Shared with the `margie` terminal command, on purpose.** |
+| `~/.local/bin/margie` | the `margie` terminal command, written again at each start (below) |
 
-The last one is the only thing written outside the Mac-standard locations, and it is
-intentional: it is the same file `setup.sh` writes and `~/bin/margie` reads.
+`margie.env` is the same file `setup.sh` writes and `~/bin/margie` reads. The `margie` command
+and its PATH line are the other things written outside the Mac-standard locations.
+
+## The `margie` terminal command
+
+At each start the app writes `margie` to `~/.local/bin`, or `%LOCALAPPDATA%\MARGIE\bin` on
+Windows, where Git for Windows' bash runs it. It puts that folder on the user's PATH: a marked
+line in the shell's startup file (`~/.zshrc`, `~/.bash_profile` for bash on macOS, `~/.bashrc`, or
+`~/.profile`), or the user Path on Windows. New terminals then find it from any folder.
+
+```text
+margie              the MARGIE command line on the HPC chosen on the start page
+margie <command>    one command there, for example: margie dane_wf margie sb -i genomes/ -o results/
+margie app          opens the app
+margie --help       how to run MARGIE, with every option
+```
+
+The pipeline runs on the HPC, so paths given to `dane_wf` are paths there. `margie` signs in with
+the app's key and options from `margie.env`, through the app's open connection when there is one,
+so a connected app means no second sign-in. A `margie` that is not the app's stays as it is, and
+the log (`main.log`) names another `margie` that comes first on PATH. `src/cli.js` writes it.
 
 ## What this needed from `margie-fe`
 

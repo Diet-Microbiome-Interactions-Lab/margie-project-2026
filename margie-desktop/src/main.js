@@ -12,7 +12,8 @@ import { fileURLToPath } from 'node:url';
 import { ensureDirs, BUILD_OPEN, BUILD_VAULT, DATA_DIR, LOG_DIR, STATE_DIR, PIPELINE_HOME, GUI_DIR } from './paths.js';
 import { log } from './log.js';
 import { localApi, quiet } from './local-api.js';
-import { restoreUserPath } from './shell-env.js';
+import { restoreUserPath, loginPath } from './shell-env.js';
+import { installCli } from './cli.js';
 import { readMargieEnv, expandHome, isPipeline } from './settings.js';
 import { installBundledPipeline } from './pipeline.js';
 import { startServer, stopServer } from './server.js';
@@ -398,6 +399,17 @@ async function start() {
 
 	// Before anything spawns git, ssh, docker or container.
 	await restoreUserPath();
+
+	// The margie terminal command: the MARGIE command line on the HPC, and margie app.
+	try {
+		const cli = await installCli({ exe: app.getPath('exe'), packaged: app.isPackaged, loginPath: loginPath() });
+		if (!cli.file) log.warn(`margie command not written: ${cli.why}`);
+		else if (!cli.written) log.warn(`a margie that is not the app's is at ${cli.file}; it stays as it is`);
+		else log.info(`margie      ${cli.file}${cli.profile ? ` (on PATH from ${cli.profile}, in new terminals)` : cli.onPath ? '' : ' (not on PATH)'}`);
+		if (cli.before) log.warn(`another margie comes first on PATH: ${cli.before}`);
+	} catch (e) {
+		log.warn(`could not write the margie command: ${e?.message ?? e}`);
+	}
 
 	// The pipeline local mode runs: the app's bundled copy.
 	try {

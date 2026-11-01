@@ -38,6 +38,10 @@ function pathFromLoginShell(timeoutMs = 3000) {
 	});
 }
 
+/** The login shell's own PATH, as restoreUserPath read it ('' before, or when the shell failed). */
+let loginShellPath = '';
+export const loginPath = () => loginShellPath;
+
 /**
  * Widens process.env.PATH with the login shell's PATH and FALLBACKS, adding entries only.
  * Best-effort: a shell that fails leaves just the fallbacks.
@@ -51,6 +55,7 @@ export async function restoreUserPath() {
 	} catch (e) {
 		log.warn('could not read PATH from the login shell:', e);
 	}
+	loginShellPath = shellPath;
 
 	const seen = new Set();
 	const merged = [];
