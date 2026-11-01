@@ -147,12 +147,6 @@ def cache_name(key: str, fingerprint: str) -> str:
     return f'{key}#{fingerprint}' if input_keyed(key) else key
 
 
-# Mirrors margie_sb.smk's INTERPRO_ANALYSIS_TO_BASENAME; the .smk is not importable.
-INTERPRO_DB_BASENAMES = [
-    "antifam", "cdd", "coils", "funfam", "gene3d", "hamap", "mobidb", "ncbifam",
-    "panther", "pfam", "pirsf", "pirsr", "prints", "prosite_patterns",
-    "prosite_profiles", "sfld", "smart", "superfamily",
-]
 WORKFLOW_DIR = Path(__file__).parent
 
 # Not 'all': it would clamp every rule's threads to the small driver allocation.
@@ -825,33 +819,47 @@ class WorkflowBase(ProgramBase):
         format, without the classification) are run again. Each restore also writes the step's
         compute token, so margie_sb.smk's gtdbtk_from_cache and rasttk_from_cache rules (told
         about these genomes through cached_gtdbtk and cached_rasttk) have nothing to do, and only
-        the other genomes go into the GTDB-Tk batch. Returns ({genome: gtdbtk restored},
-        {genome: rasttk restored}).
+        the other genomes go into the GTDB-Tk batch. A resumed run keeps the files the earlier run
+        left whole in its folder, with their times (_kept_in_folder). Returns ({genome: gtdbtk
+        restored}, {genome: rasttk restored}), cache_report.KEPT for a step kept.
         '''
         # As do_margie_sb: a domain or genetic code the config names is the config's.
         calls = genome_calls(genome_files, {'run_gtdbtk': True, 'margie_sb': self._margie_sb_dict()})
         # With the full classification on, cached identify-step results (no classification) run again.
         classify = rc_bool('margie_sb.gtdbtk.classify', False, config={'margie_sb': self._margie_sb_dict()})
         gtdbtk, rasttk = {}, {}
+        resumed = self._resumed()
         for genome, fasta_path in genome_files.items():
             prefix = get_workflow_prefix_for(genome, smk_config)
             results, table, token = WorkflowBase._gtdbtk_split_paths(genome, smk_config)
-            gtdbtk[genome] = restore(db_path, fasta_path, 'gtdbtk', [results, table], optional=[token])
+            gtdbtk_files = [results, table, token, f"{prefix}gtdbtk/gtdbtk_compute.tkn"]
+            # A resumed run keeps the earlier run's files when they are whole there and in the cache
+            # (a kept step is not stored again).
+            cached = cached_tools(db_path, fasta_path) if resumed else set()
+            kept = 'gtdbtk' in cached and WorkflowBase._kept_in_folder(gtdbtk_files)
+            gtdbtk[genome] = cache_report.KEPT if kept else restore(db_path, fasta_path, 'gtdbtk', [results, table], optional=[token])
             if gtdbtk[genome] and not WorkflowBase._names_classification(results, classified=classify):
                 LOGGER.info("Cached GTDB-Tk results for %s name no classification -- GTDB-Tk runs again", genome)
                 for path in (results, table, token):
                     Path(path).unlink(missing_ok=True)
-                gtdbtk[genome] = False
+                gtdbtk[genome] = kept = False
             if not gtdbtk[genome]:
                 continue
-            WorkflowBase._mark_restored([results, table, token, f"{prefix}gtdbtk/gtdbtk_compute.tkn"])
-            LOGGER.info("Cache HIT for gtdbtk (genome=%s) — skipping recomputation", genome)
+            if kept:
+                LOGGER.info("GTDB-Tk for %s kept from the earlier run's folder", genome)
+            else:
+                WorkflowBase._mark_restored(gtdbtk_files)
+                LOGGER.info("Cache HIT for gtdbtk (genome=%s) — skipping recomputation", genome)
             if genome in prodigal_genomes or calls.get(genome, {}).get('source') == 'metadata':
                 continue  # Prodigal's genes, or a domain/code from the config: RASTtk runs fresh
-            rasttk[genome] = restore(db_path, fasta_path, 'rasttk', WorkflowBase._rasttk_paths(genome, smk_config))
-            if rasttk[genome]:
-                WorkflowBase._mark_restored([*WorkflowBase._rasttk_paths(genome, smk_config),
-                                             f"{prefix}rasttk/rasttk_compute.tkn"])
+            rasttk_files = [*WorkflowBase._rasttk_paths(genome, smk_config), f"{prefix}rasttk/rasttk_compute.tkn"]
+            # Kept only on GTDB-Tk kept: restored GTDB-Tk results are newer than gene calls kept.
+            kept = kept and 'rasttk' in cached and WorkflowBase._kept_in_folder(rasttk_files)
+            rasttk[genome] = cache_report.KEPT if kept else restore(db_path, fasta_path, 'rasttk', WorkflowBase._rasttk_paths(genome, smk_config))
+            if kept:
+                LOGGER.info("RASTtk for %s kept from the earlier run's folder", genome)
+            elif rasttk[genome]:
+                WorkflowBase._mark_restored(rasttk_files)
                 LOGGER.info("Cache HIT for rasttk (genome=%s) — skipping recomputation", genome)
         return gtdbtk, rasttk
 
@@ -877,6 +885,24 @@ class WorkflowBase(ProgramBase):
                 return any(len(f) > col and f[col].strip() for f in (line.rstrip('\n').split('\t') for line in fh))
         except OSError:
             return False
+
+    def _resumed(self) -> bool:
+        '''A run Resume started from a copy of an earlier run's folder (margie_sb.resume).'''
+        node = (self.conf.get('margie_sb', {}) if self.conf else {}) or {}
+        return str(node.get('resume', '')).strip().lower() not in ('false', '0', 'no', 'off', '')
+
+    @staticmethod
+    def _kept_in_folder(paths: list[str]) -> bool:
+        '''A step's files whole in this run's folder, as an earlier run left them: every file there,
+        and each token no older than the step's other files (a step writes its token last). A resumed
+        run keeps them, times and all, so Snakemake takes the step as done.'''
+        try:
+            times = {p: os.stat(p).st_mtime for p in paths}
+        except OSError:
+            return False
+        tokens = [t for p, t in times.items() if p.endswith('.tkn')]
+        files = [t for p, t in times.items() if not p.endswith('.tkn')]
+        return not tokens or not files or min(tokens) >= max(files)
 
     @staticmethod
     def _mark_restored(paths: list[str]) -> None:
@@ -1140,6 +1166,7 @@ class WorkflowBase(ProgramBase):
         use_cache = str(node.get('use_cache', True)).strip().lower() not in ('false', '0', 'no', 'off')
         if not use_cache:
             LOGGER.info('This run does not use the cache: each tool runs on each genome and keeps its raw output')
+        resumed = self._resumed()
 
         restored: dict[str, dict[str, bool]] = {}
         gtdbtk_restored: dict[str, bool] = {}
@@ -1169,8 +1196,8 @@ class WorkflowBase(ProgramBase):
                     rasttk_restored[g] = True
                     LOGGER.info('RASTtk gene calls for %s came from the MARGIE database: they stand in for Prodigal', g)
             prodigal_genomes = frozenset(g for g in prodigal_genomes if not rasttk_restored.get(g))
-            LOGGER.info('From the MARGIE database: GTDB-Tk for %d of %d genome(s), RASTtk for %d',
-                        sum(gtdbtk_restored.values()), len(genome_files), sum(rasttk_restored.values()))
+            LOGGER.info('From the MARGIE database or kept in the folder: GTDB-Tk for %d of %d genome(s), RASTtk for %d',
+                        sum(map(bool, gtdbtk_restored.values())), len(genome_files), sum(map(bool, rasttk_restored.values())))
         # margie_sb.smk takes these genomes' GTDB-Tk and RASTtk outputs as they are (rules
         # gtdbtk_from_cache, rasttk_from_cache), and leaves them out of the GTDB-Tk batch.
         smk_config['cached_gtdbtk'] = ','.join(sorted(g for g, hit in gtdbtk_restored.items() if hit))
@@ -1196,6 +1223,8 @@ class WorkflowBase(ProgramBase):
             on_disk = lambda paths: all(Path(p).exists() for p in paths)
             if not run_gtdbtk_enabled:
                 provenance.set(g, 'gtdbtk', cache_report.NOT_RUN, 'switched off')
+            elif gtdbtk_restored.get(g) == cache_report.KEPT:
+                provenance.set(g, 'gtdbtk', cache_report.KEPT, "kept from the earlier run's folder")
             elif gtdbtk_restored.get(g):
                 provenance.set(g, 'gtdbtk', cache_report.RESTORED, SAME_GENOME, when.get(g, {}).get('gtdbtk', ''), cache_report.GENOME_LEVEL)
             elif on_disk(self._gtdbtk_split_paths(g, smk_config)):
@@ -1208,6 +1237,8 @@ class WorkflowBase(ProgramBase):
                 provenance.set(g, 'prodigal', cache_report.FRESH,
                                'genes called fresh by Prodigal: no RASTtk gene calls for this genome in the MARGIE database'
                                if db_path else 'genes called fresh by Prodigal')
+            elif rasttk_restored.get(g) == cache_report.KEPT:
+                provenance.set(g, 'rasttk', cache_report.KEPT, "kept from the earlier run's folder")
             elif rasttk_restored.get(g):
                 provenance.set(g, 'rasttk', cache_report.RESTORED, SAME_GENOME, when.get(g, {}).get('rasttk', ''), cache_report.GENOME_LEVEL)
             elif Path(f"{prefix}rasttk/rasttk_db.tkn").exists():
@@ -1391,6 +1422,7 @@ class WorkflowBase(ProgramBase):
             """Prepares one genome (cache restore, protein cache, report rows) and starts its Stage 2;
             None when its selected steps all came back from the cache."""
             genome_restored: dict = {}
+            kept_tools: set = set()
             merged_fp = ''
             # The genome's sequence hash: its proteins and genes are linked to it in the database.
             hashed = _safely(f'Hashing {genome}', fasta_hashes, genome_files[genome]) if db_path else None
@@ -1407,10 +1439,16 @@ class WorkflowBase(ProgramBase):
             if db_path and use_cache and genome not in prodigal_genomes:
                 genome_cache_map_now = cache_map_fn(genome)
                 tools_map = {k: v for k, v in genome_cache_map_now.items() if not input_keyed(k)}
-                genome_restored = _safely(f'Restoring {genome} from the cache', restore_all,
-                                          db_path, genome_files[genome], tools_map, genes=genes) or {}
+                # A resumed run keeps a tool's files the earlier run left whole in its folder, times and
+                # all, so Snakemake takes the tool and the steps after it as done; only a tool in the
+                # cache, as a kept tool is not stored again.
+                cached = cached_tools(db_path, genome_files[genome]) if resumed else set()
+                kept_tools = {k for k, v in tools_map.items() if k in cached and self._kept_in_folder(v)}
+                genome_restored = _safely(f'Restoring {genome} from the cache', restore_all, db_path, genome_files[genome],
+                                          {k: v for k, v in tools_map.items() if k not in kept_tools}, genes=genes) or {}
                 if genome_restored is _FAILED:
                     genome_restored = {}
+                genome_restored.update(dict.fromkeys(kept_tools, True))
                 # Gene-call guard: cached tables name genes by number under the RASTtk id they were
                 # made with. A table under another id moves onto this run's id only when the cached
                 # gene calls under that id hold the same protein under each number as this run's;
@@ -1449,6 +1487,8 @@ class WorkflowBase(ProgramBase):
                 genome_restored = {k: genome_restored.get(cache_name(k, merged_fp), False) for k in genome_cache_map_now}
                 restored[genome] = genome_restored
                 LOGGER.info('Phase4+ cache restore for %s: %s (merged tables %s)', genome, genome_restored, merged_fp)
+                if kept_tools:
+                    LOGGER.info("Kept from the earlier run's folder for %s: %s", genome, ', '.join(sorted(kept_tools)))
 
                 # Rewrites restored tables into this run's RASTtk id namespace.
                 rast_ref = f"{get_workflow_prefix_for(genome, smk_config)}rasttk/rast.gff"
@@ -1518,7 +1558,9 @@ class WorkflowBase(ProgramBase):
                         provenance.set(genome, key, cache_report.FRESH, 'run fresh on Prodigal genes')
             for key, paths in cache_map_fn(genome).items():
                 step = key.split('@')[0]
-                if db_path and genome_restored.get(key):
+                if key in kept_tools:
+                    provenance.set(genome, step, cache_report.KEPT, "kept from the earlier run's folder")
+                elif db_path and genome_restored.get(key):
                     detail = (f'{SAME_GENOME}, merging the same tool tables' if input_keyed(key) else SAME_GENOME)
                     provenance.set(genome, step, cache_report.RESTORED, detail,
                                    when.get(genome, {}).get(cache_name(key, merged_fp), ''), cache_report.GENOME_LEVEL)
@@ -2220,6 +2262,11 @@ class WorkflowBase(ProgramBase):
             sif_files_override = [*(margie_sb_sif_files() if sif_files_override is None else sif_files_override),
                                   ('prodigal.sif', 'latest')]
 
+        # InterPro's member databases this run runs (interpro.analyses), as margie_sb.smk names their files.
+        interpro_cfg = {'interpro': self.conf.get('interpro', None) or {}, **config_overrides}
+        interpro_dbs = [protein_cache.INTERPRO_ALL_ANALYSES[a] for a in protein_cache.interpro_analyses(interpro_cfg)
+                        if a in protein_cache.INTERPRO_ALL_ANALYSES]
+
         def _genome_cache_map(genome: str) -> dict[str, list[str]]:
             '''Returns each phase 4-8 tool's output files for one genome, keyed by
             tool name, for restore_all()/store_all().
@@ -2243,7 +2290,7 @@ class WorkflowBase(ProgramBase):
                                       f'{prefix}envelope/envelope_summary.tsv',
                                       f'{prefix}envelope/envelope_db.tkn']
             interpro_paths = [f'{prefix}interpro/interpro_results.tsv', f'{prefix}interpro/interpro_db.tkn']
-            for db in INTERPRO_DB_BASENAMES:
+            for db in interpro_dbs:
                 interpro_paths += [f'{prefix}interpro/interpro_{db}_results.tsv',
                                     f'{prefix}interpro/interpro_{db}_db.tkn']
             cache_map['interpro'] = interpro_paths
@@ -2266,8 +2313,7 @@ class WorkflowBase(ProgramBase):
         }
 
         # Set by resume_job's relaunch; mtime-only triggers treat copied outputs as done.
-        resume_raw = str(self.conf.get('margie_sb', {}).get('resume', '')).strip().lower()
-        rerun_triggers = 'mtime' if resume_raw not in ('false', '0', 'no', 'off', '') else None
+        rerun_triggers = 'mtime' if self._resumed() else None
 
         # margie_sb.finish_from: <a stopped or finished run's log>: makes the writes to the MARGIE
         # database that run left, from its folder (output_dir), then its closing steps, and runs nothing else.

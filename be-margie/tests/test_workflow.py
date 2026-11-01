@@ -754,11 +754,32 @@ class TestDoMargieSb:
         assert len(cache_map['tigrfam']) == 3  # results.tsv + domtbl.out + token
         assert len(cache_map['phobius']) == 3  # results.tsv + top1.tsv + token
         assert len(cache_map['envelope']) == 3  # results.tsv + summary.tsv + token
-        assert len(cache_map['interpro']) == 38  # (results.tsv + token) + 18 dbs * 2 files each
+        # (results.tsv + token) + the four member databases margie_sb.smk runs by default * 2 files each;
+        # all 18 made InterPro miss in every run, as the run leaves the other 14 unmade.
+        assert len(cache_map['interpro']) == 10
+        assert {p.rsplit('/', 1)[1] for p in cache_map['interpro']} >= {
+            'interpro_hamap_results.tsv', 'interpro_ncbifam_results.tsv', 'interpro_cdd_results.tsv', 'interpro_pirsf_db.tkn'}
 
         for paths in cache_map.values():
             for path in paths:
                 assert path.endswith(('.tsv', '.tkn', '.out', '.json'))
+
+    def test_interpro_is_cached_with_the_member_databases_the_run_runs(self, wf):
+        values = {'input': '/genomes/genome1.fa', 'main_database': '/tmp/test-margie.db',
+                  'interpro': {'analyses': ['Pfam', 'CDD']}}
+        wf.conf.get = MagicMock(side_effect=lambda key, default=None: values.get(key, default))
+        captured = {}
+        entitlement = {'usage_type': 'academic', 'licensed_tools': [], 'source': 'test'}
+        with patch('bioinformatics_tools.workflow_tools.workflow.discover_genomes',
+                   return_value={'genome1': '/genomes/genome1.fa'}), \
+             patch('bioinformatics_tools.workflow_tools.env_keys.ensure_api_keys'), \
+             patch('bioinformatics_tools.workflow_tools.license_gate.ensure_cli_license', return_value=entitlement), \
+             patch.object(wf, '_run_pipeline_batch_sequential',
+                          side_effect=lambda *a, **kw: captured.update(fn=kw['cache_map_fn'])):
+            wf.do_margie_sb(mode='dev')
+        names = sorted(p.rsplit('/', 1)[1] for p in captured['fn']('genome1')['interpro'])
+        assert names == ['interpro_cdd_db.tkn', 'interpro_cdd_results.tsv', 'interpro_db.tkn',
+                         'interpro_pfam_db.tkn', 'interpro_pfam_results.tsv', 'interpro_results.tsv']
 
 
 # ---------------------------------------------------------------------------

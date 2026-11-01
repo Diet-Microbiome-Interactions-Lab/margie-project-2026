@@ -83,7 +83,8 @@ COPY_KEEP = ('run-command.sh',)
 
 # Replaces the earlier folder's path with the new one in each text file of the copy, n files at a
 # time (threads: the work is reading files, and a script read from stdin cannot start processes
-# where they are spawned): some tools write absolute paths into their outputs. Args: old, new, n,
+# where they are spawned): some tools write absolute paths into their outputs. A file keeps its
+# time: the run takes the earlier run's steps as done by their files' times. Args: old, new, n,
 # kept names.
 COPY_REWRITE_PY = '''import os, sys
 from concurrent.futures import ThreadPoolExecutor
@@ -94,6 +95,7 @@ def fix(path):
     try:
         with open(path, encoding='utf-8') as f:
             text = f.read()
+        st = os.stat(path)
     except (UnicodeDecodeError, OSError):
         return 0
     if old not in text:
@@ -101,6 +103,7 @@ def fix(path):
     try:
         with open(path, 'w', encoding='utf-8') as f:
             f.write(text.replace(old, new))
+        os.utime(path, ns=(st.st_atime_ns, st.st_mtime_ns))
         return 1
     except OSError:
         return 0

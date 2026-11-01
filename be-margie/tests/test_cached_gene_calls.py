@@ -82,6 +82,57 @@ def test_results_that_name_only_the_domain_are_run_again(wf, tmp_path):  # noqa:
     assert not (run / 'gtdbtk_results.tsv').exists() and not (run / 'translation_table.tsv').exists()
 
 
+GENE_CALL_FILES = ['gtdbtk/gtdbtk_results.tsv', 'gtdbtk/translation_table.tsv', 'gtdbtk/gtdbtk_db.tkn',
+                   'gtdbtk/gtdbtk_compute.tkn', 'rasttk/rast.tsv', 'rasttk/rast.faa', 'rasttk/rast.gff',
+                   'rasttk/rasttk_db.tkn', 'rasttk/rasttk_compute.tkn']
+
+
+def _earlier_run(folder: Path, stamp: float = 1_700_000_000) -> None:
+    """A genome's GTDB-Tk and RASTtk files as an earlier run left them, all of one time."""
+    for name in GENE_CALL_FILES:
+        p = folder / name
+        p.parent.mkdir(parents=True, exist_ok=True)
+        p.write_text(FULL if name.endswith('gtdbtk_results.tsv') else 'earlier run\n')
+        os.utime(p, (stamp, stamp))
+
+
+def test_a_resumed_run_keeps_the_earlier_runs_gene_calls_and_their_times(wf, tmp_path):  # noqa: F811
+    """Resume: restoring the copied files gave them the time of the restore, so Snakemake took every
+    later step of each genome as out of date and a resumed run of 100 genomes did them all again."""
+    out = tmp_path / 'run'
+    _earlier_run(out / 'g1')
+    wf.conf = {'margie_sb': {'resume': True}}
+    with patch(f'{W}.restore') as restore, patch(f'{W}.cached_tools', return_value={'gtdbtk', 'rasttk'}):
+        gtdbtk, rasttk = wf._restore_gene_calls('/db', {'g1': '/in/g1.fna'}, {'output_dir': str(out)}, prodigal_genomes=set())
+    assert gtdbtk == {'g1': 'kept'} and rasttk == {'g1': 'kept'}
+    restore.assert_not_called()
+    assert {(out / 'g1' / n).stat().st_mtime for n in GENE_CALL_FILES} == {1_700_000_000}
+
+
+def test_a_resumed_run_restores_what_the_earlier_run_left_part_done_or_uncached(wf, tmp_path):  # noqa: F811
+    """A token older than the results it follows marks a step stopped part way; a step the cache
+    lacks comes back as before, so the run stores it."""
+    out = tmp_path / 'run'
+    _earlier_run(out / 'g1')
+    _earlier_run(out / 'g2')
+    os.utime(out / 'g1' / 'gtdbtk' / 'gtdbtk_results.tsv', (1_800_000_000, 1_800_000_000))
+    wf.conf = {'margie_sb': {'resume': True}}
+    cached = {'g1': {'gtdbtk', 'rasttk'}, 'g2': {'gtdbtk'}}
+    with patch(f'{W}.restore', return_value=True) as restore, \
+            patch(f'{W}.cached_tools', side_effect=lambda db, fasta: cached[Path(fasta).stem]):
+        wf._restore_gene_calls('/db', {g: f'/in/{g}.fna' for g in cached}, {'output_dir': str(out)}, prodigal_genomes=set())
+    assert [(Path(c.args[1]).stem, c.args[2]) for c in restore.call_args_list] == [('g1', 'gtdbtk'), ('g1', 'rasttk'), ('g2', 'rasttk')]
+
+
+def test_a_new_run_restores_over_files_already_there(wf, tmp_path):  # noqa: F811
+    out = tmp_path / 'run'
+    _earlier_run(out / 'g1')
+    wf.conf = {'margie_sb': {}}
+    with patch(f'{W}.restore', return_value=True) as restore, patch(f'{W}.cached_tools') as cached:
+        wf._restore_gene_calls('/db', {'g1': '/in/g1.fna'}, {'output_dir': str(out)}, prodigal_genomes=set())
+    assert restore.call_count == 2 and not cached.called
+
+
 @patch(f'{W}.cache_sif_files')
 @patch(f'{W}.locate_local_sif_files')
 @patch(f'{W}.time.sleep')

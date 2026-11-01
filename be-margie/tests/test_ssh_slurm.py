@@ -2,6 +2,8 @@
 Unit tests for bioinformatics_tools.utilities.ssh_slurm, with the SSHConnection's
 paramiko client mocked (no network).
 """
+import os
+
 import pytest
 from unittest.mock import MagicMock
 
@@ -298,6 +300,7 @@ class TestResumeCopyJob:
         old, new = tmp_path / "2026-10-27-1233", tmp_path / "2026-10-28-0747"
         (old / "genome" / "kegg").mkdir(parents=True)
         (old / "genome" / "kegg" / "kegg_results.tsv").write_text(f"in\t{old}/genome/rasttk/rast.faa\n")
+        os.utime(old / "genome" / "kegg" / "kegg_results.tsv", (1_700_000_000, 1_700_000_000))
         (old / "genome" / "original_container_outputs" / "kegg" / "stage").mkdir(parents=True)
         (old / "genome" / "original_container_outputs" / "kegg" / "stage" / "tmp.txt").write_text("x")
         (old / ".snakemake").mkdir()
@@ -317,6 +320,8 @@ class TestResumeCopyJob:
 
         assert r.returncode == 0, r.stdout + r.stderr
         assert (new / "genome" / "kegg" / "kegg_results.tsv").read_text() == f"in\t{new}/genome/rasttk/rast.faa\n"
+        # Its time stays the earlier run's: the resumed run takes the step as done by it.
+        assert (new / "genome" / "kegg" / "kegg_results.tsv").stat().st_mtime == 1_700_000_000
         assert not (new / ".snakemake").exists()
         assert not (new / "genome" / "original_container_outputs" / "kegg" / "stage").exists()
         assert (new / "run-command.sh").read_text() == f"new command in {new}\n"

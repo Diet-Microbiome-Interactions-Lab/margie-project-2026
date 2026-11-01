@@ -106,3 +106,46 @@ def test_a_run_writes_where_each_step_came_from(mock_sleep, mock_locate, mock_ca
     assert rows[('g1', 'kegg')]['source'] == 'partly restored' and '10 of 40 proteins' in rows[('g1', 'kegg')]['detail']
     assert rows[('g1', 'merops')]['source'] == 'not run'
     assert rows[('g1', 'scoring')]['source'] == 'fresh'
+
+
+@patch('bioinformatics_tools.workflow_tools.workflow.cache_sif_files')
+@patch('bioinformatics_tools.workflow_tools.workflow.locate_local_sif_files')
+@patch('bioinformatics_tools.workflow_tools.workflow.time.sleep')
+def test_a_resumed_run_keeps_the_tools_the_earlier_run_left_whole(mock_sleep, mock_locate, mock_cache, wf, tmp_path):  # noqa: F811
+    """Resume: a tool whose files the earlier run left whole in the folder, and that the cache holds,
+    keeps them with their times; restoring them over the copy made Snakemake run every later step
+    again. A tool the cache lacks comes back as before, so the run stores it."""
+    import os
+    from unittest.mock import MagicMock
+    out = tmp_path / 'run'
+    db = tmp_path / 'margie.db'
+    db.write_text('')
+    g = out / 'g1'
+    for t in ('cog', 'pfam'):
+        (g / t).mkdir(parents=True)
+        for name, stamp in ((f'{t}_results.tsv', 1_700_000_000), (f'{t}_db.tkn', 1_700_000_100)):
+            (g / t / name).write_text('earlier run\n')
+            os.utime(g / t / name, (stamp, stamp))
+    (g / 'rasttk').mkdir(parents=True)
+    (g / 'rasttk' / 'rasttk_db.tkn').write_text('')
+    (g / 'rasttk' / 'rast.faa').write_text('>p1\nMK\n')
+    w = 'bioinformatics_tools.workflow_tools.workflow'
+    cache_map = lambda s: {t: [f'{out}/{s}/{t}/{t}_results.tsv', f'{out}/{s}/{t}/{t}_db.tkn'] for t in ('cog', 'pfam', 'kegg')}
+    values = {'main_database': str(db), 'margie_sb': {'resume': True}}
+    wf.conf.get = MagicMock(side_effect=lambda *a: values[a[0]] if len(a) == 1 else values.get(a[0], a[1]))
+    asked = []
+    with patch.object(wf, '_restore_gene_calls', return_value=({'g1': cr.KEPT}, {'g1': cr.KEPT})), \
+            patch(f'{w}.restore_all', side_effect=lambda db_path, f, m, **kw: asked.append(sorted(m)) or {k: False for k in m}), \
+            patch(f'{w}.cached_tools', return_value={'cog', 'kegg'}), patch(f'{w}.cached_when', return_value={}), \
+            patch(f'{w}.store'), patch(f'{w}.store_all'), patch(f'{w}.log_workflow_run'), \
+            patch(f'{w}.is_already_processed', return_value=False), patch(f'{w}.fasta_hashes', return_value='h'), \
+            patch(f'{w}.current_rast_genome_id', return_value=None), \
+            patch(f'{w}.protein_cache.enabled', return_value=False), \
+            _fake_launchers(wf):
+        wf._run_pipeline_batch_sequential('margie_sb', {'output_dir': str(out), 'main_database': str(db)},
+                                          {'g1': '/g1.fa'}, cache_map_fn=cache_map, mode='dev')
+    assert asked[0] == ['kegg', 'pfam']  # cog kept; pfam whole but not in the cache
+    assert (g / 'cog' / 'cog_results.tsv').stat().st_mtime == 1_700_000_000
+    rows = _rows(out / cr.FILE)
+    assert rows[('g1', 'cog')]['source'] == 'kept' and 'earlier run' in rows[('g1', 'cog')]['detail']
+    assert rows[('g1', 'gtdbtk')]['source'] == 'kept' and rows[('g1', 'rasttk')]['source'] == 'kept'
