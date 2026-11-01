@@ -73,6 +73,7 @@ Homepage = "https://github.com/Diet-Microbiome-Interactions-Lab/GeneralTools"
 dane = "bioinformatics_tools.file_classes.main:cli"
 misc = "bioinformatics_tools.misc_tools.main:cli"
 dane_wf = "bioinformatics_tools.workflow_tools.main:cli"
+margie = "bioinformatics_tools.margie_cli:main"
 dane-api = "bioinformatics_tools.api.main:serve"
 
 [tool.setuptools]

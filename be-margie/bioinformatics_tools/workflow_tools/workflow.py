@@ -2136,6 +2136,11 @@ class WorkflowBase(ProgramBase):
                 self.failed('SLURM account configuration is required for cluster execution')
                 return 1
 
+        if not Path(input_path_value).expanduser().exists():
+            LOGGER.error('Input not found: %s', input_path_value)
+            self.failed(f'Input not found: {input_path_value}')
+            return 1
+
         # The genomes directly in the folder, as margie_sb.smk and the website see them: one
         # in a subfolder would be sent to GTDB-Tk and then have no rule (MissingInputException).
         genomes = discover_genomes(input_path_value)

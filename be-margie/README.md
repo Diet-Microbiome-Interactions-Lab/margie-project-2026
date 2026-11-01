@@ -121,16 +121,25 @@ So users do **not** have to type canonical filenames unless they want to overrid
 
 ```bash
 dane_wf margie sb \
-  input: path-to-input-folder-or-fasta \
-  output_dir: path-to-output-folder \
+  --input path-to-input-folder-or-fasta \
+  --output path-to-output-folder \
+  --working-directory path-to-working-folder \
+  --config path-to-config-file \
   run_full_operon_map: true
 ```
+
+`--working-directory` and `--config` are optional. Relative paths are read from the working
+directory, and without `--output` the results go in its `margie-output` folder. `dane_wf --help`
+lists the options. The older form (`input:`, `output_dir:`, `config:`) works too.
 
 Run it in the background so it survives logout:
 
 ```bash
-nohup dane_wf margie sb input: path-to-input-folder-or-fasta output_dir: path-to-output-folder run_full_operon_map: true > margie.log 2>&1 &
+nohup dane_wf margie sb --input path-to-input-folder-or-fasta --output path-to-output-folder run_full_operon_map: true > margie.log 2>&1 &
 ```
+
+`margie` opens the MARGIE command line, a prompt where these commands run from any folder:
+[The MARGIE command line](../README.md#the-margie-command-line).
 
 Watch it: `tail -f margie.log`  —  Stop it: `pkill -f dane_wf`
 
@@ -154,7 +163,7 @@ MARGIE's website runs this backend for you: it signs in to your cluster account 
 
 ## Notes
 
-- `margie sb` is two words. `output_dir:` is the exact folder (no timestamp added).
+- `margie sb` is two words. `--output` is the exact folder (no timestamp added).
 - Resume a crashed run: add `margie_sb.resume: true`.
 - Choose the tools: add `margie_sb.selected_tools:` with their names, separated by commas, for example `margie_sb.selected_tools: gtdbtk,rasttk,pfam,operon,consolidation,labeling,fingerprint,scoring_heuristic`. Every name, by phase: [Choosing the tools](../README.md#choosing-the-tools).
 - Full toolkit (file tools, API, front-end): [README-detailed.md](README-detailed.md).

@@ -7,6 +7,7 @@ All tests are mocked — no snakemake installation required.
 import subprocess
 import threading
 from contextlib import contextmanager
+from pathlib import Path
 from unittest.mock import MagicMock, patch
 
 import pytest
@@ -14,6 +15,9 @@ import pytest
 from bioinformatics_tools.workflow_tools import workflow as workflow_module
 from bioinformatics_tools.workflow_tools.workflow import WorkflowBase, WORKFLOWS
 from bioinformatics_tools.workflow_tools.workflow_registry import WORKFLOWS
+
+# A genome file that is there: a run stops when its input is not.
+EXAMPLE_GENOME = str(Path(__file__).resolve().parents[1] / 'test-files' / 'example.fasta')
 
 
 # ---------------------------------------------------------------------------
@@ -714,7 +718,7 @@ class TestDoMargieSb:
         phase4-8 tool, with the full file set for multi-file tools. Consolidation and
         labeling are not cached: they take about a minute and their tables are large."""
         wf.conf.get = MagicMock(side_effect=lambda key, default=None: {
-            'input': '/genomes/genome1.fa',
+            'input': EXAMPLE_GENOME,
             'main_database': '/tmp/test-margie.db',
         }.get(key, default))
 
@@ -765,7 +769,7 @@ class TestDoMargieSb:
                 assert path.endswith(('.tsv', '.tkn', '.out', '.json'))
 
     def test_interpro_is_cached_with_the_member_databases_the_run_runs(self, wf):
-        values = {'input': '/genomes/genome1.fa', 'main_database': '/tmp/test-margie.db',
+        values = {'input': EXAMPLE_GENOME, 'main_database': '/tmp/test-margie.db',
                   'interpro': {'analyses': ['Pfam', 'CDD']}}
         wf.conf.get = MagicMock(side_effect=lambda key, default=None: values.get(key, default))
         captured = {}

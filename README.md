@@ -140,8 +140,29 @@ then run:
 
 ```bash
 dane_wf margie sb \
-  input: path-to-input-folder-or-fasta \
-  output_dir: path-to-output-folder
+  --input path-to-input-folder-or-fasta \
+  --output path-to-output-folder
+```
+
+| Option | What it takes |
+|---|---|
+| `--input` | A genome file, or a folder of genome files |
+| `--output` | The folder the results go in |
+| `--working-directory` | The folder relative paths are read from; without `--output`, the results go in its `margie-output` folder |
+| `--config` | A config file, read over `~/.config/bioinformatics-tools/config.yaml` |
+
+Other settings follow as `key: value`, as below. The older form, `input:` and `output_dir:`, works
+too.
+
+### The MARGIE command line
+
+`margie` opens MARGIE's prompt, where `dane_wf`, `dane` and `misc` run. `cd` changes folder,
+`help` lists the commands, `exit` leaves, and other lines run in your shell.
+`margie dane_wf margie sb ...` runs one command without the prompt. To call `margie` from any
+folder, put the environment's `bin` folder on your PATH, for example in `~/.bashrc`:
+
+```bash
+export PATH="$HOME/bioinformatics-tools/.venv/bin:$PATH"
 ```
 
 ### Choosing the tools
@@ -151,8 +172,8 @@ tools up to scoring. To choose, list them by name, separated by commas:
 
 ```bash
 dane_wf margie sb \
-  input: path-to-input-folder-or-fasta \
-  output_dir: path-to-output-folder \
+  --input path-to-input-folder-or-fasta \
+  --output path-to-output-folder \
   margie_sb.selected_tools: gtdbtk,rasttk,cog,kegg,eggnog,uniprot,pfam,tigrfam,dbcan,pgap,geneprop,interpro,operon,envelope,consolidation,labeling,fingerprint,scoring_heuristic,fingerprint_database
 ```
 

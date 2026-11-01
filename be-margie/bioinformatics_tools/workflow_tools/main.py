@@ -6,6 +6,7 @@ import logging
 import sys
 
 from bioinformatics_tools.caragols.logger import config_logging_for_app
+from bioinformatics_tools.workflow_tools import cli_flags
 from bioinformatics_tools.workflow_tools.workflow import WorkflowBase
 
 LOGGER = logging.getLogger(__name__)
@@ -31,6 +32,16 @@ def find_wf(args: list) -> None | str:
 def cli():
     '''Command line interface for the script.
     '''
+    # --input, --output, --working-directory and --config, as the key: value words read below.
+    if cli_flags.wants_help(sys.argv[1:]):
+        print(cli_flags.HELP)
+        sys.exit(0)
+    try:
+        sys.argv[1:] = cli_flags.to_words(sys.argv[1:])
+    except cli_flags.FlagError as err:
+        print(f'dane_wf: {err}\n{cli_flags.HELP}', file=sys.stderr)
+        sys.exit(2)
+
     # Step 0 - Configure Logging
     config_logging_for_app()
 

@@ -12,6 +12,9 @@ from bioinformatics_tools.api.licensing.catalog import build_terms_payload
 from bioinformatics_tools.workflow_tools.workflow_registry import HIDDEN_TOOLS, WORKFLOWS
 from tests.test_workflow import wf  # noqa: F401 (fixture)
 
+# A genome file that is there: a run stops when its input is not.
+EXAMPLE_GENOME = str(Path(__file__).resolve().parents[1] / 'test-files' / 'example.fasta')
+
 SMK = Path(__file__).resolve().parents[1] / 'bioinformatics_tools' / 'workflow_tools' / 'margie_sb.smk'
 HIDDEN = {'phobius', 'tmbed', 'signalp6', 'signalp4'}
 
@@ -60,7 +63,7 @@ def test_the_pipeline_runs_signalp4_only_when_asked():
 
 def _launch(wf, selected):  # noqa: F811
     wf.conf.get = MagicMock(side_effect=lambda key, default=None: {
-        'input': '/genomes/genome1.fa', 'main_database': '/tmp/test-margie.db', 'margie_sb': {'selected_tools': selected},
+        'input': EXAMPLE_GENOME, 'main_database': '/tmp/test-margie.db', 'margie_sb': {'selected_tools': selected},
     }.get(key, default))
     captured = {}
 
