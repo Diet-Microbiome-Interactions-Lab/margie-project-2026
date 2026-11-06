@@ -3902,22 +3902,40 @@ TRANSFER_DIR = ".margie/transfers"
 TRANSFER_CORES = 16
 LOGIN_CORES = 2
 
-# Runs the plan (op \t source \t target per line), a few items at a time. It never overwrites:
-# a target that exists is reported, not replaced; a delete has no target. Each item's result
-# goes in r.<n>, then all in results.
+# Runs the plan (op \t source \t target [\t replace | kept] per line), a few items at a time. A
+# target that exists is reported and left as it is, unless the line says replace: then the new one
+# is put beside it (.<name>.margie-<id>-<n>.new), the one there is renamed aside (.old), the new one
+# takes its name and the old one is deleted; a failed step puts things back as they were. A delete
+# has no target. Each item's result goes in r.<n>, then all in results.
 TRANSFER_SCRIPT = r"""#!/bin/bash
 set -u
-dir="$1"; n="${2:-2}"
+dir="$1"; n="${2:-2}"; tid="$(basename -- "$dir")"
 say() { printf 'state=%s\nhost=%s\n' "$1" "$(hostname)" > "$dir/status.tmp" && mv "$dir/status.tmp" "$dir/status"; }
+undo() { if [ "$1" = copy ]; then rm -rf -- "$3"; else mv -- "$3" "$2"; fi; }
+swap() {
+  local op="$1" src="$2" dst="$3" i="$4" out base new old
+  base="$(dirname -- "$dst")/.$(basename -- "$dst").margie-$tid-$i"; new="$base.new"; old="$base.old"
+  if [ "$op" = copy ]; then out=$(cp -Rp -- "$src" "$new" 2>&1) || { rm -rf -- "$new"; r="ERR ${out//$'\n'/ }"; return; }
+  else out=$(mv -- "$src" "$new" 2>&1) || { r="ERR ${out//$'\n'/ }"; return; }
+  fi
+  if ! out=$(mv -- "$dst" "$old" 2>&1); then undo "$op" "$src" "$new"; r="ERR ${out//$'\n'/ }"; return; fi
+  if ! out=$(mv -- "$new" "$dst" 2>&1); then mv -- "$old" "$dst"; undo "$op" "$src" "$new"; r="ERR ${out//$'\n'/ }"; return; fi
+  rm -rf -- "$old" 2>/dev/null
+  if [ -e "$old" ] || [ -L "$old" ]; then r="LEFT $old"; else r=OK; fi
+}
 say running
 i=0
-while IFS=$'\t' read -r op src dst; do
+while IFS=$'\t' read -r op src dst rep; do
   i=$((i+1))
   while [ "$(jobs -rp | wc -l)" -ge "$n" ]; do wait -n; done
   (
     if [ ! -e "$src" ] && [ ! -L "$src" ]; then r=MISSING
     elif [ "$op" = delete ]; then out=$(rm -rf -- "$src" 2>&1) && r=OK || r="ERR ${out//$'\n'/ }"
-    elif [ -e "$dst" ] || [ -L "$dst" ]; then r=EXISTS
+    elif [ -e "$dst" ] || [ -L "$dst" ]; then
+      if [ "$rep" = replace ]; then swap "$op" "$src" "$dst" "$i"
+      elif [ "$rep" = kept ]; then r=KEPT
+      else r=EXISTS
+      fi
     elif [ "$op" = copy ]; then out=$(cp -Rp -- "$src" "$dst" 2>&1) && r=OK || r="ERR ${out//$'\n'/ }"
     else out=$(mv -- "$src" "$dst" 2>&1) && r=OK || r="ERR ${out//$'\n'/ }"
     fi
@@ -3935,10 +3953,11 @@ _RESULT = {
 }
 
 
-def _transfer_plan(op: str, sources: list[str], into: str) -> tuple[list[dict], list[dict]]:
+def _transfer_plan(op: str, sources: list[str], into: str, replace: bool = False) -> tuple[list[dict], list[dict]]:
     """Splits the sources into items to copy or move into `into`, and those refused at once:
-    a folder into itself, an item already in the folder, two items of one name, or a name
-    the plan cannot hold (a tab or a line break)."""
+    a folder into itself, an item already in the folder, two items of one name, a name the
+    plan cannot hold (a tab or a line break), or, when replacing, an item inside the one of
+    its name that it would replace."""
     items, refused, names = [], [], set()
     for source in sources:
         target = posixpath.join(into, posixpath.basename(source))
@@ -3952,6 +3971,8 @@ def _transfer_plan(op: str, sources: list[str], into: str) -> tuple[list[dict], 
             why = "Another item of the same name is in this paste; nothing was replaced."
         elif any(c in source for c in "\t\n\r"):
             why = "Its name has a tab or a line break, which cannot be copied from here."
+        elif replace and source.startswith(target + "/"):
+            why = f"It is inside the {name} it would replace; nothing was replaced."
         if why:
             refused.append({"source": source, "target": target, "ok": False, "message": why})
         else:
@@ -3961,7 +3982,9 @@ def _transfer_plan(op: str, sources: list[str], into: str) -> tuple[list[dict], 
 
 
 def _transfer_results(items: list[dict], raw: str) -> list[dict]:
-    """Each item's outcome from the results lines (n \t OK | MISSING | EXISTS | ERR message)."""
+    """Each item's outcome from the results lines (n \t OK | MISSING | EXISTS | KEPT | LEFT path |
+    ERR message). KEPT gives the item's own reason (`kept`), LEFT a replace whose earlier one was
+    not all deleted."""
     got = {}
     for line in raw.splitlines():
         n, _, r = line.partition("\t")
@@ -3974,6 +3997,10 @@ def _transfer_results(items: list[dict], raw: str) -> list[dict]:
             out.append({**it, "ok": None, "message": ""})
         elif r == "OK":
             out.append({**it, "ok": True, "message": ""})
+        elif r.startswith("LEFT "):
+            out.append({**it, "ok": True, "message": f"Replaced; the earlier one could not all be deleted and is at {r[5:]}."})
+        elif r == "KEPT":
+            out.append({**it, "ok": False, "message": it.get("kept") or "It is not replaced from here."})
         else:
             out.append({**it, "ok": False, "message": _RESULT.get(r, r[4:] if r.startswith("ERR ") else r)})
     return out
@@ -3983,13 +4010,15 @@ def _transfer_results(items: list[dict], raw: str) -> list[dict]:
 def transfer_paths(payload: dict, current_user: dict = Depends(get_current_user)):
     """Copies or moves files and folders into a folder on the cluster, as the user, as a job:
     on SLURM (the user's account and main partition, 16 cores) or, when SLURM will not take it,
-    detached on the login node for transfers under 500 MB. Nothing is overwritten. Follow it with
-    GET /transfer_paths/{id}.
+    detached on the login node for transfers under 500 MB. What is already in the folder under the
+    same name is left as it is, or, with "replace": true, replaced (TRANSFER_SCRIPT), except what is
+    not deleted from here either (_kept_why). Follow it with GET /transfer_paths/{id}.
 
-    Body: {"op": "copy" | "move", "sources": [paths], "into": folder}."""
+    Body: {"op": "copy" | "move", "sources": [paths], "into": folder, "replace": bool}."""
     op = payload.get("op")
     sources = payload.get("sources")
     into = payload.get("into")
+    replace = payload.get("replace") is True
     if op not in ("copy", "move"):
         raise HTTPException(status_code=400, detail="op must be copy or move")
     if not isinstance(sources, list) or not sources or len(sources) > 500 or not all(isinstance(x, str) and x for x in sources):
@@ -4003,24 +4032,42 @@ def transfer_paths(payload: dict, current_user: dict = Depends(get_current_user)
     if code != 0:
         raise HTTPException(status_code=404, detail=f"Not a folder on the cluster: '{into}'")
     resolved = [_resolve_browse_path(x, current_user).rstrip("/") or "/" for x in sources]
-    items, refused = _transfer_plan(op, resolved, into)
+    items, refused = _transfer_plan(op, resolved, into, replace)
     if not items:
         return {"id": None, "op": op, "into": into, "state": "done", "where": None, "job": None, "results": refused}
 
-    tid = uuid.uuid4().hex[:12]
-    d = f"{current_user['home_dir']}/{TRANSFER_DIR}/{tid}"
     q = shlex.quote
-    code, out = _run_remote_check(conn, f"mkdir -p {q(d)} && chmod 700 {q(d)}")
-    if code != 0:
-        raise HTTPException(status_code=500, detail=f"Could not make {d}: {out}")
-    ssh_sftp.write_remote_text_file(f"{d}/run.sh", TRANSFER_SCRIPT, connection=conn)
-    ssh_sftp.write_remote_text_file(f"{d}/plan", "".join(f"{op}\t{it['source']}\t{it['target']}\n" for it in items), connection=conn)
-    ssh_sftp.write_remote_text_file(f"{d}/meta.json", json.dumps({"op": op, "into": into, "items": items, "refused": refused}) + "\n", connection=conn)
-
     try:
         cfg = _read_config(current_user, conn) or {}
     except Exception:
         cfg = {}
+    if replace:
+        # Each target is judged as named and where it really is (the folder's symlinks followed).
+        home = posixpath.normpath(current_user["home_dir"])
+        _, out = _run_remote_check(
+            conn, f'printf "@%s\\n" "$(readlink -f -- {q(home + "/bioinformatics-tools")} 2>/dev/null)" "$(readlink -f -- {q(into)} 2>/dev/null)"')
+        lines = [line[1:].strip() for line in out.splitlines() if line.startswith("@")]
+        code_dir = lines[0] if lines else ""
+        real_into = posixpath.normpath(lines[1]) if len(lines) > 1 and lines[1] else into
+        group = user_stores.depot(cfg)
+        for it in items:
+            real = posixpath.join(real_into, posixpath.basename(it["target"]))
+            why = _kept_why({it["target"], real}, home, code_dir, group, replacing=True)
+            it["replace"] = "kept" if why else "replace"
+            if why:
+                it["kept"] = why
+
+    tid = uuid.uuid4().hex[:12]
+    d = f"{current_user['home_dir']}/{TRANSFER_DIR}/{tid}"
+    code, out = _run_remote_check(conn, f"mkdir -p {q(d)} && chmod 700 {q(d)}")
+    if code != 0:
+        raise HTTPException(status_code=500, detail=f"Could not make {d}: {out}")
+    ssh_sftp.write_remote_text_file(f"{d}/run.sh", TRANSFER_SCRIPT, connection=conn)
+    ssh_sftp.write_remote_text_file(
+        f"{d}/plan", "".join(f"{op}\t{it['source']}\t{it['target']}" + (f"\t{it['replace']}" if replace else "") + "\n" for it in items),
+        connection=conn)
+    ssh_sftp.write_remote_text_file(f"{d}/meta.json", json.dumps({"op": op, "into": into, "items": items, "refused": refused}) + "\n", connection=conn)
+
     compute = (cfg.get("compute") or {}).get("cluster_default") or {}
     account = str(compute.get("account") or "").strip()
     partition = str(compute.get("partition") or "").strip()
@@ -4097,27 +4144,39 @@ def _delete_plan(sources: list[str], seen: dict[str, str], home: str, code: str,
     really is and `group` the lab's shared MARGIE folder ('' when none). Refused: the top of
     the file system, home or anything above it, MARGIE's own folders (_KEEP_IN_HOME, its code),
     the shared folder itself, and its databases/ and sif/, which every run uses."""
-    above = lambda p, q: q == p or q.startswith(p.rstrip("/") + "/")  # noqa: E731  (p is q or above it)
-    whole = [f"{home}/{k}" for k in _KEEP_IN_HOME] + [x for x in (code,) if x]
-    shared = [f"{group}/databases", f"{group}/sif"] if group else []
     items, refused, done = [], [], set()
     for source in sources:
-        why = ""
-        for p in {source, seen.get(source) or source}:
-            if p.count("/") < 2 or any(c in p for c in "\t\n\r"):
-                why = why or "Too high up in the file system to delete from here."
-            elif above(p, home):
-                why = why or "Your home folder, or a folder above it, is not deleted from here."
-            elif any(above(p, k) or above(k, p) for k in whole):
-                why = why or "MARGIE's own code, keys, settings or job records: they are not deleted from here."
-            elif any(above(p, k) or above(k, p) for k in shared) or (group and above(p, group)):
-                why = why or "The lab's shared databases and containers, which every run uses, are not deleted from here."
+        why = _kept_why({source, seen.get(source) or source}, home, code, group)
         if why:
             refused.append({"source": source, "target": "", "ok": False, "message": why})
         elif source not in done:
             done.add(source)
             items.append({"source": source, "target": ""})
     return items, refused
+
+
+def _kept_why(paths, home: str, code: str, group: str, *, replacing: bool = False) -> str:
+    """Why these paths (one item, as named and where it really is) are not deleted or replaced
+    from here, or ''. A replace may take ~/.margie and what is in it, except the folder the
+    paste itself runs from (TRANSFER_DIR)."""
+    above = lambda p, q: q == p or q.startswith(p.rstrip("/") + "/")  # noqa: E731  (p is q or above it)
+    verb = "replaced" if replacing else "deleted"
+    keep = [k for k in _KEEP_IN_HOME if not (replacing and k == ".margie")]
+    whole = [f"{home}/{k}" for k in keep] + [x for x in (code,) if x]
+    shared = [f"{group}/databases", f"{group}/sif"] if group else []
+    runs_from = f"{home}/{TRANSFER_DIR}"
+    for p in paths:
+        if p.count("/") < 2 or any(c in p for c in "\t\n\r"):
+            return f"Too high up in the file system to {verb[:-1]} from here."
+        if above(p, home):
+            return f"Your home folder, or a folder above it, is not {verb} from here."
+        if any(above(p, k) or above(k, p) for k in whole):
+            return f"MARGIE's own code, keys, settings or job records: they are not {verb} from here."
+        if replacing and above(p, runs_from):
+            return f"It holds {runs_from}, which this paste runs from, so it is not replaced from here."
+        if any(above(p, k) or above(k, p) for k in shared) or (group and above(p, group)):
+            return f"The lab's shared databases and containers, which every run uses, are not {verb} from here."
+    return ""
 
 
 @router.post("/delete_paths")

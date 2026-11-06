@@ -926,10 +926,9 @@ class Workspace {
 
 	/** Databases in an earlier format: your working copies ('mine'), or, with none yet, the group's ones a first setup copies ('group'). */
 	get databasesEarlier(): 'mine' | 'group' | null {
-		const f = this.storeFormats;
-		if (!f) return null;
-		if (f.stores.some((s) => s.working)) return f.stores.some((s) => s.working?.format === 'earlier') ? 'mine' : null;
-		return f.stores.some((s) => s.base?.format === 'earlier') ? 'group' : null;
+		const list = Array.isArray(this.storeFormats?.stores) ? this.storeFormats.stores : [];
+		if (list.some((s) => s.working)) return list.some((s) => s.working?.format === 'earlier') ? 'mine' : null;
+		return list.some((s) => s.base?.format === 'earlier') ? 'group' : null;
 	}
 
 	/** Opens the databases choice and acts on it: fresh databases, or the group's copied (a first setup). */

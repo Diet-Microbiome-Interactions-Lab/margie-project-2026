@@ -15,7 +15,7 @@
 		ws.loadStoreFormats();
 	});
 	/** A store's format where it is (user_stores.formats): earlier ones are said on its row. */
-	const formatOf = (id: string) => ws.storeFormats?.stores.find((f) => f.id === id);
+	const formatOf = (id: string) => ws.storeFormats?.stores?.find((f) => f.id === id);
 	function earlierIn(id: string, mine: boolean): string[] {
 		const fm = formatOf(id);
 		return [

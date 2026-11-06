@@ -20,6 +20,7 @@
 	import { ws } from './data.svelte';
 	import { ago } from './format';
 	import { copyText } from './clipboard';
+	import Seg from './Seg.svelte';
 
 	/**
 	 * File browser drawn as a tree with back, forward, up and a path box; polls while a run writes.
@@ -272,14 +273,32 @@
 	/** The paste under way: a job on SLURM (or the login node), followed until it ends. */
 	let pasting = $state<Transfer | null>(null);
 	const pastedSoFar = $derived(pasting ? pasting.results.filter((r) => r.ok !== null).length : 0);
+	/** Replace: No leaves what is already in the folder under the same name; Yes replaces it. */
+	let replace = $state<'no' | 'yes'>('no');
+	/** What waits on a yes before it is replaced: names in the folder, and hidden ones (Files does not list them). */
+	let replacing = $state<{ shown: string[]; hidden: string[] } | null>(null);
+	const replacingCount = $derived(replacing ? replacing.shown.length + replacing.hidden.length : 0);
 
-	/** Copies or moves what is on the clipboard into the folder open here; nothing is overwritten. */
-	async function paste() {
+	/** Pastes, after a yes when Replace is Yes and something of the same name is, or may be, in the folder. */
+	function paste() {
 		const into = current?.path;
+		if (!into || !clip.paths.length || pasting) return;
+		if (replace === 'no') return void send(false);
+		const names = clip.paths.filter((p) => (p.slice(0, p.lastIndexOf('/')) || '/') !== into).map(nameOf);
+		const shown = names.filter((n) => !n.startsWith('.') && entries.some((x) => x.name === n));
+		const hidden = names.filter((n) => n.startsWith('.'));
+		if (shown.length || hidden.length) replacing = { shown, hidden };
+		else void send(true);
+	}
+
+	/** Copies or moves what is on the clipboard into the folder open here, replacing what is there of the same name when asked. */
+	async function send(replacingThere: boolean) {
+		const into = current?.path;
+		replacing = null;
 		if (!into || !clip.paths.length || pasting) return;
 		const op = clip.op;
 		try {
-			let d = await post<Transfer>('/files/transfer', { op, sources: clip.paths, into });
+			let d = await post<Transfer>('/files/transfer', { op, sources: clip.paths, into, replace: replacingThere });
 			pasting = d;
 			while (d.id && (d.state === 'queued' || d.state === 'running')) {
 				await new Promise((r) => setTimeout(r, 2000));
@@ -290,6 +309,7 @@
 			const failed = d.results.filter((r) => r.ok === false);
 			if (d.state === 'failed') ui.notify(`The ${op === 'copy' ? 'copy' : 'move'} job ended before it started (SLURM job ${d.job}); nothing was ${op === 'copy' ? 'copied' : 'moved'}.`, 'error');
 			if (done.length) ui.notify(`${op === 'copy' ? 'Copied' : 'Moved'} ${done.length === 1 ? nameOf(done[0].source) : `${done.length} items`} into ${nameOf(into)}`, 'ok');
+			for (const r of done.filter((r) => r.message)) ui.notify(`${nameOf(r.source)}: ${r.message}`, 'info');
 			for (const r of failed) ui.notify(`${nameOf(r.source)}: ${r.message}`, 'error');
 			// What was moved is gone from where it was; a copy can be pasted again elsewhere.
 			if (op === 'move') clip.paths = clip.paths.filter((p) => !done.some((r) => r.source === p));
@@ -494,6 +514,7 @@
 		if (menu) menu = null;
 		else if (renaming) renaming = null;
 		else if (asking) asking = null;
+		else if (replacing) replacing = null;
 	}}
 	onresize={() => (menu = null)}
 />
@@ -573,13 +594,17 @@
 				<b>{clip.paths.length === 1 ? nameOf(clip.paths[0]) : `${clip.paths.length} items`}</b>
 				{current ? `into ${nameOf(current.path) || '/'}` : ': open a folder to paste into'}
 			</span>
+			<button type="button" class="vw-btn icon fv-clip-x" title="Clear" aria-label="Clear" disabled={!!pasting} onclick={() => (clip.paths = [])}><X size={14} /></button>
 			{#if pasting}
 				<span class="fv-clip-job">
 					{pasting.where === 'slurm' ? `SLURM job ${pasting.job}${pasting.state === 'queued' ? ', waiting' : ''}` : 'on the login node'}{pasting.results.length > 1 ? ` | ${pastedSoFar} of ${pasting.results.length}` : ''}
 				</span>
 			{/if}
+			<span class="fv-replace" title="Yes: what is already in the folder under the same name is replaced (a folder as a whole). No: it is left as it is.">
+				<span class="fv-lbl">Replace</span>
+				<Seg label="Replace what is already there" value={replace} onpick={(v) => (replace = v)} options={[{ value: 'no', label: 'No', disabled: !!pasting }, { value: 'yes', label: 'Yes', disabled: !!pasting }]} />
+			</span>
 			<button type="button" class="vw-pill fv-paste" disabled={!current || !!pasting} onclick={paste}><ClipboardPaste size={14} />{pasting ? (clip.op === 'copy' ? 'Copying…' : 'Moving…') : 'Paste here'}</button>
-			<button type="button" class="vw-btn icon" title="Clear" aria-label="Clear" disabled={!!pasting} onclick={() => (clip.paths = [])}><X size={14} /></button>
 		</div>
 	{/if}
 	{#if backend.cluster && deleting}
@@ -788,6 +813,32 @@
 				<!-- svelte-ignore a11y_autofocus -->
 				<button type="button" class="vw-pill" autofocus onclick={() => (asking = null)}>Cancel</button>
 				<button type="button" class="vw-pill fv-danger solid" onclick={remove}><Trash2 size={14} />Delete</button>
+			</div>
+		</div>
+	{/if}
+	{#if replacing && current}
+		<!-- Replacing asks first: what is replaced, and that the one there now goes. -->
+		<div class="fv-ask-back" role="presentation" onclick={() => (replacing = null)}></div>
+		<div class="fv-ask" role="alertdialog" aria-modal="true" aria-labelledby="fv-rep-t" aria-describedby="fv-rep-d" tabindex="-1">
+			<h3 id="fv-rep-t">
+				<ClipboardPaste size={16} />
+				Replace {replacingCount === 1 ? [...replacing.shown, ...replacing.hidden][0] : `${replacingCount} items`} in {nameOf(current.path) || '/'}?
+			</h3>
+			<p id="fv-rep-d">
+				The {clip.op === 'copy' ? 'copied' : 'moved'} {replacingCount === 1 ? 'one takes the place of the one' : 'ones take the place of those'} in this folder under the same name; a folder is replaced as a whole, everything in it too.
+				The one there now is deleted once the new one is in place, and stays if a step fails. Deleted files cannot be recovered.
+			</p>
+			<ul class="fv-ask-list">
+				{#each replacing.shown.slice(0, 6) as n (n)}<li class="mg-mono">{n}</li>{/each}
+				{#if replacing.shown.length > 6}<li>and {replacing.shown.length - 6} more</li>{/if}
+				{#each replacing.hidden.slice(0, 6) as n (n)}<li><span class="mg-mono">{n}</span>, if it is there (Files does not list hidden items)</li>{/each}
+				{#if replacing.hidden.length > 6}<li>and {replacing.hidden.length - 6} more hidden items, if they are there</li>{/if}
+			</ul>
+			<p>MARGIE's keys, settings and job records, and the lab's shared databases and containers, are left as they are.</p>
+			<div class="fv-ask-acts">
+				<!-- svelte-ignore a11y_autofocus -->
+				<button type="button" class="vw-pill" autofocus onclick={() => (replacing = null)}>Cancel</button>
+				<button type="button" class="vw-pill fv-danger solid" onclick={() => send(true)}><ClipboardPaste size={14} />Replace</button>
 			</div>
 		</div>
 	{/if}
@@ -1173,6 +1224,46 @@
 		flex-wrap: wrap;
 		align-items: center;
 		gap: 10px;
+	}
+	/* Clear comes last in the bar; in a narrow tree, beside what is pasted. */
+	.fv-clip-x {
+		flex: none;
+		order: 9;
+		height: 26px;
+	}
+	/* Replace: No | Yes, beside Paste here. */
+	.fv-replace {
+		display: inline-flex;
+		flex: none;
+		align-items: center;
+		gap: 6px;
+		color: var(--mg-text-2);
+		font-size: var(--mg-fs-xs);
+	}
+	.fv-replace :global(.mg-seg button) {
+		height: 22px;
+		padding: 0 9px;
+		font-size: var(--mg-fs-xs);
+	}
+	/* In a narrow tree, what is pasted takes its own line above Replace and Paste here. */
+	@container (max-width: 460px) {
+		.fv-clip:not(.fv-sel) {
+			flex-wrap: wrap;
+			row-gap: 6px;
+		}
+		.fv-clip:not(.fv-sel) .fv-clip-what {
+			flex-basis: calc(100% - 64px);
+		}
+		.fv-clip:not(.fv-sel) .fv-clip-x {
+			order: 0;
+		}
+		.fv-clip:not(.fv-sel) .fv-replace {
+			margin-right: auto;
+		}
+		.fv-clip:not(.fv-sel) .fv-paste {
+			flex: 1 1 100%;
+			justify-content: center;
+		}
 	}
 	.fv-clip-job {
 		flex: none;

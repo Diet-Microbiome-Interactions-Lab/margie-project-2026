@@ -36,14 +36,17 @@
 	/** The opening's height (the logo's size); the DNA film uses the box's width as well. */
 	const LOGO = 'clamp(220px, 24vw, 300px)';
 	/** The openings Home offers, picked with the dots under it and kept with the account (ui prefs); the
-	 * films are on the development server only (HOME_FILMS). */
+	 * films show on the development server (HOME_FILMS) and for accounts that unlocked the logo
+	 * animations in Customize (prefs.logoAnimations). */
 	const OPENINGS = [
 		{ id: 'logo', label: 'The MARGIE logo' },
 		{ id: 'dna', label: 'DNA forming, then bending into the MARGIE logo' },
 		{ id: 'circular', label: 'DNA forming on a circle into the MARGIE logo' },
 		{ id: 'confidence', label: 'Genes gathering evidence and confidence, closing into a genome map' }
 	] as const;
-	const opening = $derived(HOME_FILMS ? ui.prefs.homeAnimation : 'logo');
+	const films = $derived(HOME_FILMS || ui.prefs.logoAnimations);
+	const puzzle = $derived(LOGO_PUZZLE || ui.prefs.logoAnimations);
+	const opening = $derived(films ? ui.prefs.homeAnimation : 'logo');
 
 	let open = $state<string | null>(null);
 	/** What a run does and what each page does: behind Learn more, open by itself in Guided mode. */
@@ -79,19 +82,19 @@
 <div class="home">
 	<section class="hero">
 		<!-- The opening, as picked with the dots: the logo, which turns in and turns again under the pointer
-		     (with LOGO_PUZZLE on, a click breaks it into a jigsaw), or one of the films that end on it (HOME_FILMS).
+		     (with the logo animations unlocked, a click breaks it into a jigsaw), or one of the films that end on it.
 		     One box for all, so the page keeps its place when the pick changes. -->
 		<div class="opening" style="--logo: {LOGO}">
 			{#if opening !== 'logo'}
 				<h1 class="opening-box film">
 					{#key opening}<OpeningFilm film={opening} />{/key}<span class="hidden-text">MARGIE</span>
 				</h1>
-			{:else if LOGO_PUZZLE}
+			{:else if puzzle}
 				<div class="opening-box"><LogoPuzzle size={LOGO} /></div>
 			{:else}
 				<h1 class="opening-box"><MargieLogo size={LOGO} /></h1>
 			{/if}
-			{#if HOME_FILMS}<div class="picks" role="radiogroup" aria-label="Opening animation">
+			{#if films}<div class="picks" role="radiogroup" aria-label="Opening animation">
 				{#each OPENINGS as o (o.id)}
 					<button
 						type="button"

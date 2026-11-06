@@ -5,9 +5,10 @@
 	import Seg from './Seg.svelte';
 	import SizeSliders from './SizeSliders.svelte';
 	import Switch from './Switch.svelte';
-	import { ACCENTS, accentColor } from './prefs';
+	import { ACCENTS, accentColor, type UiPrefs } from './prefs';
 	import { SHADE_NAMES, SHADE_ORDER } from './shades';
 	import { ui } from './ui.svelte';
+	import { Sparkles } from 'lucide-svelte';
 
 	/**
 	 * Customize's settings, in two parts: `colours` (the accent and how much colour the page
@@ -15,6 +16,13 @@
 	 */
 	let { part }: { part: 'colours' | 'layout' } = $props();
 	const HEX = /^#?[0-9a-fA-F]{6}$/;
+	/** Home's openings, once the logo animations are unlocked. */
+	const OPENINGS: { value: UiPrefs['homeAnimation']; label: string; title: string }[] = [
+		{ value: 'logo', label: 'Logo', title: 'The MARGIE logo' },
+		{ value: 'dna', label: 'DNA', title: 'DNA forming, then bending into the MARGIE logo' },
+		{ value: 'circular', label: 'Circle', title: 'DNA forming on a circle into the MARGIE logo' },
+		{ value: 'confidence', label: 'Confidence', title: 'Genes gathering evidence and confidence, closing into a genome map' }
+	];
 	const custom = $derived(ui.prefs.accent.startsWith('#'));
 	let hex = $state('');
 	$effect(() => {
@@ -151,6 +159,17 @@
 		<Field title="Speed">
 			<SpeedControl />
 		</Field>
+
+		<Field title="Logo animations">
+			{#if ui.prefs.logoAnimations}
+				<Seg label="Home's opening" value={ui.prefs.homeAnimation} onpick={(homeAnimation) => ui.update({ homeAnimation })} options={OPENINGS} />
+				<span class="note">Home opens with the one picked here or with the dots under the logo. A click plays a film again; on the logo, a click breaks it into a jigsaw.</span>
+				<button type="button" class="mg-btn small anim-btn" onclick={() => ui.update({ logoAnimations: false, homeAnimation: 'logo' })}>Lock them again</button>
+			{:else}
+				<button type="button" class="mg-btn small anim-btn" onclick={() => ui.update({ logoAnimations: true })}><Sparkles size={14} />Unlock all logo animations</button>
+				<span class="note">Three films that end on the MARGIE logo (DNA forming, DNA on a circle, a genome gathering confidence) and a logo that breaks into a jigsaw.</span>
+			{/if}
+		</Field>
 	</section>
 {/if}
 
@@ -206,6 +225,12 @@
 	.note {
 		font-size: var(--mg-fs-xs);
 		color: var(--mg-text-3);
+	}
+	.anim-btn {
+		display: inline-flex;
+		align-self: flex-start;
+		align-items: center;
+		gap: 6px;
 	}
 	.line-switch {
 		display: flex;

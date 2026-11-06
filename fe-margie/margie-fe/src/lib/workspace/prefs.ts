@@ -81,6 +81,9 @@ export interface UiPrefs {
 	backdrop: 'glow' | 'plain';
 	/** Home's opening: the turning logo, or a film that ends on it (DNA, DNA on a circle, the genome's confidence). */
 	homeAnimation: 'logo' | 'dna' | 'circular' | 'confidence';
+	/** All of Home's logo animations unlocked (Customize → Motion): the three films, picked with the dots
+	 * under the logo or in Customize, and the logo that breaks into a jigsaw on a click. */
+	logoAnimations: boolean;
 	/** How much the next run annotates (Custom uses the hand-picked tools), kept across restarts. */
 	toolDepth: 'quick' | 'standard' | 'licensed' | 'custom';
 	toolPick: string[] | null;
@@ -178,6 +181,7 @@ export const DEFAULT_PREFS: UiPrefs = {
 	marks: false,
 	backdrop: 'plain',
 	homeAnimation: 'logo',
+	logoAnimations: false,
 	toolDepth: 'standard',
 	toolPick: null,
 	quast: false,
@@ -335,6 +339,7 @@ export function sanitizePrefs(raw: unknown, base: UiPrefs = DEFAULT_PREFS): UiPr
 		marks: typeof r.marks === 'boolean' ? r.marks : base.marks,
 		backdrop: oneOf(r.backdrop, ['glow', 'plain'] as const, base.backdrop),
 		homeAnimation: oneOf(r.homeAnimation, ['logo', 'dna', 'circular', 'confidence'] as const, base.homeAnimation),
+		logoAnimations: typeof r.logoAnimations === 'boolean' ? r.logoAnimations : base.logoAnimations,
 		toolDepth: oneOf(r.toolDepth, ['quick', 'standard', 'licensed', 'custom'] as const, base.toolDepth),
 		quast: typeof r.quast === 'boolean' ? r.quast : base.quast,
 		toolPick: Array.isArray(r.toolPick)
