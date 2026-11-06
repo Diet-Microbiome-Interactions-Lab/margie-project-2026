@@ -9,6 +9,7 @@
 	import { authHeaders, clearToken } from '$lib/auth.js';
 	import { getApiUrl } from '$lib/config';
 	import AboutYou from '$lib/crisp/AboutYou.svelte';
+	import { HOSTED } from '$lib/hosted';
 
 	const API_URL = getApiUrl();
 
@@ -155,7 +156,28 @@
 		}
 	}
 
-	onMount(loadUser);
+	// ------------------------------------------------ remembered browsers (api/browser_check.py)
+	type Browser = { id: number; label: string; created_at: string; expires_at: string; last_used_at: string | null };
+	let browsers = $state<Browser[] | null>(null);
+	async function loadBrowsers() {
+		try {
+			const r = await fetch(`${API_URL}/v1/auth/browsers`, { headers: authHeaders() });
+			browsers = r.ok ? ((await r.json()).browsers ?? []) : [];
+		} catch {
+			browsers = [];
+		}
+	}
+	async function forgetBrowser(id?: number) {
+		if (id === undefined && !confirm('Forget every remembered browser? Each one, this one too, asks for a code at its next sign-in.')) return;
+		await fetch(`${API_URL}/v1/auth/browsers${id === undefined ? '' : `/${id}`}`, { method: 'DELETE', headers: authHeaders() }).catch(() => {});
+		await loadBrowsers();
+	}
+	const day = (iso: string | null) => (iso ? new Date(iso).toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric' }) : '—');
+
+	onMount(() => {
+		void loadUser();
+		if (HOSTED) void loadBrowsers();
+	});
 </script>
 
 <svelte:head><title>User profile | MARGIE</title></svelte:head>
@@ -247,6 +269,32 @@
 			{/if}
 		</section>
 	</div>
+
+	{#if HOSTED}
+		<section class="pf-box pf-delete" aria-labelledby="pf-br">
+			<header class="pf-head"><h2 id="pf-br">Remembered browsers</h2></header>
+			<p class="pf-del-text">
+				After the password, a browser MARGIE does not know asks for a code, emailed to your Purdue address by your cluster. These browsers
+				were confirmed and remembered; Forget makes the next sign-in there ask for a code again. Each new browser that signs in is also
+				emailed to you.
+			</p>
+			{#if browsers === null}
+				<p class="pf-del-text">Reading…</p>
+			{:else if !browsers.length}
+				<p class="pf-del-text">None remembered.</p>
+			{:else}
+				<ul class="pf-br">
+					{#each browsers as b (b.id)}
+						<li>
+							<span class="pf-br-what"><b>{b.label}</b><span class="pf-br-when">remembered until {day(b.expires_at)} | last signed in {day(b.last_used_at)}</span></span>
+							<button type="button" class="mg-btn small" onclick={() => forgetBrowser(b.id)}>Forget</button>
+						</li>
+					{/each}
+				</ul>
+				<div><button type="button" class="mg-btn small" onclick={() => forgetBrowser()}>Forget all</button></div>
+			{/if}
+		</section>
+	{/if}
 
 	<section class="pf-box pf-delete" aria-labelledby="pf-del">
 		<header class="pf-head"><h2 id="pf-del">Delete account</h2></header>
@@ -348,6 +396,33 @@
 		border: 1px solid var(--cr-card-edge, var(--mg-border));
 		border-radius: var(--mg-r);
 		background: var(--cr-card, var(--mg-surface));
+	}
+	.pf-br {
+		display: flex;
+		flex-direction: column;
+		gap: 8px;
+		margin: 0;
+		padding: 0;
+		list-style: none;
+	}
+	.pf-br li {
+		display: flex;
+		align-items: center;
+		gap: 12px;
+		padding: 8px 10px;
+		border: 1px solid var(--mg-border);
+		border-radius: var(--mg-r-sm, 6px);
+	}
+	.pf-br-what {
+		display: flex;
+		flex: 1;
+		flex-direction: column;
+		gap: 2px;
+		min-width: 0;
+	}
+	.pf-br-when {
+		color: var(--mg-text-2);
+		font-size: var(--mg-fs-sm);
 	}
 	.pf-head {
 		display: flex;

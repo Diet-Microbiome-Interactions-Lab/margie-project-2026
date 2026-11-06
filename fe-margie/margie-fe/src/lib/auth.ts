@@ -39,3 +39,25 @@ export function authHeaders(): Record<string, string> {
     }
     return headers;
 }
+
+/**
+ * A remembered browser's token for an account (api/browser_check.py): sent with the next sign-in
+ * there, so no code is asked for while it is remembered. One per account in this browser.
+ */
+const BROWSER_KEY = (username: string) => `margie.browser.${username.trim().toLowerCase()}`;
+
+export function browserToken(username: string): string | null {
+    try {
+        return localStorage.getItem(BROWSER_KEY(username));
+    } catch {
+        return null;
+    }
+}
+
+export function rememberBrowser(username: string, token: string): void {
+    try {
+        if (token) localStorage.setItem(BROWSER_KEY(username), token);
+    } catch {
+        // Not kept: the next sign-in here asks for a code again.
+    }
+}

@@ -15,7 +15,7 @@ from datetime import datetime, timezone
 import paramiko
 from fastapi import APIRouter, Depends, HTTPException, Request, status
 
-from bioinformatics_tools.api import access
+from bioinformatics_tools.api import access, browser_check
 
 from bioinformatics_tools.api.auth import (
     create_access_token,
@@ -35,6 +35,7 @@ from bioinformatics_tools.api.models import (
     TokenResponse,
     UpdateClusterCredentials,
     UserLogin,
+    VerifyBrowser,
     UserProfile,
     UserRegister,
     UpdateProfile,
@@ -158,6 +159,8 @@ def register(body: UserRegister, request: Request):
     )
     made = _store_user(body, **account)
     _drop_leftover_acceptances({**account, 'user_id': made['user_id'], 'username': body.username}, request)
+    # Making the account proved the cluster key works, so this browser is remembered (browser_check).
+    made['browser'] = browser_check.remember(made['user_id'], browser_check.SIGNUP_DAYS, browser_check.label(request))
     return made
 
 
@@ -225,7 +228,8 @@ def login(body: UserLogin, request: Request):
 
     with get_db() as db:
         row = db.execute(
-            'SELECT id, username, password_hash, cluster_host FROM users WHERE username = ?',
+            'SELECT id, username, password_hash, cluster_host, cluster_username, private_key_encrypted, email '
+            'FROM users WHERE username = ?',
             (body.username,)
         ).fetchone()
 
@@ -240,9 +244,77 @@ def login(body: UserLogin, request: Request):
         access.check_cluster(row['cluster_host'])
     access.SIGNIN_BY_NAME.clear(name)
 
+    # A browser MARGIE does not know confirms the sign-in with a code emailed to the account (browser_check).
+    if not is_local_mode() and not browser_check.known(row['id'], body.browser):
+        wait = browser_check.CODES_BY_NAME.wait(name)
+        if wait:
+            raise access.too_many(wait, 'sign-in codes')
+        browser_check.CODES_BY_NAME.count(name)
+        user = dict(row)
+        try:
+            sent = browser_check.start(user, browser_check.label(request), lambda: _connection_of(user))
+        except browser_check.CheckError as exc:
+            raise HTTPException(status_code=status.HTTP_503_SERVICE_UNAVAILABLE, detail=str(exc))
+        LOGGER.info('Sign-in code sent for %s (a new browser)', body.username)
+        return TokenResponse(verify=True, challenge=sent['challenge'], sent_to=sent['to'])
+
     token = create_access_token(user_id=row['id'], username=row['username'])
     LOGGER.info('User logged in: %s', body.username)
     return TokenResponse(access_token=token, token_type='bearer')
+
+
+def _connection_of(user: dict):
+    """The account's cluster connection, from its stored key."""
+    return make_user_connection(user['cluster_host'], user['cluster_username'], decrypt_private_key(user['private_key_encrypted']))
+
+
+@router.post('/login/verify', response_model=TokenResponse)
+def login_verify(body: VerifyBrowser, request: Request):
+    """
+    Finishes a sign-in from a new browser with the emailed code; remembers the browser for
+    remember_days (7, 15, 20 or 30; else not) and tells the account's address that a new browser
+    signed in. A wrong code counts against the address, as a wrong password does.
+    """
+    address = access.client_address(request)
+    wait = access.SIGNIN_BY_ADDRESS.wait(address) if address else 0
+    if wait:
+        raise access.too_many(wait, 'failed sign-ins')
+    try:
+        user_id, where = browser_check.check(body.challenge, body.code)
+    except browser_check.CheckError as exc:
+        if address:
+            access.SIGNIN_BY_ADDRESS.count(address)
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail=str(exc))
+    with get_db() as db:
+        row = db.execute('SELECT id, username, cluster_host, cluster_username, private_key_encrypted, email FROM users WHERE id = ?',
+                         (user_id,)).fetchone()
+    if row is None:
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail='Invalid credentials')
+    user = dict(row)
+    days = body.remember_days if body.remember_days in browser_check.REMEMBER_DAYS else 0
+    kept = browser_check.remember(user_id, days, where) if days else ''
+    browser_check.notify(user, where, days, lambda: _connection_of(user))
+    LOGGER.info('User logged in from a new browser: %s (remembered %s days)', row['username'], days)
+    return TokenResponse(access_token=create_access_token(user_id=row['id'], username=row['username']),
+                         token_type='bearer', browser=kept)
+
+
+@router.get('/browsers')
+def remembered_browsers(current_user: dict = Depends(get_current_user)):
+    """The browsers this account remembers, newest first (User profile)."""
+    return {'browsers': browser_check.browsers(current_user['user_id'])}
+
+
+@router.delete('/browsers/{browser_id}')
+def forget_browser(browser_id: int, current_user: dict = Depends(get_current_user)):
+    """Forgets one remembered browser: its next sign-in asks for a code."""
+    return {'forgotten': browser_check.forget(current_user['user_id'], browser_id)}
+
+
+@router.delete('/browsers')
+def forget_browsers(current_user: dict = Depends(get_current_user)):
+    """Forgets every browser the account remembers."""
+    return {'forgotten': browser_check.forget(current_user['user_id'])}
 
 
 @router.get('/me', response_model=UserProfile)
@@ -370,6 +442,7 @@ def delete_account(body: DeleteAccount, request: Request, current_user: dict = D
     with get_db() as db:
         db.execute('DELETE FROM users WHERE id = ?', (current_user['user_id'],))
         db.commit()
+    browser_check.forget_account(current_user['user_id'])
     read_cache.drop(current_user['user_id'])
     close_user_connections(current_user['cluster_host'], current_user['cluster_username'])
     LOGGER.info('Deleted the account %r (the cluster home stays as it is)', current_user['username'])

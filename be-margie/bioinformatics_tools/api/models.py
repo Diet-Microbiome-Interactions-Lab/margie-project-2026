@@ -49,11 +49,26 @@ class UserRegister(BaseModel):
 class UserLogin(BaseModel):
     username: str
     password: str
+    # The token a remembered browser keeps (api/browser_check.py); none from a browser MARGIE does not know.
+    browser: str | None = Field(default=None, max_length=200)
 
 
 class TokenResponse(BaseModel):
-    access_token: str
-    token_type: str   # always "bearer"
+    """A sign-in: the access token, or, from a browser MARGIE does not know, verify with the code's
+    challenge and the masked address it went to. browser: the token a remembered browser keeps."""
+    access_token: str = ''
+    token_type: str = 'bearer'
+    verify: bool = False
+    challenge: str = ''
+    sent_to: str = ''
+    browser: str = ''
+
+
+class VerifyBrowser(BaseModel):
+    """The emailed code for a sign-in, and how many days to remember the browser (0: not)."""
+    challenge: str = Field(min_length=1, max_length=100)
+    code: str = Field(min_length=1, max_length=20)
+    remember_days: int = 0
 
 
 class UserProfile(BaseModel):

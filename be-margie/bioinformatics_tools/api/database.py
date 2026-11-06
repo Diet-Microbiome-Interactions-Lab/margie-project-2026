@@ -84,6 +84,30 @@ def init_db() -> None:
         # The website's look kept with the account (JSON: prefs and default), so each browser shows the same.
         if 'ui_look' not in _user_cols:
             conn.execute("ALTER TABLE users ADD COLUMN ui_look TEXT NOT NULL DEFAULT ''")
+        # A browser confirmed with an emailed code and remembered for some days, and the codes sent
+        # (api/browser_check.py); both kept as keyed hashes.
+        conn.execute("""
+            CREATE TABLE IF NOT EXISTS trusted_browsers (
+                id            INTEGER PRIMARY KEY AUTOINCREMENT,
+                user_id       INTEGER NOT NULL,
+                token_hash    TEXT    NOT NULL UNIQUE,
+                label         TEXT    NOT NULL DEFAULT '',
+                created_at    TEXT    NOT NULL,
+                expires_at    TEXT    NOT NULL,
+                last_used_at  TEXT
+            )
+        """)
+        conn.execute("""
+            CREATE TABLE IF NOT EXISTS signin_codes (
+                id          TEXT    PRIMARY KEY,
+                user_id     INTEGER NOT NULL,
+                code_hash   TEXT    NOT NULL,
+                label       TEXT    NOT NULL DEFAULT '',
+                created_at  TEXT    NOT NULL,
+                expires_at  TEXT    NOT NULL,
+                attempts    INTEGER NOT NULL DEFAULT 0
+            )
+        """)
         # Adds columns older tables lack; SQLite has no ADD COLUMN IF NOT EXISTS.
         _existing = {row[1] for row in conn.execute("PRAGMA table_info(license_acceptances)")}
         for _col in ("usage_type", "licensed_tools"):

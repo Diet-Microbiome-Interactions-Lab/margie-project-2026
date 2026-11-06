@@ -26,7 +26,7 @@
 	import SizeSliders from '$lib/workspace/SizeSliders.svelte';
 	import { LAB, DATABASES } from '$lib/crisp/about';
 	import { crispVars } from '$lib/crisp/theme';
-	import { isLoggedIn, setToken } from '$lib/auth';
+	import { browserToken, isLoggedIn, rememberBrowser, setToken } from '$lib/auth';
 	import { getApiUrl } from '$lib/config';
 	import { DEFAULT_PREFS, sanitizePrefs, styleString } from '$lib/workspace/prefs';
 	import { ui } from '$lib/workspace/ui.svelte';
@@ -41,6 +41,12 @@
 	let privateKey = $state('');
 	let busy = $state(false);
 	let problem = $state('');
+	/** A browser MARGIE does not know: the emailed code's challenge and the address it went to (api/browser_check.py). */
+	let check = $state<{ challenge: string; to: string } | null>(null);
+	let code = $state('');
+	let remember = $state(true);
+	let rememberDays = $state(15);
+	const REMEMBER_DAYS = [7, 15, 20, 30];
 	/** The clusters this MARGIE accepts accounts on (GET /v1/auth/policy); empty: any. */
 	let clusters = $state<string[]>([]);
 
@@ -73,13 +79,37 @@
 		const res = await fetch(`${getApiUrl()}/v1/auth/login`, {
 			method: 'POST',
 			headers: { 'Content-Type': 'application/json' },
-			body: JSON.stringify({ username, password })
+			body: JSON.stringify({ username, password, browser: browserToken(username) ?? undefined })
 		});
 		if (res.status === 401) throw new Error('Wrong username or password.');
 		if (!res.ok) throw new Error(describe((await res.json().catch(() => ({}))).detail, `Could not sign in (${res.status}).`));
-		setToken((await res.json()).access_token);
+		const d = await res.json();
+		// A browser MARGIE does not know: a code was emailed, and the sign-in waits for it.
+		if (d.verify) {
+			check = { challenge: d.challenge, to: d.sent_to };
+			code = '';
+			return;
+		}
+		finish(d);
+	}
+
+	/** Signed in: the token kept, the browser remembered when it was asked to be, and the home page. */
+	function finish(d: { access_token: string; browser?: string }) {
+		if (d.browser) rememberBrowser(username, d.browser);
+		setToken(d.access_token);
 		ui.restore();
 		location.assign(ui.home());
+	}
+
+	async function confirmCode() {
+		if (!check) return;
+		const res = await fetch(`${getApiUrl()}/v1/auth/login/verify`, {
+			method: 'POST',
+			headers: { 'Content-Type': 'application/json' },
+			body: JSON.stringify({ challenge: check.challenge, code: code.trim(), remember_days: remember ? rememberDays : 0 })
+		});
+		if (!res.ok) throw new Error(describe((await res.json().catch(() => ({}))).detail, `Could not confirm the code (${res.status}).`));
+		finish(await res.json());
 	}
 
 	async function createAccount() {
@@ -89,7 +119,10 @@
 			body: JSON.stringify({ username, password, cluster_host: clusterHost.trim(), cluster_username: clusterUser.trim(), private_key: privateKey })
 		});
 		if (!res.ok) throw new Error(describe((await res.json().catch(() => ({}))).detail, `Could not create the account (${res.status}).`));
-		// Registration also checks that SSH to the cluster works, so signing in follows at once.
+		// Registration also checks that SSH to the cluster works, so signing in follows at once, from this
+		// browser, which the new account remembers.
+		const made = await res.json();
+		if (made.browser) rememberBrowser(username, made.browser);
 		await signIn();
 	}
 
@@ -98,7 +131,8 @@
 		busy = true;
 		problem = '';
 		try {
-			if (mode === 'signin') await signIn();
+			if (check) await confirmCode();
+			else if (mode === 'signin') await signIn();
 			else await createAccount();
 		} catch (e) {
 			problem = e instanceof TypeError ? `Can't reach the server at ${getApiUrl() || location.origin}.` : e instanceof Error ? e.message : String(e);
@@ -210,9 +244,9 @@
 					<header class="card-head"><h2><span class="num"><Server size={14} /></span>Account</h2></header>
 					<div class="card-body">
 						<div class="tabs" role="tablist" aria-label="Account">
-							<button type="button" role="tab" aria-selected={mode === 'signin'} onclick={() => (mode = 'signin')}>Sign in</button>
-							<button type="button" role="tab" aria-selected={mode === 'create'} onclick={() => (mode = 'create')}>Create account</button>
-							<button type="button" role="tab" aria-selected={mode === 'request'} onclick={() => (mode = 'request')}>Outside Purdue</button>
+							<button type="button" role="tab" aria-selected={mode === 'signin'} onclick={() => ((mode = 'signin'), (check = null))}>Sign in</button>
+							<button type="button" role="tab" aria-selected={mode === 'create'} onclick={() => ((mode = 'create'), (check = null))}>Create account</button>
+							<button type="button" role="tab" aria-selected={mode === 'request'} onclick={() => ((mode = 'request'), (check = null))}>Outside Purdue</button>
 						</div>
 
 						{#if problem}
@@ -267,6 +301,34 @@
 									<a class="mg-btn primary" class:off={!canRequest} href={canRequest ? mailto : undefined} aria-disabled={!canRequest}><Mail size={15} /> Send request</a>
 								</div>
 							</div>
+						{:else}
+						{#if check}
+						<!-- A browser MARGIE does not know: the code emailed to the account's address. -->
+						<form class="form" onsubmit={submit}>
+							<p class="hint">
+								This browser is new to MARGIE. A code is on its way to <b>{check.to}</b>, sent by your cluster; enter it to finish signing in.
+							</p>
+							<div class="fields">
+								<label class="field">
+									<span class="label">Code</span>
+									<input class="mg-input mono" bind:value={code} inputmode="numeric" autocomplete="one-time-code" maxlength="6" placeholder="123456" spellcheck="false" required />
+								</label>
+								<div class="field remember">
+									<label class="remember-check"><input type="checkbox" bind:checked={remember} /> Remember this browser for</label>
+									<select class="mg-input remember-days" bind:value={rememberDays} disabled={!remember} aria-label="Days to remember this browser">
+										{#each REMEMBER_DAYS as d (d)}<option value={d}>{d} days</option>{/each}
+									</select>
+								</div>
+							</div>
+							<div class="acts">
+								<button type="button" class="mg-btn" disabled={busy} onclick={() => ((check = null), (code = ''), (problem = ''))}>Back</button>
+								<button type="button" class="mg-link quiet" disabled={busy} onclick={async () => { busy = true; problem = ''; try { await signIn(); } catch (e) { problem = e instanceof Error ? e.message : String(e); } finally { busy = false; } }}>Send a new code</button>
+								<button type="submit" class="mg-btn primary" disabled={code.trim().length < 6 || busy}>
+									{#if busy}<LoaderCircle size={15} class="spin" />{/if}
+									Confirm
+								</button>
+							</div>
+						</form>
 						{:else}
 						<form class="form" onsubmit={submit}>
 							<div class="fields">
@@ -330,6 +392,7 @@
 								</button>
 							</div>
 						</form>
+						{/if}
 						{/if}
 					</div>
 				</section>
@@ -739,6 +802,23 @@
 		align-items: center;
 		justify-content: flex-end;
 		gap: 12px;
+	}
+	/* The code step: remember this browser, for so many days. */
+	.remember {
+		display: flex;
+		flex-wrap: wrap;
+		align-items: center;
+		gap: 8px 10px;
+		align-self: end;
+	}
+	.remember-check {
+		display: inline-flex;
+		align-items: center;
+		gap: 8px;
+		cursor: pointer;
+	}
+	.remember-days {
+		width: auto;
 	}
 	.error {
 		display: flex;

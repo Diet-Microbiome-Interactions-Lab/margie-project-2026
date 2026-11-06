@@ -39,6 +39,11 @@
 			if (!res.ok) throw new Error('Login failed. Please try again.');
 
 			const data = await res.json();
+			// A browser MARGIE does not know confirms the sign-in with an emailed code, on the sign-in page.
+			if (data.verify) {
+				window.location.assign('/signin');
+				return;
+			}
 			setToken(data.access_token);
 			// The interface this browser opens with: Crisp, unless another was picked.
 			ui.restore();

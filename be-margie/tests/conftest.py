@@ -158,3 +158,15 @@ def _launches_recorded(monkeypatch):
         return True
     recorded.real = ssh._in_history
     monkeypatch.setattr(ssh, "_in_history", recorded)
+
+
+@pytest.fixture(autouse=True)
+def _known_browser(request):
+    """Tests that sign in for other reasons do it from a browser MARGIE knows, so no sign-in code is
+    asked for; tests marked browser_check run with the check on (api/browser_check.py)."""
+    if request.node.get_closest_marker("browser_check"):
+        yield
+        return
+    from unittest.mock import patch
+    with patch("bioinformatics_tools.api.browser_check.known", return_value=True):
+        yield
