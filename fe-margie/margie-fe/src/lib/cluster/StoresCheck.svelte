@@ -12,7 +12,18 @@
 
 	onMount(() => {
 		ws.loadStores();
+		ws.loadStoreFormats();
 	});
+	/** A store's format where it is (user_stores.formats): earlier ones are said on its row. */
+	const formatOf = (id: string) => ws.storeFormats?.stores.find((f) => f.id === id);
+	function earlierIn(id: string, mine: boolean): string[] {
+		const fm = formatOf(id);
+		return [
+			fm?.working?.format === 'earlier' && 'your working copy',
+			fm?.backup?.format === 'earlier' && 'your newest backup',
+			!mine && fm?.base?.format === 'earlier' && "the group's copy"
+		].filter((x): x is string => !!x);
+	}
 
 	const st = $derived(ws.stores);
 	const op = $derived(ws.storesOp);
@@ -21,7 +32,7 @@
 
 	async function again() {
 		looking = true;
-		await ws.loadStores();
+		await Promise.all([ws.loadStores(), ws.loadStoreFormats(true)]);
 		looking = false;
 	}
 
@@ -49,12 +60,14 @@
 		<ul class="sc-list">
 			{#each st.stores as s (s.id)}
 				{@const r = row(s)}
+				{@const old = earlierIn(s.id, !!s.version)}
 				<li class="sc-row">
 					<b class="sc-name">{s.label}</b>
 					<span class="sc-chip {r.tone}">{r.word}</span>
 					<span class="sc-where">
 						{#if r.path}<span class="mg-mono sc-path" title={r.path}><span dir="ltr">{r.path}</span></span><CopyPath path={r.path} />{/if}
 						{#if r.note}<span class="mg-note">{r.note}</span>{/if}
+						{#if old.length}<span class="mg-note sc-old">Earlier format ({old.join(', ')}): made by an earlier version of MARGIE.</span>{/if}
 					</span>
 				</li>
 			{/each}
@@ -154,6 +167,9 @@
 	.sc-where .mg-note {
 		grid-column: 1 / -1;
 		font-size: var(--mg-fs-xs);
+	}
+	.sc-where .sc-old {
+		color: var(--mg-warn);
 	}
 	.sc-chip {
 		padding: 1px 8px;

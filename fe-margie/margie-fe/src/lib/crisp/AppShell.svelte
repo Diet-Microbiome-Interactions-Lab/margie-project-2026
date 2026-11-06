@@ -17,6 +17,8 @@
 	import RunRing from '$lib/crisp/RunRing.svelte';
 	import GenomeDrop from '$lib/workspace/GenomeDrop.svelte';
 	import InstallGate from '$lib/workspace/blocks/InstallGate.svelte';
+	import MargieCopyPrompt from './MargieCopyPrompt.svelte';
+	import DatabasesChoice from './DatabasesChoice.svelte';
 	import { FAQS } from './faq';
 	import Field from '$lib/workspace/Field.svelte';
 	import Seg from '$lib/workspace/Seg.svelte';
@@ -218,6 +220,8 @@
 	<VisionFilters />
 	<GenomeDrop />
 	<InstallGate />
+	<MargieCopyPrompt />
+	<DatabasesChoice />
 
 	<AppBar class="mg-appbar">
 		<AppBar.Toolbar class="grid-cols-[auto_1fr_auto]">

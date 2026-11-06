@@ -38,7 +38,8 @@ from bioinformatics_tools.api.services import hosting_usage, job_history_client,
 from bioinformatics_tools.api.services.job_store import job_store
 from bioinformatics_tools.utilities import ssh_sftp, ssh_slurm
 from bioinformatics_tools.utilities.ssh_connection import (
-    make_user_connection, provision_in_background, sync_remote_dane_wf, wait_provisioned,
+    check_remote_dane_wf, make_user_connection, provision_in_background, start_update, sync_remote_dane_wf,
+    update_state, wait_provisioned,
 )
 from bioinformatics_tools.workflow_tools import cache_report
 from bioinformatics_tools.workflow_tools.workflow_helpers import GENOME_EXTENSIONS
@@ -1735,6 +1736,10 @@ def _launch_job(
     """
     selected_tools_csv = ",".join(selected_tools) if selected_tools is not None else None
 
+    # A run reads the account's copy of MARGIE, so it waits for an update under way.
+    if (update_state(conn) or {}).get('state') == 'running':
+        raise HTTPException(status_code=409, detail="MARGIE is updating in your account; start the run once the update has finished.")
+
     # The job history is written by the account's own clone of the repository, so one not set up
     # yet (or still an older checkout) is set up first.
     if workflow == 'margie_sb':
@@ -1869,6 +1874,40 @@ def _active_run(current_user: dict, conn, user_config: dict) -> bool:
     return any(str(r.get("status", "")).lower() == "running" for r in rows)
 
 
+# ---- The account's copy of MARGIE (utilities/ssh_connection.check_remote_dane_wf) ----
+
+@router.get("/margie_version")
+def margie_version(fresh: bool = False, current_user: dict = Depends(get_current_user)):
+    """Describes the copy of MARGIE the account runs beside the latest, what an update moves into
+    ~/margie-previous-versions, and the update under way or last finished. Read again after five
+    minutes, or now with fresh=true."""
+    conn = _build_connection(current_user)
+    if fresh:
+        read_cache.drop(current_user["user_id"], "margie_version")
+    copy_now = read_cache.get((current_user["user_id"], "margie_version"),
+                              lambda: check_remote_dane_wf(conn), fresh=300.0, stale=900.0)
+    return {**copy_now, "update": update_state(conn)}
+
+
+@router.post("/margie_version/update")
+def update_margie_version(current_user: dict = Depends(get_current_user)):
+    """Installs the latest MARGIE as the account's copy, in the background (GET /margie_version
+    follows it). Waits for the user's runs: a run reads the copy it started with."""
+    conn = _build_connection(current_user)
+    going = bool(job_store.going_for(current_user["user_id"]))
+    if not going:
+        try:
+            going = _active_run(current_user, conn, _read_config(current_user, conn))
+        except Exception as exc:
+            LOGGER.debug("Could not read the runs before an update: %s", exc)
+    if going:
+        raise HTTPException(status_code=409, detail="One of your runs is going and reads the current copy of MARGIE. Update once it has finished, or stop it first.")
+    user_id = current_user["user_id"]
+    # A new copy can change any answer read from the account, so they are read again.
+    state = start_update(conn, on_done=lambda _result: read_cache.drop(user_id))
+    return {"update": state}
+
+
 @router.get("/stores")
 def get_stores(current_user: dict = Depends(get_current_user)):
     """Returns each database's location and version, latest depot backup, and the
@@ -1881,6 +1920,20 @@ def get_stores(current_user: dict = Depends(get_current_user)):
         return _stores_call(user_stores.status, conn, user_config, current_user["cluster_username"])
 
     return read_cache.get((current_user["user_id"], "stores"), ask)
+
+
+@router.get("/stores/formats")
+def get_store_formats(fresh: bool = False, current_user: dict = Depends(get_current_user)):
+    """Checks whether each database (the group's base, your newest backup, your working copy) is in
+    the format this MARGIE writes (user_stores.formats); read again after ten minutes, or now."""
+    conn = _build_connection(current_user)
+    if fresh:
+        read_cache.drop(current_user["user_id"], "store_formats")
+
+    def ask():
+        return _stores_call(user_stores.formats, conn, _stores_user_config(current_user, conn), current_user["cluster_username"])
+
+    return read_cache.get((current_user["user_id"], "store_formats"), ask, fresh=600.0, stale=3600.0)
 
 
 @router.get("/stores/progress")

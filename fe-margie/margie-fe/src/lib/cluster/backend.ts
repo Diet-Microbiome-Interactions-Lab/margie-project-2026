@@ -1480,9 +1480,17 @@ export async function clusterApi<T = any>(path: string, init: RequestInit = {}):
 			}
 			case 'GET /genomes':
 				return listGenomes();
+			// The copy of MARGIE the account runs, beside the latest, and its update (fresh: read now).
+			case 'GET /margie-version':
+				return get(`/v1/ssh/margie_version${params.get('fresh') ? '?fresh=true' : ''}`);
+			case 'POST /margie-version/update':
+				return call('POST', '/v1/ssh/margie_version/update');
 			// Your databases on scratch, their backups on depot, and the copy under way.
 			case 'GET /stores':
 				return storesAnswer(get('/v1/ssh/stores'));
+			// Each database's format, in the group's folder, your newest backup and your working folder.
+			case 'GET /stores/formats':
+				return get(`/v1/ssh/stores/formats${params.get('fresh') ? '?fresh=true' : ''}`);
 			case 'GET /stores/progress':
 				return get('/v1/ssh/stores/progress');
 			case 'POST /results/refresh-map':

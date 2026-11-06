@@ -495,3 +495,246 @@ echo "UPDATED $remote_sha"
     return 'up-to-date'
 
 
+# ---- The account's copy of MARGIE: what it is, and an update on request ----
+# The folder an update moves a replaced copy into, one subfolder per update, named for its time.
+PREVIOUS_VERSIONS_DIR = 'margie-previous-versions'
+
+_CHECK_SCRIPT = r'''link="$HOME/bioinformatics-tools"; repo="$HOME/__CLONE__"; code="$repo/__BACKEND__"
+echo "HOME=$HOME"
+if [ -L "$link" ]; then echo "KIND=link"; echo "TARGET=$(readlink -f "$link" 2>/dev/null)"
+elif [ -d "$link" ]; then echo "KIND=folder"
+else echo "KIND=missing"; fi
+top=$(git -C "$link" rev-parse --show-toplevel 2>/dev/null)
+[ "$top" = "$HOME" ] && top=""
+if [ -n "$top" ]; then
+    echo "TOP=$top"
+    echo "COMMIT=$(git -C "$top" rev-parse HEAD 2>/dev/null)"
+    echo "DATE=$(git -C "$top" log -1 --format=%cs 2>/dev/null)"
+    echo "ORIGIN=$(git -C "$top" remote get-url origin 2>/dev/null)"
+    git -C "$top" status --porcelain --untracked-files=no 2>/dev/null | head -n 20 | sed 's/^/EDIT=/'
+fi
+echo "CODE=$(readlink -f "$code" 2>/dev/null)"
+if [ -e "$repo" ]; then
+    echo "REPO=1"
+    if [ -d "$repo/.git" ]; then
+        echo "REPO_ORIGIN=$(git -C "$repo" remote get-url origin 2>/dev/null)"
+        [ -n "$(git -C "$repo" status --porcelain --untracked-files=no 2>/dev/null)" ] && echo "REPO_EDITED=1"
+    fi
+fi
+echo "LATEST=$(GIT_TERMINAL_PROMPT=0 timeout 30 git ls-remote __URL__ refs/heads/__REF__ 2>/dev/null | cut -f1)"
+'''
+
+# Moves the copy in use (and an edited or foreign ~/margie-project-2026) into a time-named folder
+# of ~/margie-previous-versions, installs the latest MARGIE and links ~/bioinformatics-tools to
+# it. A failed step puts the moved folders back, so the copy in use before stays in use.
+_UPDATE_SCRIPT = r'''link="$HOME/bioinformatics-tools"; repo="$HOME/__CLONE__"; code="$repo/__BACKEND__"
+backup="$HOME/__PREVIOUS__/$(date +%Y-%m-%d-%H%M%S)"
+same() { [ -n "$(readlink -f "$1" 2>/dev/null)" ] && [ "$(readlink -f "$1" 2>/dev/null)" = "$(readlink -f "$2" 2>/dev/null)" ]; }
+ours() { case "$(git -C "$1" remote get-url origin 2>/dev/null)" in __URL_BARE__|__URL_BARE__.git) return 0 ;; esac; return 1; }
+moved_link=""; moved_repo=""; old_target=""; carry=""
+fail() {
+    echo "FAILED $1"
+    if [ -n "$moved_repo" ]; then
+        [ -e "$repo" ] && mv "$repo" "$backup/__CLONE__-incomplete"
+        mv "$backup/__CLONE__" "$repo"
+    fi
+    if [ -n "$moved_link" ]; then
+        [ -L "$link" ] && rm -f "$link"
+        mv "$backup/bioinformatics-tools" "$link"
+    elif [ -n "$old_target" ]; then
+        ln -sfn "$old_target" "$link"
+    fi
+    [ -n "$carry" ] && rm -f "$carry"
+    [ -n "$moved_link$moved_repo" ] && echo "RESTORED"
+    rmdir "$backup" "$HOME/__PREVIOUS__" 2>/dev/null
+    exit 1
+}
+# The copy's own keys (.env) go with it into the new copy, so nothing it signed changes.
+if [ -f "$link/.env" ]; then carry=$(mktemp "$HOME/.margie-keys.XXXXXX") && cp -p "$link/.env" "$carry" || carry=""; fi
+if [ -d "$link" ] && [ ! -L "$link" ]; then
+    mkdir -p "$backup" && mv "$link" "$backup/bioinformatics-tools" || fail "could not move $link aside"
+    moved_link=1; echo "MOVED $link|$backup/bioinformatics-tools"
+fi
+if [ -e "$repo" ] && { [ ! -d "$repo/.git" ] || ! ours "$repo" || [ -n "$(git -C "$repo" status --porcelain --untracked-files=no 2>/dev/null)" ]; }; then
+    mkdir -p "$backup" && mv "$repo" "$backup/__CLONE__" || fail "could not move $repo aside"
+    moved_repo=1; echo "MOVED $repo|$backup/__CLONE__"
+fi
+if [ -L "$link" ] && ! same "$link" "$code"; then
+    old_target=$(readlink "$link"); rm -f "$link" || fail "could not relink $link"
+    echo "UNLINKED $old_target"
+fi
+if [ ! -d "$repo/.git" ]; then
+    GIT_TERMINAL_PROMPT=0 git clone -q -b __REF__ __URL__ "$repo" || fail "could not download MARGIE"
+fi
+cd "$repo" || fail "could not open $repo"
+GIT_TERMINAL_PROMPT=0 git fetch -q origin __REF__ || fail "could not reach the MARGIE repository"
+git checkout -q __REF__ 2>/dev/null || git checkout -q -b __REF__ origin/__REF__ || fail "could not switch to __REF__"
+git reset -q --hard origin/__REF__ || fail "could not update $repo"
+cd "$code" || fail "could not open $code"
+export PATH="$HOME/.local/bin:$PATH"
+command -v uv >/dev/null 2>&1 || curl -LsSf https://astral.sh/uv/install.sh | sh >/dev/null 2>&1
+command -v uv >/dev/null 2>&1 || fail "could not install uv"
+uv sync --quiet || fail "could not build MARGIE's environment (uv sync)"
+[ -x "$code/.venv/bin/dane_wf" ] || fail "dane_wf is missing after the build"
+if [ ! -e "$code/.env" ]; then
+    if [ -n "$carry" ]; then cp -p "$carry" "$code/.env"
+    else "$code/.venv/bin/python" -c 'from bioinformatics_tools.workflow_tools.env_keys import ensure_api_keys; ensure_api_keys()' >/dev/null 2>&1 || true
+    fi
+fi
+[ -n "$carry" ] && rm -f "$carry"
+ln -sfn "$code" "$link" || fail "could not link $link"
+echo "UPDATED $(git -C "$repo" rev-parse HEAD)"
+[ -n "$moved_link$moved_repo" ] && echo "BACKUP $backup"
+exit 0
+'''
+
+
+def _fill(script: str, repo_url: str, ref: str) -> str:
+    """The script with the repository, branch and folder names in place."""
+    bare = repo_url[:-4] if repo_url.endswith('.git') else repo_url
+    return (script.replace('__URL_BARE__', shlex.quote(bare)).replace('__URL__', shlex.quote(repo_url))
+            .replace('__REF__', shlex.quote(ref)).replace('__CLONE__', _CLONE_DIR)
+            .replace('__BACKEND__', _BACKEND_DIR).replace('__PREVIOUS__', PREVIOUS_VERSIONS_DIR))
+
+
+def _same_repo(url: str, repo_url: str) -> bool:
+    strip = lambda u: (u or '').strip().removesuffix('/').removesuffix('.git')
+    return bool(url) and strip(url) == strip(repo_url)
+
+
+def check_remote_dane_wf(conn: SSHConnection, *, ref: str = _MARGIE_SB_REF, repo_url: str = _DANE_WF_REPO_URL,
+                         timeout: float = 60.0) -> dict:
+    """
+    Describes the copy of MARGIE the account runs (~/bioinformatics-tools) beside the latest on
+    `ref`, and what an update would move into ~/margie-previous-versions/<time>/.
+
+    state: 'latest'; 'behind' (MARGIE's clone, updated before the next run); 'own-folder' (a
+    folder of the user's own); 'edited' (MARGIE's clone with edited files); 'other-copy' (a link
+    to another checkout); 'missing' (set up at sign-in). The last four are kept as they are
+    until the user updates (update_remote_dane_wf).
+    """
+    _, stdout, stderr = conn.connect().exec_command(_fill(_CHECK_SCRIPT, repo_url, ref), timeout=timeout)
+    stdout.channel.settimeout(timeout)
+    out = stdout.read().decode(errors='replace')
+    stderr.read()
+    facts: dict = {}
+    edits: list[str] = []
+    for line in out.splitlines():
+        key, sep, value = line.partition('=')
+        if not sep:
+            continue
+        if key == 'EDIT':
+            edits.append(value.strip())
+        else:
+            facts[key] = value.strip()
+    home = facts.get('HOME', '')
+    link = f'{home}/bioinformatics-tools'
+    repo = f'{home}/{_CLONE_DIR}'
+    kind = facts.get('KIND', '')
+    commit, latest = facts.get('COMMIT', ''), facts.get('LATEST', '')
+    ours = facts.get('TARGET') and facts.get('TARGET') == facts.get('CODE')
+    if kind == 'folder':
+        state = 'own-folder'
+    elif kind == 'link' and ours:
+        state = 'edited' if edits else 'behind' if latest and commit and commit != latest else 'latest'
+    elif kind == 'link':
+        state = 'other-copy'
+    else:
+        state = 'missing'
+    # What an update moves aside: the folder in use when it is the user's own, and the clone
+    # when it has edits or is a clone of something else.
+    moves = []
+    if kind == 'folder':
+        moves.append(link)
+    if facts.get('REPO') and (not facts.get('REPO_ORIGIN') or facts.get('REPO_EDITED')
+                              or not _same_repo(facts.get('REPO_ORIGIN', ''), repo_url)):
+        moves.append(repo)
+    return {
+        'state': state,
+        'home': home,
+        'path': link,
+        'points_to': facts.get('TARGET', '') if kind == 'link' else link if kind == 'folder' else '',
+        'checkout': facts.get('TOP', ''),
+        'from_margie': _same_repo(facts.get('ORIGIN', ''), repo_url),
+        'current': {'commit': commit, 'date': facts.get('DATE', '')} if commit else None,
+        'latest': {'commit': latest} if latest else None,
+        'edited': edits,
+        'moves': moves,
+        'install': f'{repo}/{_BACKEND_DIR}',
+        'previous_versions': f'{home}/{PREVIOUS_VERSIONS_DIR}',
+    }
+
+
+def update_remote_dane_wf(conn: SSHConnection, *, ref: str = _MARGIE_SB_REF, repo_url: str = _DANE_WF_REPO_URL,
+                          timeout: float = 900.0) -> dict:
+    """
+    Installs the latest MARGIE on `ref` as the account's copy: the copy in use, when it is a
+    folder of the user's own, and an edited or foreign ~/margie-project-2026 move into
+    ~/margie-previous-versions/<time>/ first, with their files as they were. Returns {'ok',
+    'commit', 'backup', 'moved': [[from, to]], 'restored', 'message'}; a failed step puts the
+    moved folders back (restored).
+    """
+    _, stdout, stderr = conn.connect().exec_command(_fill(_UPDATE_SCRIPT, repo_url, ref), timeout=timeout)
+    stdout.channel.settimeout(timeout)
+    out = stdout.read().decode(errors='replace')
+    err = stderr.read().decode(errors='replace')
+    code = stdout.channel.recv_exit_status()
+    lines = out.splitlines()
+    pick = lambda word: next((ln[len(word) + 1:].strip() for ln in lines if ln.startswith(word + ' ')), '')
+    moved = [ln[6:].split('|', 1) for ln in lines if ln.startswith('MOVED ') and '|' in ln]
+    result = {
+        'ok': code == 0 and bool(pick('UPDATED')),
+        'commit': pick('UPDATED'),
+        'backup': pick('BACKUP'),
+        'moved': moved,
+        'restored': 'RESTORED' in lines,
+        'message': pick('FAILED') or (err.strip().splitlines()[-1] if code and err.strip() else ''),
+    }
+    LOGGER.info('MARGIE update for %s@%s: %s', conn.username, conn.host, result)
+    return result
+
+
+# ---- Each account's update, run in the background and followed by the site ----
+_UPDATES: dict = {}
+_UPDATES_LOCK = threading.Lock()
+
+
+def update_state(conn: SSHConnection) -> dict | None:
+    """The account's update under way or last finished in this API, or None."""
+    with _UPDATES_LOCK:
+        state = _UPDATES.get((conn.host, conn.username))
+        return {k: v for k, v in state.items() if k != 'thread'} if state else None
+
+
+def start_update(conn: SSHConnection, on_done=None) -> dict:
+    """Starts update_remote_dane_wf for this account in a thread (one at a time) and returns its
+    state; on_done(result) runs when it ends."""
+    key = (conn.host, conn.username)
+    with _UPDATES_LOCK:
+        state = _UPDATES.get(key)
+        if state and state['state'] == 'running':
+            return {k: v for k, v in state.items() if k != 'thread'}
+        state = {'state': 'running', 'started': time.time(), 'finished': None, 'result': None}
+        _UPDATES[key] = state
+
+    def run() -> None:
+        try:
+            # The sign-in's own set-up of the clone finishes first.
+            wait_provisioned(conn)
+            result = update_remote_dane_wf(conn)
+        except Exception as exc:
+            LOGGER.warning('MARGIE update for %s@%s raised: %s', conn.username, conn.host, exc)
+            result = {'ok': False, 'commit': '', 'backup': '', 'moved': [], 'restored': False, 'message': str(exc)}
+        with _UPDATES_LOCK:
+            state.update(state='done' if result['ok'] else 'failed', finished=time.time(), result=result)
+        if on_done:
+            try:
+                on_done(result)
+            except Exception as exc:
+                LOGGER.debug('After the MARGIE update: %s', exc)
+
+    state['thread'] = threading.Thread(target=run, name=f'update-{conn.username}', daemon=True)
+    state['thread'].start()
+    return {k: v for k, v in state.items() if k != 'thread'}
+
+

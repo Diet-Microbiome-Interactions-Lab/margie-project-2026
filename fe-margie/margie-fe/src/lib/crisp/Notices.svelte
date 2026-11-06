@@ -56,7 +56,64 @@
 		const r = ws.runs.find((x) => x.kind === 'annotate');
 		return r && (r.status === 'failed' || r.status === 'cancelled') && !dismissed.includes(`run:${r.id}:${r.status}`) ? r : null;
 	});
-	const count = $derived(blocking.length + (lastBad ? 1 : 0));
+	/** The account runs a copy of MARGIE the website keeps as it is (MargieCopyPrompt): shown at each
+	 * sign-in until updated; × hides it for this sign-in. */
+	const signin = (() => {
+		try {
+			return (localStorage.getItem('bsp_token') ?? '').slice(-16);
+		} catch {
+			return '';
+		}
+	})();
+	const COPY_HIDDEN = 'margie.copy.hidden';
+	let copyHidden = $state(
+		(() => {
+			try {
+				return localStorage.getItem(COPY_HIDDEN) === signin;
+			} catch {
+				return false;
+			}
+		})()
+	);
+	function hideCopy() {
+		copyHidden = true;
+		try {
+			localStorage.setItem(COPY_HIDDEN, signin);
+		} catch {
+			// hidden for this visit only
+		}
+	}
+	const copyNotice = $derived.by(() => {
+		const c = ws.margieCopy;
+		if (!c || copyHidden || !ws.margieCopyKept) return null;
+		if (ws.margieUpdating) return 'MARGIE is updating in your account';
+		if (c.state === 'own-folder') return 'Your account runs its own copy of MARGIE; a newer one is ready';
+		if (c.state === 'edited') return 'Your account runs an edited copy of MARGIE; a newer one is ready';
+		return 'Your account runs MARGIE from another folder; a newer copy is ready';
+	});
+	/** Databases in an earlier format (DatabasesChoice): shown at each sign-in until replaced; × hides it for this sign-in. */
+	const DB_HIDDEN = 'margie.db.hidden';
+	let dbHidden = $state(
+		(() => {
+			try {
+				return localStorage.getItem(DB_HIDDEN) === signin;
+			} catch {
+				return false;
+			}
+		})()
+	);
+	function hideDb() {
+		dbHidden = true;
+		try {
+			localStorage.setItem(DB_HIDDEN, signin);
+		} catch {
+			// hidden for this visit only
+		}
+	}
+	const dbNotice = $derived(
+		dbHidden || ws.storesBusy ? null : ws.databasesEarlier === 'mine' ? 'Your databases are in an earlier format' : ws.databasesEarlier === 'group' ? "Your group's databases are in an earlier format" : null
+	);
+	const count = $derived(blocking.length + (lastBad ? 1 : 0) + (copyNotice ? 1 : 0) + (dbNotice ? 1 : 0));
 
 	/** The messages of this visit, newest first (each also shows by the bell for a moment). */
 	let recent = $state<(Toast & { at: number })[]>([]);
@@ -69,6 +126,8 @@
 
 	/** Clears the list: messages gone, notices dismissed until they change. */
 	function clearAll() {
+		if (copyNotice) hideCopy();
+		if (dbNotice) hideDb();
 		dismiss(...blocking.map((b) => b.key), ...(lastBad ? [`run:${lastBad.id}:${lastBad.status}`] : []));
 		recent = [];
 		ui.toasts = [];
@@ -132,6 +191,28 @@
 							<button type="button" class="x" aria-label="Dismiss" title="Dismiss" onclick={() => dismiss(b.key)}><X size={12} /></button>
 						</li>
 					{/each}
+				</ul>
+			{/if}
+			{#if copyNotice}
+				<p class="h">MARGIE in your account</p>
+				<ul>
+					<li class="warn">
+						<span class="dot" aria-hidden="true"></span>
+						<button type="button" class="t" class:wide={wide.includes('copy')} aria-expanded={wide.includes('copy')} onclick={() => toggle('copy')}>{copyNotice}</button>
+						<button type="button" class="go" onclick={() => ((open = false), (ws.margiePromptOpen = true))}>Review <ArrowRight size={13} /></button>
+						<button type="button" class="x" aria-label="Hide until the next sign-in" title="Hide until the next sign-in" onclick={hideCopy}><X size={12} /></button>
+					</li>
+				</ul>
+			{/if}
+			{#if dbNotice}
+				<p class="h">Databases</p>
+				<ul>
+					<li class="warn">
+						<span class="dot" aria-hidden="true"></span>
+						<button type="button" class="t" class:wide={wide.includes('db')} aria-expanded={wide.includes('db')} onclick={() => toggle('db')}>{dbNotice}</button>
+						<button type="button" class="go" onclick={() => ((open = false), ws.offerDatabases())}>Review <ArrowRight size={13} /></button>
+						<button type="button" class="x" aria-label="Hide until the next sign-in" title="Hide until the next sign-in" onclick={hideDb}><X size={12} /></button>
+					</li>
 				</ul>
 			{/if}
 			{#if lastBad}
@@ -367,13 +448,22 @@
 	li:has(.t.wide) {
 		align-items: flex-start;
 	}
-	li a {
+	li a,
+	li .go {
 		display: inline-flex;
 		align-items: center;
 		gap: 2px;
 		flex: none;
 		color: var(--mg-accent-ink);
 		font-weight: 600;
+	}
+	li .go {
+		padding: 0;
+		border: none;
+		background: none;
+		font: inherit;
+		font-weight: 600;
+		cursor: pointer;
 	}
 	.when {
 		flex: none;

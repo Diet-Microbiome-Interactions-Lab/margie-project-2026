@@ -786,11 +786,11 @@ echo "== finished" >> "$log"
 
 
 def _copy_cpus(cfg: dict | None) -> int:
-    """Returns the copy job's cores: margie_sb.stores_copy_cpus, default 4, capped at 16 (the lab's limit)."""
+    """Returns the copy job's cores: margie_sb.stores_copy_cpus, default 16, capped at 16 (the lab's limit)."""
     try:
-        n = int(_cfg_get(cfg or {}, 'margie_sb.stores_copy_cpus') or 4)
+        n = int(_cfg_get(cfg or {}, 'margie_sb.stores_copy_cpus') or 16)
     except (TypeError, ValueError):
-        n = 4
+        n = 16
     return max(1, min(16, n))
 
 
@@ -930,6 +930,95 @@ def progress(conn, cfg: dict) -> dict | None:
     """Returns only the copy under way, for the progress bar's polling."""
     root = scratch_root(conn, cfg)
     return _read_op(conn, root) or None
+
+
+# ---- Formats: whether a database is in the format this MARGIE writes ----
+# The marks of the current format: the MARGIE database's cache dates (output_cache_when) and a
+# numbered protein cache (output_cache.py, protein_cache.py); the operon reference's version
+# (c3_occ.REF_VERSION); each fingerprint pool's genome list (<pool>.genomes.tsv, pool_members.py).
+_FORMAT_SCRIPT = r'''
+import json, os, pickle, sqlite3, sys
+version = int(sys.argv[2])
+out = {}
+for key, kind, path in json.loads(sys.argv[1]):
+    try:
+        if not os.path.exists(path):
+            out[key] = 'missing'
+        elif kind == 'job_db':
+            if os.path.getsize(path) == 0:
+                out[key] = 'empty'
+                continue
+            con = sqlite3.connect('file:' + path + '?mode=ro', uri=True, timeout=10)
+            names = {r[0] for r in con.execute("SELECT name FROM sqlite_master WHERE type='table'")}
+            cols = {r[1] for r in con.execute('PRAGMA table_info(protein_cache)')} if 'protein_cache' in names else {'id'}
+            con.close()
+            out[key] = 'empty' if not names else 'current' if 'output_cache_when' in names and 'id' in cols else 'earlier'
+        elif kind == 'occ':
+            with open(path, 'rb') as fh:
+                ref = pickle.load(fh)
+            out[key] = 'current' if isinstance(ref, dict) and ref.get('version') == version else 'earlier'
+        elif kind == 'fingerprint':
+            pool = os.path.join(path, 'fingerprint-database.tsv')
+            out[key] = 'empty' if not os.path.exists(pool) else 'current' if os.path.exists(pool + '.genomes.tsv') else 'earlier'
+    except Exception:
+        out[key] = 'unreadable'
+print(json.dumps(out))
+'''
+_FORMAT_STORES = ('job_db', 'occ', 'fingerprint')
+
+
+def _occ_version() -> int:
+    """The operon reference version this MARGIE reads (c3_occ.REF_VERSION, read from its source:
+    the module loads numpy and scipy)."""
+    src = os.path.join(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))),
+                       'workflow_tools', 'scoring', 'c3_occ.py')
+    try:
+        with open(src, encoding='utf-8') as fh:
+            found = re.search(r'^REF_VERSION\s*=\s*(\d+)', fh.read(), re.M)
+        return int(found.group(1)) if found else 2
+    except OSError:
+        return 2
+
+
+def formats(conn, cfg: dict, user: str) -> dict:
+    """Checks each database's format in each place it is: the group's base and your newest backup
+    (depot) and your working copy (scratch). Each is 'current' (the format this MARGIE writes),
+    'earlier', 'empty', 'missing' or 'unreadable'. With the server's note and contact on updated
+    databases (MARGIE_UPDATED_DATABASES_NOTE, MARGIE_UPDATED_DATABASES_CONTACT)."""
+    root = scratch_root(conn, cfg)
+    probe = _probe(conn, root, user, cfg)
+    places: dict = {}
+    checks = []
+    for s in STORES:
+        if s['id'] not in _FORMAT_STORES:
+            continue
+        _, path = probe['wanted'].get(s['id'], (None, ''))
+        backups = probe['backups'].get(s['id'], [])
+        places[s['id']] = {
+            'base': resolve_base(conn, s, cfg) or '',
+            'working': path if s['id'] in probe['present'] else '',
+            'backup': posixpath.join(backup_dir(s, cfg), versioned(s, user, *backups[-1])) if backups else '',
+        }
+        checks += [[f"{s['id']}|{where}", s['id'], p] for where, p in places[s['id']].items() if p]
+    found: dict = {}
+    if checks:
+        # MARGIE's own Python where it is installed (it reads the newest pickles), else the system's.
+        cmd = ('py="$HOME/bioinformatics-tools/.venv/bin/python"; [ -x "$py" ] || py=python3; '
+               f'timeout 120 "$py" -I -c {shlex.quote(_FORMAT_SCRIPT)} {shlex.quote(json.dumps(checks))} {_occ_version()}')
+        code, out = _run(conn, cmd, timeout=150)
+        try:
+            found = json.loads(out.strip().splitlines()[-1]) if out.strip() else {}
+        except (ValueError, IndexError):
+            LOGGER.warning('Format check gave no answer (exit %s): %s', code, out[-300:])
+    labels = {s['id']: s['label'] for s in STORES}
+    return {
+        'stores': [{'id': sid, 'label': labels[sid],
+                    **{where: {'path': p, 'format': found.get(f'{sid}|{where}', 'unreadable')} if p else None
+                       for where, p in pl.items()}}
+                   for sid, pl in places.items()],
+        'note': os.environ.get('MARGIE_UPDATED_DATABASES_NOTE', '').strip(),
+        'contact': os.environ.get('MARGIE_UPDATED_DATABASES_CONTACT', '').strip(),
+    }
 
 
 def run_here(conn, cfg: dict) -> dict | None:

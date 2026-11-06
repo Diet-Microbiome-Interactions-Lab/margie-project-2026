@@ -216,6 +216,45 @@ export interface StoreOp {
 	slurm_reason?: string;
 }
 
+/** An update of the account's copy of MARGIE (utilities/ssh_connection.start_update). */
+export interface MargieUpdate {
+	state: 'running' | 'done' | 'failed';
+	started: number;
+	finished: number | null;
+	result: { ok: boolean; commit: string; backup: string; moved: [string, string][]; restored: boolean; message: string } | null;
+}
+
+/** The copy of MARGIE the account runs (GET /v1/ssh/margie_version). */
+export interface MargieCopy {
+	state: 'latest' | 'behind' | 'own-folder' | 'edited' | 'other-copy' | 'missing';
+	home: string;
+	path: string;
+	points_to: string;
+	checkout: string;
+	from_margie: boolean;
+	current: { commit: string; date: string } | null;
+	latest: { commit: string } | null;
+	edited: string[];
+	moves: string[];
+	install: string;
+	previous_versions: string;
+	update: MargieUpdate | null;
+}
+
+/** A database's format in one place (user_stores.formats). */
+export interface StoreFormat {
+	path: string;
+	format: 'current' | 'earlier' | 'empty' | 'missing' | 'unreadable';
+}
+
+/** Each database's format in the group's folder, your newest backup and your working folder. */
+export interface StoreFormats {
+	stores: { id: string; label: string; base: StoreFormat | null; working: StoreFormat | null; backup: StoreFormat | null }[];
+	/** The server's note on updated databases, and whom to ask for them (empty where unset). */
+	note: string;
+	contact: string;
+}
+
 export interface StoresStatus {
 	root: string;
 	user: string;
@@ -479,6 +518,8 @@ class Workspace {
 		await Promise.allSettled([this.loadGenomes(), this.loadTools(), this.loadOverview(), this.loadRuns(), this.loadResults(), this.loadSettings(), this.loadSetup()]);
 		this.loaded = true;
 		this.loadCheck();
+		this.loadMargieCopy();
+		this.loadStoreFormats();
 	}
 
 	async loadGenomes() {
@@ -796,6 +837,64 @@ class Workspace {
 		}
 	}
 
+	// ------------------------------------------------------------ MARGIE in your cluster account
+
+	/** The copy of MARGIE your account runs, beside the latest (cluster only); null until read. */
+	margieCopy = $state<MargieCopy | null>(null);
+	/** The dialog that offers the update (MargieCopyPrompt), opened after sign-in or from Notices. */
+	margiePromptOpen = $state(false);
+	#copyTimer: ReturnType<typeof setTimeout> | null = null;
+
+	get margieUpdating() {
+		return this.margieCopy?.update?.state === 'running';
+	}
+
+	/** A copy the website runs as it is until you update: a folder of your own, an edited copy, or a link to another one. */
+	get margieCopyKept() {
+		return !!this.margieCopy && ['own-folder', 'edited', 'other-copy'].includes(this.margieCopy.state);
+	}
+
+	async loadMargieCopy(fresh = false) {
+		if (!backend.cluster) return;
+		try {
+			this.margieCopy = await api<MargieCopy>(`/margie-version${fresh ? '?fresh=1' : ''}`);
+			if (this.margieUpdating) this.#watchMargieCopy();
+		} catch {
+			// Read again on the next page load.
+		}
+	}
+
+	/** Installs the latest MARGIE as your account's copy; what it replaces moves to ~/margie-previous-versions. */
+	async updateMargieCopy(): Promise<string> {
+		try {
+			const { update } = await post<{ update: MargieUpdate }>('/margie-version/update', {});
+			if (this.margieCopy) this.margieCopy = { ...this.margieCopy, update };
+			this.#watchMargieCopy();
+			return '';
+		} catch (e) {
+			return message(e);
+		}
+	}
+
+	/** Follows the update every five seconds, then reads the copy and the tools again. */
+	#watchMargieCopy() {
+		if (this.#copyTimer) return;
+		const tick = async () => {
+			this.#copyTimer = null;
+			try {
+				this.margieCopy = await api<MargieCopy>('/margie-version');
+			} catch {
+				// A missed poll is retried.
+			}
+			if (this.margieUpdating) {
+				this.#copyTimer = setTimeout(tick, 5000);
+				return;
+			}
+			if (this.margieCopy?.update?.state === 'done') await Promise.allSettled([this.loadMargieCopy(true), this.loadTools(), this.loadOverview()]);
+		};
+		this.#copyTimer = setTimeout(tick, 3000);
+	}
+
 	// ------------------------------------------------------------ your databases (cluster)
 
 	/** Where your databases are, and the copy under way; null until read, or where there are none (this computer). */
@@ -807,6 +906,36 @@ class Workspace {
 
 	get storesBusy() {
 		return this.storesOp?.state === 'queued' || this.storesOp?.state === 'running';
+	}
+
+	/** Each database's format where it is (GET /stores/formats); null until read. */
+	storeFormats = $state<StoreFormats | null>(null);
+	/** The databases choice (DatabasesChoice): opened at sign-in, from Notices, or before a first setup. */
+	dbChoice = $state<{ resolve: (pick: 'fresh' | 'group' | null) => void; from: 'signin' | 'setup' } | null>(null);
+
+	async loadStoreFormats(fresh = false) {
+		if (!backend.cluster) return;
+		try {
+			this.storeFormats = await api<StoreFormats>(`/stores/formats${fresh ? '?fresh=1' : ''}`);
+		} catch {
+			// Shown without formats.
+		}
+	}
+
+	/** Databases in an earlier format: your working copies ('mine'), or, with none yet, the group's ones a first setup copies ('group'). */
+	get databasesEarlier(): 'mine' | 'group' | null {
+		const f = this.storeFormats;
+		if (!f) return null;
+		if (f.stores.some((s) => s.working)) return f.stores.some((s) => s.working?.format === 'earlier') ? 'mine' : null;
+		return f.stores.some((s) => s.base?.format === 'earlier') ? 'group' : null;
+	}
+
+	/** Opens the databases choice and acts on it: fresh databases, or the group's copied (a first setup). */
+	async offerDatabases() {
+		if (this.dbChoice) return;
+		const pick = await new Promise<'fresh' | 'group' | null>((resolve) => (this.dbChoice = { resolve, from: 'signin' }));
+		this.dbChoice = null;
+		if (pick) await this.setupStores(pick === 'fresh', true);
 	}
 
 	async loadStores() {
@@ -821,14 +950,31 @@ class Workspace {
 
 	/** Copies whichever databases are missing on scratch (from your newest backup, else the base). */
 	/** fresh: every database starts empty, as a new lab's own, instead of copies (after a yes). */
-	async setupStores(fresh = false) {
+	/** chosen: picked in the databases choice already, so asked no more. */
+	async setupStores(fresh = false, chosen = false) {
 		// The install statement, the first time for this place (installLock).
 		if (!(await installLock.confirm('Set up your databases'))) {
 			this.#runAfterSetup = null;
 			return;
 		}
+		// A first setup, with the group's databases in an earlier format: fresh ones, or the group's copied.
+		if (!fresh && !chosen) {
+			await Promise.all([this.loadStores(), this.loadStoreFormats()]);
+			if (this.databasesEarlier === 'group') {
+				const pick = await new Promise<'fresh' | 'group' | null>((resolve) => (this.dbChoice = { resolve, from: 'setup' }));
+				this.dbChoice = null;
+				if (!pick) {
+					this.#runAfterSetup = null;
+					return;
+				}
+				fresh = pick === 'fresh';
+				chosen = true;
+			}
+		}
 		const where = this.stores?.root ? ` in ${this.stores.root}` : ' in your databases folder';
-		if (fresh) {
+		if (chosen) {
+			// Said and chosen in the dialog.
+		} else if (fresh) {
 			if (!confirm(`Create fresh, empty databases${where}? The MARGIE database, operon reference, fingerprint databases and genome pool start empty, as new versions; your current copies stay where they are, and runs use the new ones.`)) return;
 		} else {
 			// Then a plain yes or no, saying what is copied where.
