@@ -214,6 +214,8 @@ export interface StoreOp {
 	/** On an HPC, the job's state in the queue, and why it waits (squeue's %r). */
 	slurm_state?: string;
 	slurm_reason?: string;
+	/** The bytes the copy moves (its status file). */
+	total_bytes?: string | number;
 }
 
 /** An update of the account's copy of MARGIE (utilities/ssh_connection.start_update). */

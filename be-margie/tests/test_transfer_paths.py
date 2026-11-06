@@ -34,13 +34,15 @@ def test_the_script_never_overwrites_and_runs_in_parallel():
     assert "wait -n" in TRANSFER_SCRIPT
 
 
-def _remote(calls, sbatch=(0, "4242\n")):
+def _remote(calls, sbatch=(0, "4242\n"), size=1000):
     def run(conn, command):
         calls.append(command)
         if command.startswith("test -d"):
             return (0, "")
         if "sbatch" in command:
             return sbatch
+        if command.startswith("du -sb"):
+            return (0, f"{size}\n")
         if "setsid nohup" in command:
             return (0, "started")
         return (0, "")
@@ -50,13 +52,13 @@ def _remote(calls, sbatch=(0, "4242\n")):
 @patch(f"{SSH}.ssh_sftp.read_remote_yaml", return_value={"compute": {"cluster_default": {"account": "mylab", "partition": "cpu"}}})
 @patch(f"{SSH}.ssh_sftp.write_remote_text_file")
 @patch(f"{SSH}._build_connection")
-def test_it_goes_to_slurm_with_the_account_partition_and_8_cores(_conn, written, _yaml, authed_client):  # noqa: F811
+def test_it_goes_to_slurm_with_the_account_partition_and_16_cores(_conn, written, _yaml, authed_client):  # noqa: F811
     calls = []
     with patch(f"{SSH}._run_remote_check", side_effect=_remote(calls)):
         d = authed_client.post(ROUTE, json={"op": "copy", "sources": ["/s/a.tsv", "/s/run"], "into": "/d"}).json()
     assert d["where"] == "slurm" and d["job"] == "4242" and d["state"] == "queued"
     sb = next(c for c in calls if "sbatch" in c)
-    assert "--account=mylab" in sb and "--partition=cpu" in sb and "--cpus-per-task=8" in sb
+    assert "--account=mylab" in sb and "--partition=cpu" in sb and "--cpus-per-task=16" in sb
     plan = next(c.args[1] for c in written.call_args_list if c.args[0].endswith("/plan"))
     assert plan == "copy\t/s/a.tsv\t/d/a.tsv\ncopy\t/s/run\t/d/run\n"
 
@@ -70,6 +72,17 @@ def test_without_slurm_it_runs_on_the_login_node(_conn, _written, _yaml, authed_
         d = authed_client.post(ROUTE, json={"op": "move", "sources": ["/s/a.tsv"], "into": "/d"}).json()
     assert d["where"] == "login" and d["job"] is None
     assert any("setsid nohup bash run.sh" in c and c.rstrip().endswith("& echo started") for c in calls)
+
+
+@patch(f"{SSH}.ssh_sftp.read_remote_yaml", return_value={"compute": {"cluster_default": {"account": "mylab"}}})
+@patch(f"{SSH}.ssh_sftp.write_remote_text_file")
+@patch(f"{SSH}._build_connection")
+def test_without_slurm_a_transfer_over_500_mb_is_refused(_conn, _written, _yaml, authed_client):  # noqa: F811
+    calls = []
+    with patch(f"{SSH}._run_remote_check", side_effect=_remote(calls, sbatch=(1, "sbatch: error: invalid account"), size=600 * 1024 * 1024)):
+        r = authed_client.post(ROUTE, json={"op": "copy", "sources": ["/s/big"], "into": "/d"})
+    assert r.status_code == 409 and "500.0 MB" in r.json()["detail"]
+    assert not any("setsid nohup bash run.sh" in c for c in calls)
 
 
 @patch(f"{SSH}._build_connection")

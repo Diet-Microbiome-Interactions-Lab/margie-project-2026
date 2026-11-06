@@ -3897,8 +3897,9 @@ def download_path(path: str, request: Request, current_user: dict = Depends(get_
 
 # Where each transfer keeps its plan, script, status and results, under the user's home.
 TRANSFER_DIR = ".margie/transfers"
-# Cores for a transfer on SLURM (items copy in parallel); on the login node, fewer.
-TRANSFER_CORES = 8
+# Cores for a transfer on SLURM (items copy in parallel); on the login node, fewer, for transfers
+# under user_stores.LOGIN_COPY_LIMIT.
+TRANSFER_CORES = 16
 LOGIN_CORES = 2
 
 # Runs the plan (op \t source \t target per line), a few items at a time. It never overwrites:
@@ -3981,8 +3982,9 @@ def _transfer_results(items: list[dict], raw: str) -> list[dict]:
 @router.post("/transfer_paths")
 def transfer_paths(payload: dict, current_user: dict = Depends(get_current_user)):
     """Copies or moves files and folders into a folder on the cluster, as the user, as a job:
-    on SLURM (the user's account and main partition, 8 cores) or, when SLURM will not take it,
-    detached on the login node. Nothing is overwritten. Follow it with GET /transfer_paths/{id}.
+    on SLURM (the user's account and main partition, 16 cores) or, when SLURM will not take it,
+    detached on the login node for transfers under 500 MB. Nothing is overwritten. Follow it with
+    GET /transfer_paths/{id}.
 
     Body: {"op": "copy" | "move", "sources": [paths], "into": folder}."""
     op = payload.get("op")
@@ -4037,7 +4039,16 @@ def transfer_paths(payload: dict, current_user: dict = Depends(get_current_user)
             ssh_sftp.write_remote_text_file(f"{d}/status", "state=queued\n", connection=conn)
             ssh_sftp.write_remote_text_file(f"{d}/job", job + "\n", connection=conn)
     if where == "login":
-        # SLURM would not take it (or no account is set): the login node does it.
+        # SLURM would not take it (or no account is set): the login node does it when it is small.
+        _, said = _run_remote_check(conn, "du -sb -- " + " ".join(q(it["source"]) for it in items) + " 2>/dev/null | awk '{s+=$1} END{print s+0}'")
+        size = int(said.strip().splitlines()[-1]) if said.strip() and said.strip().splitlines()[-1].isdigit() else None
+        if size is None or size > user_stores.LOGIN_COPY_LIMIT:
+            _run_remote_check(conn, f"printf 'state=failed\\n' > {q(d)}/status")
+            raise HTTPException(status_code=409, detail=(
+                f"This {op} is {user_stores._gb(size) if size is not None else 'of unknown size'}: the login node takes "
+                f"{op}s under {user_stores._gb(user_stores.LOGIN_COPY_LIMIT)}, and larger ones run as a SLURM job"
+                + (f", which SLURM did not take ({' '.join(out.split())[:200]})." if account else
+                   ". Set your SLURM account in Settings → Compute, then start it again.")))
         code, out = _run_remote_check(conn, f"cd {q(d)} && setsid nohup bash run.sh {q(d)} {LOGIN_CORES} > /dev/null 2>&1 < /dev/null & echo started")
         if "started" not in out:
             raise HTTPException(status_code=500, detail=f"Could not start the {op}: {out}")

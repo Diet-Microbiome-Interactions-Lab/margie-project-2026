@@ -785,6 +785,22 @@ echo "== finished" >> "$log"
 '''
 
 
+# The largest copy the login node takes (Run here, or an account with no SLURM account set);
+# larger ones run as a SLURM job on a compute node.
+LOGIN_COPY_LIMIT = 500 * 1024 * 1024
+
+
+def _plan_bytes(plan: list[list]) -> int:
+    """The bytes a plan copies (its copy and files steps)."""
+    return sum(int(step[4]) for step in plan
+               if len(step) > 4 and step[0] in ('copy', 'files') and str(step[4]).isdigit())
+
+
+def _login_refusal(total: int) -> str:
+    return (f'This copy is {_gb(total)}: the login node takes copies under {_gb(LOGIN_COPY_LIMIT)}, '
+            'and larger ones run as a SLURM job on a compute node.')
+
+
 def _copy_cpus(cfg: dict | None) -> int:
     """Returns the copy job's cores: margie_sb.stores_copy_cpus, default 16, capped at 16 (the lab's limit)."""
     try:
@@ -796,7 +812,11 @@ def _copy_cpus(cfg: dict | None) -> int:
 
 def _start(conn, root: str, kind: str, plan: list[list], after: dict, cfg: dict | None = None,
            walltime: str = '12:00:00', mem: str = '4G') -> None:
-    """Writes the plan and starts the copy script: via sbatch when an account is set, else detached on the login node."""
+    """Writes the plan and starts the copy script: via sbatch when an account is set, else detached on
+    the login node, for copies under LOGIN_COPY_LIMIT."""
+    total = _plan_bytes(plan)
+    if not str(_cfg_get(cfg or {}, 'compute.cluster_default.account') or '').strip() and total > LOGIN_COPY_LIMIT:
+        raise StoreError(_login_refusal(total) + ' Set your SLURM account in Settings → Compute, then start it again.', 409)
     state = f'{root}/{STATE_DIR}'
     code, out = _run(conn, f'mkdir -p {shlex.quote(state)} && chmod 700 {shlex.quote(state)}')
     if code != 0:
@@ -829,7 +849,7 @@ def _start(conn, root: str, kind: str, plan: list[list], after: dict, cfg: dict 
         ssh_sftp.write_remote_text_file(f'{state}/op.jobid', job + '\n', connection=conn)
         # Shows the job as queued until it starts, unless the script has started and said running.
         _run(conn, f'cd {q(state)} && [ -e op.status ] || '
-                   f'printf "state=queued\\nop=%s\\nlabel=Waiting for a SLURM slot\\n" {q(kind)} > op.status')
+                   f'printf "state=queued\\nop=%s\\nlabel=Waiting for a SLURM slot\\ntotal_bytes=%s\\n" {q(kind)} {total} > op.status')
         return
     code, out = _run(conn, f'cd {q(state)} && setsid nohup bash op.sh {q(state)} '
                             f'> /dev/null 2>&1 < /dev/null & echo started')
@@ -1031,6 +1051,10 @@ def run_here(conn, cfg: dict) -> dict | None:
         raise StoreError('The copy has already started on a compute node.', 409)
     state = f'{root}/{STATE_DIR}'
     q = shlex.quote
+    _, out = _run(conn, "awk -F'\\t' '$1==\"copy\"||$1==\"files\"{s+=$5} END{print s+0}' " + q(f'{state}/op.plan'))
+    total = int(out.strip()) if out.strip().isdigit() else LOGIN_COPY_LIMIT + 1
+    if total > LOGIN_COPY_LIMIT:
+        raise StoreError(_login_refusal(total) + ' It starts once SLURM gives it a node.', 409)
     code, out = _run(conn, f'scancel {q(op["job"])} && cd {q(state)} && rm -f op.jobid op.slurm.out op.status '
                             f'&& (setsid nohup bash op.sh {q(state)} > /dev/null 2>&1 < /dev/null &) && echo started')
     if 'started' not in out:

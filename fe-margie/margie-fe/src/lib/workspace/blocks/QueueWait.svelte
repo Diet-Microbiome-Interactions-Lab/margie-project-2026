@@ -4,9 +4,10 @@
 	import type { StoreOp } from '$lib/workspace/data.svelte';
 
 	/**
-	 * Shown on an HPC while a copy job is pending in SLURM: explains the wait and offers to run it
-	 * on the login node instead.
+	 * Shown on an HPC while a copy job is pending in SLURM: explains the wait and, for a copy under
+	 * 500 MB (user_stores.LOGIN_COPY_LIMIT), offers to run it on the login node instead.
 	 */
+	const LOGIN_LIMIT = 500 * 1024 * 1024;
 	let { op, onchange }: { op: StoreOp; onchange?: (op: StoreOp | null) => void } = $props();
 	let going = $state(false);
 
@@ -19,6 +20,8 @@
 		BeginTime: 'it is set to start later'
 	};
 	const why = $derived(op.slurm_reason ? (REASONS[op.slurm_reason] ?? op.slurm_reason) : '');
+	const bytes = $derived(Number(op.total_bytes));
+	const small = $derived(op.total_bytes !== undefined && op.total_bytes !== '' && Number.isFinite(bytes) && bytes <= LOGIN_LIMIT);
 
 	async function runHere() {
 		if (
@@ -43,7 +46,11 @@
 {#if op.state === 'queued' && op.slurm_state === 'PENDING'}
 	<div class="qw">
 		<span>Waiting in the SLURM queue{why ? `: ${why}` : ''}.</span>
-		<button type="button" class="mg-btn small" disabled={going} onclick={runHere}>{going ? 'Starting…' : 'Run on the login node instead'}</button>
+		{#if small}
+			<button type="button" class="mg-btn small" disabled={going} onclick={runHere}>{going ? 'Starting…' : 'Run on the login node instead'}</button>
+		{:else}
+			<span class="mg-note">It starts on a compute node once SLURM gives it one; the login node takes copies under 500 MB.</span>
+		{/if}
 	</div>
 {/if}
 
