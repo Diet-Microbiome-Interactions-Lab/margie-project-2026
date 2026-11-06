@@ -17,16 +17,16 @@
 			text: 'Sign up with your cluster’s address and your username. Make a key for MARGIE with ssh-keygen and add its public half to ~/.ssh/authorized_keys; the sign-up page shows the commands.'
 		},
 		{
-			title: 'Set up your working folder',
-			text: 'Analyze asks for it first: margie in your scratch by default. One click makes margie-input, margie-output, margie-databases and job-history in it (and sif and reference-databases/db when your group’s cannot be read), and sets your SLURM account when you have one.',
+			title: 'Choose your SLURM account',
+			text: 'Analyze’s first step: set on its own when your cluster user has one account; with more, pick one. Settings → Cluster changes it later, with the main partition. GTDB-Tk needs a large-memory partition (about 400 GB), set under Phases.',
 			to: '/analyze',
 			go: 'Open Analyze'
 		},
 		{
-			title: 'Check your SLURM account',
-			text: 'Set with the working folder when your cluster user has one account; with more, choose it in Settings → Cluster, with the main partition. GTDB-Tk needs a large-memory partition (about 400 GB), set under Phases.',
-			to: '/settings#cluster',
-			go: 'Open Settings'
+			title: 'Set up your working folder',
+			text: 'Analyze’s second step: margie in your scratch by default. One click makes margie-input, margie-output, margie-databases and job-history (your job history) in it, and sif and reference-databases/db when your group’s cannot be read.',
+			to: '/analyze',
+			go: 'Open Analyze'
 		},
 		{
 			title: 'Containers and reference databases',
@@ -36,7 +36,7 @@
 		},
 		{
 			title: 'MARGIE’s databases',
-			text: 'The first run sets up margie-databases as a short SLURM job: a copy of your group’s base databases, or new ones where your account reads none. Settings → Databases can start fresh ones.',
+			text: 'Analyze’s fifth step copies them into margie-databases as a short SLURM job: your group’s base databases, or new ones where your account reads none. Settings → Databases can start fresh ones.',
 			to: '/settings#databases',
 			go: 'Open Databases'
 		},
@@ -50,8 +50,8 @@
 
 	/** Running, once set up. */
 	const RUN = [
-		{ title: 'Add your genomes', text: 'Analyze’s second step: drop FASTA files (.fna, .fa, .fasta) and they go into margie-input, or point the genomes folder at a folder that already holds them.' },
-		{ title: 'Check gene calling and the tools', text: 'Analyze’s third step: the recommended settings are applied; unlock them only to change them. The fourth asks for the licence terms once, before the first run.' },
+		{ title: 'Add your genomes', text: 'Analyze’s third step: drop FASTA files (.fna, .fa, .fasta) and they go into margie-input, or point the genomes folder at a folder that already holds them. The fourth asks for the licence terms once.' },
+		{ title: 'Check gene calling and the tools', text: 'In the run step, above the start button: the recommended settings are applied; unlock them only to change them.' },
 		{ title: 'Start the run', text: 'Each step goes to SLURM. Jobs follows the run genome by genome, with its log.' },
 		{ title: 'Read the results', text: 'Results shows each genome’s map, every gene with its confidence tier, and the tables to download.' }
 	];

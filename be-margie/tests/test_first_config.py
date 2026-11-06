@@ -147,3 +147,32 @@ def test_a_new_config_outside_the_group_carries_none_of_its_paths(monkeypatch):
     cfg = {"margie_sb": {"shared_root": GROUP, "backup_root": f"{GROUP}/databases/x", "threads": 4}, "main_database": "~/m.db"}
     assert ssh._without_group(cfg) == {"margie_sb": {"shared_root": "", "backup_root": "", "threads": 4}, "main_database": "~/m.db"}
     assert user_stores.suggested_group({"compute": {"cluster_default": {"account": "a; rm -rf"}}}) == ""
+
+
+def _two_accounts(conn, cmd, timeout=60):
+    """A cluster user with two SLURM accounts."""
+    if "sacctmgr" in cmd:
+        return 0, "lab-a\nlab-b\n"
+    return _cluster(conn, cmd, timeout)
+
+
+@patch(f"{SSH}._build_connection")
+def test_the_first_step_lists_the_accounts_and_the_one_chosen_is_saved_with_the_working_folder(_conn, authed_client):  # noqa: F811
+    read_cache.drop(FAKE_USER["user_id"])
+    build = {"path": None, "source": None, "clone_to": "/h/margie-build", "url": ""}
+    with patch(f"{SSH}.ssh_sftp.read_remote_yaml", return_value={}), \
+         patch(f"{SSH}.user_stores._run", side_effect=_two_accounts), \
+         patch(f"{SSH}.tool_assets.build_recipes", return_value=build):
+        d = authed_client.get("/v1/ssh/setup").json()
+    assert d["accounts"] == ["lab-a", "lab-b"] and d["account"] == ""
+    for asked, expected in (("lab-b", "lab-b"), ("not-mine", "")):
+        read_cache.drop(FAKE_USER["user_id"])
+        written = {}
+        with patch(f"{SSH}.ssh_sftp.read_remote_yaml", return_value={}), \
+             patch(f"{SSH}.user_stores._run", side_effect=_two_accounts), \
+             patch(f"{SSH}.user_stores.fill_default_partition", return_value=False), \
+             patch(f"{SSH}.tool_assets.build_recipes", return_value=build), \
+             patch(f"{SSH}.ssh_sftp.write_remote_yaml", side_effect=lambda path, cfg, connection: written.update(cfg)):
+            r = authed_client.post("/v1/ssh/setup/working-folder", json={"account": asked})
+        assert r.status_code == 200, r.text
+        assert (written["compute"]["cluster_default"].get("account") or "") == expected

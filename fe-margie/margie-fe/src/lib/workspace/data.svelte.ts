@@ -160,6 +160,9 @@ export interface FirstSetup {
 	configured: boolean;
 	/** As set; '' before the first setup. */
 	working_folder: string;
+	/** The SLURM accounts this cluster user may run under, and the one set ('' when none yet). */
+	accounts: string[];
+	account: string;
 	/** The one MARGIE suggests: margie in the account's scratch. */
 	default: string;
 	folders: { input: string; output: string; databases: string; containers: string; references: string };
@@ -586,9 +589,12 @@ class Workspace {
 	 * margie-databases go in it, with sif and db where the group's cannot be read. Then reads
 	 * everything that depends on it again.
 	 */
+	/** The SLURM account picked on Analyze's first step before there is a config; saved with the working folder. */
+	chosenAccount = $state('');
+
 	async setWorkingFolder(path = '') {
 		try {
-			this.firstSetup = await post<FirstSetup>('/setup/working-folder', { path });
+			this.firstSetup = await post<FirstSetup>('/setup/working-folder', { path, ...(this.chosenAccount ? { account: this.chosenAccount } : {}) });
 			await this.loadSettings();
 			await Promise.allSettled([this.loadOverview(), this.loadTools(), this.loadGenomes()]);
 			ui.notify(`Working folder set: ${this.firstSetup.working_folder}`, 'ok');

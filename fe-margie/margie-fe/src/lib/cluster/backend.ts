@@ -659,7 +659,7 @@ async function overview(): Promise<Overview> {
 	]);
 	const account = str(dig(cfg, 'compute.cluster_default.account'));
 	const partition = str(dig(cfg, 'compute.cluster_default.partition'));
-	const db = str(cfg.main_database);
+	const working = str(dig(cfg, `${WORKFLOW}.working_folder`));
 	const output = str(dig(cfg, `${WORKFLOW}.output_path`));
 	const rows: SetupRow[] = [
 		{
@@ -700,14 +700,15 @@ async function overview(): Promise<Overview> {
 			required: true,
 			href: '/analyze#licence'
 		},
+		// The job history is kept in the working folder (job-history), made when the working folder is set.
 		{
 			id: 'history',
 			label: 'Job history',
-			value: db ? baseName(db) : 'Not set',
-			detail: db ? 'Where the cluster records your runs' : 'Runs are not recorded without it',
-			tone: db ? 'ok' : 'warn',
+			value: working ? 'job-history' : 'Not set',
+			detail: working ? `In the working folder: ${working.replace(/\/+$/, '')}/job-history` : 'Kept in the working folder, once it is set',
+			tone: working ? 'ok' : 'warn',
 			required: true,
-			href: '/settings#main_database'
+			href: '/analyze'
 		},
 		...(await installed
 			.get()
@@ -933,9 +934,10 @@ async function settingsList(): Promise<{ settings: Setting[]; configMissing: boo
 	return { settings, configMissing: !Object.keys(cfg ?? {}).length };
 }
 
-/** Sets the working folder (the default config.yaml first, when there is none); the folders in it follow. */
-async function setWorkingFolder(body: { path?: string }) {
-	const d = await call('POST', '/v1/ssh/setup/working-folder', { path: body.path ?? '' });
+/** Sets the working folder (the default config.yaml first, when there is none) and the SLURM account
+ * picked on Analyze's first step; the folders in it follow. */
+async function setWorkingFolder(body: { path?: string; account?: string }) {
+	const d = await call('POST', '/v1/ssh/setup/working-folder', { path: body.path ?? '', ...(body.account ? { account: body.account } : {}) });
 	config.drop();
 	installed.drop();
 	// The settings' placeholders follow the new folders.

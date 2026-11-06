@@ -56,3 +56,20 @@ def test_a_run_without_a_localization_tool_still_runs_the_envelope_stage(authed_
     command = runner.submit_job.call_args.kwargs.get("command") or runner.submit_job.call_args.args[1]
     chosen = command.split("margie_sb.selected_tools:", 1)[1].split()[0].split(",")
     assert "envelope" in chosen
+
+
+def test_a_new_accounts_first_run_goes_on_to_set_up_its_databases(authed_client):  # noqa: F811
+    """A new account has no main_database until its databases are set up, so the first run is told to
+    set them up (409 stores-not-ready, which the site acts on), not that main_database is missing."""
+    with patch("bioinformatics_tools.api.licensing.has_accepted_current_terms", return_value=True), \
+            patch("bioinformatics_tools.api.licensing.get_entitlement", return_value={"usage_type": "academic", "licensed_tools": []}), \
+            patch(f"{SSH}.tool_assets"), patch(f"{SSH}.user_stores") as stores, \
+            patch(f"{SSH}._build_connection"), patch(f"{SSH}.job_runner") as runner, patch(f"{SSH}.ssh_sftp") as sftp:
+        sftp.read_remote_yaml.return_value = {"compute": {"cluster_default": {"account": "lab"}},
+                                              "margie_sb": {"working_folder": "/scratch/c/u/margie"}}
+        stores.apply_finished.return_value = False
+        stores.status.return_value = {"ready": False, "op": {}}
+        stores.StoreError = Exception
+        resp = authed_client.post("/v1/ssh/run_workflow", json={"genome_path": "/g/ecoli.fasta", "workflow": "margie_sb"})
+    assert resp.status_code == 409 and resp.json()["detail"].startswith("stores-not-ready"), resp.json()
+    runner.submit_job.assert_not_called()

@@ -1394,6 +1394,9 @@ def _setup_state(current_user: dict, conn, cfg: dict) -> dict:
         "configured": bool(cfg),
         "working_folder": working,
         "default": default,
+        # The SLURM accounts this cluster user may run under, and the one set ('' when none yet).
+        "accounts": user_stores.slurm_accounts(conn),
+        "account": get("compute.cluster_default.account"),
         "folders": {
             "input": get("margie_sb.input_path") or f"{at}/{user_stores.INPUT_NAME}",
             "output": get("margie_sb.output_path") or f"{at}/{user_stores.OUTPUT_NAME}",
@@ -1423,7 +1426,8 @@ def setup_state(current_user: dict = Depends(get_current_user)):
 
 @router.post("/setup/working-folder")
 def setup_working_folder(body: dict | None = None, current_user: dict = Depends(get_current_user)):
-    """Sets the working folder ({path}, else the suggested one) and fills the folders left empty:
+    """Sets the working folder ({path}, else the suggested one) and the SLURM account ({account}, one of
+    the user's; else their only one), and fills the folders left empty:
     margie-input, margie-output and margie-databases in it, and the containers and reference
     databases (the group's where the account reads them, else sif and reference-databases/db in it). Writes the
     default config.yaml first when there is none. A folder in the old working folder moves with
@@ -1455,8 +1459,12 @@ def setup_working_folder(body: dict | None = None, current_user: dict = Depends(
         user_stores._cfg_set(cfg, user_stores.WORKING_KEY, target)
         user_stores.fill_default_folders(conn, cfg)
         user_stores.fill_default_partition(conn, cfg)
-        # The SLURM account too, when the user has only one.
-        user_stores.fill_default_account(conn, cfg)
+        # The SLURM account: the one chosen on Analyze's first step, else the user's only one.
+        chosen = str((body or {}).get("account") or "").strip()
+        if chosen and chosen in user_stores.slurm_accounts(conn):
+            user_stores._cfg_set(cfg, "compute.cluster_default.account", chosen)
+        else:
+            user_stores.fill_default_account(conn, cfg)
         inside = [str(user_stores._cfg_get(cfg, k) or "") for k in _IN_WORKING]
         inside = [x for x in inside if x.startswith(f"{target}/")]
         # The databases folder's own folders too, so a copy can go straight in.
@@ -2457,9 +2465,10 @@ def run_workflow(genome_data: GenomeSend, current_user: dict = Depends(get_curre
     # Validate required fields
     missing_fields = []
 
-    # Check main_database
+    # Check main_database: a margie_sb run's first one is set when its databases are set up
+    # (_margie_sb_stores_ready, below), so a new account gets there.
     main_db = user_config.get('main_database')
-    if not main_db or str(main_db).strip() == '':
+    if (not main_db or str(main_db).strip() == '') and genome_data.workflow != 'margie_sb':
         missing_fields.append('main_database')
 
     # Check compute.cluster_default.account

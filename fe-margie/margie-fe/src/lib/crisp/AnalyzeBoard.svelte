@@ -14,6 +14,7 @@
 	import FoldToggle from '$lib/workspace/motion/FoldToggle.svelte';
 	import RunSteps from './RunSteps.svelte';
 	import WorkingFolderSetup from './WorkingFolderSetup.svelte';
+	import StoresCheck from '$lib/cluster/StoresCheck.svelte';
 
 	/**
 	 * The Analyze page, in the order a run is set up, one box each as on Install: the genomes
@@ -21,9 +22,11 @@
 	 * once before a first run, then the start button (or the run's bar with Stop and Go to Jobs, or
 	 * Resume and Restart after a failed run). A run's progress by genome and step is on Jobs.
 	 *
-	 * On the cluster these are five steps, taken one after another: the working folder, the
-	 * genomes, gene calling and the tools, the licence terms, the run. The step to take is open;
-	 * a step done folds to one line (a click opens it again); the steps after it wait, greyed.
+	 * On the cluster these are six steps, taken one after another: the SLURM account, the working
+	 * folder (which sets up the job history), the genomes, the licence terms, MARGIE's databases
+	 * (copied into the working folder), and the run (gene calling, the tools and the start button).
+	 * The step to take is open; a step done folds to one line (a click opens it again); the steps
+	 * after it wait, greyed.
 	 */
 	const GENOME_TABLE = 'analyze:genome-table';
 
@@ -38,28 +41,44 @@
 	const LICENCE = 'analyze:licence';
 
 	// ---------------------------------------------------------------- the steps (on the cluster)
-	type StepId = 'folder' | 'genomes' | 'tools' | 'licence' | 'run';
-	type Step = { id: StepId; title: string; done: boolean; summary: string };
+	type StepId = 'account' | 'folder' | 'genomes' | 'licence' | 'databases' | 'run';
+	/** after: how the next step names this one while it waits (after the SLURM account). */
+	type Step = { id: StepId; title: string; after: string; done: boolean; summary: string };
 	const stepped = $derived(!!backend.cluster);
 	$effect(() => {
 		if (backend.cluster && !ws.firstSetup) void ws.loadSetup();
 	});
-	/** The working folder comes first: the genomes, results and databases folders go in it. */
+	/** The working folder: the genomes, results, databases and job history go in it. */
 	const needsWorking = $derived(!!backend.cluster && (ws.configMissing || (!!ws.firstSetup && !ws.firstSetup.working_folder)));
 	const working = $derived(ws.setting('margie_sb.working_folder') || ws.firstSetup?.working_folder || '');
 	const genomeFolder = $derived(ws.genomeFolder || ws.setting('USER_INPUT_DIR') || '');
-	/** An account that has run before has seen the tools. */
-	const ranBefore = $derived(ws.runs.some((r) => r.kind === 'annotate'));
 	const lastName = (p: string) => p.replace(/\/+$/, '').split('/').pop() || p;
+
+	/** The SLURM account: as set, else the one picked here (saved with the working folder), else the user's only one. */
+	const accounts = $derived(ws.firstSetup?.accounts ?? []);
+	const accountSet = $derived(ws.setting('compute.cluster_default.account') || ws.firstSetup?.account || '');
+	const account = $derived(accountSet || ws.chosenAccount || (accounts.length === 1 ? accounts[0] : ''));
+	let typedAccount = $state('');
+	async function pickAccount(a: string) {
+		if (!a) return;
+		// Before there is a config, the pick waits for the working folder (a config read fills an empty one).
+		if (ws.configMissing) ws.chosenAccount = a;
+		else if (await ws.saveSettings({ 'compute.cluster_default.account': a })) void ws.loadSetup();
+	}
+	/** A config without an account, and only one to choose: it is saved without asking. */
+	$effect(() => {
+		if (stepped && !ws.configMissing && ws.firstSetup && !accountSet && accounts.length === 1) void pickAccount(accounts[0]);
+	});
+
 	const steps = $derived.by((): Step[] => {
 		const n = ws.genomes.length;
-		const t = ws.chosenTools.length;
 		return [
-			{ id: 'folder', title: 'Working folder', done: !needsWorking, summary: working },
-			{ id: 'genomes', title: 'Genomes', done: n > 0, summary: `${n} genome${n === 1 ? '' : 's'}${genomeFolder ? ` in ${lastName(genomeFolder)}` : ''}` },
-			{ id: 'tools', title: 'Gene calling and tools', done: ui.prefs.toolsChecked || ranBefore, summary: t ? `${t} tool${t === 1 ? '' : 's'}` : 'gene calling only' },
-			{ id: 'licence', title: 'Licence terms', done: !needsTerms, summary: 'accepted' },
-			{ id: 'run', title: 'Run', done: false, summary: '' }
+			{ id: 'account', title: 'SLURM account', after: 'the SLURM account', done: !!account, summary: account + (!accountSet && accounts.length === 1 ? ' (your only one)' : '') },
+			{ id: 'folder', title: 'Working folder', after: 'the working folder', done: !needsWorking, summary: working },
+			{ id: 'genomes', title: 'Genomes', after: 'the genomes', done: n > 0, summary: `${n} genome${n === 1 ? '' : 's'}${genomeFolder ? ` in ${lastName(genomeFolder)}` : ''}` },
+			{ id: 'licence', title: 'Licence terms', after: 'the licence terms', done: !needsTerms, summary: 'accepted' },
+			{ id: 'databases', title: 'MARGIE’s databases', after: 'MARGIE’s databases', done: !!ws.stores?.ready, summary: 'in your working folder' },
+			{ id: 'run', title: 'Run', after: 'the run', done: false, summary: '' }
 		];
 	});
 	/** The step to take: the first not done (the run, once the others are). */
@@ -70,7 +89,7 @@
 	const isOpen = (i: number, id: StepId) => i === current || (i < current && !!reopened[id]);
 	/** The genomes' box opens with its step. */
 	$effect(() => {
-		if (stepped && isOpen(1, 'genomes') && ui.isFolded(GENOME_TABLE, true)) ui.toggleFold(GENOME_TABLE, true);
+		if (stepped && isOpen(2, 'genomes') && ui.isFolded(GENOME_TABLE, true)) ui.toggleFold(GENOME_TABLE, true);
 	});
 
 	// ---------------------------------------------------------------- the run
@@ -150,7 +169,28 @@
 {/snippet}
 
 {#snippet body(id: StepId)}
-	{#if id === 'folder'}
+	{#if id === 'account'}
+		<div class="card step-card">
+			<p class="step-lead">The SLURM account your jobs run under and are charged to.</p>
+			{#if !ws.firstSetup}
+				<p class="mg-note">Reading your SLURM accounts…</p>
+			{:else if accounts.length > 1}
+				<div class="step-pick" role="radiogroup" aria-label="SLURM account">
+					{#each accounts as a (a)}
+						<label class="step-opt"><input type="radio" name="slurm-account" checked={account === a} onchange={() => pickAccount(a)} /><span class="mg-mono">{a}</span></label>
+					{/each}
+				</div>
+			{:else if accounts.length === 1}
+				<p class="mg-note">Your cluster user has one account, <span class="mg-mono">{accounts[0]}</span>: it is set with the working folder.</p>
+			{:else}
+				<p class="mg-note">No account could be read from SLURM (sacctmgr). Type the one your group uses:</p>
+				<div class="step-pick">
+					<input class="mg-input mg-mono" bind:value={typedAccount} placeholder="account" spellcheck="false" autocomplete="off" aria-label="SLURM account" onkeydown={(e) => e.key === 'Enter' && pickAccount(typedAccount.trim())} />
+					<button type="button" class="pill solid" disabled={!typedAccount.trim()} onclick={() => pickAccount(typedAccount.trim())}>Use it</button>
+				</div>
+			{/if}
+		</div>
+	{:else if id === 'folder'}
 		<div class="card step-card"><WorkingFolderSetup bare /></div>
 	{:else if id === 'genomes'}
 		<p class="step-lead">
@@ -159,17 +199,16 @@
 			the cluster, point the genomes folder at them with Change folders.
 		</p>
 		<GenomesBoard foldId={GENOME_TABLE} />
-	{:else if id === 'tools'}
-		<p class="step-lead">The recommended gene calling and tools are set. Unlock a box to change it; a run uses what is saved.</p>
-		<RunSteps />
-		{#if stateOf(2) === 'current'}
-			<div class="step-go">
-				<button type="button" class="pill solid" onclick={() => ui.update({ toolsChecked: true })}>Continue <ArrowRight size={13} strokeWidth={2.5} /></button>
-			</div>
-		{/if}
 	{:else if id === 'licence'}
 		<div class="card step-card"><Licence /></div>
+	{:else if id === 'databases'}
+		<p class="step-lead">
+			MARGIE’s databases (the MARGIE database, the operon reference, the fingerprint databases and the genome pool) are copied once into
+			your working folder on scratch, from your group’s shared copies, as a short SLURM job. Where your group has none, they start empty.
+		</p>
+		<div class="card step-db"><StoresCheck /></div>
 	{:else}
+		<RunSteps />
 		{@render runCard()}
 	{/if}
 {/snippet}
@@ -192,7 +231,7 @@
 					<div class="step-head">
 						<span class="step-num" aria-hidden="true">{i + 1}</span>
 						<b>{st.title}</b>
-						{#if state === 'later'}<span class="step-sum">after {steps[i - 1].title.toLowerCase()}</span>{/if}
+						{#if state === 'later'}<span class="step-sum">after {steps[i - 1].after}</span>{/if}
 					</div>
 				{/if}
 				{#if isOpen(i, st.id)}
@@ -329,9 +368,21 @@
 	.step-card {
 		padding: var(--cr-box-pad, 16px 18px);
 	}
-	.step-go {
+	.step-pick {
 		display: flex;
-		justify-content: flex-end;
+		flex-wrap: wrap;
+		align-items: center;
+		gap: 8px 18px;
+		margin-top: 10px;
+	}
+	.step-opt {
+		display: inline-flex;
+		align-items: center;
+		gap: 8px;
+		cursor: pointer;
+	}
+	.step-db {
+		padding-top: var(--mg-pad, 16px);
 	}
 
 	/* The licence terms, once: their body pads like the head. */

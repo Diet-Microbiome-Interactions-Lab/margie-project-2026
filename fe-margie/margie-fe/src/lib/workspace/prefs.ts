@@ -84,8 +84,6 @@ export interface UiPrefs {
 	/** Home's logo animations unlocked (Customize → Motion): the three films that end on the logo, picked
 	 * with the dots under it or in Customize. */
 	logoAnimations: boolean;
-	/** Analyze's third step (gene calling and tools) looked at and kept: the steps go on to the licence and the run. */
-	toolsChecked: boolean;
 	/** How much the next run annotates (Custom uses the hand-picked tools), kept across restarts. */
 	toolDepth: 'quick' | 'standard' | 'licensed' | 'custom';
 	toolPick: string[] | null;
@@ -184,7 +182,6 @@ export const DEFAULT_PREFS: UiPrefs = {
 	backdrop: 'plain',
 	homeAnimation: 'logo',
 	logoAnimations: false,
-	toolsChecked: false,
 	toolDepth: 'standard',
 	toolPick: null,
 	quast: false,
@@ -343,7 +340,6 @@ export function sanitizePrefs(raw: unknown, base: UiPrefs = DEFAULT_PREFS): UiPr
 		backdrop: oneOf(r.backdrop, ['glow', 'plain'] as const, base.backdrop),
 		homeAnimation: oneOf(r.homeAnimation, ['logo', 'dna', 'circular', 'confidence'] as const, base.homeAnimation),
 		logoAnimations: typeof r.logoAnimations === 'boolean' ? r.logoAnimations : base.logoAnimations,
-		toolsChecked: typeof r.toolsChecked === 'boolean' ? r.toolsChecked : base.toolsChecked,
 		toolDepth: oneOf(r.toolDepth, ['quick', 'standard', 'licensed', 'custom'] as const, base.toolDepth),
 		quast: typeof r.quast === 'boolean' ? r.quast : base.quast,
 		toolPick: Array.isArray(r.toolPick)
