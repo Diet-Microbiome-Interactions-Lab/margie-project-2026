@@ -31,7 +31,7 @@
 			{
 				"question": "The student plans to compare the four genomes gene by gene. Which setup suits that comparison?",
 				"options": [
-					"Keep the mix, as Prodigal's gene table has RASTtk's columns",
+					"Keep the mix, as Prodigal's gene table has RASTtk's layout",
 					"Keep the mix, as scoring evens out the two callers' calls",
 					"Fill in the table or turn on GTDB-Tk, so RASTtk calls the four",
 					"Run each genome with both callers and keep the longer gene set"

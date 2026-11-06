@@ -178,6 +178,9 @@ def _col(row: dict, name: str) -> str:
     for k, v in row.items():
         if k and k.split(":")[-1].strip() == name:
             return (v or "").strip()
+    # A genome Prodigal called has the gene caller's columns as PRODIGAL_ (RAST_start -> PRODIGAL_start).
+    if name.startswith("RAST_"):
+        return _col(row, "PRODIGAL_" + name[len("RAST_"):])
     return ""
 
 
@@ -188,12 +191,16 @@ _SCHEMA_HELP = {
     "best_consensus_product_descriptor": "the product name the pipeline settled on",
     "best_consensus_product_descriptor_source": "which database that name came from",
     "BEST_PRODUCT_DESCRIPTOR(copied_here_for_convenience)": "same descriptor, duplicated for convenience",
-    "RAST_feature_id": "RAST feature identifier",
+    "RAST_feature_id": "RASTtk's feature identifier",
+    "PRODIGAL_feature_id": "Prodigal's feature identifier, <contig>_<n>",
     "FEATURE_TYPE": "CDS, RNA, etc.",
     "EC_EVIDENCE_STATUS": "state of EC-number evidence for this gene",
     "RAST_start": "start coordinate on its replicon",
     "RAST_end": "end coordinate",
     "RAST_strand": "+ or -",
+    "PRODIGAL_start": "start coordinate on its replicon (Prodigal's gene call)",
+    "PRODIGAL_end": "end coordinate (Prodigal's gene call)",
+    "PRODIGAL_strand": "+ or - (Prodigal's gene call)",
     "CONFIDENCE_TIER": "highest | high | medium | fair | low | NOT_APPLICABLE_NON_CODING",
     "CONFIDENCE_TIER_hybrid": "same scale, operon-context-adjusted variant",
     "NEEDS_REVIEW?": "yes/no — pipeline wants a human to look",
@@ -281,13 +288,20 @@ _BRIEF_FIELDS = ("gene_id", "best_consensus_product_descriptor", "CONFIDENCE_TIE
                  "NEEDS_REVIEW?", "UniOP_OPERON_id", "RAST_start", "RAST_end")
 
 
+def _named(r: dict, name: str) -> str:
+    """The field's name as the record has it: a RAST_ field is PRODIGAL_ in a genome Prodigal called."""
+    if name.startswith("RAST_") and not any(k and k.split(":")[-1].strip() == name for k in r):
+        return "PRODIGAL_" + name[len("RAST_"):]
+    return name
+
+
 def _render_brief(r: dict) -> str:
     """Renders a context-only record as one line of key fields."""
     bits = []
     for f in _BRIEF_FIELDS:
         v = _col(r, f)
         if v:
-            bits.append(f"{f}={v}")
+            bits.append(f"{_named(r, f)}={v}")
     return "    " + "; ".join(bits)
 
 
@@ -301,7 +315,7 @@ def _render_gene(r: dict) -> str:
         if not v:
             continue
         bare = k.split(":")[-1].strip()
-        if bare == "RAST_na_sequence":
+        if bare in ("RAST_na_sequence", "PRODIGAL_na_sequence"):
             v = f"<{len(v)} nt, omitted>"
         elif len(v) > 600:
             v = v[:600] + f" …[truncated, {len(v)} chars total]"
@@ -348,7 +362,7 @@ def _gene_context(rows: list[dict], gene_id: str, organism: str) -> tuple[str, d
         v = (v or "").strip()
         if not v:
             continue
-        if k.split(":")[-1].strip() == "RAST_na_sequence":
+        if k.split(":")[-1].strip() in ("RAST_na_sequence", "PRODIGAL_na_sequence"):
             v = f"<{len(v)} nt, omitted>"
         lines.append(f"  {k.split(':')[-1].strip()}: {v}")
     return "\n".join(lines), {"scope": "gene", "gene_id": gene_id,

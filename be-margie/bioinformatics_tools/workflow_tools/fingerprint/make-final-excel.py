@@ -59,6 +59,8 @@ _COL_WIDTHS: dict[str, int] = {
     "gene_end":        12,
     "RAST_feature_type": 16,
     "RAST_strand":     10,
+    "PRODIGAL_feature_type": 16,
+    "PRODIGAL_strand": 10,
     "operon_id":       16,
     "operon_member_count": 14,
     "operon_gene_position_in_operon": 20,

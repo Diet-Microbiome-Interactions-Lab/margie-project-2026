@@ -68,14 +68,16 @@ export class FinalTally {
 		if (tier) this.#tiers[tier] = (this.#tiers[tier] ?? 0) + 1;
 		this.#envelope ||= get('ENVELOPE') || get('envelope');
 
-		const start = Number(get('RAST_start') || get('gene_start'));
-		const end = Number(get('RAST_end') || get('gene_end'));
+		// The gene caller's columns: RAST_ for RASTtk, PRODIGAL_ for a genome Prodigal called.
+		const caller = (f: string) => get(`RAST_${f}`) || get(`PRODIGAL_${f}`);
+		const start = Number(caller('start') || get('gene_start'));
+		const end = Number(caller('end') || get('gene_end'));
 		if (Number.isFinite(start) && Number.isFinite(end) && start > 0 && end > 0) {
 			const id = get('gene_id');
-			const contig = id.match(/^(.*)_\d+[+-]\d+$/)?.[1] ?? get('RAST_feature_id').match(/^(.*)_\d+$/)?.[1] ?? '';
+			const contig = id.match(/^(.*)_\d+[+-]\d+$/)?.[1] ?? caller('feature_id').match(/^(.*)_\d+$/)?.[1] ?? '';
 			const t = (get('CONFIDENCE_TIER_hybrid') || tier).toLowerCase();
 			const ti = GLYPH_TIERS.indexOf(t);
-			this.#placed.push({ contig, start: Math.min(start, end), end: Math.max(start, end), strand: get('RAST_strand'), tier: ti < 0 ? 5 : ti });
+			this.#placed.push({ contig, start: Math.min(start, end), end: Math.max(start, end), strand: caller('strand'), tier: ti < 0 ? 5 : ti });
 		}
 	}
 

@@ -22,6 +22,9 @@ csv.field_size_limit(10_000_000)
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "labeling"))
 import descriptor_rules as _rules  # noqa: E402
 
+sys.path.append(str(Path(__file__).resolve().parents[1]))
+import gene_caller  # noqa: E402
+
 is_uninformative = _rules.is_uninformative
 
 
@@ -140,7 +143,7 @@ def load_organism(organism: str, labeled_path: Path, operon_path: Path,
                 "aa_length": _to_int(row.get("aa_length")),
                 "start": _to_int(row.get("gene_start")),
                 "end": _to_int(row.get("gene_end")),
-                "strand": (row.get("RAST_strand") or "").strip() or "+",
+                "strand": gene_caller.value(row, "strand").strip() or "+",
                 "operon_id": operon_id if in_operon else "",
                 "in_operon": in_operon,
                 "member_count": op.get("member_count", 0),

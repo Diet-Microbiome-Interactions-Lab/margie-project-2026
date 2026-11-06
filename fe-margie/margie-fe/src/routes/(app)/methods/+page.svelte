@@ -25,7 +25,7 @@
 					n: '3',
 					step: 'Gene calling',
 					tools: ['RASTtk', 'Prodigal'],
-					does: "RASTtk calls and names the genes of each genome with a known domain and genetic code; Prodigal calls those of the others, in prodigal/ with RASTtk's columns, so the later steps are shared.",
+					does: "RASTtk calls and names the genes of each genome with a known domain and genetic code; Prodigal calls those of the others, in prodigal/ in RASTtk's layout under Prodigal's own column names, so the later steps are shared and each column names the caller that made it.",
 					more: { href: '/faq#gene-calling', label: 'How MARGIE calls genes' }
 				}
 			]

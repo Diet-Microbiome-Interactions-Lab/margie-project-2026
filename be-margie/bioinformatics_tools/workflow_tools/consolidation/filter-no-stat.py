@@ -13,6 +13,9 @@ import csv
 import sys
 from pathlib import Path
 
+sys.path.append(str(Path(__file__).resolve().parents[1]))
+import gene_caller  # noqa: E402
+
 csv.field_size_limit(10_000_000)
 
 
@@ -114,8 +117,17 @@ ENVELOPE_COLUMNS: list[tuple[str, str, str]] = [
 
 
 def build_column_plan(header: set[str]) -> list[tuple[str, str, str]]:
-    """Returns the output column plan restricted to columns present in the merged header."""
-    plan: list[tuple[str, str, str]] = list(IDENTITY_COLUMNS)
+    """Returns the output column plan restricted to columns present in the merged header. The gene
+    caller's columns are Prodigal's (PRODIGAL_feature_type, PRODIGAL_strand) for a genome Prodigal
+    called, in place of RASTtk's (gene_caller.py)."""
+    caller = gene_caller.identity_columns(gene_caller.prefix_of(header))
+    plan: list[tuple[str, str, str]] = []
+    for entry in IDENTITY_COLUMNS:
+        if entry[0].startswith(gene_caller.RAST):
+            if entry[0] == gene_caller.RAST + "feature_type":
+                plan.extend((c, c, "copy") for c in caller)
+            continue
+        plan.append(entry)
     for prefix in ANNOTATION_ID_DESCRIPTION_TOOLS:
         id_col, desc_col = f"{prefix}_id", f"{prefix}_description"
         if id_col in header:

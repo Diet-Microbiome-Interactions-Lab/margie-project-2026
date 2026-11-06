@@ -512,7 +512,8 @@ def load_organism_genes(run_root: Path, organism: str) -> pd.DataFrame:
                        keep_default_na=False, engine="python")
     conf = _coerce_numeric(conf)
 
-    coords_cols = ["feature_id", "gene_id", "gene_start", "gene_end", "RAST_strand"]
+    # The strand under the gene caller's name: RAST_strand, or PRODIGAL_strand for a genome Prodigal called.
+    coords_cols = ["feature_id", "gene_id", "gene_start", "gene_end", "RAST_strand", "PRODIGAL_strand"]
     lab = pd.read_csv(_require_organism_file(base, _LABELED), sep="\t", dtype=str,
                       keep_default_na=False, engine="python",
                       usecols=lambda c: c in coords_cols)
@@ -520,6 +521,10 @@ def load_organism_genes(run_root: Path, organism: str) -> pd.DataFrame:
         if c in lab.columns:
             lab[c] = pd.to_numeric(lab[c], errors="coerce")
     df = conf.merge(lab, on="feature_id", how="left")
+    df["gene_strand"] = ""
+    for c in ("PRODIGAL_strand", "RAST_strand"):
+        if c in df.columns:
+            df["gene_strand"] = df[c].where(df[c].fillna("").astype(str) != "", df["gene_strand"])
 
     df["contig"] = df.get("gene_id", "").map(parse_contig)
     df["clean_desc"] = df["best_consensus_product_descriptor"].map(clean_descriptor)
@@ -577,7 +582,7 @@ def build_operons(genes: pd.DataFrame) -> pd.DataFrame:
             "feature_ids": g["feature_id"].tolist(),
             "starts": g["gene_start"].tolist(),
             "ends": g["gene_end"].tolist(),
-            "strands": g.get("RAST_strand", pd.Series([""] * len(g))).tolist(),
+            "strands": g.get("gene_strand", pd.Series([""] * len(g))).tolist(),
             "contigs": g["contig"].tolist(),
             "confidences": pd.to_numeric(
                 g.get("confidence_score", pd.Series([np.nan] * len(g))),

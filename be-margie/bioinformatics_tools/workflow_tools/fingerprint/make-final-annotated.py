@@ -12,7 +12,13 @@ import csv
 import sys
 from pathlib import Path
 
+sys.path.append(str(Path(__file__).resolve().parents[1]))
+import gene_caller  # noqa: E402
+
 csv.field_size_limit(10_000_000)
+
+# The gene caller's columns in _OUT_COLS, named PRODIGAL_ for a genome Prodigal called (gene_caller.py).
+_CALLER_COLS = ("RAST_feature_type", "RAST_strand")
 
 _OUT_COLS = [
     # ── Gene identity and details ──────────────────────────────────────
@@ -111,6 +117,9 @@ def main() -> None:
             raise SystemExit(1)
 
     lab_by_gene  = _load_tsv(lab_path,     "feature_id")
+    # The gene caller's feature type and strand: Prodigal's names for a genome Prodigal called.
+    prefix = gene_caller.prefix_of(next(iter(lab_by_gene.values()), {}))
+    out_cols = [c.replace(gene_caller.RAST, prefix, 1) if c in _CALLER_COLS else c for c in _OUT_COLS]
     fp_by_gene   = _load_tsv(fp_full_path, "feature_id")
 
     out_path.parent.mkdir(parents=True, exist_ok=True)
@@ -124,7 +133,7 @@ def main() -> None:
             print("[make-final-annotated] ERROR: input is empty", file=sys.stderr)
             raise SystemExit(1)
 
-        writer = csv.DictWriter(out_fh, fieldnames=_OUT_COLS, delimiter="\t",
+        writer = csv.DictWriter(out_fh, fieldnames=out_cols, delimiter="\t",
                                 extrasaction="ignore")
         writer.writeheader()
 
@@ -154,8 +163,8 @@ def main() -> None:
                 "aa_length":        lab.get("aa_length", ""),
                 "gene_start":       lab.get("gene_start", ""),
                 "gene_end":         lab.get("gene_end", ""),
-                "RAST_feature_type": lab.get("RAST_feature_type", ""),
-                "RAST_strand":      lab.get("RAST_strand", ""),
+                prefix + "feature_type": lab.get(prefix + "feature_type", ""),
+                prefix + "strand":  lab.get(prefix + "strand", ""),
                 "operon_id":                     row.get("operon_id", ""),
                 "operon_member_count":            row.get("operon_member_count", ""),
                 "operon_gene_position_in_operon": row.get("operon_gene_position_in_operon", ""),

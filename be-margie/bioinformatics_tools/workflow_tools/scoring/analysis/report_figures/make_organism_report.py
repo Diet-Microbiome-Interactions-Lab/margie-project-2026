@@ -290,7 +290,7 @@ def fig05(genes: pd.DataFrame, outdir: Path, org_label: str) -> None:
     """Draws one real genome window with its operons via reportfig_lib.render_operon_page."""
     from matplotlib.patches import Patch
     win = _pick_window(genes)
-    members = [{"start": r.gene_start, "end": r.gene_end, "strand": r.RAST_strand,
+    members = [{"start": r.gene_start, "end": r.gene_end, "strand": r.gene_strand,
                 "label": r.best_consensus_product_descriptor, "operon_id": r.operon_id,
                 "source": getattr(r, "product_descriptor_source", ""),
                 "needs_review": getattr(r, "needs_review", ""),
@@ -318,8 +318,10 @@ def fig05(genes: pd.DataFrame, outdir: Path, org_label: str) -> None:
                          run_root=_RUN_ROOT, note=L.OPERON_CORRECTION_NOTE,
                          footer_sources=L.organism_source_lines(_RUN_ROOT, org_label, coords=True),
                          per_row=10, min_span=10, badges=badges, legend_handles=handles)
+    # The strand keeps the gene caller's name (RAST_strand, or PRODIGAL_strand for Prodigal).
+    strand = next((c for c in ("RAST_strand", "PRODIGAL_strand") if c in win.columns and (win[c].astype(str) != "").any()), "gene_strand")
     out = win[["feature_id", "operon_id", "operon_member_count", "gene_start",
-               "gene_end", "RAST_strand", "best_consensus_product_descriptor",
+               "gene_end", strand, "best_consensus_product_descriptor",
                "confidence_score"]].copy()
     L.write_tsv(out, outdir / "fig05_operon_neighbourhood.tsv")
 

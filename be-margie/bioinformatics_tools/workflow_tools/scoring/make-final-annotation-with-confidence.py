@@ -22,6 +22,9 @@ import c3_occ  # noqa: E402
 import c3_lib as L  # noqa: E402
 import c3_score_organism as C3S  # noqa: E402
 
+sys.path.append(str(_HERE.parent))
+import gene_caller  # noqa: E402
+
 _PAIRWISE_EMPTY = {"", "NA", "N/A", "None", "none", "nan", "NaN"}
 _CONTEXT_THRESHOLD = 0.1
 
@@ -95,6 +98,13 @@ def _excel_col_name(i: int) -> str:
         n, r = divmod(n - 1, 26)
         out.append(chr(ord("A") + r))
     return "".join(reversed(out))
+
+
+def _named_columns(labeled_by_fid: dict) -> list[str]:
+    """BASE_COLUMNS with the gene caller's columns under its name: PRODIGAL_feature_id, PRODIGAL_start
+    ... for a genome Prodigal called, RAST_ ones for RASTtk (gene_caller.py)."""
+    prefix = gene_caller.prefix_of(next(iter(labeled_by_fid.values()), {}))
+    return [c.replace(gene_caller.RAST, prefix, 1) if c.startswith(gene_caller.RAST) else c for c in BASE_COLUMNS]
 
 
 def _prefixed_columns(cols: list[str]) -> list[str]:
@@ -404,7 +414,7 @@ def main() -> None:
         for oid, members in operon_members.items()
     }
 
-    prefixed_cols = _prefixed_columns(BASE_COLUMNS)
+    prefixed_cols = _prefixed_columns(_named_columns(labeled_by_fid))
     col_map = dict(zip(BASE_COLUMNS, prefixed_cols))
 
     out_path = Path(args.output)
@@ -480,8 +490,8 @@ def main() -> None:
                 col_map["envelope"]: cf.get("ENVELOPE_envelope_type", ""),
                 col_map["gene_id"]: lab.get("gene_id", ""),
                 col_map["RAST_feature_id"]: fid,
-                col_map["FEATURE_TYPE"]: cf.get("feature_type", "") or lab.get("RAST_feature_type", ""),
-                col_map["RAST_strand"]: lab.get("RAST_strand", ""),
+                col_map["FEATURE_TYPE"]: cf.get("feature_type", "") or gene_caller.value(lab, "feature_type"),
+                col_map["RAST_strand"]: gene_caller.value(lab, "strand"),
                 col_map["RAST_start"]: lab.get("gene_start", ""),
                 col_map["RAST_end"]: lab.get("gene_end", ""),
                 col_map["RAST_na_sequence"]: lab.get("na_seq", ""),

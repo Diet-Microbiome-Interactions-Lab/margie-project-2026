@@ -19,6 +19,9 @@ import re
 import sys
 from pathlib import Path
 
+sys.path.append(str(Path(__file__).resolve().parents[1]))
+import gene_caller  # noqa: E402
+
 csv.field_size_limit(10_000_000)
 
 _NEUTRAL = 0.5
@@ -174,7 +177,7 @@ def main() -> None:
             loc_by_gene[fid] = {col: row.get(col, "") for col in _LOCALIZATION_COLUMNS}
             spec_by_gene[fid] = _specialized_db_hits(row)
             # Feature type lets later outputs colour non-coding rows.
-            type_by_gene[fid] = (row.get("RAST_feature_type", "") or "").strip()
+            type_by_gene[fid] = gene_caller.value(row, "feature_type").strip()
 
     out_columns = (
         _IDENTITY_COLUMNS

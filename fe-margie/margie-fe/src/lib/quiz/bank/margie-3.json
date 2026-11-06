@@ -765,9 +765,9 @@
 		"topic": "margie",
 		"level": "easy",
 		"kind": "truefalse",
-		"statement": "Prodigal writes a genome's gene calls in RASTtk's columns, so the later phases run on a Prodigal genome as they do on a RASTtk genome.",
+		"statement": "Prodigal writes a genome's gene calls in the layout of RASTtk's table under its own names, so the later phases run on a Prodigal genome as they do on a RASTtk genome.",
 		"answer": true,
-		"explain": "Prodigal writes its gene calls to prodigal/ in RASTtk's columns, so phases 4 to 13 run the same way; its genomes take their product descriptors from the other tools, and C1 reaches at most 6/7."
+		"explain": "Prodigal writes its gene calls to prodigal/ in RASTtk's layout with PRODIGAL_ names (PRODIGAL_strand, PRODIGAL_feature_type), so phases 4 to 13 run the same way and each column names the caller that made it. Its genomes take their product descriptors from the other tools, labeling marks RAST as not run, and C1 reaches at most 6/7."
 	},
 	{
 		"id": "margie3-038",
@@ -1383,5 +1383,14 @@
 		],
 		"answer": 1,
 		"explain": "UniOP's probability says the gene is likely transcribed with its neighbours in this genome, which does not test its best product descriptor. C3 tests the best product descriptor against other genomes, and C2 scales that lift, from half of C3 to the whole of it for an operon gene."
+	},
+	{
+		"id": "margie3-067",
+		"topic": "margie",
+		"level": "medium",
+		"kind": "truefalse",
+		"statement": "In a genome that Prodigal called, the final table names the gene coordinates RAST_start and RAST_end, as it does for a RASTtk genome.",
+		"answer": false,
+		"explain": "Each gene-call column names the caller that made it. A Prodigal genome's final table has PRODIGAL_feature_id | PRODIGAL_strand | PRODIGAL_start | PRODIGAL_end and its sequences under PRODIGAL_, and a RASTtk genome's has the RAST_ ones, so the table shows which caller placed each gene."
 	}
 ]

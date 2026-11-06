@@ -75,18 +75,20 @@ def tally(lines: Iterable[str]) -> dict:
             tiers[tier] = tiers.get(tier, 0) + 1
         envelope = envelope or get('ENVELOPE') or get('envelope')
 
-        start = _number(get('RAST_start') or get('gene_start'))
-        end = _number(get('RAST_end') or get('gene_end'))
+        # The gene caller's columns: RAST_ for RASTtk, PRODIGAL_ for a genome Prodigal called.
+        caller = lambda f: get('RAST_' + f) or get('PRODIGAL_' + f)  # noqa: E731
+        start = _number(caller('start') or get('gene_start'))
+        end = _number(caller('end') or get('gene_end'))
         if start is not None and end is not None and start > 0 and end > 0:
             m = _GENE_CONTIG.match(get('gene_id'))
             if m:
                 contig = m.group(1)
             else:
-                m = _FEATURE_CONTIG.match(get('RAST_feature_id'))
+                m = _FEATURE_CONTIG.match(caller('feature_id'))
                 contig = m.group(1) if m else ''
             t = (get('CONFIDENCE_TIER_hybrid') or tier).lower()
             ti = GLYPH_TIERS.index(t) if t in GLYPH_TIERS else -1
-            placed.append((contig, min(start, end), max(start, end), get('RAST_strand'), 5 if ti < 0 else ti))
+            placed.append((contig, min(start, end), max(start, end), caller('strand'), 5 if ti < 0 else ti))
 
     return {
         'columns': [plain_name(c) for c in columns],

@@ -20,7 +20,11 @@ Usage:
 import argparse
 import csv
 import sys
+from pathlib import Path
 from urllib.parse import quote
+
+sys.path.append(str(Path(__file__).resolve().parents[1]))
+import gene_caller  # noqa: E402
 
 csv.field_size_limit(10_000_000)
 
@@ -76,7 +80,7 @@ def main() -> None:
         gene_id        = row.get("gene_id", "").strip()
         gene_start_raw = row.get("gene_start", "").strip()
         gene_end_raw   = row.get("gene_end", "").strip()
-        strand         = row.get("RAST_strand", ".").strip() or "."
+        strand         = gene_caller.value(row, "strand", ".").strip() or "."
         descriptor     = row.get("best_consensus_product_descriptor", "").strip()
         fp_hash        = row.get("fingerprint_hash", "").strip()
         conf_score     = row.get("confidence_score", ".").strip() or "."

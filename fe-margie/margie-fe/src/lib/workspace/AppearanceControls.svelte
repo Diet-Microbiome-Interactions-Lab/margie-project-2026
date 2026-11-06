@@ -163,11 +163,11 @@
 		<Field title="Logo animations">
 			{#if ui.prefs.logoAnimations}
 				<Seg label="Home's opening" value={ui.prefs.homeAnimation} onpick={(homeAnimation) => ui.update({ homeAnimation })} options={OPENINGS} />
-				<span class="note">Home opens with the one picked here or with the dots under the logo. A click plays a film again; on the logo, a click breaks it into a jigsaw.</span>
+				<span class="note">Home opens with the one picked here or with the dots under the logo. A click plays a film again.</span>
 				<button type="button" class="mg-btn small anim-btn" onclick={() => ui.update({ logoAnimations: false, homeAnimation: 'logo' })}>Lock them again</button>
 			{:else}
 				<button type="button" class="mg-btn small anim-btn" onclick={() => ui.update({ logoAnimations: true })}><Sparkles size={14} />Unlock all logo animations</button>
-				<span class="note">Three films that end on the MARGIE logo (DNA forming, DNA on a circle, a genome gathering confidence) and a logo that breaks into a jigsaw.</span>
+				<span class="note">Three films that end on the MARGIE logo: DNA forming, DNA on a circle, and a genome gathering confidence.</span>
 			{/if}
 		</Field>
 	</section>

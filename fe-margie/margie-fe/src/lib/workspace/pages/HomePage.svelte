@@ -5,10 +5,9 @@
 	import { uiBase } from '../base.svelte';
 	import { ui } from '../ui.svelte';
 	import TabPicture from './home/TabPicture.svelte';
-	import LogoPuzzle from '../LogoPuzzle.svelte';
 	import MargieLogo from '../MargieLogo.svelte';
 	import OpeningFilm from '../OpeningFilm.svelte';
-	import { HOME_FILMS, LOGO_PUZZLE } from '$lib/features';
+	import { HOME_FILMS } from '$lib/features';
 
 	/**
 	 * Home: the logo, what MARGIE is, and where to start; under Learn more, what a run does,
@@ -45,7 +44,6 @@
 		{ id: 'confidence', label: 'Genes gathering evidence and confidence, closing into a genome map' }
 	] as const;
 	const films = $derived(HOME_FILMS || ui.prefs.logoAnimations);
-	const puzzle = $derived(LOGO_PUZZLE || ui.prefs.logoAnimations);
 	const opening = $derived(films ? ui.prefs.homeAnimation : 'logo');
 
 	let open = $state<string | null>(null);
@@ -81,16 +79,14 @@
 
 <div class="home">
 	<section class="hero">
-		<!-- The opening, as picked with the dots: the logo, which turns in and turns again under the pointer
-		     (with the logo animations unlocked, a click breaks it into a jigsaw), or one of the films that end on it.
+		<!-- The opening, as picked with the dots: the logo, which turns in and turns again under the pointer,
+		     or one of the films that end on it.
 		     One box for all, so the page keeps its place when the pick changes. -->
 		<div class="opening" style="--logo: {LOGO}">
 			{#if opening !== 'logo'}
 				<h1 class="opening-box film">
 					{#key opening}<OpeningFilm film={opening} />{/key}<span class="hidden-text">MARGIE</span>
 				</h1>
-			{:else if puzzle}
-				<div class="opening-box"><LogoPuzzle size={LOGO} /></div>
 			{:else}
 				<h1 class="opening-box"><MargieLogo size={LOGO} /></h1>
 			{/if}

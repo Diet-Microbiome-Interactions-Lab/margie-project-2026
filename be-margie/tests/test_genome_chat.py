@@ -73,6 +73,13 @@ def test_settings_are_kept_in_bounds():
     assert s['provider'] == 'anthropic' and s['budget'] == 400000 and s['answerTokens'] == 500 and s['consented'] == ['anthropic']
 
 
+def test_a_genome_name_carries_its_fa1_label():
+    assert gc.safe_genome('GCA_001717135.1_ASM171713v1_genomic--fa1:e20e89ed') == 'GCA_001717135.1_ASM171713v1_genomic--fa1:e20e89ed'
+    for bad in ('..', '../x', 'a/b', 'a b', '', 'a;b'):
+        with pytest.raises(gc.ChatError):
+            gc.safe_genome(bad)
+
+
 def test_the_model_reads_only_inside_the_genomes_folders():
     src = gc.Source(None, 'g1', ['/scratch/c/u/out/run1/g1'], '/scratch/c/u/out/run1/g1/FINAL.tsv')
     assert src.inside('g1/scoring/x.tsv') == '/scratch/c/u/out/run1/g1/scoring/x.tsv'

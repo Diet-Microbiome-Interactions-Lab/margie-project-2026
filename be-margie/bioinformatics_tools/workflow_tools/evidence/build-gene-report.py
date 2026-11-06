@@ -132,7 +132,10 @@ def _row(tool, id_="", desc="", domain="", category="", ec="", score="",
 
 
 def rows_rast(row: dict) -> list[list[str]]:
-    """Returns the RAST row: product description and subsystem."""
+    """Returns the RAST row: product description and subsystem; in a genome Prodigal called,
+    that RASTtk did not run."""
+    if "PRODIGAL_strand" in row and "RAST_strand" not in row:
+        return [_row("RAST", other="not run: Prodigal called this genome's genes")]
     desc = _clean(row.get("RAST_description"))
     if not desc:
         return [_row("RAST")]
@@ -372,24 +375,26 @@ def evidence_block(section_fns: list, row: dict, header: list[str], indent: str 
 # ---- physical neighbor block (peg-number adjacency) -----------------------
 def physical_neighbors_block(fid: str, df_indexed: dict, confidence_final: dict,
                               n: int = OPERON_WINDOW) -> str:
-    """Renders a table of up to n neighbours on each side, found by peg-number adjacency (regex on the feature id).
+    """Renders a table of up to n neighbours on each side, found by gene-number adjacency (regex on the feature id).
 
-    Consecutive peg numbers stand in for consecutive genes on one replicon.
+    Consecutive peg numbers (RASTtk's fig|<genome>.peg.<n>) or gene numbers on a contig
+    (Prodigal's <contig>_<n>) stand in for consecutive genes on one replicon.
     """
-    m = re.match(r'^(fig\|\d+\.\d+\.peg\.)(\d+)$', fid)
+    m = re.match(r'^(fig\|\d+\.\d+\.peg\.)(\d+)$', fid) or re.match(r'^(.+_)(\d+)$', fid)
     if not m:
-        return "Physical neighbor data unavailable (non-peg feature ID)."
+        return "Physical neighbor data unavailable (feature ID without a gene number)."
     prefix, peg_n = m.group(1), int(m.group(2))
     rows = []
     for offset in list(range(-n, 0)) + list(range(1, n + 1)):
-        nbr_fid = f"{prefix}peg.{peg_n + offset}"
+        nbr_fid = f"{prefix}{peg_n + offset}"
         if nbr_fid not in df_indexed:
             continue
         cf_nbr = confidence_final.get(nbr_fid, {})
         label  = (cf_nbr.get("best_consensus_product_descriptor")
                   or cf_nbr.get("best_consensus_product_descriptor")
                   or df_indexed[nbr_fid].get("best_consensus_product_descriptor", "unknown"))
-        strand = _clean(df_indexed[nbr_fid].get("RAST_strand", "?"))
+        nbr = df_indexed[nbr_fid]
+        strand = _clean(nbr.get("RAST_strand") or nbr.get("PRODIGAL_strand") or "?")
         side   = "upstream" if offset < 0 else "downstream"
         rows.append([nbr_fid, f"{offset:+d} ({side})", label[:60], strand])
     if not rows:
@@ -417,7 +422,7 @@ def identity_block(fid: str, row: dict, org_name: str, cf: dict, operon_str: str
         ("Feature ID", fid),
         ("Gene ID", _clean(row.get("gene_id")) or fid),
         ("Location", f"{_clean(row.get('gene_start'))}..{_clean(row.get('gene_end'))} "
-                      f"[{_clean(row.get('RAST_strand'))}]"),
+                      f"[{_clean(row.get('RAST_strand') or row.get('PRODIGAL_strand'))}]"),
         ("Consensus Product Descriptor", cf.get("best_consensus_product_descriptor", "")),
         ("Product Descriptor Source", cf.get("product_descriptor_source", "")),
         ("Operon", operon_str),

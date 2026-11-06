@@ -16,12 +16,20 @@ import hashlib
 import sys
 from pathlib import Path
 
+sys.path.append(str(Path(__file__).resolve().parents[1]))
+import gene_caller  # noqa: E402
+
 csv.field_size_limit(10_000_000)
 
 _KEPT_COLUMNS = [
     "organism_name", "feature_id", "domain", "gene_id", "gene_start", "gene_end",
     "RAST_feature_type", "RAST_strand",
 ]
+
+
+def _kept_columns(prefix: str) -> list[str]:
+    """_KEPT_COLUMNS with the gene caller's feature type and strand (PRODIGAL_ for a genome Prodigal called)."""
+    return [c.replace(gene_caller.RAST, prefix, 1) if c.startswith(gene_caller.RAST) else c for c in _KEPT_COLUMNS]
 
 # Slot order follows assign-canonical-label.py's trust hierarchy; empty slots stay.
 _ALL_IDS_DESC_TOOLS = [
@@ -101,7 +109,6 @@ def main() -> None:
     for p in outputs.values():
         p.parent.mkdir(parents=True, exist_ok=True)
 
-    out_columns = _KEPT_COLUMNS + ["fingerprint"]
 
     n = 0
     no_hit_count = 0
@@ -113,6 +120,8 @@ def main() -> None:
          open(outputs["full_with_scores"], "w", newline="") as f_fws:
 
         reader = csv.DictReader(fh, delimiter="\t")
+        kept = _kept_columns(gene_caller.prefix_of(reader.fieldnames))
+        out_columns = kept + ["fingerprint"]
         writers = {
             key: csv.DictWriter(f, fieldnames=out_columns, delimiter="\t", extrasaction="ignore")
             for key, f in (("hash_pattern", f_hp), ("hash_label", f_hl),
@@ -126,7 +135,7 @@ def main() -> None:
             values = build_fingerprint_values(row)
             h = _sha256(values)
             label = row.get("best_consensus_product_descriptor", "")
-            identity = {col: row.get(col, "") for col in _KEPT_COLUMNS}
+            identity = {col: row.get(col, "") for col in kept}
             scores = build_scores_token(score_by_fid.get(row.get("feature_id", "")))
 
             writers["hash_pattern"].writerow({**identity, "fingerprint": f"pattern hash: {h} || fingerprint: {values}"})

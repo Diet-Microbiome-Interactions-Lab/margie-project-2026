@@ -45,3 +45,53 @@ def test_a_map_names_the_script_version_that_drew_it():
 def test_the_server_says_which_version_is_deployed(authed_client):  # noqa: F811
     r = authed_client.get('/v1/ssh/genome-viewer/version')
     assert r.status_code == 200 and r.json()['version'] == viewer.viewer_version()
+
+
+# C4's reasoning, as the final table writes it.
+CONFLICT = ('EC_reporting_tools_count = 2. EC_conflict_fraction = 1.0000 = conflicting tool-pairs / all EC-reporting tool-pairs. '
+            'C4 is the fraction of confidence retained after EC-conflict penalty. 1/1 EC tool-pairs conflict among 2 tools '
+            '(R=1.0000): EGGNOG: 3.1.3.5,3.1.3.6,3.1.4.16; KEGG: 3.1.31.1 — penalty=(min(m,5)/5)·R=(2/5)·1.0000=0.4000 '
+            '→ c4_score=0.6000 (discounts C1 by 40.0%); categorical status=conflicting')
+
+
+def test_the_map_lists_each_tools_ec_numbers():
+    assert viewer.ec_by_tool(CONFLICT) == [['eggNOG', '3.1.3.5, 3.1.3.6, 3.1.4.16'], ['KEGG', '3.1.31.1']]
+    assert viewer.ec_pairs(CONFLICT) == [1, 1]
+    one = 'EC_reporting_tools_count = 1. ... only one tool reported an EC (KEGG: 1.3.98.3) — nothing independent to conflict with'
+    assert viewer.ec_by_tool(one) == [['KEGG', '1.3.98.3']] and viewer.ec_pairs(one) is None
+    assert viewer.ec_by_tool('EC_reporting_tools_count = 3. ...: EGGNOG: 1.1.1.1; KEGG: 1.3.1.-; RAST: 1.3.1.84 — ...') == [
+        ['eggNOG', '1.1.1.1'], ['KEGG', '1.3.1.-'], ['RAST', '1.3.1.84']]
+    assert viewer.ec_by_tool('no EC number assigned by any tool — no conflict measurable') == []
+
+
+def test_the_map_waits_for_fingerprints_when_they_are_made():
+    smk = (VIEWER.parents[1] / 'margie_sb.smk').read_text()
+    rule = smk.split('rule run_genome_viewer_one_genome:')[1].split('\nrule ')[0]
+    assert "fingerprint_tkn=([FINGERPRINT_COMPUTE_TOKEN] if rc_bool('run_fingerprint', False, config=config) else [])" in rule
+
+
+def test_a_drawn_map_carries_fingerprints_and_ec_numbers(tmp_path):
+    import base64, gzip, json, re, sys
+    from unittest.mock import patch
+    g = tmp_path / 'g1'
+    (g / 'fingerprint').mkdir(parents=True)
+    (g / 'fingerprint' / 'labeled-genes-fingerprint-full.tsv').write_text(
+        'feature_id\tfingerprint\nfig|1.1.peg.1\tpattern hash: ab12 || label: X || fingerprint: KEGG_id: K1 | PFAM_id: PF1\n')
+    head = ['organism_name', 'gene_id', 'RAST_feature_id', 'RAST_start', 'RAST_end', 'RAST_strand', 'CONFIDENCE_TIER',
+            'C4_score_EC_conflict', 'C4_score_reasoning', 'best_consensus_product_descriptor']
+    row = ['G', 'c1_10+300', 'fig|1.1.peg.1', '10', '309', '+', 'medium', '0.6', CONFLICT, 'a nuclease']
+    (g / 'scoring').mkdir()
+    final = g / 'scoring' / 'FINAL_ANNOTATION_WITH_CONFIDENCE.tsv'
+    final.write_text('\t'.join(head) + '\n' + '\t'.join(row) + '\n')
+    out = tmp_path / 'map.html'
+    with patch.object(sys, 'argv', ['gen_genome_viewer.py', str(final), str(out)]):
+        viewer.main()
+    html = out.read_text()
+    d = json.loads(re.search(r'const D = (\{.*?\});\n', html).group(1))
+    gene = d['genes'][0]
+    assert d['fpMade'] is True and gene['fp'] == 1 and gene['ecp'] == [1, 1]
+    assert gene['ec'][0] == ['eggNOG', '3.1.3.5, 3.1.3.6, 3.1.4.16']
+    packed = re.search(r'id="xtra">([^<]+)<', html).group(1)
+    extras = json.loads(gzip.decompress(base64.b64decode(packed)))
+    x = dict(zip(extras['fields'], extras['rows'][0]))
+    assert x['fingerprint_hash'] == 'ab12' and x['fingerprint_label'] == 'X' and 'PFAM_id: PF1' in x['fingerprint_line']

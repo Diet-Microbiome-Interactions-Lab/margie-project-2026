@@ -104,8 +104,9 @@ class ReadError(Exception):
 
 
 def safe_genome(g) -> str:
+    """A genome's name as its folder is named, <file stem>--fa1:<8 hex>, so a colon is allowed."""
     s = str(g or '')
-    if not re.fullmatch(r'[\w.-]+', s) or s in ('.', '..'):
+    if not re.fullmatch(r'[\w.:-]+', s) or s in ('.', '..'):
         raise ChatError('That is not a genome name.', 400)
     return s
 
@@ -365,7 +366,9 @@ class Source:
         return f'{text}\n[only the first megabyte of this file can be read from here]' if len(raw) > READ_LIMIT else text
 
 
-KEEP = ['gene_id', 'RAST_feature_id', 'FEATURE_TYPE', 'RAST_start', 'RAST_end', 'IS_IN_OPERON?', 'UniOP_OPERON_id',
+# The gene caller's columns are RAST_ for RASTtk and PRODIGAL_ for a genome Prodigal called.
+KEEP = ['gene_id', 'RAST_feature_id', 'PRODIGAL_feature_id', 'FEATURE_TYPE', 'RAST_start', 'RAST_end', 'PRODIGAL_start', 'PRODIGAL_end',
+        'IS_IN_OPERON?', 'UniOP_OPERON_id',
         'best_consensus_product_descriptor', 'best_consensus_product_descriptor_source',
         'ADJUSTED_CONFIDENCE_WITH_OPERON_CONTEXT', 'CONFIDENCE_TIER', 'NEEDS_REVIEW?', 'NEEDS_REVIEW_REASON']
 

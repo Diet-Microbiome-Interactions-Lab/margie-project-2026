@@ -26,7 +26,7 @@ GLOBAL_COLUMNS: frozenset[str] = frozenset({
     "ENVELOPE_envelope_type", "ENVELOPE_inference_basis", "ENVELOPE_evidence_json",
 })
 
-# Identity columns copied from rasttk rows; GLOBAL_COLUMNS, so never prefixed.
+# Identity columns copied from the gene caller's rows (RASTtk's or Prodigal's); GLOBAL_COLUMNS, so never prefixed.
 RASTTK_IDENTITY_COLUMNS: tuple[str, ...] = (
     "gene_id", "gene_start", "gene_end", "na_length", "aa_length", "na_seq", "aa_seq",
 )
@@ -37,7 +37,7 @@ TOOL_PREFIX_MAP: dict[str, str] = {
     "geneprop_": "GENEPROP_", "dbcan_": "DBCAN_", "kegg_": "KEGG_",
     "cog_": "COG_", "merops_": "MEROPS_", "tcdb_": "TCDB_",
     "uniprot_": "UNIPROT_", "eggnog_": "EGGNOG_", "interpro_": "INTERPRO_",
-    "rast_": "RAST_", "rasttk_": "RASTTK_", "signalp4_": "SIGNALP4_",
+    "rast_": "RAST_", "rasttk_": "RASTTK_", "prodigal_": "PRODIGAL_", "signalp4_": "SIGNALP4_",
     "signalp6_": "SIGNALP6_", "phobius_": "PHOBIUS_", "operon_": "OPERON_",
 }
 
@@ -252,6 +252,7 @@ IDENTITY_COLUMNS: list[str] = [
     "gene_id", "gene_start", "gene_end",
     "na_length", "aa_length",
     "RAST_feature_type", "RAST_strand", "RAST_description",
+    "PRODIGAL_feature_type", "PRODIGAL_strand",
     "na_seq", "aa_seq",
 ]
 

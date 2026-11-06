@@ -1177,11 +1177,13 @@ rule run_report_figures_one_genome:
 
 
 rule run_genome_viewer_one_genome:
-    """Builds the HTML genome viewer and the circular map; errors are logged and skipped."""
+    """Builds the HTML genome viewer and the circular map; errors are logged and skipped. With
+    fingerprints on, it waits for them, so the map carries each gene's fingerprint."""
     input:
         scoring_tkn=SCORING_COMPUTE_TOKEN,
         final_with_confidence=SCORING_FINAL_ANNOTATION_WITH_CONFIDENCE,
-        merged=CONSOLIDATION_MERGED
+        merged=CONSOLIDATION_MERGED,
+        fingerprint_tkn=([FINGERPRINT_COMPUTE_TOKEN] if rc_bool('run_fingerprint', False, config=config) else [])
     output:
         tkn=GENOME_VIEWER_TOKEN
     params:
@@ -2078,7 +2080,9 @@ rule run_rasttk:
 
 rule run_prodigal:
     """Phase3: Prodigal gene calls for PRODIGAL_GENOMES (domain or code unknown): the proteins, the GFF
-    and the gene table (in rast.tsv's columns), in prodigal/."""
+    and the gene table, in prodigal/. The table has rast.tsv's layout under Prodigal's names
+    (PRODIGAL_strand, PRODIGAL_feature_type; gene_caller.py) and no description, as Prodigal names
+    no function; a container that writes RASTtk's names has them renamed here."""
     input:
         fasta=lambda wildcards: GENOMES[wildcards.genome],
         info=GENOME_INFO
@@ -2110,7 +2114,8 @@ rule run_prodigal:
         /usr/local/bin/run -i "$FASTA" -o {params.output_dir} -g "${{GCODE:-11}}" --domain "${{DOMAIN:-Unknown}}" --organism-name {wildcards.genome} --force
         cp {params.output_dir}/gene_calls/genome.faa {output.faa}
         cp {params.output_dir}/gene_calls/genome.gff {output.gff}
-        cp {params.output_dir}/processed/prodigal_gene_calls.tsv {output.results}
+        # RAST_ names become PRODIGAL_ ones, and the empty RAST_description is left out.
+        awk -F'\\t' -v OFS='\\t' 'NR==1{{for(i=1;i<=NF;i++){{if($i=="RAST_description") d=i; else sub(/^RAST_/,"PRODIGAL_",$i)}}}} {{o=""; n=0; for(i=1;i<=NF;i++) if(i!=d) o=(n++ ? o OFS : "") $i; print o}}' {params.output_dir}/processed/prodigal_gene_calls.tsv > {output.results}
         echo "prodigal complete for {wildcards.genome}" > {output.tkn}
         """
 

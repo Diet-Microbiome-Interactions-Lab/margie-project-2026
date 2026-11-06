@@ -30,6 +30,9 @@ csv.field_size_limit(10_000_000)
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 import descriptor_rules as R  # noqa: E402
 
+sys.path.append(str(Path(__file__).resolve().parents[1]))
+import gene_caller  # noqa: E402
+
 _NULLISH_UNINFORMATIVE = R.NULLISH
 is_uninformative = R.is_uninformative
 
@@ -132,6 +135,10 @@ class ToolEvaluation(NamedTuple):
     all_descriptions: str = ""   # every hit's description, raw "id: desc; ..." form
     all_stats: str = ""      # every hit's stat, raw "id: val; ..." form
     confirmatory: bool = False   # True for MEROPS/TCDB/DBCAN -- reference only, never a winner
+
+
+# The gate note of a tool that did not run for the genome (RASTtk, in a genome Prodigal called).
+_NOT_RUN = "not run"
 
 
 def _no_hit(tool_name: str, confirmatory: bool = False) -> ToolEvaluation:
@@ -296,7 +303,10 @@ def eval_cog(row: dict[str, str]) -> ToolEvaluation:
 
 # ─── RAST ────────────────────────────────────────────────────────────────────────
 def eval_rast(row: dict[str, str]) -> ToolEvaluation:
-    """Evaluates the RAST/SEED description (no id or e-value), accepted on presence."""
+    """Evaluates the RAST/SEED description (no id or e-value), accepted on presence. In a genome
+    Prodigal called, RASTtk did not run, and the hierarchy and audit trail say so."""
+    if gene_caller.prefix_of(row) == gene_caller.PRODIGAL:
+        return ToolEvaluation("RAST", "", "", False, True, _NOT_RUN, False)
     desc = row.get("RAST_description", "")
     if not desc:
         return _no_hit("RAST")
@@ -361,6 +371,7 @@ def build_audit_trail(evaluations: list[ToolEvaluation], winner: Optional[ToolEv
     trail_parts = []
     for ev in evaluations:
         tag = "WINNER" if winner is ev else (
+            "not_run" if ev.gate_note == _NOT_RUN else
             "no_hit" if not ev.description else
             "uninformative" if not ev.informative else
             "gate_failed" if not ev.gate_passed else
@@ -376,7 +387,8 @@ def build_audit_trail(evaluations: list[ToolEvaluation], winner: Optional[ToolEv
 def build_hierarchy(evaluations: list[ToolEvaluation], winner: Optional[ToolEvaluation]) -> str:
     """Returns the priority-ordered tool chain marked hit/no hit, with the winner and its gate note."""
     chain = " > ".join(
-        f"{ev.tool_name}({'hit' if ev.description else 'no hit'})" for ev in evaluations
+        f"{ev.tool_name}({'hit' if ev.description else _NOT_RUN if ev.gate_note == _NOT_RUN else 'no hit'})"
+        for ev in evaluations
     )
     if winner is None:
         return f"{chain} (no qualifying winner -- every hit failed its gate or was uninformative)"
@@ -435,7 +447,8 @@ def assign_label(
 
 
 # ─── CLI ──────────────────────────────────────────────────────────────────────
-# Output column order: identity, label, per-tool evidence, RAST, confirmatory tools.
+# Output column order: identity (with the gene caller's feature type and strand), label, per-tool
+# evidence, RAST, confirmatory tools.
 
 _IDENTITY_COLUMNS = [
     "organism_name", "feature_id", "na_seq", "aa_seq", "na_length", "aa_length",
@@ -443,6 +456,12 @@ _IDENTITY_COLUMNS = [
     "domain", "gene_id", "gene_start", "gene_end",
     "RAST_feature_type", "RAST_strand",
 ]
+
+
+def _identity_columns(prefix: str) -> list[str]:
+    """_IDENTITY_COLUMNS with the gene caller's feature type and strand (PRODIGAL_ for a genome
+    Prodigal called; gene_caller.py)."""
+    return [c.replace(gene_caller.RAST, prefix, 1) if c.startswith(gene_caller.RAST) else c for c in _IDENTITY_COLUMNS]
 
 # tool_name -> name used for its stat columns (e.g. "evalue").
 _STAT_LABELS: dict[str, str] = {
@@ -465,6 +484,12 @@ def _evidence_columns(tool_name: str) -> list[str]:
 _DECISION_TOOL_NAMES = ["PGAP", "NCBIFAM", "TIGRFAM", "HAMAP", "PIRSF", "UNIPROT",
                         "KEGG", "EGGNOG", "PFAM", "CDD", "COG"]
 _CONFIRMATORY_TOOL_NAMES = ["MEROPS", "TCDB", "DBCAN"]
+
+def _output_columns(prefix: str) -> list[str]:
+    """The output columns for a genome whose genes this caller called; RAST_description only for RASTtk."""
+    rest = _OUTPUT_COLUMNS[len(_IDENTITY_COLUMNS):]
+    return _identity_columns(prefix) + [c for c in rest if prefix == gene_caller.RAST or c != "RAST_description"]
+
 
 _OUTPUT_COLUMNS = (
     _IDENTITY_COLUMNS
@@ -514,13 +539,15 @@ def main() -> None:
     n = 0
     with open(input_path, newline="") as fh, open(output_path, "w", newline="") as out_fh:
         reader = csv.DictReader(fh, delimiter="\t")
-        writer = csv.DictWriter(out_fh, fieldnames=_OUTPUT_COLUMNS, delimiter="\t", extrasaction="ignore")
+        prefix = gene_caller.prefix_of(reader.fieldnames)
+        identity = _identity_columns(prefix)
+        writer = csv.DictWriter(out_fh, fieldnames=_output_columns(prefix), delimiter="\t", extrasaction="ignore")
         writer.writeheader()
         for row in reader:
             (label, source, source_id, hierarchy, trail,
              evaluations, confirmatory_evals, confirmatory_summary) = assign_label(row)
 
-            out_row = {col: row.get(col, "") for col in _IDENTITY_COLUMNS}
+            out_row = {col: row.get(col, "") for col in identity}
             out_row["best_consensus_product_descriptor"] = label
             out_row["product_descriptor_source"] = source
             out_row["product_descriptor_source_id"] = source_id
@@ -530,7 +557,8 @@ def main() -> None:
                 if ev.tool_name == "RAST":
                     continue  # RAST has only RAST_description, written below
                 _write_evidence(out_row, ev)
-            out_row["RAST_description"] = row.get("RAST_description", "")
+            if prefix == gene_caller.RAST:
+                out_row["RAST_description"] = row.get("RAST_description", "")
             for ev in confirmatory_evals:
                 _write_evidence(out_row, ev)
             out_row["product_descriptor_confirmatory_summary"] = confirmatory_summary

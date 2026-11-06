@@ -21,7 +21,7 @@
 		"kind": "truefalse",
 		"statement": "MARGIE calls a genome's genes with RASTtk when its domain and genetic code are known, from the genome table or from GTDB-Tk, and otherwise, for a genome new to the MARGIE database, calls them with Prodigal.",
 		"answer": true,
-		"explain": "RASTtk needs both the domain and the genetic code, so the gene caller is chosen genome by genome: GTDB-Tk supplies both when it runs, and with GTDB-Tk off the genome table gives them. Prodigal writes its gene calls to its own prodigal/ folder, with its gene table in RASTtk's columns, so the later steps are shared. A genome whose sequence already has RASTtk results in the MARGIE database takes those instead of Prodigal's."
+		"explain": "RASTtk needs both the domain and the genetic code, so the gene caller is chosen genome by genome: GTDB-Tk supplies both when it runs, and with GTDB-Tk off the genome table gives them. Prodigal writes its gene calls to its own prodigal/ folder, with its gene table in RASTtk's layout under Prodigal's own names (PRODIGAL_strand, PRODIGAL_feature_type), so the later steps are shared. A genome whose sequence already has RASTtk results in the MARGIE database takes those instead of Prodigal's."
 	},
 	{
 		"id": "margie-003",

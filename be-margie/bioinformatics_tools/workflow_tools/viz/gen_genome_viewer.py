@@ -80,6 +80,33 @@ def c1_counted(reasoning: str) -> list[str]:
     return out
 
 
+# C4's reasoning lists each tool's EC numbers ("EGGNOG: 3.1.3.5,3.1.3.6; KEGG: 3.1.31.1"); the map names
+# the tools as the evidence trail does.
+_EC = r"\d+\.(?:\d+|-)\.(?:\d+|-)\.(?:\d+|-)"
+_EC_LIST = re.compile(rf"\b([A-Z][A-Z0-9_]*): ({_EC}(?:,{_EC})*)")
+_EC_PAIRS = re.compile(r"(\d+)/(\d+) EC tool-pairs conflict")
+EC_TOOL_NAMES = {"RAST": "RAST", "DBCAN": "dbCAN", "EGGNOG": "eggNOG", "KEGG": "KEGG", "TCDB": "TCDB", "COG": "COG",
+                 "TIGRFAM": "TIGRFAM", "PFAM": "Pfam", "PGAP": "PGAP", "MEROPS": "MEROPS", "UNIPROT": "UniProt",
+                 "INTERPRO": "InterPro", "GENEPROP": "GenProp"}
+
+
+def ec_by_tool(reasoning: str) -> list[list[str]]:
+    """Returns [[tool, "EC, EC"]] from C4's reasoning, in its order; empty when no tool reported an EC."""
+    out, seen = [], set()
+    for m in _EC_LIST.finditer(reasoning or ""):
+        name = EC_TOOL_NAMES.get(m.group(1), m.group(1))
+        if name not in seen:
+            seen.add(name)
+            out.append([name, ", ".join(m.group(2).split(","))])
+    return out
+
+
+def ec_pairs(reasoning: str) -> list[int] | None:
+    """Returns [conflicting, all] EC tool pairs from C4's reasoning, or None when it names none."""
+    m = _EC_PAIRS.search(reasoning or "")
+    return [int(m.group(1)), int(m.group(2))] if m else None
+
+
 def viewer_version() -> str:
     """A short hash of this script: the same script always draws the same kind of map."""
     import hashlib
@@ -310,7 +337,8 @@ def main():
         c4v = num(col(r, "C4_score_EC_conflict"))
         # Regions RASTtk reports beside the genes (prophages, repeats, CRISPR arrays) span many genes.
         ftype = col(r, "FEATURE_TYPE").strip().lower()
-        genes.append({
+        c4_why = col(r, "C4_score_reasoning")
+        gene = {
             "s": s, "e": e,
             "rg": 1 if ftype and ftype not in ("cds", "peg", "rna") else 0,
             "st": -1 if col(r, "RAST_strand").strip() == "-" else 1,
@@ -331,16 +359,24 @@ def main():
             "tih": TIER_IDX.get(col(r, "CONFIDENCE_TIER_hybrid").strip(), -1),
             "imp": 1 if col(r, "DOES_OPERON_CONTEXT_IMPROVE_CONFIDENCE?").strip().lower() in ("increases", "yes") else 0,
             "ecs": col(r, "EC_EVIDENCE_STATUS"),
-            "c4r": col(r, "C4_score_reasoning")[:200] if (c4v is not None and c4v < 1) else "",
             "rv": 1 if rv else 0,
             "rr": col(r, "NEEDS_REVIEW_REASON") if rv else "",
             "src": col(r, "best_consensus_product_descriptor_source"),
             "up": uniprot_hit(col(r, "RAST_feature_id")),
             "ev": evidence_of(col(r, "RAST_feature_id")),
             "fid": col(r, "RAST_feature_id"),
-            "fp": ({k: v for k, v in fps[col(r, "RAST_feature_id")].items() if k != "raw"} if col(r, "RAST_feature_id") in fps else None),
-        })
-        extras.append([col(r, k) for k in XF] + [(fps.get(col(r, "RAST_feature_id")) or {}).get("raw", "")])
+            # The fingerprint itself travels gzipped with the report text (extras), read when a gene is opened.
+            "fp": 1 if col(r, "RAST_feature_id") in fps else 0,
+        }
+        # Each tool's EC numbers, and how many tool pairs disagree when C4 is below 1 (only when there are any).
+        ecs = ec_by_tool(c4_why)
+        if ecs:
+            gene["ec"] = ecs
+        if c4v is not None and c4v < 1 and ec_pairs(c4_why):
+            gene["ecp"] = ec_pairs(c4_why)
+        genes.append(gene)
+        fp = fps.get(col(r, "RAST_feature_id")) or {}
+        extras.append([col(r, k) for k in XF] + [fp.get("raw", ""), fp.get("h", ""), fp.get("l", "")])
 
     n_op = len({g["op"] for g in genes if g["op"]})
     n_flag = sum(g["rv"] for g in genes)
@@ -351,9 +387,11 @@ def main():
         "contigs": contigs, "genes": genes,
         "nOperons": n_op, "nFlag": n_flag,
         "totLen": sum(clen.values()),
+        # Whether the fingerprint table was there when the map was drawn.
+        "fpMade": bool(fps),
         "evNames": EV_NAMES, "evGroups": EV_GROUPS,
     }
-    packed = base64.b64encode(gzip.compress(json.dumps({"fields": XF + ["fingerprint_line"], "rows": extras},
+    packed = base64.b64encode(gzip.compress(json.dumps({"fields": XF + ["fingerprint_line", "fingerprint_hash", "fingerprint_label"], "rows": extras},
                                                         separators=(",", ":")).encode("utf-8"), 9)).decode("ascii")
     html = TEMPLATE.replace("/*__DATA__*/", json.dumps(data, separators=(",", ":"))).replace("__XTRA__", packed)
 
@@ -424,9 +462,20 @@ TEMPLATE = r"""<!doctype html>
   .zbtn.on{background:var(--ink);color:#fff;border-color:var(--ink)}
   svg{width:100%;height:auto;display:block;touch-action:none}
   .gene{cursor:pointer}
-  .sel{stroke:#111;stroke-width:2;paint-order:stroke}
+  /* Outlines keep their width at any zoom. */
+  .sel{stroke:#111;stroke-width:2;paint-order:stroke;vector-effect:non-scaling-stroke}
   .dim{opacity:.16}
-  .hi{stroke:#111;stroke-width:1.1}
+  .hi{stroke:#111;stroke-width:1.1;vector-effect:non-scaling-stroke}
+  #lin .sel{stroke:#000;stroke-width:3}
+  .pin{pointer-events:none}
+  #map text{user-select:none;-webkit-user-select:none}
+  /* Find a gene: by position, range, feature id or name. */
+  .find{display:flex;gap:6px;align-items:center;margin:2px 0 6px;max-width:560px}
+  .find input{flex:1 1 auto;min-width:0;font-family:inherit;font-size:13px;padding:5px 8px;border:1px solid var(--line);border-radius:6px;background:#fff;color:var(--ink)}
+  .findres{max-width:560px;margin:0 0 8px;border:1px solid var(--line);border-radius:4px;font-size:12.5px;max-height:220px;overflow:auto}
+  .findres .fnote{padding:5px 10px;color:var(--muted)}
+  .findres .mrow{border-radius:0;border-top:1px solid #eee}
+  .findres .mrow.on{background:#f3f6ff}
   .plate{position:relative}
   .zoombar{position:absolute;top:6px;right:6px;z-index:2;display:flex;gap:4px;align-items:center}
   .zbtn{font-family:inherit;font-size:14px;line-height:1;width:26px;height:26px;
@@ -512,7 +561,7 @@ TEMPLATE = r"""<!doctype html>
   .uphit .uninf{color:#c0143c}
   .oplink{color:var(--operon);cursor:pointer;text-decoration:underline;text-underline-offset:2px}
   #tip{position:fixed;pointer-events:none;background:#ffffff;color:#000000;font-size:11.5px;
-    padding:6px 9px;border:1px solid #000000;max-width:280px;opacity:0;transition:opacity .08s;z-index:9;line-height:1.35}
+    padding:6px 9px;border:1px solid #000000;max-width:320px;opacity:0;transition:opacity .08s;z-index:9;line-height:1.35}
   #tip b{color:#000000;font-weight:bold}
   .foot{font-size:11.5px;color:#000000;margin-top:12px}
 </style>
@@ -544,6 +593,11 @@ TEMPLATE = r"""<!doctype html>
         <span id="linPos" class="linpos"></span>
       </span>
     </div>
+    <form class="find" id="find" role="search" autocomplete="off">
+      <input id="findQ" type="search" placeholder="Find a gene: 991414 | 991.4 kb | 990000-995000 | contig:position | feature id | name" aria-label="Find a gene by position, range, feature id or name">
+      <button class="zreset" type="submit">Find</button>
+    </form>
+    <div class="findres" id="findRes" hidden></div>
     <div class="plate" id="circPlate">
       <div class="zoombar">
         <button id="zarea" class="zbtn" type="button" title="Drag a box to zoom into it (or hold Shift and drag)" aria-label="Zoom into an area"><svg viewBox="0 0 16 16" width="13" height="13" aria-hidden="true"><rect x="2.5" y="2.5" width="11" height="11" fill="none" stroke="currentColor" stroke-width="1.4" stroke-dasharray="3 2"/></svg></button>
@@ -683,6 +737,18 @@ D.genes.forEach((g,i)=>{
   if(g.rv){const mid=(aHi+aLo)/2;const[x0,y0]=pol(R.tick-6,mid),[x1,y1]=pol(R.tick+6,mid);
     const ln=el("line",{x1:x0,y1:y0,x2:x1,y2:y1,stroke:FLAG,"stroke-width":.9}); ln.dataset.flag=i; flagLayer.appendChild(ln);}
 });
+// The selected gene's pin, outside the backbone, so it shows on the whole circle too. PIN_K is the
+// zoom (shown width / full width), so the pin keeps one size on screen at any zoom.
+const pinLayer=el("g",{class:"pin"}); svg.appendChild(pinLayer);
+let PIN_K=1, PIN_AT=null;
+function pinGene(i){
+  PIN_AT=i; pinLayer.innerHTML="";
+  if(i==null) return;
+  const k=PIN_K, g=D.genes[i], a=ang(g.ci,(g.s+g.e)/2), [x0,y0]=pol(R.bbO+2*k,a), [x1,y1]=pol(R.bbO+15*k,a);
+  pinLayer.appendChild(el("line",{x1:x0,y1:y0,x2:x1,y2:y1,stroke:"#ffffff","stroke-width":4.5*k,"stroke-linecap":"round"}));
+  pinLayer.appendChild(el("line",{x1:x0,y1:y0,x2:x1,y2:y1,stroke:"#000000","stroke-width":2*k,"stroke-linecap":"round"}));
+  pinLayer.appendChild(el("circle",{cx:x1,cy:y1,r:3.6*k,fill:"#000000",stroke:"#ffffff","stroke-width":1.2*k}));
+}
 // centre label
 const cInfo=el("text",{x:CX,y:CY+2,"font-size":14,fill:"#000000","text-anchor":"middle"});
 cInfo.textContent=(D.totLen/1e6).toFixed(2)+" Mb  |  "+D.genes.length.toLocaleString()+" genes"; svg.appendChild(cInfo);
@@ -817,9 +883,21 @@ function applySelection(){
   } else if(selKind==="gene" && selVal!=null){
     nodes[selVal].classList.add("sel");
   }
+  pinGene(selKind==="gene"?selVal:null);
+  // The linear view shows the same selection.
+  if(typeof LIN!=="undefined" && LIN.visible()) LIN.render();
 }
 function pct(v){return v==null?"—":(+v).toFixed(2);}   // model scores are 0–1; show as decimals
 function tierBadge(ti){return ti<0?["non-coding","#999"]:[TIER_NAMES[ti],TIER_COL[ti]];}
+/** Each tool's EC numbers, as C4 compared them: "eggNOG 3.1.3.5, 3.1.3.6 | KEGG 3.1.31.1". */
+function ecText(g){return (g.ec||[]).map(([t,e])=>`${t} ${e}`).join(" | ");}
+/** One tool's EC numbers, when its description on the evidence trail does not carry them. */
+function ecFor(g,name,desc){ const r=(g.ec||[]).find(([t])=>t===name); return r&&!/\bEC[: ]?\d/.test(desc)?r[1]:""; }
+/** Why C4 is below 1: how many tool pairs disagree, and on which EC numbers. */
+function ecConflict(g){
+  const p=g.ecp, pairs=p?`${p[0]} of ${p[1]} ${p[1]===1?"tool pair":"tool pairs"} ${p[0]===1?"disagrees":"disagree"}`:"The tools disagree on the EC number";
+  return pairs+(g.ec?`: ${ecText(g)}`:"");
+}
 function bar(v,c){return `<div class="bar"><i style="width:${Math.round((v||0)*100)}%;background:${c}"></i></div>`;}
 
 function geneCard(i){
@@ -837,6 +915,7 @@ function geneCard(i){
   h+=`<b>C2 operon membership</b><span>${pct(g.c2)} (${g.op?"in an operon":"singleton"})</span>`;
   h+=`<b>C3 operon context</b><span>${pct(g.c3)} (adj) | ${pct(g.c3h)} (hyb)</span>`;
   h+=`<b>C4 EC agreement</b><span>${pct(g.c4)}${g.ecs?" | "+esc(g.ecs):""}</span>`;
+  if(g.ec) h+=`<b>EC numbers by tool</b><span>${esc(ecText(g))}</span>`;
   h+=`</div>`;
   h+=`<div class="kv"><b>preliminary (C1 × C4)</b><span>${pct(g.pre)}</span></div>${bar(g.pre,"#888")}`;
   h+=`<div class="kv"><b>final confidence</b><span>${pct(g.fin)} (adj) | ${pct(g.finh)} (hyb)</span></div>${bar(g.fin,tc)}`;
@@ -849,9 +928,24 @@ function geneCard(i){
   return h;
 }
 // The gene's fingerprint: its label, and the fields that are filled in (the hash kept small).
+// It is read from the gzipped extras when the gene opens (fillFingerprint).
 function fingerprintBox(g){
-  const fp=g.fp;
-  if(!fp) return "";
+  if(!g.fp) return D.fpMade?"":`<div class="trail"><h4>fingerprint</h4><div class="cnt">The fingerprint table was not there when this map was drawn; Redraw the map in MARGIE's Results adds it.</div></div>`;
+  return `<div class="trail" id="fpbox"><h4>fingerprint</h4><div class="cnt">reading…</div></div>`;
+}
+/** A gene's fingerprint from its extras row: {l: label, h: pattern hash, f: [[field, value]]}. */
+function fpOf(x){
+  const f=[];
+  String(x.fingerprint_line||"").split(" | ").forEach(seg=>{ const j=seg.indexOf(":"); if(j<0) return;
+    const k=seg.slice(0,j).trim(), v=seg.slice(j+1).trim(); if(k&&v) f.push([k,v]); });
+  return {l:x.fingerprint_label||"", h:x.fingerprint_hash||"", f};
+}
+async function fillFingerprint(i){
+  if(!D.genes[i].fp) return;
+  const X=await extras(), b=document.getElementById("fpbox");
+  if(b&&selKind==="gene"&&selVal===i) b.outerHTML=fingerprintHTML(fpOf(X[i]||{}));
+}
+function fingerprintHTML(fp){
   let h=`<div class="trail"><h4>fingerprint</h4>`;
   if(fp.l) h+=`<div class="cnt">label: <b>${esc(fp.l)}</b></div>`;
   h+=`<div class="fpgrid">`;
@@ -908,23 +1002,26 @@ function geneSections(i,X,pad){
   kv(1,"C3 operon context",`${pct(g.c3)} (adj) | ${pct(g.c3h)} (hyb)`);
   sub(1,"formula",x.C3_score_formula); sub(1,"reasoning",x.C3_score_reasoning);
   kv(1,"C4 EC agreement",`${pct(g.c4)}${g.ecs?" | "+g.ecs:""}`);
+  kv(2,"EC numbers by tool",ecText(g));
   sub(1,"formula",x.C4_score_formula); sub(1,"reasoning",x.C4_score_reasoning);
   kv(1,"Review",g.rv?`flagged: ${x.NEEDS_REVIEW_REASON||g.rr||""}`:"not flagged");
   L.push(pad+SEP);
   L.push(`${pad}FINGERPRINT`);
   if(g.fp){
-    kv(1,"Label",g.fp.l); kv(1,"Pattern hash",g.fp.h);
-    kv(1,"Fingerprint (one line)",x.fingerprint_line||(g.fp.f||[]).map(([k,v])=>`${k}: ${v}`).join(" | "));
+    const fp=fpOf(x);
+    kv(1,"Label",fp.l); kv(1,"Pattern hash",fp.h);
+    kv(1,"Fingerprint (one line)",x.fingerprint_line);
     L.push(`${P(1)}By database:`);
-    byDatabase(g.fp.f).forEach(([db,items])=>{ L.push(`${P(2)}${db}`); items.forEach(([f,v])=>L.push(`${P(3)}${f}: ${v}`)); });
-  } else L.push(`${P(1)}no fingerprint for this gene`);
+    byDatabase(fp.f).forEach(([db,items])=>{ L.push(`${P(2)}${db}`); items.forEach(([f,v])=>L.push(`${P(3)}${f}: ${v}`)); });
+  } else L.push(`${P(1)}${D.fpMade?"no fingerprint for this gene":"the fingerprint table was not there when this map was drawn; Redraw the map in MARGIE's Results adds it"}`);
   L.push(pad+SEP);
   L.push(`${pad}EVIDENCE TRAIL (every database's call)`);
   const ev=g.ev||[]; let last=null;
   if(!ev.length) L.push(`${P(1)}no per-tool record for this feature`);
   ev.forEach(r=>{ const grp=D.evGroups[r[0]], name=D.evNames[r[0]];
     if(grp!==last){ L.push(`${P(1)}${GRP_LABEL[grp]||grp}`); last=grp; }
-    L.push(`${P(2)}${name}${r[2]?" ("+r[2]+")":""}: ${r[1]}${isWin(name,g.src)?"  [chosen]":""}${r[3]?"":"  [uninformative]"}`); });
+    const ec=ecFor(g,name,r[1]);
+    L.push(`${P(2)}${name}${r[2]?" ("+r[2]+")":""}: ${r[1]}${ec?"  [EC "+ec+"]":""}${isWin(name,g.src)?"  [chosen]":""}${r[3]?"":"  [uninformative]"}`); });
   if(g.up) kv(1,"UniProt best hit",`${g.up.en||""} | ${g.up.pid!=null?g.up.pid+"% id | ":""}${g.up.desc||""}${g.up.inf?"":" (uninformative, not used)"}`);
   kv(1,"Name audit trail",x.best_consensus_product_descriptor_source_audit_trail);
   kv(1,"Specialised database hits",x.specialized_database_hits);
@@ -980,8 +1077,7 @@ function evidenceTrail(g){
        +`${g.src?` | chosen: <b>${esc(g.src)}</b>`:""}</div>`
        +`<div class="cnt ehint">dimmed: not counted in C1 (no function in the name, such as hypothetical, uncharacterized or a UPF or DUF family, or the TIGRFAM slot it shares with PGAP and NCBIfam already counted)</div>`;
   if(g.c4!=null && g.c4<1)
-    h+=`<div class="ecflag">⚑ EC conflict: C4 = ${pct(g.c4)}${g.ecs?" ("+esc(g.ecs)+")":""}. `
-      +`${esc(g.c4r||"tools disagree on the EC number; compare the [EC:…] tags below.")}</div>`;
+    h+=`<div class="ecflag">⚑ EC conflict: C4 = ${pct(g.c4)}${g.ecs?" ("+esc(g.ecs)+")":""}. ${esc(ecConflict(g))}.</div>`;
   let last=null;
   ev.forEach(row=>{
     const ti=row[0], desc=row[1], metric=row[2]||"", inf=row[3];
@@ -992,7 +1088,7 @@ function evidenceTrail(g){
     const lit=grp==="decision"&&g.c1t?counted.has(name):inf;
     h+=`<div class="erow${win?" win":""}${lit?"":" uninf"}"><span class="etool">${esc(name)}`
       +`${metric?` <span class="emetric">${esc(metric)}</span>`:""}</span>`
-      +`<span class="edesc">${esc(desc)}${win?`<span class="chosen">chosen</span>`:""}</span></div>`;
+      +`<span class="edesc">${esc(desc)}${ecFor(g,name,desc)?` <span class="emetric">EC ${esc(ecFor(g,name,desc))}</span>`:""}${win?`<span class="chosen">chosen</span>`:""}</span></div>`;
   });
   return h+`</div>`;
 }
@@ -1044,25 +1140,32 @@ function operonArrowMap(sorted){
 function esc(s){return String(s).replace(/[&<>]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;"}[c]));}
 
 const panel=document.getElementById("panel");
-function showGene(i){selKind="gene";selVal=i;panel.innerHTML=geneCard(i);applySelection();}
+function showGene(i){selKind="gene";selVal=i;panel.innerHTML=geneCard(i);applySelection();fillFingerprint(i);}
 function showOperon(id){selKind="operon";selVal=id;panel.innerHTML=operonCard(id);applySelection();}
 
 // ---- interaction ----
 const tip=document.getElementById("tip");
 function tipShow(html,x,y){tip.innerHTML=html;tip.style.opacity=1;
   tip.style.left=Math.min(x+14,innerWidth-tip.offsetWidth-8)+"px";
-  tip.style.top=(y+14)+"px";}
+  tip.style.top=Math.max(4,Math.min(y+14,innerHeight-tip.offsetHeight-8))+"px";}
 function tipHide(){tip.style.opacity=0;}
+/** A gene's place: contig:start–end (strand). */
+function where(g){
+  const cn=D.contigs[g.ci].name;
+  return `${esc(cn.length>40?cn.slice(0,39)+"…":cn)}:${g.s.toLocaleString()}–${g.e.toLocaleString()} (${g.st>0?"+":"−"})`;
+}
+/** Hover on either map: the name, the location, the confidence and whether it is flagged. */
+function geneTip(g){
+  const [tn]=tierBadge(g.ti), why=g.rr||"";
+  return `<b>${esc((g.nm||"(unnamed)").slice(0,90))}</b><br>${where(g)}`
+    +`<br>confidence ${pct(g.fin)} | ${tn}`
+    +`<br>${g.rv?"⚑ flagged"+(why?": "+esc(why.length>90?why.slice(0,89)+"…":why):""):"not flagged"}`
+    +`${g.op?"<br>"+esc(g.op)+" | "+operons[g.op].length+" genes":""}`;
+}
 
 geneLayer.addEventListener("mousemove",e=>{
   const t=e.target.closest(".gene"); if(!t){tipHide();return;}
-  const i=+t.dataset.i, g=D.genes[i];
-  if(mode==="operon"&&g.op){
-    tipShow(`<b>${g.op}</b> | ${operons[g.op].length} genes<br>${esc((g.nm||"").slice(0,60))}`,e.clientX,e.clientY);
-  } else {
-    const[tn]=tierBadge(g.ti);
-    tipShow(`${esc((g.nm||"(unnamed)").slice(0,64))}<br><b>${tn}</b> | final ${pct(g.fin)}${g.rv?" | ⚑":""}`,e.clientX,e.clientY);
-  }
+  tipShow(geneTip(D.genes[+t.dataset.i]),e.clientX,e.clientY);
 });
 geneLayer.addEventListener("mouseleave",tipHide);
 geneLayer.addEventListener("click",e=>{
@@ -1246,7 +1349,9 @@ const LIN=(function(){
       const c=geneFill(g), nm=(g.nm||"(unnamed)");
       // Narrow slots get the position only; wider ones the score too.
       const kb=`${(g.s/1000).toFixed(1)}–${(g.e/1000).toFixed(1)} kb`+(sw>=150?` | ${pct(g.fin)}${g.rv?" | ⚑":""}`:"");
-      out+=`<polygon class="gene" data-i="${i}" points="${pts}" fill="${c}" stroke="rgba(0,0,0,.35)" stroke-width="0.8"></polygon>`;
+      // The gene or operon selected on either map stays marked here.
+      const mark=selKind==="gene"?(selVal===i?" sel":""):selKind==="operon"?(g.op===selVal?" hi":" dim"):"";
+      out+=`<polygon class="gene${mark}" data-i="${i}" points="${pts}" fill="${c}" stroke="rgba(0,0,0,.35)" stroke-width="0.8"></polygon>`;
       if(!two){
         out+=`<text x="${cx}" y="${TOP-26}" font-size="11" fill="#000" text-anchor="middle">${k+1}</text>`
           +`<text x="${cx}" y="${TOP-10}" font-size="11.5" fill="#000" text-anchor="middle">${short(nm)}</text>`
@@ -1275,8 +1380,7 @@ const LIN=(function(){
     const i=+t.dataset.i, g=D.genes[i];
     if(mode==="operon"&&g.op) showOperon(g.op); else showGene(i); });
   svgL.addEventListener("mousemove",e=>{ const t=e.target.closest(".gene"); if(!t){tipHide();return;}
-    const g=D.genes[+t.dataset.i], [tn]=tierBadge(g.ti);
-    tipShow(`${esc((g.nm||"(unnamed)").slice(0,64))}<br><b>${tn}</b> | final ${pct(g.fin)}${g.op?" | "+esc(g.op):""}`,e.clientX,e.clientY); });
+    tipShow(geneTip(D.genes[+t.dataset.i]),e.clientX,e.clientY); });
   svgL.addEventListener("mouseleave",tipHide);
 
   function show(linear){
@@ -1308,6 +1412,12 @@ const VIEW=(function(){
     VIEWNOW=v; tell();
     if(v==="ctg"){ LIN.show(false); document.getElementById("circPlate").hidden=true; plateK.hidden=false; renderContigList(); }
     else { plateK.hidden=true; LIN.show(v==="lin"); }
+    // The linear view opens on what is selected: the gene, an operon's first gene, or a contig's start.
+    if(v==="lin"){
+      if(selKind==="gene"&&selVal!=null) LIN.goto(selVal);
+      else if(selKind==="operon"&&operons[selVal]) LIN.goto(operons[selVal].slice().sort((a,b)=>D.genes[a].s-D.genes[b].s)[0]);
+      else if(selKind==="contig"&&selVal!=null) LIN.showContig(selVal);
+    }
     bC.classList.toggle("on",v==="circ"); bL.classList.toggle("on",v==="lin"); if(bK) bK.classList.toggle("on",v==="ctg");
   }
   bC.addEventListener("click",()=>set("circ"));
@@ -1347,9 +1457,9 @@ document.getElementById("showFlags").onchange=paint;
 // genes are sub-pixel. Zoom is what makes individual operons readable, so it
 // drives the viewBox rather than a CSS transform -- vectors stay crisp at any
 // magnification and hit-testing keeps working, which a scaled bitmap would lose.
-(function(){
+const ZOOM=(function(){
   const svg=document.getElementById("map");
-  if(!svg) return;
+  if(!svg) return {focus(){}};
   const BASE={x:0,y:0,w:780,h:780};
   let vb={...BASE};
   // 40x in, and out to a third of the map's size, so the whole circle can be
@@ -1357,6 +1467,7 @@ document.getElementById("showFlags").onchange=paint;
   const MIN_W=780/40, MAX_W=780*3;
 
   function apply(){ svg.setAttribute("viewBox",`${vb.x} ${vb.y} ${vb.w} ${vb.h}`);
+    PIN_K=vb.w/BASE.w; if(PIN_AT!=null) pinGene(PIN_AT);
     const btn=document.getElementById("zreset");
     if(btn) btn.disabled = (Math.abs(vb.w-BASE.w)<0.5 && Math.abs(vb.x)<0.5 && Math.abs(vb.y)<0.5);
   }
@@ -1485,6 +1596,91 @@ document.getElementById("showFlags").onchange=paint;
   if(btn) btn.addEventListener("click",()=>{ vb={...BASE}; apply(); });
   svg.style.cursor="grab";
   apply();
+  /** Zooms in on gene *i*: its ring, the backbone and its pin in view. */
+  function focus(i){
+    const g=D.genes[i], ri=g.rg?R.rI:g.st>0?R.fI:R.rI, ro=R.bbO+33;
+    const [x,y]=pol((ri+ro)/2,ang(g.ci,(g.s+g.e)/2)), w=ro-ri+16;
+    vb={x:x-w/2,y:y-w/2,w,h:w}; clamp(); apply();
+  }
+  return {focus};
+})();
+
+// ---- find a gene: by position, range, contig:position, gene id, feature id or name ----
+(function(){
+  const form=document.getElementById("find"), q=document.getElementById("findQ"), box=document.getElementById("findRes");
+  if(!form||!q||!box) return;
+  const MAXROWS=200;
+  // 991414, 991,414, 991.4 kb, 0.99 Mb
+  function num(t){
+    const m=/^(\d[\d,_ ]*(?:\.\d+)?)\s*(bp|kbp?|mbp?)?$/i.exec(String(t).trim()); if(!m) return null;
+    const v=parseFloat(m[1].replace(/[,_ ]/g,"")), u=(m[2]||"").toLowerCase();
+    return Math.round(u[0]==="k"?v*1e3:u[0]==="m"?v*1e6:v);
+  }
+  // One position, or a range: 990000-995000, 990,000..995,000, 990 kb to 995 kb.
+  function span(t){
+    const m=/^(.+?)\s*(?:-|–|—|\.\.|\bto\b)\s*(.+)$/i.exec(t.trim());
+    if(m){ const a=num(m[1]), b=num(m[2]); if(a!=null&&b!=null) return [Math.min(a,b),Math.max(a,b)]; }
+    const p=num(t); return p==null?null:[p,p];
+  }
+  function contigNamed(t){
+    const k=t.trim().toLowerCase(); if(!k) return -1;
+    const exact=D.contigs.findIndex(c=>c.name.toLowerCase()===k); if(exact>=0) return exact;
+    const some=D.contigs.map((c,i)=>i).filter(i=>D.contigs[i].name.toLowerCase().startsWith(k));
+    return some.length===1?some[0]:-1;
+  }
+  /** Returns {hits, note}: the genes found and what was looked for. */
+  function look(text){
+    const t=text.trim(); if(!t) return {hits:[],note:""};
+    let where=null, cis=null;
+    // A gene id, <contig>_<start><strand><length>: that contig, from its start.
+    const gid=/^(.+)_(\d+)[+-](\d+)$/.exec(t);
+    if(gid&&contigNamed(gid[1])>=0){ cis=[contigNamed(gid[1])]; where=[+gid[2],+gid[2]]; }
+    // contig:position or contig:range
+    const at=t.lastIndexOf(":");
+    if(!where&&at>0&&contigNamed(t.slice(0,at))>=0&&span(t.slice(at+1))){ cis=[contigNamed(t.slice(0,at))]; where=span(t.slice(at+1)); }
+    if(!where) where=span(t);
+    if(where){
+      const [a,b]=where, on=cis||D.contigs.map((c,i)=>i);
+      const label=(a===b?a.toLocaleString():a.toLocaleString()+"–"+b.toLocaleString())+(cis?" on "+D.contigs[cis[0]].name:"");
+      let hits=D.genes.map((g,i)=>i).filter(i=>{ const g=D.genes[i]; return on.includes(g.ci)&&g.s<=b&&g.e>=a; });
+      // Genes first, then the regions (prophages, repeats) that hold the position.
+      hits.sort((x,y)=>(D.genes[x].rg-D.genes[y].rg)||(D.genes[x].ci-D.genes[y].ci)||(D.genes[x].s-D.genes[y].s));
+      if(hits.length) return {hits,note:`${hits.length.toLocaleString()} ${hits.length===1?"gene covers":"genes cover"} ${label}`};
+      // No gene there: the nearest one on each contig searched.
+      const near=[];
+      on.forEach(ci=>{ let best=-1,dist=Infinity;
+        D.genes.forEach((g,i)=>{ if(g.ci!==ci||g.rg) return; const d=Math.min(Math.abs(g.s-a),Math.abs(g.e-b)); if(d<dist){dist=d;best=i;} });
+        if(best>=0&&(a<=D.contigs[ci].len||on.length===1)) near.push(best); });
+      return {hits:near,note:`No gene covers ${label}; the nearest ${near.length===1?"gene is":"genes are"} below`};
+    }
+    // A feature id (whole or its end, such as peg.944) or a word in the name.
+    const k=t.toLowerCase();
+    const hits=D.genes.map((g,i)=>i).filter(i=>{ const g=D.genes[i], f=(g.fid||"").toLowerCase();
+      return f===k||f.endsWith(k)||(g.nm||"").toLowerCase().includes(k); });
+    hits.sort((x,y)=>(D.genes[x].ci-D.genes[y].ci)||(D.genes[x].s-D.genes[y].s));
+    return {hits,note:hits.length?`${hits.length.toLocaleString()} ${hits.length===1?"gene matches":"genes match"} “${esc(t)}”`:`No gene matches “${esc(t)}”`};
+  }
+  /** Opens gene *i* on every map: its card, the circle zoomed to it, and the linear view at it. */
+  function pick(i){
+    showGene(i);
+    if(VIEWNOW==="ctg") VIEW.set("circ");
+    ZOOM.focus(i);
+    if(LIN.visible()) LIN.goto(i);
+    box.querySelectorAll(".mrow").forEach(r=>r.classList.toggle("on",+r.dataset.find===i));
+  }
+  form.addEventListener("submit",e=>{
+    e.preventDefault();
+    const {hits,note}=look(q.value);
+    if(!note){ box.hidden=true; box.innerHTML=""; return; }
+    let h=`<div class="fnote">${note}${hits.length>MAXROWS?` | the first ${MAXROWS} are listed`:""}</div>`;
+    hits.slice(0,MAXROWS).forEach(i=>{ const g=D.genes[i], [,tc]=tierBadge(g.ti);
+      h+=`<div class="mrow" data-find="${i}"><span class="dot" style="background:${g.rg?REGION:tc}"></span>`
+        +`<span class="mnm">${esc(g.nm||"(unnamed)")}${g.rv?" ⚑":""}</span><span class="mnum kb">${where(g)}</span></div>`; });
+    box.innerHTML=h; box.hidden=false;
+    if(hits.length) pick(hits[0]);
+  });
+  box.addEventListener("click",e=>{ const r=e.target.closest("[data-find]"); if(r) pick(+r.dataset.find); });
+  q.addEventListener("search",()=>{ if(!q.value.trim()){ box.hidden=true; box.innerHTML=""; } });
 })();
 
 document.getElementById("org").textContent=D.short;   // genome identifier / filename, verbatim
