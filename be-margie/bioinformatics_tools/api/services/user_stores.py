@@ -8,6 +8,7 @@ A copy the user already put in the working folder is used where it is instead (o
 
 from __future__ import annotations
 
+import fnmatch
 import json
 import os
 import logging
@@ -55,16 +56,24 @@ def resolve_base(conn, store: dict, cfg: dict | None) -> str:
     """The base that exists on the cluster: base_of(), or else the first file or folder of that
     name anywhere under the group folder (a group may lay its folder out its own way). '' when none."""
     guess = base_of(store, cfg)
+    chosen = _cfg_get(cfg or {}, f"margie_sb.stores.base.{store['id']}")
+    pattern = store.get('base_glob', '')
     if guess:
         code, _ = _run(conn, f'test -e {shlex.quote(guess)}')
         if code == 0:
             return guess
+        # A base named with its genome count (margie-base-108-genomes.db): the one with the most.
+        if pattern and not (isinstance(chosen, str) and chosen.strip()):
+            code, out = _run(conn, f'ls -1d {shlex.quote(posixpath.dirname(guess))}/{pattern} 2>/dev/null | sort -V | tail -1')
+            if code == 0 and out.strip():
+                return out.strip()
     d = depot(cfg)
     if not d:
         return ''
     name = posixpath.basename(store['base_rel'])
     kind = 'd' if store['kind'] == 'dir' else 'f'
-    code, out = _run(conn, f'find {shlex.quote(d)} -maxdepth 6 -type {kind} -name {shlex.quote(name)} 2>/dev/null | head -1')
+    names = f"-name {shlex.quote(name)}" + (f" -o -name {shlex.quote(pattern)}" if pattern else '')
+    code, out = _run(conn, f'find {shlex.quote(d)} -maxdepth 6 -type {kind} \\( {names} \\) 2>/dev/null | sort -V | tail -1')
     return out.strip() if code == 0 and out.strip() else ''
 
 
@@ -94,11 +103,14 @@ STORES: list[dict] = [
         'label': 'MARGIE database',
         'note': 'The main MARGIE database (SQLite): every run’s results and cached tool outputs; the job history sits beside it.',
         'kind': 'file',
-        'base_rel': 'sqlite/margie-thesis-22-prokaryotes-base.db',
+        # The group's base: margie-base.db, or margie-base-<N>-genomes.db (the most genomes).
+        'base_rel': 'sqlite/margie-base.db',
+        'base_glob': 'margie-base-*-genomes.db',
         'depot_sub': 'sqlite',
         'sub': 'sqlite',
+        # The earlier base's name: copies and records made under it are still recognised.
         'name': 'margie-thesis-22-prokaryotes-base',
-        # A copy set up any other way than from the base (new, the starter, the user's own): <user>-margie-vN.db.
+        # The name MARGIE gives a copy: <user>-margie-vN.db.
         'short': 'margie',
         'ext': '.db',
         'companions': [],
@@ -137,6 +149,15 @@ STORES: list[dict] = [
             'operon-fingerprint-database-evidence_composition-metadata.json',
             'operon-fingerprint-database-label_ordered-metadata.json',
             'operon-fingerprint-database-label_composition-metadata.json',
+        ],
+        # Each pool's genome list (pool_members.py), copied when the base has it: it marks the
+        # current format and keeps a genome from joining a pool twice.
+        'base_optional': [
+            'fingerprint-database.tsv.genomes.tsv',
+            'operon-fingerprint-database-evidence-ordered.tsv.genomes.tsv',
+            'operon-fingerprint-database-evidence-composition.tsv.genomes.tsv',
+            'operon-fingerprint-database-label-ordered.tsv.genomes.tsv',
+            'operon-fingerprint-database-label-composition.tsv.genomes.tsv',
         ],
         'depot_sub': 'fingerprint-database',
         'sub': 'fingerprint-database',
@@ -331,20 +352,20 @@ def fill_default_partition(conn, cfg: dict) -> bool:
 # ---- Names ----
 
 def short_stem(store: dict) -> str:
-    """The name of a copy set up any other way than from the group's base (new, the starter, the
-    user's own): margie, operon-reference, fingerprint-database, genome-pool."""
+    """The name MARGIE gives a copy, whatever it is made from (the group's base, new, the starter,
+    the user's own): margie, operon-reference, fingerprint-database, genome-pool."""
     return store.get('short') or store['name']
 
 
 def _stems(store: dict) -> list[str]:
-    """The names a copy of the store goes by: the base's (a copy of the group's base, and its
-    backups) and the short one."""
+    """The names a copy of the store goes by: the short one, and the base's (copies of the group's
+    base were named after it until 2026-11, and their backups still are)."""
     return list(dict.fromkeys([store['name'], short_stem(store)]))
 
 
 def versioned(store: dict, user: str, version: int, stem: str | None = None) -> str:
-    """Returns <user>-<name>-v<N><ext>, the name used on scratch and depot: the base's name, or
-    stem (short_stem for a copy not made from the base)."""
+    """Returns <user>-<stem>-v<N><ext>, the name used on scratch and depot: stem is the copy's
+    recorded name (short_stem for copies made since 2026-11), else the earlier base's."""
     return f"{user}-{stem or store['name']}-v{version}{store.get('ext', '') if store['kind'] == 'file' else ''}"
 
 
@@ -500,9 +521,13 @@ def own_copy(store: dict, user: str, root: str, top: list[str], inside: list[str
         return {'path': f'{sub}/{n}', 'how': 'named', 'version': v, 'stem': stem}
     base = posixpath.basename(store['base_rel'])
     if not is_dir:
+        # The base under its name, its counted name (margie-base-108-genomes.db) or its earlier one.
+        earlier = f"{store['name']}{store.get('ext', '')}"
+        is_base = lambda n: n in (base, earlier) or bool(store.get('base_glob') and fnmatch.fnmatch(n, store['base_glob']))
         for where, names in ((sub, inside), (root, top)):
-            if (base, False) in names:
-                return {'path': f'{where}/{base}', 'how': 'base', 'version': 1}
+            for n, d in names:
+                if not d and is_base(n):
+                    return {'path': f'{where}/{n}', 'how': 'base', 'version': 1}
         ext = store.get('ext', '')
         someone_elses = re.compile(rf".+-({'|'.join(re.escape(n) for n in _stems(store))})-v\d+{re.escape(ext)}")
         for where, names in ((sub, inside), (root, top)):
@@ -560,11 +585,10 @@ def _gb(n: int) -> str:
 
 
 def adopted_stem(store: dict, found: dict) -> str:
-    """The name a found copy goes by once taken: its own (MARGIE's name), the base's (a file named
-    as the group's base is a copy of it), else the short one."""
+    """The name a found copy goes by once taken: its own (MARGIE's name), else the short one."""
     if found['how'] == 'named':
         return found.get('stem') or store['name']
-    return store['name'] if found['how'] == 'base' else short_stem(store)
+    return short_stem(store)
 
 
 def adopt(conn, store: dict, found: dict, root: str, user: str) -> int:
@@ -583,8 +607,11 @@ def adopt(conn, store: dict, found: dict, root: str, user: str) -> int:
                   for c in store.get('companions', [])]
     else:
         names = ' '.join(q(f"{found['path']}/{n}") for n in store.get('base_files') or [])
-        steps = [f'test ! -e {q(dst)}', f'mkdir {q(dst + ".partial")}', f'mv -n -- {names} {q(dst + ".partial")}/',
-                 f'mv -- {q(dst + ".partial")} {q(dst)}']
+        part = dst + ".partial"
+        steps = [f'test ! -e {q(dst)}', f'mkdir {q(part)}', f'mv -n -- {names} {q(part)}/']
+        steps += [f'{{ ! test -e {q(found["path"] + "/" + n)} || mv -n -- {q(found["path"] + "/" + n)} {q(part)}/; }}'
+                  for n in store.get('base_optional', [])]
+        steps += [f'mv -- {q(part)} {q(dst)}']
     code, out = _run(conn, ' && '.join(steps))
     if code != 0:
         raise StoreError(f"Could not use your copy of {store['label']} ({found['path']}): {out.strip()}")
@@ -892,13 +919,13 @@ def _config_paths(store: dict, target: str) -> dict:
             for key, inner in store['config'].items()}
 
 
-def default_paths(root: str, user: str, short: bool = False) -> dict:
+def default_paths(root: str, user: str) -> dict:
     """The settings of the databases folder as a first setup in root makes them: each store's first
-    working copy (under the base's names, or the short ones for a setup not made from the base),
-    and the run archives (OUTPUT_DIRS), for Settings to show while unset."""
+    working copy, under its short name, and the run archives (OUTPUT_DIRS), for Settings to show
+    while unset."""
     out: dict = {}
     for st in STORES:
-        out.update(_config_paths(st, working_path(st, root, user, 1, short_stem(st) if short else None)))
+        out.update(_config_paths(st, working_path(st, root, user, 1, short_stem(st))))
     out.update({key: f'{root}/{sub}' for key, sub in OUTPUT_DIRS.items()})
     return out
 
@@ -1152,9 +1179,8 @@ def start_setup(conn, cfg: dict, user: str, fresh: bool = False) -> dict:
             src = resolve_base(conn, s, cfg)
             version = 1
             label = s['label']
-            # A copy of the group's base keeps the base's name; any other (new, or from a source of
-            # the user's own) gets the short one.
-            stem = s['name'] if src and in_group(src) else short_stem(s)
+            # Every first copy takes the short name: <user>-margie-v1.db, <user>-operon-reference-v1.pkl.
+            stem = short_stem(s)
         dst = working_path(s, root, user, version, stem)
         after['names'][s['id']] = stem
         if not src:
@@ -1182,8 +1208,10 @@ def start_setup(conn, cfg: dict, user: str, fresh: bool = False) -> dict:
                 if code == 0:
                     plan.append(['copy', f"{s['label']} ({c.lstrip('.')})", src + c, dst + c, _size(conn, [src + c])])
         elif s.get('base_files') and not backups:
-            files = [posixpath.join(src, f) for f in s['base_files']]
-            plan.append(['files', label, src, dst, _size(conn, files), ','.join(s['base_files'])])
+            # The copy job takes the names that are there, so the optional ones may be missing.
+            names = s['base_files'] + s.get('base_optional', [])
+            files = [posixpath.join(src, f) for f in names]
+            plan.append(['files', label, src, dst, _size(conn, files), ','.join(names)])
         else:
             plan.append(['copy', label, src, dst, _size(conn, [src])])
         after['versions'][s['id']] = version

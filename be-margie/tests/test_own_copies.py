@@ -76,9 +76,9 @@ def test_a_dropped_file_is_renamed_into_place_with_its_companions(tmp_path):
     (tmp_path / "occ_reference.pkl").write_text("ref")
     (tmp_path / "occ_reference.pkl.members.tsv").write_text("members")
     v = _adopt(tmp_path, OCC, {"path": str(tmp_path / "occ_reference.pkl"), "how": "base", "version": 1})
-    dst = tmp_path / "operon-database" / "u-occ_reference-v1.pkl"
+    dst = tmp_path / "operon-database" / "u-operon-reference-v1.pkl"
     assert v == 1 and dst.read_text() == "ref"
-    assert (tmp_path / "operon-database" / "u-occ_reference-v1.pkl.members.tsv").read_text() == "members"
+    assert (tmp_path / "operon-database" / "u-operon-reference-v1.pkl.members.tsv").read_text() == "members"
     assert not (tmp_path / "occ_reference.pkl").exists()
 
 
@@ -295,12 +295,68 @@ def _setup_plan(src_for_base: str):
     return got
 
 
-def test_a_new_setup_takes_short_names_and_a_copy_of_the_groups_base_keeps_its_own():
+def test_every_first_copy_takes_the_short_name():
     with patch.object(us, "DEPOT", "/shared/lab/margie"):
         fresh = _setup_plan("")
-        lab = _setup_plan("/shared/lab/margie/databases/margie-generated-databases/sqlite/margie-thesis-22-prokaryotes-base.db")
+        lab = _setup_plan("/shared/lab/margie/databases/margie-generated-databases/sqlite/margie-base-108-genomes.db")
         mine = _setup_plan("/home/u/my-own.db")
     assert fresh["after"]["names"]["job_db"] == "margie" and fresh["after"]["names"]["occ"] == "operon-reference"
     assert any(step[-1] == f"{ROOT}/sqlite/u-margie-v1.db" or f"{ROOT}/sqlite/u-margie-v1.db" in step for step in fresh["plan"])
-    assert lab["after"]["names"]["job_db"] == "margie-thesis-22-prokaryotes-base"
+    assert lab["after"]["names"] == fresh["after"]["names"]
+    assert any(f"{ROOT}/sqlite/u-margie-v1.db" in step for step in lab["plan"])
     assert mine["after"]["names"]["job_db"] == "margie"
+
+
+def test_the_groups_base_is_found_under_its_count_the_most_genomes_first():
+    calls = []
+
+    def run(conn, cmd, timeout=60):
+        calls.append(cmd)
+        if cmd.startswith("test -e"):
+            return 1, ""
+        if cmd.startswith("ls -1d"):
+            return 0, "/g/databases/margie-generated-databases/sqlite/margie-base-108-genomes.db\n"
+        return 1, ""
+    with patch.object(us, "_run", side_effect=run):
+        got = us.resolve_base(None, JOB_DB, {"margie_sb": {"shared_root": "/g"}})
+    assert got == "/g/databases/margie-generated-databases/sqlite/margie-base-108-genomes.db"
+    assert "margie-base-*-genomes.db" in calls[1] and "sort -V" in calls[1]
+    # A source chosen in Settings is taken as it is, never widened to the counted names.
+    calls.clear()
+    with patch.object(us, "_run", side_effect=run):
+        us.resolve_base(None, JOB_DB, {"margie_sb": {"shared_root": "/g", "stores": {"base": {"job_db": "/mine/x.db"}}}})
+    assert not any(c.startswith("ls -1d") for c in calls)
+
+
+def test_a_dropped_base_is_known_by_its_new_counted_or_earlier_name():
+    for n in ("margie-base.db", "margie-base-108-genomes.db", "margie-thesis-22-prokaryotes-base.db"):
+        f = us.own_copy(JOB_DB, "u", ROOT, [], [n])
+        assert f == {"path": f"{ROOT}/sqlite/{n}", "how": "base", "version": 1}
+    # Copies and records under the earlier stem are still read as the user's own.
+    assert us.parse_versioned(JOB_DB, "u", "u-margie-thesis-22-prokaryotes-base-v2.db") == (2, "margie-thesis-22-prokaryotes-base")
+    assert us.adopted_stem(JOB_DB, {"how": "base"}) == "margie"
+
+
+FINGERPRINT = us.STORE_BY_ID["fingerprint"]
+
+
+def test_a_copy_of_the_groups_fingerprints_brings_each_pools_genome_list():
+    with patch.object(us, "DEPOT", "/shared/lab/margie"):
+        lab = _setup_plan("/shared/lab/margie/databases/margie-generated-databases/fingerprint-database")
+    step = next(s for s in lab["plan"] if s[0] == "files" and s[1] == FINGERPRINT["label"])
+    names = step[-1].split(",")
+    assert "fingerprint-database.tsv" in names and "fingerprint-database.tsv.genomes.tsv" in names
+    assert len([n for n in names if n.endswith(".genomes.tsv")]) == 5
+
+
+def test_a_fingerprint_folder_laid_flat_keeps_its_genome_lists_when_it_has_them(tmp_path):
+    for with_lists in (True, False):
+        root = tmp_path / ("with" if with_lists else "without")
+        pool = root / "fingerprint-database"
+        pool.mkdir(parents=True)
+        for n in FINGERPRINT["base_files"] + (FINGERPRINT["base_optional"] if with_lists else []):
+            (pool / n).write_text(n)
+        _adopt(root, FINGERPRINT, {"path": str(pool), "how": "flat", "version": 1})
+        moved = pool / "u-fingerprint-database-v1"
+        assert (moved / "fingerprint-database.tsv").exists()
+        assert (moved / "fingerprint-database.tsv.genomes.tsv").exists() is with_lists
