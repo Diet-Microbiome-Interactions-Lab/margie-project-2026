@@ -70,6 +70,8 @@ def test_setting_the_working_folder_writes_the_config_and_makes_the_folders(_con
     made = " ".join(c for c in ran if c.startswith("mkdir"))
     assert all(f"/scratch/c/u/margie/{d}" in made for d in ("margie-input", "margie-output", "margie-databases", "sif", "reference-databases/db"))
     assert r.json()["working_folder"] == "/scratch/c/u/margie"
+    # The job history goes in the working folder from the start: each run's files through ~/.local/share/bsp/jobs.
+    assert any("/scratch/c/u/margie/job-history/jobs" in c and ".local/share/bsp/jobs" in c for c in ran)
 
 
 @patch(f"{SSH}._build_connection")

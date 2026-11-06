@@ -24,7 +24,7 @@
 	async function clearHistory() {
 		const sure = confirm(
 			`Clear the job history?\n\n${finished} finished job${finished === 1 ? '' : 's'} will leave this list. A backup of the list is saved first, ` +
-				'in your working folder (job-history-backups). Jobs still running stay.\n\n' +
+				'in your working folder (job-history/backups). Jobs still running stay.\n\n' +
 				'Results, run folders and the cached tool results in your MARGIE database are not touched.'
 		);
 		if (!sure) return;

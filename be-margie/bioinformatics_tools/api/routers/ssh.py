@@ -34,7 +34,7 @@ from dataclasses import asdict
 from bioinformatics_tools.api import build_gate, licensing
 from bioinformatics_tools.api.auth import decode_token, decrypt_private_key, get_current_user
 from bioinformatics_tools.api.models import GenomeSend, SlurmSend
-from bioinformatics_tools.api.services import hosting_usage, job_history_client, job_runner, read_cache, scratch_cache, tool_assets, user_stores
+from bioinformatics_tools.api.services import hosting_usage, job_history, job_history_client, job_runner, read_cache, scratch_cache, tool_assets, user_stores
 from bioinformatics_tools.api.services.job_store import job_store
 from bioinformatics_tools.utilities import ssh_sftp, ssh_slurm
 from bioinformatics_tools.utilities.ssh_connection import (
@@ -1455,11 +1455,16 @@ def setup_working_folder(body: dict | None = None, current_user: dict = Depends(
         user_stores._cfg_set(cfg, user_stores.WORKING_KEY, target)
         user_stores.fill_default_folders(conn, cfg)
         user_stores.fill_default_partition(conn, cfg)
+        # The SLURM account too, when the user has only one.
+        user_stores.fill_default_account(conn, cfg)
         inside = [str(user_stores._cfg_get(cfg, k) or "") for k in _IN_WORKING]
         inside = [x for x in inside if x.startswith(f"{target}/")]
         # The databases folder's own folders too, so a copy can go straight in.
         inside += user_stores.database_folders(user_stores.scratch_root(conn, cfg))
+        user_stores.carry_job_history(conn, before, target)
         user_stores._run(conn, "mkdir -p -- " + " ".join(shlex.quote(x) for x in [target, *inside]))
+        # The job history goes in the working folder from the start (job-history).
+        user_stores.link_run_files(conn, target)
 
     _stores_call(apply)
     _write_config(current_user, cfg, conn)
@@ -1715,6 +1720,11 @@ def _in_history(conn, main_db: str, job_id: str, current_user: dict) -> bool:
         owner_cluster_username=current_user["cluster_username"]))
 
 
+def _working_of(cfg: dict | None) -> str:
+    """The working folder a config sets, or ''."""
+    return str(user_stores._cfg_get(cfg or {}, user_stores.WORKING_KEY) or "").strip().rstrip("/")
+
+
 def _launch_job(
     *, genome_path: str, workflow: str, base_output_dir: str,
     selected_tools: list[str] | None, current_user: dict, conn, main_db: str | None,
@@ -1726,6 +1736,7 @@ def _launch_job(
     copy_only: list[str] | None = None,
     run_full_operon_map: bool = False,
     use_cache: bool = True,
+    working_folder: str = "",
 ) -> dict:
     """Generates job_id and output_dir, records the job and submits dane_wf; for a Resume
     (margie_sb.resume: true) a job of its own first copies the previous run's output forward on a
@@ -1796,6 +1807,11 @@ def _launch_job(
         command = _with_usage_report(command, job_id, output_dir)
         if hosting_usage.enabled(current_user["username"], current_user["cluster_username"]):
             job_store.update(job_id, hosting_start=hosting_usage.snapshot())
+    # The run's log, exit code and SLURM id go to the working folder's job history.
+    try:
+        user_stores.link_run_files(conn, working_folder.strip().rstrip("/"))
+    except Exception as exc:
+        LOGGER.warning("Could not point the run files at the working folder's job history: %s", exc)
     job_runner.submit_job(
         job_id,
         command,
@@ -2555,6 +2571,7 @@ def run_workflow(genome_data: GenomeSend, current_user: dict = Depends(get_curre
         slurm_walltime=slurm_walltime,
         run_full_operon_map=effective_full_operon_map,
         use_cache=genome_data.use_cache,
+        working_folder=_working_of(user_config),
     )
 
 
@@ -2952,7 +2969,7 @@ def _list_jobs(conn, current_user: dict, workflow: str | None, page: int, page_s
 @router.post("/job_history/clear")
 def clear_job_history(body: dict | None = None, current_user: dict = Depends(get_current_user)):
     """Clears the job list: copies this user's finished jobs (or only body.job_ids among them) into a
-    backup in the working folder (job-history-backups/job-history-<time>.db), then removes them from
+    backup in the working folder (job-history/backups/job-history-<time>.db), then removes them from
     the history. A job still going stays. Returns {backup, removed, kept}."""
     job_ids = [str(j) for j in ((body or {}).get("job_ids") or []) if re.fullmatch(r"[A-Za-z0-9-]{1,64}", str(j))]
     conn = _build_connection(current_user)
@@ -2963,7 +2980,10 @@ def clear_job_history(body: dict | None = None, current_user: dict = Depends(get
     main_db = user_config.get("main_database")
     if not main_db:
         return {"backup": "", "removed": 0, "kept": 0}
-    root = _stores_call(user_stores.scratch_root, conn, user_config)
+    working = _working_of(user_config)
+    # Backups go in the working folder's job history (before it held one: job-history-backups in the databases folder).
+    backups = (f"{user_stores.job_history_folder(working)}/{job_history.BACKUPS_FOLDER}" if working
+               else f"{_stores_call(user_stores.scratch_root, conn, user_config)}/job-history-backups")
     # The history is cleared by the account's own copy of MARGIE, brought up to the deployed version first.
     try:
         sync_remote_dane_wf(conn)
@@ -2972,7 +2992,7 @@ def clear_job_history(body: dict | None = None, current_user: dict = Depends(get
     stamp = datetime.now(timezone.utc).strftime("%Y-%m-%d-%H%M%S")
     name = f"job-{job_ids[0][:8]}-{stamp}" if len(job_ids) == 1 else f"job-history-{stamp}"
     result = job_history_client.clear_jobs(
-        conn, main_db, f"{root}/job-history-backups/{name}.db",
+        conn, main_db, f"{backups}/{name}.db",
         owner_username=current_user["username"], owner_cluster_username=current_user["cluster_username"],
         job_ids=job_ids or None)
     if result is None:
@@ -3266,6 +3286,7 @@ def _resume_job(job_id: str, genomes: list[str], current_user: dict) -> dict:
         relaunched_from=job_id, copy_from_work_dir=work_dir, copy_only=copy_only,
         run_full_operon_map=_ran_with_full_operon_map(conn, work_dir),
         use_cache=not _ran_without_cache(conn, work_dir),
+        working_folder=_working_of(user_config),
     )
 
 
@@ -3317,6 +3338,7 @@ def _restart_job(job_id: str, current_user: dict) -> dict:
         relaunched_from=job_id,
         run_full_operon_map=_ran_with_full_operon_map(conn, original.get("work_dir")),
         use_cache=not _ran_without_cache(conn, original.get("work_dir")),
+        working_folder=_working_of(user_config),
     )
 
 

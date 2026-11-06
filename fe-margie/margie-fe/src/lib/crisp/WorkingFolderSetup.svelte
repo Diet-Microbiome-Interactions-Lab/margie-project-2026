@@ -10,7 +10,8 @@
 	 * margie-output and margie-databases go in it, and sif and reference-databases/db when the account cannot read the
 	 * group's containers and reference databases. Shown on Analyze and Settings until it is set.
 	 */
-	let { headingLevel = 3 }: { headingLevel?: 2 | 3 } = $props();
+	/** bare: inside Analyze's first step, which gives the title and the frame. */
+	let { headingLevel = 3, bare = false }: { headingLevel?: 2 | 3; bare?: boolean } = $props();
 
 	$effect(() => {
 		if (!ws.firstSetup) void ws.loadSetup();
@@ -33,8 +34,8 @@
 	}
 </script>
 
-<section class="wf" aria-labelledby="wf-title">
-	<svelte:element this={`h${headingLevel}`} id="wf-title" class="wf-title">Set up your working folder first</svelte:element>
+<section class="wf" class:bare aria-labelledby={bare ? undefined : 'wf-title'}>
+	{#if !bare}<svelte:element this={`h${headingLevel}`} id="wf-title" class="wf-title">Set up your working folder first</svelte:element>{/if}
 	<p class="wf-lead">
 		MARGIE keeps what your runs need in one working folder on the cluster. Setting it up makes these folders in it; you can point any of
 		them elsewhere later, in Settings → Folders.
@@ -45,6 +46,7 @@
 		<li><b class="mg-mono">margie-input</b><span>the genomes you add</span></li>
 		<li><b class="mg-mono">margie-output</b><span>the results of each run</span></li>
 		<li><b class="mg-mono">margie-databases</b><span>MARGIE's databases: the first run copies your group's base databases here, or starts new ones</span></li>
+		<li><b class="mg-mono">job-history</b><span>your job history: each job's record, log, exit code and SLURM ids</span></li>
 		{#if !groupSif}<li><b class="mg-mono">sif</b><span>the containers the tools run in, built or copied on Install</span></li>{/if}
 		{#if !groupDb}<li><b class="mg-mono">reference-databases/db</b><span>the reference databases the tools search, downloaded on Install</span></li>{/if}
 	</ul>
@@ -116,6 +118,11 @@
 		border-radius: var(--mg-r);
 		background: var(--mg-surface);
 		color: var(--mg-text);
+	}
+	.wf.bare {
+		padding: 0;
+		border: 0;
+		background: none;
 	}
 	.wf-title {
 		margin: 0;

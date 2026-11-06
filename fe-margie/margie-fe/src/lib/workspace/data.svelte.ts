@@ -1184,7 +1184,7 @@ class Workspace {
 
 	/**
 	 * Empties the history. The server copies everything it removes into a backup
-	 * first (on the cluster, job-history-backups/ in the working folder) and says
+	 * first (on the cluster, job-history/backups/ in the working folder) and says
 	 * where, so nothing is ever only deleted. A run still going stays in the list.
 	 */
 	async clearRuns() {

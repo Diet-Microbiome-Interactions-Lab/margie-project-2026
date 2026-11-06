@@ -150,8 +150,8 @@
 						>
 							{#snippet help()}
 								<p>
-									The databases MARGIE builds from your runs and adds to with each genome: the MARGIE database (SQLite: results, cached tool
-									outputs and job history), the operon reference, the fingerprint databases and the genome pool. Left empty, MARGIE makes
+									The databases MARGIE builds from your runs and adds to with each genome: the MARGIE database (SQLite: results and cached tool
+									outputs), the operon reference, the fingerprint databases and the genome pool. Left empty, MARGIE makes
 									margie-databases in the working folder. You can back them up to depot from <a class="mg-link" href={uiBase.to('/settings#databases')}
 										>Settings</a
 									>; the reference databases the annotation tools search (Pfam, KEGG, COG and the others) are set up on Install.

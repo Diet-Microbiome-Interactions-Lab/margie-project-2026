@@ -882,7 +882,7 @@ async function settingsList(): Promise<{ settings: Setting[]; configMissing: boo
 	const [w, cfg] = await Promise.all([workflow(), config.get()]);
 	const toolLabel = new Map(w.tools.filter((t) => t.key).map((t) => [t.key as string, t.name]));
 	const params: Param[] = [
-		{ param: 'main_database', default: '', description: 'The main MARGIE database on the cluster: every run’s results and cached tool outputs; the job history sits beside it.', type: 'path' },
+		{ param: 'main_database', default: '', description: 'The main MARGIE database on the cluster: every run’s results and cached tool outputs. The job history is kept in job-history, in the working folder.', type: 'path' },
 		...w.configurable_params
 	];
 	const settings: Setting[] = params.map((p) => {
@@ -1445,7 +1445,7 @@ export async function clusterApi<T = any>(path: string, init: RequestInit = {}):
 			// Where each step's results came from: the run's cache report, or its job log for an older run.
 			if (run[2] === 'sources') return get(`/v1/ssh/job_sources/${q(id)}`);
 			if (run[2] === 'resume' || run[2] === 'restart') return relaunchRun(id, run[2], body?.genomes);
-			// One finished job leaves the list, after a backup of it (job-history-backups).
+			// One finished job leaves the list, after a backup of it (job-history/backups in the working folder).
 			if (method === 'DELETE') {
 				const cleared = await call('POST', '/v1/ssh/job_history/clear', { job_ids: [id] });
 				jobs.drop();

@@ -906,7 +906,7 @@
 			"The operon reference and the fingerprint pools that C3 and fingerprinting read"
 		],
 		"answer": 2,
-		"explain": "Results, caches and provenance share the file, so copying it carries them along; it also keeps the site's job history. Consolidation's tables stay in the results folder, and the operon reference and fingerprint databases are separate files in the store folder."
+		"explain": "Results, caches and provenance share the file, so copying it carries them along; the site's job history is a file of its own in the working folder's job-history. Consolidation's tables stay in the results folder, and the operon reference and fingerprint databases are separate files in the store folder."
 	},
 	{
 		"id": "margie-053",

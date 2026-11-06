@@ -38,6 +38,27 @@ def get_genomes(
 
 
 RUN_FILE_DIR = '.local/share/bsp/jobs'
+# Before each launch: a link left pointing at a folder that is gone (a working folder moved or
+# renamed) gives way to a folder of its own, so the run's files have somewhere to go.
+_RUN_DIR_READY = (f'{{ [ ! -L $HOME/{RUN_FILE_DIR} ] || [ -d $HOME/{RUN_FILE_DIR} ] || rm -f -- $HOME/{RUN_FILE_DIR}; }} && '
+                  f'mkdir -p $HOME/{RUN_FILE_DIR} && ')
+
+
+def link_run_files_sh(working: str, jobs_dir: str) -> str:
+    """Shell that points ~/.local/share/bsp/jobs, where each run writes its log, exit code and SLURM
+    id, at jobs_dir (<working folder>/job-history/jobs), when the working folder is there. A folder
+    of run files from before moves into jobs_dir first, only while the account has no SLURM job (a
+    log being written stays put). Prints nothing, and leaves things as they are on any failure."""
+    return (
+        f'wf={shlex.quote(working.rstrip("/"))}; w={shlex.quote(jobs_dir.rstrip("/"))}; j="$HOME/{RUN_FILE_DIR}"; '
+        '{ [ -d "$wf" ] && mkdir -p "$w" "$(dirname "$j")" && '
+        'if [ -L "$j" ]; then [ "$(readlink "$j")" = "$w" ] || ln -sfn "$w" "$j"; '
+        'elif [ -d "$j" ]; then '
+        'if [ -z "$(squeue -h -u "$USER" -o %i 2>/dev/null | head -1)" ]; then '
+        'for f in "$j"/* "$j"/.[!.]*; do [ -e "$f" ] && mv -n "$f" "$w"/; done; '
+        'rmdir "$j" && ln -s "$w" "$j"; fi; '
+        'else ln -s "$w" "$j"; fi; } >/dev/null 2>&1; true'
+    )
 
 
 def run_file_stem(job_id: str | None) -> str:
@@ -334,7 +355,7 @@ def build_driver_launch(cmd: str, base: str, safe: str, log: str, rcf: str,
         )
 
     return (
-        f'mkdir -p $HOME/.local/share/bsp/jobs && '
+        f'{_RUN_DIR_READY}'
         f'rm -f {rcf} {jobidf} {base}.copyid && '
         f"cat > {driversh} <<'MARGIE_WORKFLOW_EOF'\n"
         f'#!/bin/bash\n'
@@ -430,7 +451,7 @@ def submit_ssh_job(
         else:
             # setsid blocks SIGHUP; nohup covers the gap before it takes effect.
             launch = (
-                f'mkdir -p $HOME/.local/share/bsp/jobs && '
+                f'{_RUN_DIR_READY}'
                 f'rm -f {rcf} && '
                 f'export PATH=$HOME/.local/bin:$PATH && '
                 f"nohup setsid bash -c '{{ {cmd} ; }} > {log} 2>&1; echo $? > {rcf}' "

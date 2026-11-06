@@ -77,7 +77,8 @@
 			{#if status.action}<a class="mg-link" href={status.action.href}>{status.action.label}</a>{/if}
 			{#if ws.active}<a class="mg-link quiet an-quiz" href="/quiz">Bored while waiting? Try Quizzes!</a>{/if}
 		</p>
-	{:else}
+	{:else if !backend.cluster}
+		<!-- On the cluster, the steps below take a run from the working folder to the start. -->
 		<ul class="an-check" aria-label="Before a run">
 			{#each checklist as c (c.text)}
 				<li class:ok={c.ok && !c.info} class:todo={!c.ok} class:info={c.info}>

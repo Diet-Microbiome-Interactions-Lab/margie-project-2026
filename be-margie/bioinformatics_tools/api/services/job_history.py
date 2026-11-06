@@ -1,8 +1,9 @@
 """
 Persistent job history (table api_jobs), keyed on the API's job_id and kept in sync with the
-in-memory job_store. It has a SQLite file of its own beside main_database (history_path), made
-the first time from the rows main_database held until then: a run's writes to main_database hold
-its readers, and the Jobs page reads the history.
+in-memory job_store. It has a SQLite file of its own in the working folder's job-history folder
+(history_path), beside each job's run files (job-history/jobs), made the first time from the
+history kept until then (beside main_database) or from main_database's rows: a run's writes to
+main_database hold its readers, and the Jobs page reads the history.
 Runs on the cluster account, called over SSH as `python -m ... job_history <action>`
 with JSON on stdin/stdout (see job_history_client.py). Each action takes main_database's path.
 """
@@ -68,24 +69,64 @@ def _get_connection(db_path: str, timeout: float = 30.0) -> sqlite3.Connection:
     return conn
 
 
-def history_path(db_path: str) -> str:
-    """The history's own file, in main_database's folder: <account>-job-history.db."""
+# The working folder's job history: the records file, the run files of each job (jobs/), and
+# the backups a cleared history leaves (backups/). user_stores and ssh.py use the same names.
+HISTORY_FOLDER = "job-history"
+RUNS_FOLDER = "jobs"
+BACKUPS_FOLDER = "backups"
+CONFIG = "~/.config/bioinformatics-tools/config.yaml"
+
+
+def working_folder() -> str:
+    """The account's working folder (margie_sb.working_folder in config.yaml) when it is there, else ''."""
+    try:
+        import yaml
+        with open(os.path.expanduser(CONFIG)) as fh:
+            cfg = yaml.safe_load(fh) or {}
+    except Exception:
+        return ""
+    sb = cfg.get("margie_sb") if isinstance(cfg, dict) else None
+    value = str((sb or {}).get("working_folder") or "").strip().rstrip("/") if isinstance(sb, dict) else ""
+    return value if value and os.path.isdir(os.path.expanduser(value)) else ""
+
+
+def _beside(db_path: str) -> str:
+    """Where the history was kept before the working folder held it: main_database's folder."""
     folder = os.path.dirname(os.path.expanduser(db_path))
     return os.path.join(folder, f"{getpass.getuser()}-job-history.db")
 
 
+def history_path(db_path: str) -> str:
+    """The history's own file, <account>-job-history.db: in <working folder>/job-history, or beside
+    main_database when no working folder is set (or it is not there)."""
+    working = working_folder()
+    if working:
+        return os.path.join(os.path.expanduser(working), HISTORY_FOLDER, f"{getpass.getuser()}-job-history.db")
+    return _beside(db_path)
+
+
 def _history(db_path: str, create: bool = True) -> str | None:
-    """Returns the history's file. The first time, it is made from main_database's api_jobs rows
-    and then put in place whole, so no reader sees it half made. A folder the account cannot write
-    to keeps the history in main_database. None when neither exists and `create` is False."""
+    """Returns the history's file. The first time, it is made from the history kept beside
+    main_database until then (left where it is), else from main_database's api_jobs rows, and put
+    in place whole, so no reader sees it half made. A folder the account cannot write to keeps the
+    history in main_database. None when there is nothing yet and `create` is False."""
     main = os.path.expanduser(db_path)
     path = history_path(db_path)
     if os.path.exists(path):
         return path
+    # Made from the history kept beside main_database until now, else from main_database's rows.
+    earlier = _beside(db_path)
+    seed = earlier if earlier != path and os.path.exists(earlier) else main
     folder = os.path.dirname(path)
+    # The working folder's job-history folder is made here; main_database's folder is not.
+    if create and path != earlier and not os.path.isdir(folder):
+        try:
+            os.makedirs(folder, exist_ok=True)
+        except OSError:
+            pass
     if not os.access(folder or ".", os.W_OK):
         return main if os.path.exists(main) or create else None
-    if not create and not os.path.exists(main):
+    if not create and not os.path.exists(seed):
         return None
     tmp = f"{path}.{os.getpid()}-{threading.get_ident()}.new"
     try:
@@ -93,8 +134,8 @@ def _history(db_path: str, create: bool = True) -> str | None:
         try:
             conn.execute(CREATE_API_JOBS_SQL)
             conn.commit()
-            if os.path.exists(main):
-                conn.execute("ATTACH DATABASE ? AS m", (main,))
+            if os.path.exists(seed):
+                conn.execute("ATTACH DATABASE ? AS m", (seed,))
                 if conn.execute("SELECT 1 FROM m.sqlite_master WHERE type = 'table' AND name = 'api_jobs'").fetchone():
                     have = {r[1] for r in conn.execute("PRAGMA m.table_info(api_jobs)")}
                     cols = ", ".join(f'"{c}"' for c in _ALL_COLUMNS if c in have)

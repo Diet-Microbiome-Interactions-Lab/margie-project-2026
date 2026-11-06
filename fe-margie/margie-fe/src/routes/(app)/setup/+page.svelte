@@ -18,13 +18,13 @@
 		},
 		{
 			title: 'Set up your working folder',
-			text: 'MARGIE asks for it first: margie in your scratch by default. One click makes margie-input, margie-output and margie-databases in it, and sif and reference-databases/db when your group’s cannot be read.',
+			text: 'Analyze asks for it first: margie in your scratch by default. One click makes margie-input, margie-output, margie-databases and job-history in it (and sif and reference-databases/db when your group’s cannot be read), and sets your SLURM account when you have one.',
 			to: '/analyze',
 			go: 'Open Analyze'
 		},
 		{
-			title: 'Set your SLURM account',
-			text: 'Settings → Cluster: the account your jobs run under and the main partition. GTDB-Tk needs a large-memory partition (about 400 GB), set under Phases.',
+			title: 'Check your SLURM account',
+			text: 'Set with the working folder when your cluster user has one account; with more, choose it in Settings → Cluster, with the main partition. GTDB-Tk needs a large-memory partition (about 400 GB), set under Phases.',
 			to: '/settings#cluster',
 			go: 'Open Settings'
 		},
@@ -50,8 +50,8 @@
 
 	/** Running, once set up. */
 	const RUN = [
-		{ title: 'Add your genomes', text: 'Drop FASTA files (.fna, .fa, .fasta) on Genomes, on Analyze. They go into margie-input.' },
-		{ title: 'Check gene calling and the tools', text: 'Recommended settings are applied; unlock them only to change them. Accept the licence terms once, before the first run.' },
+		{ title: 'Add your genomes', text: 'Analyze’s second step: drop FASTA files (.fna, .fa, .fasta) and they go into margie-input, or point the genomes folder at a folder that already holds them.' },
+		{ title: 'Check gene calling and the tools', text: 'Analyze’s third step: the recommended settings are applied; unlock them only to change them. The fourth asks for the licence terms once, before the first run.' },
 		{ title: 'Start the run', text: 'Each step goes to SLURM. Jobs follows the run genome by genome, with its log.' },
 		{ title: 'Read the results', text: 'Results shows each genome’s map, every gene with its confidence tier, and the tables to download.' }
 	];
@@ -69,6 +69,7 @@
 		{ what: 'Working folder', value: '/scratch/<cluster>/<you>/margie', where: 'Settings → Folders' },
 		{ what: 'Genomes | results', value: 'margie-input | margie-output, in the working folder', where: 'Settings → Folders' },
 		{ what: 'MARGIE’s databases', value: 'margie-databases, in the working folder', where: 'Settings → Folders' },
+		{ what: 'Job history', value: 'job-history, in the working folder', where: 'Copied along when the working folder changes' },
 		{ what: 'Containers', value: 'Your group’s, else sif in the working folder', where: 'Settings → Folders' },
 		{ what: 'Reference databases', value: 'Your group’s, else reference-databases/db in the working folder', where: 'Settings → Folders' },
 		{ what: 'margie-build', value: 'The folder you name, else your group’s, else ~/margie-build', where: 'Settings → Folders' }

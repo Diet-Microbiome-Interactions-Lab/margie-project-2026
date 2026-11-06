@@ -17,7 +17,8 @@ import re
 import shlex
 import time
 
-from bioinformatics_tools.utilities import ssh_sftp
+from bioinformatics_tools.api.services import job_history
+from bioinformatics_tools.utilities import ssh_sftp, ssh_slurm
 from bioinformatics_tools.workflow_tools.workflow_registry import SHARED_FOLDER_DEFAULTS
 
 LOGGER = logging.getLogger(__name__)
@@ -262,6 +263,34 @@ def working_folder(conn, cfg: dict) -> str:
     return f'{_scratch(conn)}/{HOME_NAME}'
 
 
+# ---- The job history, in the working folder ----
+
+def job_history_folder(working: str) -> str:
+    """<working>/job-history: the job records (<user>-job-history.db), each job's run files (jobs/)
+    and the backups a cleared history leaves (backups/)."""
+    return f"{working.rstrip('/')}/{job_history.HISTORY_FOLDER}"
+
+
+def link_run_files(conn, working: str) -> None:
+    """Points ~/.local/share/bsp/jobs, where each run writes its log, exit code and SLURM id, at
+    <working>/job-history/jobs, when the working folder is there (ssh_slurm.link_run_files_sh)."""
+    if working:
+        _run(conn, ssh_slurm.link_run_files_sh(working, f"{job_history_folder(working)}/{job_history.RUNS_FOLDER}"))
+
+
+def carry_job_history(conn, before: str, working: str) -> None:
+    """When the working folder changes, its job history comes along: <before>/job-history is copied
+    into the new working folder when that has none and it is under LOGIN_COPY_LIMIT. The earlier
+    one stays where it is."""
+    if not before or not working or before.rstrip('/') == working.rstrip('/'):
+        return
+    old, new = job_history_folder(before), job_history_folder(working)
+    q = shlex.quote
+    _run(conn, f'[ -d {q(old)} ] && [ ! -e {q(new)} ] && [ ! -e {q(new + ".partial")} ] '
+               f'&& [ "$(du -sk {q(old)} | cut -f1)" -lt {LOGIN_COPY_LIMIT // 1024} ] '
+               f'&& mkdir -p {q(working)} && cp -Rp {q(old)} {q(new + ".partial")} && mv {q(new + ".partial")} {q(new)}')
+
+
 def scratch_root(conn, cfg: dict) -> str:
     """Returns margie_sb.stores_root if set (every finished setup saves it), else margie-databases
     in the working folder."""
@@ -346,6 +375,25 @@ def fill_default_partition(conn, cfg: dict) -> bool:
     if not partition:
         return False
     _cfg_set(cfg, 'compute.cluster_default.partition', partition)
+    return True
+
+
+def slurm_accounts(conn) -> list[str]:
+    """The SLURM accounts this cluster user may run jobs under (sacctmgr associations), sorted."""
+    _, out = _run(conn, 'sacctmgr -nP show assoc user="$USER" format=Account 2>/dev/null | sort -u')
+    return sorted({a.strip() for a in out.split() if a.strip() and re.fullmatch(r'[\w.-]+', a.strip())})
+
+
+def fill_default_account(conn, cfg: dict) -> bool:
+    """Sets an empty SLURM account setting when the user has exactly one account, so a run needs
+    nothing more than the working folder. An account chosen in Settings is not changed; with more
+    than one, Settings asks. Returns True when the config changed."""
+    if str(_cfg_get(cfg, 'compute.cluster_default.account') or '').strip():
+        return False
+    accounts = slurm_accounts(conn)
+    if len(accounts) != 1:
+        return False
+    _cfg_set(cfg, 'compute.cluster_default.account', accounts[0])
     return True
 
 

@@ -210,7 +210,7 @@
 	async function clearOne(r: Run) {
 		menu = null;
 		const sure = confirm(
-			`Clear "${title(r)}" (${shortId(r.id)}) from the job history?\n\nA backup of its record is saved first, in your working folder (job-history-backups). ` +
+			`Clear "${title(r)}" (${shortId(r.id)}) from the job history?\n\nA backup of its record is saved first, in your working folder (job-history/backups). ` +
 				'Its results, run folder and the cached tool results in your MARGIE database stay as they are.'
 		);
 		if (!sure) return;
