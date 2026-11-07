@@ -1996,6 +1996,32 @@ def setup_stores(body: dict | None = None, current_user: dict = Depends(get_curr
 
 # ---- Genome viewer refresh (rebuilt beside the old file, then moved over) ----
 
+# Draws one genome's map and circular figure again with the account's MARGIE copy. $1 is the genome's
+# folder: its report table is there or in scoring/, its map beside the table, and its circular figure
+# (redrawn where it is) in diagrams/ or scoring/figures/. Exits 3 without the folder, 4 without the table,
+# 5 when the map cannot be drawn; prints the map's path.
+_REDRAW_ONE = r'''redraw_one() {
+  cd "$1" 2>/dev/null || return 3
+  T=FINAL_ANNOTATION_WITH_CONFIDENCE.tsv; [ -f "$T" ] || T=scoring/$T; [ -f "$T" ] || return 4
+  V=FINAL_GENOME_VIEWER.html; [ -f "$V" ] || { [ -f scoring/$V ] && V=scoring/$V; }
+  "$PY" "$VIZ/gen_genome_viewer.py" "$T" "$V.new" > .viewer-refresh.log 2>&1 && mv -f "$V.new" "$V" || return 5
+  g=$(basename "$PWD")
+  for P in "diagrams/${g}_circular.png" "scoring/figures/${g}_circular.png"; do
+    if [ -f "$P" ]; then
+      "$PY" "$VIZ/make_circular_genome.py" "$T" "$P.new.png" >> .viewer-refresh.log 2>&1 && mv -f "$P.new.png" "$P"
+    fi
+  done
+  echo "$V"
+}'''
+
+
+def _redraw_env(current_user: dict) -> str:
+    """PY and VIZ for _REDRAW_ONE: the account's MARGIE copy and its drawing scripts."""
+    repo = f"{current_user['home_dir']}/bioinformatics-tools"
+    q = shlex.quote
+    return f"PY=${{MARGIE_PYTHON:-{q(repo)}/.venv/bin/python}}; VIZ={q(repo + '/bioinformatics_tools/workflow_tools/viz')}"
+
+
 @router.post("/genome-viewer/refresh")
 def refresh_genome_viewer(body: dict | None = None, current_user: dict = Depends(get_current_user)):
     """Rebuilds a genome's viewer. body: {folder}; returns {viewer}: the map's path."""
@@ -2009,17 +2035,7 @@ def refresh_genome_viewer(body: dict | None = None, current_user: dict = Depends
         sync_remote_dane_wf(conn)
     except Exception as exc:
         LOGGER.warning("dane_wf version-sync before a map refresh failed, using the clone as it is: %s", exc)
-    q = shlex.quote
-    home = current_user["home_dir"]
-    repo = f"{home}/bioinformatics-tools"
-    script = f"{repo}/bioinformatics_tools/workflow_tools/viz/gen_genome_viewer.py"
-    cmd = (
-        f"cd {q(folder)} || exit 3; "
-        "T=FINAL_ANNOTATION_WITH_CONFIDENCE.tsv; [ -f \"$T\" ] || T=scoring/$T; [ -f \"$T\" ] || exit 4; "
-        "V=FINAL_GENOME_VIEWER.html; [ -f \"$V\" ] || { [ -f scoring/$V ] && V=scoring/$V; }; "
-        f"PY=${{MARGIE_PYTHON:-{q(repo)}/.venv/bin/python}}; "
-        f"\"$PY\" {q(script)} \"$T\" \"$V.new\" > .viewer-refresh.log 2>&1 && mv -f \"$V.new\" \"$V\" && echo \"$V\""
-    )
+    cmd = f"{_redraw_env(current_user)}\n{_REDRAW_ONE}\nredraw_one {shlex.quote(folder)}"
     code, out = user_stores._run(conn, cmd, timeout=600)
     if code == 3:
         raise HTTPException(status_code=404, detail=f"No folder {folder} on the cluster.")
@@ -2030,6 +2046,112 @@ def refresh_genome_viewer(body: dict | None = None, current_user: dict = Depends
         raise HTTPException(status_code=500, detail=f"The map could not be made again: {(log or out).strip()[-600:]}")
     viewer = out.strip().splitlines()[-1] if out.strip() else "FINAL_GENOME_VIEWER.html"
     return {"viewer": f"{folder}/{viewer}"}
+
+
+# ---- Redraw all maps: one SLURM job draws each listed genome's map and circular figure again ----
+
+MAP_REDRAWS = "user-requested-map-redraws"
+# Four genomes at a time, each drawing on one core.
+_REDRAW_AT_ONCE = 4
+_REDRAW_SCRIPT = r'''#!/bin/bash
+# Draws each genome in folders.txt again: its map and circular figure (MARGIE's Results: Redraw all maps).
+S="$1"; cd "$S" || exit 1
+. "$S/env.sh"
+total=$(grep -c . folders.txt)
+: > done.txt; : > failed.txt
+printf 'state=running\ntotal=%s\njob=%s\n' "$total" "${SLURM_JOB_ID:-}" > status
+''' + _REDRAW_ONE + r'''
+one() { if (redraw_one "$1" > /dev/null 2>&1); then echo "$1" >> "$S/done.txt"; else echo "$1" >> "$S/failed.txt"; fi; }
+export -f one redraw_one; export S PY VIZ
+tr '\n' '\0' < folders.txt | xargs -0 -P "$AT_ONCE" -I{} bash -c 'one "$1"' _ {}
+printf 'state=done\ntotal=%s\ndone=%s\nfailed=%s\njob=%s\n' "$total" "$(grep -c . done.txt)" "$(grep -c . failed.txt)" "${SLURM_JOB_ID:-}" > status
+'''
+
+
+def _redraw_state(current_user: dict, conn) -> tuple[str, dict]:
+    """The folder that keeps the redraw job's script, list, status and log, and the account's config."""
+    try:
+        user_config = _read_config(current_user, conn)
+    except Exception:
+        raise HTTPException(status_code=400, detail="Configuration file not found. Create your configuration first.")
+    return f"{_stores_call(user_stores.scratch_root, conn, user_config)}/{MAP_REDRAWS}", user_config
+
+
+def _redraw_status(conn, state: str) -> dict:
+    """{state: none | queued | running | done | failed, total, done, failed, job, failedFolders}."""
+    q = shlex.quote
+    _, out = user_stores._run(conn, (
+        f"cd {q(state)} 2>/dev/null || exit 0; cat status 2>/dev/null; "
+        "echo \"count_done=$(grep -c . done.txt 2>/dev/null)\"; echo \"count_failed=$(grep -c . failed.txt 2>/dev/null)\"; "
+        "j=$(sed -n 's/^job=//p' status 2>/dev/null | head -1); "
+        "[ -n \"$j\" ] && echo \"in_slurm=$(squeue -h -j \"$j\" -o %T 2>/dev/null | head -1)\"; "
+        "echo '--failed--'; head -n 20 failed.txt 2>/dev/null"))
+    head, _, tail = out.partition("--failed--")
+    got = dict(line.split("=", 1) for line in head.splitlines() if "=" in line)
+    state_now = got.get("state", "").strip()
+    if not state_now:
+        return {"state": "none"}
+    num = lambda k: int(got.get(k, "0").strip() or 0) if got.get(k, "0").strip().isdigit() else 0  # noqa: E731
+    info = {"total": num("total"), "done": num("count_done"), "failed": num("count_failed"),
+            "job": got.get("job", "").strip(), "failedFolders": [x for x in tail.split("\n") if x.strip()]}
+    in_slurm = got.get("in_slurm", "").strip()
+    if state_now in ("queued", "running") and info["job"] and not in_slurm:
+        # SLURM no longer has the job, yet it did not say it finished: it ended early (time, memory or a cancel).
+        return {**info, "state": "failed", "note": f"SLURM job {info['job']} ended before it finished; see {state}/slurm.out."}
+    if state_now == "queued" and in_slurm == "RUNNING":
+        state_now = "running"
+    return {**info, "state": state_now}
+
+
+@router.post("/genome-viewer/refresh-all")
+def refresh_all_genome_viewers(body: dict | None = None, current_user: dict = Depends(get_current_user)):
+    """Draws the maps and circular figures of the listed genome folders again, as one SLURM job.
+    body: {folders}; returns the job's status (see refresh-all-status)."""
+    folders_in = (body or {}).get("folders")
+    if not isinstance(folders_in, list) or not folders_in:
+        raise HTTPException(status_code=400, detail="Which genomes?")
+    folders = list(dict.fromkeys(_resolve_browse_path(str(f), current_user).rstrip("/") for f in folders_in if str(f).strip()))
+    conn = _build_connection(current_user)
+    state, user_config = _redraw_state(current_user, conn)
+    if _redraw_status(conn, state).get("state") in ("queued", "running"):
+        raise HTTPException(status_code=409, detail="The maps are being drawn again already; this page shows how far it has got.")
+    account = str(user_stores._cfg_get(user_config, "compute.cluster_default.account") or "").strip()
+    if not account:
+        raise HTTPException(status_code=409, detail="Set your SLURM account first (Analyze, or Settings → Compute): the maps are drawn as a SLURM job.")
+    partition = str(user_stores._cfg_get(user_config, "compute.cluster_default.partition") or "").strip() or user_stores.default_partition(conn)
+    # The maps are drawn with the account's own clone, brought up to the deployed version first.
+    try:
+        sync_remote_dane_wf(conn)
+    except Exception as exc:
+        LOGGER.warning("dane_wf version-sync before redrawing all maps failed, using the clone as it is: %s", exc)
+    q = shlex.quote
+    code, out = user_stores._run(conn, f"mkdir -p {q(state)} && cd {q(state)} && rm -f status done.txt failed.txt slurm.out")
+    if code != 0:
+        raise HTTPException(status_code=500, detail=f"Could not write to {state} on the cluster: {out.strip()[-300:]}")
+    ssh_sftp.write_remote_text_file(f"{state}/redraw.sh", _REDRAW_SCRIPT, connection=conn)
+    ssh_sftp.write_remote_text_file(f"{state}/env.sh", f"{_redraw_env(current_user)}; AT_ONCE={_REDRAW_AT_ONCE}\n", connection=conn)
+    ssh_sftp.write_remote_text_file(f"{state}/folders.txt", "".join(f + "\n" for f in folders), connection=conn)
+    # About a minute a genome, four at a time, with room to spare.
+    minutes = max(30, min(24 * 60, 2 * len(folders)))
+    cmd = (f"cd {q(state)} && sbatch --parsable --job-name=margie-maps --account={q(account)} "
+           + (f"--partition={q(partition)} " if partition else "")
+           + f"--time={minutes} --ntasks=1 --cpus-per-task={_REDRAW_AT_ONCE} --mem=16G --output={q(state)}/slurm.out "
+           + f"redraw.sh {q(state)}")
+    code, out = user_stores._run(conn, cmd)
+    job = out.strip().split(";")[0].split()[-1] if out.strip() else ""
+    if code != 0 or not job.isdigit():
+        raise HTTPException(status_code=502, detail=f"SLURM would not take the job (account {account}, partition {partition or 'none'}): {' '.join(out.split())[:300]}")
+    # Queued until the script starts and says running.
+    user_stores._run(conn, f"cd {q(state)} && [ -e status ] || printf 'state=queued\\ntotal=%s\\njob=%s\\n' {len(folders)} {q(job)} > status")
+    return _redraw_status(conn, state)
+
+
+@router.get("/genome-viewer/refresh-all")
+def refresh_all_status(current_user: dict = Depends(get_current_user)):
+    """How far the latest Redraw all maps job has got: {state, total, done, failed, job, failedFolders, note?}."""
+    conn = _build_connection(current_user)
+    state, _ = _redraw_state(current_user, conn)
+    return _redraw_status(conn, state)
 
 
 # ---- Job report: a PDF of the job, prepared in the background and kept in the working databases folder ----

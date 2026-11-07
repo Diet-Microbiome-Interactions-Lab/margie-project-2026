@@ -9,6 +9,7 @@
 	import { cubicOut } from 'svelte/easing';
 	import { fly } from 'svelte/transition';
 	import { api, fileUrl, viewableUrl } from '$lib/api';
+	import { fileBlob } from '$lib/cluster/backend';
 	import CountUp from '$lib/crisp/CountUp.svelte';
 	import ResultsRing from '$lib/crisp/ResultsRing.svelte';
 	import LoadProgress from '$lib/crisp/LoadProgress.svelte';
@@ -147,7 +148,92 @@
 			remaking = false;
 		}
 	}
-		const chatOpen = $derived(!ui.isFolded(CHAT, true));
+
+	/** Redraw all maps (cluster): one SLURM job draws each shown genome's map and circular figure again; its progress shows on the folder's header. */
+	type Redraw = { state: 'none' | 'queued' | 'running' | 'done' | 'failed'; total?: number; done?: number; failed?: number; job?: string; failedFolders?: string[]; note?: string };
+	let redraw = $state<Redraw | null>(null);
+	let redrawTimer: ReturnType<typeof setTimeout> | null = null;
+	async function followRedraw() {
+		if (redrawTimer) clearTimeout(redrawTimer);
+		const was = redraw?.state;
+		try {
+			redraw = await api<Redraw>('/results/redraw-all');
+		} catch {
+			return;
+		}
+		if (redraw.state === 'queued' || redraw.state === 'running') redrawTimer = setTimeout(followRedraw, 10_000);
+		else if (was === 'queued' || was === 'running') {
+			if (redraw.state === 'done')
+				ui.notify(`Maps drawn again: ${redraw.done} of ${redraw.total}${redraw.failed ? `; ${redraw.failed} could not be drawn` : ''}.`, redraw.failed ? 'error' : 'ok');
+			else ui.notify(redraw.note || 'The maps could not all be drawn again.', 'error');
+			mapVersion = Date.now();
+			ws.loadResults(true).catch(() => {});
+		}
+	}
+	$effect(() => {
+		if (backend.cluster) untrack(followRedraw);
+		return () => {
+			if (redrawTimer) clearTimeout(redrawTimer);
+		};
+	});
+	async function redrawAll() {
+		const folders = finishedHere.map((r) => r.final?.dir ?? r.folder ?? '').filter(Boolean);
+		if (!folders.length) return;
+		const n = folders.length;
+		if (!confirm(`Draw the maps and circular figures of ${n} genome${n > 1 ? 's' : ''} again with this version of MARGIE? It runs as one SLURM job; the scores and tables stay as they are.`)) return;
+		try {
+			redraw = await api<Redraw>('/results/redraw-all', { method: 'POST', body: JSON.stringify({ folders }) });
+			redrawTimer = setTimeout(followRedraw, 10_000);
+		} catch (e) {
+			ui.notify(e instanceof Error ? e.message : String(e), 'error');
+		}
+	}
+	const redrawing = $derived(redraw?.state === 'queued' || redraw?.state === 'running');
+
+	/** Score all again (cluster): a new run of the picked run's genomes with that run's tools, whose results come back from the database. */
+	let scoringAll = $state(false);
+	/** The run's tools: from its job, else from the run-command.sh it saved in its folder. */
+	async function toolsOf(r: ResultRun): Promise<string[]> {
+		const job = ws.runs.find((j) => (j.outputDir ?? '').replace(/\/$/, '') === r.dir && j.tools?.length);
+		if (job?.tools?.length) return job.tools;
+		try {
+			const text = await (await fileBlob(`${r.dir}/run-command.sh`, true)).text();
+			return (/margie_sb\.selected_tools:\s*([^\s\\]+)/.exec(text)?.[1] ?? '').split(',').filter(Boolean);
+		} catch {
+			return [];
+		}
+	}
+	async function scoreAll() {
+		const r = pickedRun;
+		if (!r) return;
+		scoringAll = true;
+		try {
+			const offered = new Set(ws.tools.map((t) => t.name));
+			const tools = (await toolsOf(r)).filter((t) => offered.has(t));
+			if (!tools.length) {
+				ui.notify(`MARGIE could not tell which tools run ${r.name} used, so it cannot score it again as it was.`, 'error');
+				return;
+			}
+			const files: string[] = [];
+			const missing: string[] = [];
+			for (const o of r.organisms) {
+				const f = ws.genomes.find((x) => stemOf(x.name) === o.organism || stemOf(x.name) === baseOf(o.organism))?.name;
+				if (f) files.push(f);
+				else missing.push(baseOf(o.organism));
+			}
+			if (!files.length) {
+				ui.notify(`None of run ${r.name}'s genomes is in your genomes folder: add their FASTA files there to score them again.`, 'error');
+				return;
+			}
+			const left = missing.length ? ` ${missing.length} of its genomes are not in your genomes folder and are left out (${missing.slice(0, 3).join(', ')}${missing.length > 3 ? ', …' : ''}).` : '';
+			if (!confirm(`Score run ${r.name}'s ${files.length} genome${files.length > 1 ? 's' : ''} again against your current databases and operon reference? They run with the run's ${tools.length} tools, whose results come back from the database; scoring, the reports and the maps are made again, in a new run.${left}`)) return;
+			const run = await ws.start({ kind: 'annotate', tools, genomes: files });
+			if (run) ui.notify('Scoring them again: follow it on Jobs.', 'ok');
+		} finally {
+			scoringAll = false;
+		}
+	}
+	const chatOpen = $derived(!ui.isFolded(CHAT, true));
 	const TABS: { id: Tab; label: string }[] = [
 		{ id: 'map', label: 'Map' },
 		{ id: 'table', label: 'Table' },
@@ -499,7 +585,44 @@
 					<h2 id="rb-title">{pickedRun ? 'Run folder' : 'Results folder'}</h2>
 					<Explain><p class="rb-note">{pickedRun ? "This run's tool output and genome results, as they are on disk." : "Every tool's output and each genome's results, as they are on disk."}</p></Explain>
 				</div>
+				{#if backend.cluster && finishedHere.length}
+					<div class="rb-downloads">
+						<button
+							type="button"
+							class="rb-btn"
+							disabled={redrawing}
+							title={pickedRun
+								? "Draws the map and circular figure of each of this run's finished genomes again with this version of MARGIE, as one SLURM job; scores and tables stay as they are"
+								: "Draws the map and circular figure of each genome's latest result again with this version of MARGIE, as one SLURM job; scores and tables stay as they are"}
+							onclick={redrawAll}>{redrawing ? 'Drawing the maps…' : `Redraw all maps (${finishedHere.length})`}</button
+						>
+						{#if pickedRun}
+							<button
+								type="button"
+								class="rb-btn"
+								disabled={scoringAll}
+								title="Runs this run's genomes again in a new run, with the same tools, whose results come back from the database: scoring, the reports and the maps are made again against your current databases and operon reference"
+								onclick={scoreAll}>{scoringAll ? 'Starting…' : `Score all again (${pickedRun.organisms.length})`}</button
+							>
+						{/if}
+					</div>
+				{/if}
 			</header>
+			{#if backend.cluster && redraw && (redrawing || redraw.state === 'failed' || (redraw.state === 'done' && redraw.failed))}
+				<p class="rb-remake" role="status">
+					<span>
+						{#if redraw.state === 'queued'}
+							Redraw all maps: waiting for a SLURM slot{redraw.job ? ` (job ${redraw.job})` : ''} | {redraw.total} genomes.
+						{:else if redraw.state === 'running'}
+							Drawing the maps again: {redraw.done} of {redraw.total}{redraw.failed ? ` | ${redraw.failed} could not be drawn` : ''}{redraw.job ? ` (job ${redraw.job})` : ''}.
+						{:else if redraw.state === 'failed'}
+							{redraw.note || 'The maps could not all be drawn again.'}
+						{:else}
+							Maps drawn again: {redraw.done} of {redraw.total}. Not drawn: {(redraw.failedFolders ?? []).map((f) => baseOf(f.split('/').pop() ?? f)).join(', ')}{(redraw.failed ?? 0) > (redraw.failedFolders?.length ?? 0) ? ', …' : ''}.
+						{/if}
+					</span>
+				</p>
+			{/if}
 			<div class="rb-pane rb-flow">
 				<FolderView roots={wholeRoots} memory="all" empty="The results folder is not set. See Settings." />
 			</div>

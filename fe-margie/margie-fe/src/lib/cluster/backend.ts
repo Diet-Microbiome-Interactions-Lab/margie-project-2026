@@ -1498,6 +1498,11 @@ export async function clusterApi<T = any>(path: string, init: RequestInit = {}):
 			case 'POST /results/refresh-map':
 				// Regenerates the genome map with the backend's current viewer.
 				return call('POST', '/v1/ssh/genome-viewer/refresh', { folder: String((body as { folder?: string })?.folder ?? '') });
+			// Every listed genome's map and circular figure drawn again, as one SLURM job; and how far it has got.
+			case 'POST /results/redraw-all':
+				return call('POST', '/v1/ssh/genome-viewer/refresh-all', { folders: (body as { folders?: string[] })?.folders ?? [] });
+			case 'GET /results/redraw-all':
+				return get('/v1/ssh/genome-viewer/refresh-all');
 			case 'POST /stores/run-here':
 				return call('POST', '/v1/ssh/stores/run-here');
 			case 'POST /stores/stop':
