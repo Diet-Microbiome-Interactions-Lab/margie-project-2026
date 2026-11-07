@@ -139,6 +139,33 @@ def test_a_refusal_is_said_plainly():
     assert 'declined' in gc.ask_claude(SimpleNamespace(run=None), {**gc.DEFAULTS}, 'k', 's', [], 'q', client=fake)
 
 
+def test_a_service_that_answers_with_a_list_is_read():
+    """Gemini sends some replies, its errors among them, as a JSON list of objects."""
+    kit = SimpleNamespace(run=lambda name, args: f'[E1] {name} {args["query"]}: 1 row')
+    s = {**gc.DEFAULTS, 'provider': 'gemini', 'model': 'gemini-x'}
+    err = lambda url, key, body: (400, [{'error': {'code': 400, 'message': 'API key not valid.'}}])  # noqa: E731
+    with pytest.raises(gc.ChatError, match='API key not valid'):
+        gc.ask_openai(kit, s, 'gemini', 'k', 'system', [], 'q', post=err)
+    replies = iter([
+        [{'choices': [{'message': {'content': None, 'tool_calls': [
+            {'id': 'c1', 'type': 'function', 'function': {'name': 'search_table', 'arguments': {'query': 'dnaA'}}}]}}]}],
+        [{'choices': [{'message': {'content': 'dnaA is gene 1 [E1].'}, 'finish_reason': 'stop'}]}],
+    ])
+    sent = []
+
+    def post(url, key, body):
+        sent.append(body)
+        return 200, next(replies)
+    assert gc.ask_openai(kit, s, 'gemini', 'k', 'system', [], 'Where is dnaA?', post=post) == 'dnaA is gene 1 [E1].'
+    assert sent[1]['messages'][-1] == {'role': 'tool', 'tool_call_id': 'c1', 'content': '[E1] search_table dnaA: 1 row'}
+
+
+def test_only_turns_margie_wrote_are_read_back():
+    with FakeAccount() as acct:
+        acct.files[gc._history_file('/home/u', 'g1')] = b'[{"role": "user", "text": "hi"}, ["user", "old"], {"role": "assistant", "text": "hello"}, {"x": 1}]'
+        assert gc.read_history(None, '/home/u', 'g1') == [{'role': 'user', 'text': 'hi'}, {'role': 'assistant', 'text': 'hello'}]
+
+
 def test_asking_needs_the_notice_and_a_key():
     with FakeAccount():
         with pytest.raises(gc.ChatError, match='data notice'):

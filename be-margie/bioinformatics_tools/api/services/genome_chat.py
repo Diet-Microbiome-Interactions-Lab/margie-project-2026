@@ -296,7 +296,9 @@ def read_history(conn, home: str, genome: str) -> list:
     if not genome:
         return []
     turns = _read_json(conn, _history_file(home, genome))
-    return turns if isinstance(turns, list) else []
+    # Turns MARGIE wrote: a role and a text each.
+    return [t for t in turns if isinstance(t, dict) and t.get('role') in ('user', 'assistant') and isinstance(t.get('text'), str)] \
+        if isinstance(turns, list) else []
 
 
 def clear_history(conn, home: str, genome: str) -> None:
@@ -615,6 +617,13 @@ def _post_json(url: str, key: str, body: dict) -> tuple[int, dict]:
             return e.code, {}
 
 
+def _one(d) -> dict:
+    """A reply as one object: Gemini sends some replies (its errors) as a list of them."""
+    if isinstance(d, list):
+        d = next((x for x in d if isinstance(x, dict)), {})
+    return d if isinstance(d, dict) else {}
+
+
 def ask_openai(kit: Toolkit, s: dict, p: str, key: str, system: str, history: list, question: str, post=_post_json) -> str:
     """Asks OpenAI, Gemini or an OpenAI-compatible service via chat completions, over the same three tools."""
     label = PROVIDERS[p]['label']
@@ -634,16 +643,18 @@ def ask_openai(kit: Toolkit, s: dict, p: str, key: str, system: str, history: li
             status, d = post(f'{base}/chat/completions', key, {'model': s['model'], 'messages': messages, 'tools': tools, **limit})
         except (urllib.error.URLError, TimeoutError, OSError) as e:
             raise ChatError(f'Could not reach {label}: {e}', 502)
+        d = _one(d)
         if status >= 400:
-            why = (d.get('error') or {}).get('message') if isinstance(d.get('error'), dict) else d.get('message')
+            err = _one(d.get('error'))
+            why = err.get('message') or d.get('message')
             if status == 401:
                 raise ChatError(f'{label} did not accept the API key.', 401)
             raise ChatError(f'{label} answered with an error ({status}): {why or "no reason given"}', 502)
-        choice = (d.get('choices') or [{}])[0]
-        m = choice.get('message')
+        choice = _one(d.get('choices'))
+        m = _one(choice.get('message'))
         if not m:
             raise ChatError('The service sent no answer.', 502)
-        calls = m.get('tool_calls') or []
+        calls = [c for c in (m.get('tool_calls') or []) if isinstance(c, dict) and isinstance(c.get('function'), dict)]
         if not calls:
             text = str(m.get('content') or '').strip()
             if choice.get('finish_reason') == 'length':
@@ -652,7 +663,8 @@ def ask_openai(kit: Toolkit, s: dict, p: str, key: str, system: str, history: li
         messages.append({'role': 'assistant', 'content': m.get('content'), 'tool_calls': calls})
         for c in calls:
             try:
-                args = json.loads(c['function'].get('arguments') or '{}')
+                raw = c['function'].get('arguments')
+                args = raw if isinstance(raw, dict) else json.loads(raw or '{}')
             except (ValueError, KeyError, TypeError):
                 messages.append({'role': 'tool', 'tool_call_id': c.get('id'), 'content': 'The arguments were not valid JSON; try again.'})
                 continue
