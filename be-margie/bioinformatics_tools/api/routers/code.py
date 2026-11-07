@@ -127,7 +127,7 @@ STEPS = [
         "title": "Genome map and diagrams",
         "what": "Draws each genome's interactive map (gene, operon or review mode; circular or linear; one or two strands), "
                 "its circular figure and its operon diagrams.",
-        "files": ["viz/gen_genome_viewer.py", "viz/make_circular_genome.py",
+        "files": ["viz/gen_genome_viewer.py", "viz/genome_fasta.py", "viz/make_circular_genome.py",
                   "scoring/analysis/report_figures/make_complete_operon_diagrams.py"],
     },
     {

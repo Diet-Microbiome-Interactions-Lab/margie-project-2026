@@ -95,3 +95,16 @@ def test_a_drawn_map_carries_fingerprints_and_ec_numbers(tmp_path):
     extras = json.loads(gzip.decompress(base64.b64decode(packed)))
     x = dict(zip(extras['fields'], extras['rows'][0]))
     assert x['fingerprint_hash'] == 'ab12' and x['fingerprint_label'] == 'X' and 'PFAM_id: PF1' in x['fingerprint_line']
+
+
+def test_the_linear_view_is_drawn_to_scale_unless_asked_for_gene_order():
+    t = viewer.TEMPLATE
+    assert '<select id="linScale"><option value="scale">to scale</option><option value="order">in gene order</option></select>' in t
+    assert 'let two=false, scaled=true;' in t
+    # Regions lie under the genes they span, and labels are measured to fit their gene.
+    assert 'if(scaled) for(const k of ks){ const i=list[k], g=D.genes[i]; if(!g.rg) continue;' in t
+    assert 'function fit(texts,px,size,keep)' in t
+
+
+def test_the_page_can_leave_out_the_maps_title():
+    assert 'head=0' in viewer.TEMPLATE and '.nohead .left>h1' in viewer.TEMPLATE

@@ -4,16 +4,18 @@ matplotlib from FINAL_ANNOTATION_WITH_CONFIDENCE.tsv.
 
 Everything comes from the FINAL table; only GC% is computed, from the per-gene
 nucleotide sequences. A key under the legend names each ring and the GC line:
-  * replicon / contig identity   <- parsed from gene_id  (<accession>_<start><strand><len>)
+  * sequence identity             <- parsed from gene_id  (<accession>_<start><strand><len>)
+  * sequence length and kind      <- the genome's FASTA, when the run's link to it is found
+                                     (genome_fasta.py); otherwise to each sequence's last gene
   * gene arc                      <- RAST_start / RAST_end / RAST_strand
   * ring colour                   <- CONFIDENCE_TIER
   * review track                  <- NEEDS_REVIEW?
   * GC ring                       <- RAST_na_sequence (windowed)
 
-Each replicon or contig is an arc proportional to its length (with a floor for
-tiny ones), separated by gap wedges that stand for unassembled regions.
+Each sequence is an arc proportional to its length (with a floor for tiny ones),
+with a small gap between sequences.
 
-Usage: make_circular_genome.py <FINAL.tsv> <out.png>
+Usage: make_circular_genome.py <FINAL.tsv> <out.png> [--fasta <genome.fna>]
 """
 import csv
 import glob
@@ -28,6 +30,9 @@ import matplotlib.font_manager as fm
 import matplotlib.pyplot as plt
 from matplotlib.collections import LineCollection, PatchCollection
 from matplotlib.patches import Wedge
+
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+from genome_fasta import genome_sequences  # noqa: E402
 
 plt.rcParams["font.family"] = "sans-serif"
 plt.rcParams["font.sans-serif"] = ["Arial", "Liberation Sans", "DejaVu Sans"]
@@ -47,10 +52,10 @@ TCOL = dict(TIER)
 REVIEW_COL = "#b32b1e"
 # Prophage, repeat and CRISPR regions, under the genes; matches REGION in gen_genome_viewer.py.
 REGION_COL = "#e6e6e1"
-GAP_DEG = 4.0                 # angular gap between replicons/contigs
-GAP_BUDGET_DEG = 40.0         # total gap angle, so many-contig drafts still fit in 360 deg
-MIN_SPAN_DEG = 4.0            # floor so a tiny plasmid/contig is still visible
-MAX_LABELLED = 12             # above this many contigs, no per-contig captions
+GAP_DEG = 4.0                 # angular gap between sequences
+GAP_BUDGET_DEG = 40.0         # total gap angle, so many sequences still fit in 360 deg
+MIN_SPAN_DEG = 4.0            # floor so a tiny sequence is still visible
+MAX_LABELLED = 12             # above this many sequences, no per-sequence captions
 TICK_MIN_SPAN_DEG = 2.0       # no Mb ticks on arcs narrower than this
 START_DEG = 90.0             # 12 o'clock origin, genome runs clockwise
 INK = "#000000"
@@ -105,11 +110,18 @@ def xy(r, deg):
 
 def main():
     """Reads the FINAL table with csv and draws gene, review, GC and backbone rings with matplotlib."""
-    final, out = sys.argv[1], sys.argv[2]
+    argv = sys.argv[1:]
+    given = None
+    if "--fasta" in argv:
+        i = argv.index("--fasta")
+        given = argv[i + 1]
+        del argv[i:i + 2]
+    final, out = argv[0], argv[1]
     rows = [r for r in csv.DictReader(open(final, newline=""), delimiter="\t")]
     organism = col(rows[0], "organism_name")
 
-    # Groups genes by contig; contig length = max end.
+    # Groups genes by sequence; a sequence's length is read from the genome's FASTA, or else
+    # taken as its last gene's end.
     contigs = {}
     for r in rows:
         gid = col(r, "gene_id")
@@ -123,6 +135,12 @@ def main():
         d = contigs.setdefault(c, {"len": 0, "genes": []})
         d["len"] = max(d["len"], e)
         d["genes"].append(r)
+    seqs, _ = genome_sequences(final, organism, given)
+    exact = bool(seqs) and all(c in seqs for c in contigs)
+    if exact:
+        for c, sq in seqs.items():
+            d = contigs.setdefault(c, {"len": 0, "genes": []})
+            d["len"], d["kind"] = sq["len"], sq["kind"]   # the FASTA's length as it is
     order = sorted(contigs, key=lambda c: -contigs[c]["len"])   # largest first
     total_len = sum(contigs[c]["len"] for c in order)
     n_gap = len(order)
@@ -148,13 +166,13 @@ def main():
     def ang(c, pos):
         """Returns the angle of a position on contig c (clockwise)."""
         s0, span = layout[c]
-        return s0 - span * (pos / contigs[c]["len"])           # clockwise: decreasing angle
+        return s0 - span * (min(pos, contigs[c]["len"]) / contigs[c]["len"])           # clockwise: decreasing angle
 
     fig, ax = plt.subplots(figsize=(11, 12))
     fig.patch.set_facecolor("white"); ax.set_facecolor("white")
     ax.set_xlim(-1.36, 1.36); ax.set_ylim(-1.74, 1.30); ax.set_aspect("equal"); ax.axis("off")
 
-    # Length-weighted genome-wide mean GC, the deviation baseline.
+    # Length-weighted mean GC of the genes' sequences, the deviation baseline.
     tot_gc = tot_bp = 0.0
     for r in rows:
         seq = col(r, "RAST_na_sequence")
@@ -233,7 +251,7 @@ def main():
         if spans[c] < TICK_MIN_SPAN_DEG:
             continue          # hairline arc
         step = 1_000_000 if L > 3_000_000 else 500_000
-        # Numerals only when replicons are captioned; draft contigs restart at 0.
+        # Numerals only when the sequences are captioned (12 or fewer).
         show_nums = L >= 250_000 and len(order) <= MAX_LABELLED
         p = 0
         while p <= L:
@@ -245,7 +263,7 @@ def main():
                 ax.text(xt, yt, f"{p/1e6:.1f}", ha="center", va="center", fontsize=7.5, color="#000000")
             p += step
 
-    # Captions only for 2..MAX_LABELLED replicons; the HTML viewer names contigs.
+    # Captions only for 2..MAX_LABELLED sequences; the HTML viewer names them all.
     if 1 < len(order) <= MAX_LABELLED:
         placed = []                                            # (angle, radius) already used
         for c in order:
@@ -256,18 +274,24 @@ def main():
                 rad += 0.085
             placed.append((mid, rad))
             fs = 8.5 if contigs[c]["len"] >= 250_000 else 7.3
-            xl, yl = xy(rad, mid)
-            ax.text(xl, yl, f"{c}\n{contigs[c]['len']/1e6:.2f} Mb", ha="center", va="center",
+            # Beside the ring a caption grows outward from it; above and below it is centred.
+            side = cos(mid * pi / 180)
+            ha = "left" if side > 0.35 else "right" if side < -0.35 else "center"
+            xl, yl = xy(rad - (0.07 if ha != "center" else 0), mid)
+            kind = f"{contigs[c]['kind']} | " if contigs[c].get("kind") else ""
+            ax.text(xl, yl, f"{c}\n{kind}{'' if exact else '≥ '}{contigs[c]['len']/1e6:.2f} Mb", ha=ha, va="center",
                     fontsize=fs, color="#000000", linespacing=0.95)
 
     # Centre block: stats only; the genome identifier is the figure title.
     n_flag = sum(1 for r in rows if col(r, "NEEDS_REVIEW?").strip().lower() == "yes")
-    ax.text(0, 0.05, f"{total_len/1e6:.2f} Mb | {len(rows):,} genes", ha="center", va="center",
+    ax.text(0, 0.09, f"{'' if exact else '≥ '}{total_len/1e6:.2f} Mb | {len(rows):,} genes", ha="center", va="center",
             fontsize=13, color="#000000")
-    # Many pieces means a draft assembly, so they are called contigs.
-    unit = "contig" if len(order) > MAX_LABELLED else "replicon"
-    ax.text(0, -0.05, f"{len(order)} {unit}{'s' if len(order) > 1 else ''} | "
-            f"{n_flag:,} flagged for review", ha="center", va="center", fontsize=11.5, color="#000000")
+    # The sequences, and what their FASTA headers call them, when they say.
+    kinds = [contigs[c].get("kind", "") for c in order]
+    named = [f"{kinds.count(k)} {k}{'s' if kinds.count(k) > 1 else ''}" for k in ("chromosome", "plasmid") if kinds.count(k)]
+    ax.text(0, 0.0, f"{len(order)} sequence{'s' if len(order) > 1 else ''}{': ' + ', '.join(named) if named else ''}",
+            ha="center", va="center", fontsize=10.5, color="#000000")
+    ax.text(0, -0.08, f"{n_flag:,} flagged for review", ha="center", va="center", fontsize=11.5, color="#000000")
 
     # tier legend (bottom), only tiers actually present
     used = set(gene_colors)
@@ -285,12 +309,16 @@ def main():
     big = max(order, key=lambda c: contigs[c]["len"])
     win_kb = contigs[big]["len"] / max(12, min(360, contigs[big]["len"] // 6000)) / 1000
     key = [
-        "Rings, outside in:  black band, the replicons (positions in Mb)  |  genes on the + strand  |  genes on the − strand",
+        "Rings, outside in:  black band, the genome's sequences (positions in Mb)  |  genes on the + strand  |  genes on the − strand",
         "Gene rings coloured by confidence tier  |  dark red ticks: genes flagged for review"
         + (f"  |  pale grey band: {len(region_patches)} prophage or repeat region{'s' if len(region_patches) != 1 else ''}" if region_patches else ""),
-        f"Centre line: GC content in {win_kb:.0f} kb windows; outside the grey circle is above the genome's mean GC "
+        f"Centre line: the genes' GC content in {win_kb:.0f} kb windows; outside the grey circle is above the genes' mean GC "
         f"({gc_mean * 100:.1f}%), inside below",
     ]
+    notes = ([] if exact else ["≥: lengths run to each sequence's last gene (the genome's FASTA was not found)"]) \
+        + (["chromosome, plasmid: as the sequences' FASTA headers name them"] if named else [])
+    if notes:
+        key.append("  |  ".join(notes))
     for k, text in enumerate(key):
         ax.text(0, -1.45 - 0.075 * k, text, ha="center", va="center", fontsize=9.6, color="#333333")
 
@@ -298,7 +326,7 @@ def main():
     out = Path(out); out.parent.mkdir(parents=True, exist_ok=True)
     fig.savefig(out, dpi=300, bbox_inches="tight", facecolor="white")
     plt.close(fig)
-    print(f"wrote {out.name}  ({organism}: {len(rows)} genes, {len(order)} {unit}s, {n_flag} flagged)")
+    print(f"wrote {out.name}  ({organism}: {len(rows)} genes, {len(order)} sequences{'' if exact else ' (lengths to the last gene)'}, {n_flag} flagged)")
 
 
 if __name__ == "__main__":

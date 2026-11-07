@@ -17,6 +17,9 @@ import re
 import sys
 from pathlib import Path
 
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+from genome_fasta import genome_sequences  # noqa: E402
+
 csv.field_size_limit(10 ** 8)
 
 TIERS = ["highest", "high", "medium", "fair", "low"]          # index 0..4; -1 = non-coding
@@ -108,9 +111,10 @@ def ec_pairs(reasoning: str) -> list[int] | None:
 
 
 def viewer_version() -> str:
-    """A short hash of this script: the same script always draws the same kind of map."""
+    """A short hash of this script and the FASTA reader it uses: the same scripts always draw the same kind of map."""
     import hashlib
-    return hashlib.sha256(Path(__file__).read_bytes()).hexdigest()[:12]
+    here = Path(__file__).resolve().parent
+    return hashlib.sha256(Path(__file__).read_bytes() + (here / "genome_fasta.py").read_bytes()).hexdigest()[:12]
 
 
 def fmt_pid(v):
@@ -223,15 +227,19 @@ def load_fingerprints(final_path):
 def main():
     """Reads the FINAL table and evidence with csv, packs the per-gene data and writes the HTML viewer."""
     argv = [a for a in sys.argv[1:] if a != "--artifact"]
-    explicit_cons = None
+    explicit_cons = explicit_fasta = None
     if "--consolidated" in argv:
         i = argv.index("--consolidated")
         explicit_cons = argv[i + 1]
         del argv[i:i + 2]
+    if "--fasta" in argv:
+        i = argv.index("--fasta")
+        explicit_fasta = argv[i + 1]
+        del argv[i:i + 2]
     if len(argv) < 2:
         raise SystemExit(
             "usage: gen_genome_viewer.py <FINAL.tsv> <out.html> "
-            "[--consolidated <consolidated-merged-all-columns.tsv>] [--artifact]"
+            "[--consolidated <consolidated-merged-all-columns.tsv>] [--fasta <genome.fna>] [--artifact]"
         )
     final, out = argv[0], argv[1]
     rows = list(csv.DictReader(open(final, newline=""), delimiter="\t"))
@@ -295,7 +303,9 @@ def main():
         return {"pid": pidv, "en": en, "desc": desc[:80],
                 "inf": bool(desc) and not _UNINF.match(clean_ev(desc))}
 
-    # Contig lengths (max end), largest first.
+    # The genome's sequences, largest first. With the genome's FASTA (the run's link to it), each
+    # sequence's length and what its header calls it (plasmid, chromosome), every sequence counted;
+    # without it, only the sequences that carry genes, each as long as its last gene's end.
     clen = {}
     for r in rows:
         gid = col(r, "gene_id")
@@ -307,9 +317,17 @@ def main():
             continue
         c = contig_of(gid)
         clen[c] = max(clen.get(c, 0), e)
+    seqs, fasta = genome_sequences(final, organism, explicit_fasta)
+    exact = bool(seqs) and all(c in seqs for c in clen)
+    if exact:
+        # The FASTA's lengths as they are (a gene that ends past its sequence by RASTtk's
+        # off-by-one in older tables is drawn to the end).
+        clen = {c: s["len"] for c, s in seqs.items()}
+    elif fasta is not None:
+        print(f"[genome_viewer] {fasta} does not name every sequence the genes are on; lengths run to the last gene")
     order = sorted(clen, key=lambda c: -clen[c])
     cidx = {c: i for i, c in enumerate(order)}
-    contigs = [{"name": c, "len": clen[c]} for c in order]
+    contigs = [{"name": c, "len": clen[c], "kind": seqs[c]["kind"] if exact else ""} for c in order]
 
     fps = load_fingerprints(final)
     genes = []
@@ -387,6 +405,8 @@ def main():
         "contigs": contigs, "genes": genes,
         "nOperons": n_op, "nFlag": n_flag,
         "totLen": sum(clen.values()),
+        # Lengths from the genome's FASTA (true), or to each sequence's last gene (false).
+        "exact": exact,
         # Whether the fingerprint table was there when the map was drawn.
         "fpMade": bool(fps),
         "evNames": EV_NAMES, "evGroups": EV_GROUPS,
@@ -407,7 +427,8 @@ def main():
     html = html.replace("<!doctype html>", f"<!doctype html>\n<!-- margie-viewer {viewer_version()} -->", 1)
     out = Path(out); out.parent.mkdir(parents=True, exist_ok=True)
     out.write_text(html)
-    print(f"wrote {out}  ({short}: {len(genes)} genes, {len(order)} replicons, "
+    print(f"wrote {out}  ({short}: {len(genes)} genes, {len(order)} sequences"
+          f"{' from ' + str(fasta) if exact else ' with genes (lengths to the last gene)'}, "
           f"{n_op} operons, {n_flag} flagged)  {out.stat().st_size//1024} KB")
 
 
@@ -440,6 +461,8 @@ TEMPLATE = r"""<!doctype html>
   h1{font-size:18px;margin:0 0 2px;overflow-wrap:anywhere;word-break:break-word}
   h1 em{font-style:italic}
   .sub{color:var(--muted);font-size:13px;margin-bottom:12px}
+  .nohead .left>h1,.nohead .left>.sub{display:none}
+  .nohead .wrap{padding-top:8px}
   .modebar{display:flex;gap:0;margin:6px 0 4px;border:1px solid var(--line);border-radius:3px;overflow:hidden;width:max-content;box-shadow:var(--shadow)}
   .modebar button{font-family:inherit;font-size:14px;padding:7px 20px;border:0;background:var(--btn);color:var(--btn-ink);cursor:pointer;transition:background .12s}
   .modebar button.on{background:var(--ink);color:var(--surface)}
@@ -584,11 +607,12 @@ TEMPLATE = r"""<!doctype html>
       <div class="modebar small">
         <button id="vCirc" class="on" type="button">Circular</button>
         <button id="vLin" type="button">Linear</button>
-        <button id="vCtg" type="button" hidden>Contigs</button>
+        <button id="vCtg" type="button" hidden>Sequences</button>
       </div>
       <span id="linctl" class="linctl" hidden>
-        <label><span id="linWhat">replicon</span> <select id="linContig"></select></label>
+        <label><span id="linWhat">sequence</span> <select id="linContig"></select></label>
         <label>genes shown <select id="linN"><option>10</option><option>20</option><option>40</option></select></label>
+        <label>drawn <select id="linScale"><option value="scale">to scale</option><option value="order">in gene order</option></select></label>
         <label>strands <select id="linStr"><option value="one">one line</option><option value="two">two strands</option></select></label>
         <span id="linPos" class="linpos"></span>
       </span>
@@ -610,17 +634,17 @@ TEMPLATE = r"""<!doctype html>
     </div>
     <div class="plate linplate" id="linPlate" hidden>
       <div class="linscroll" id="linScroll"><div class="linspacer" id="linSpacer"></div><svg id="lin" aria-label="linear gene map"></svg></div>
-      <div class="zhint">scroll sideways through the replicon | click a gene for its scorecard</div>
+      <div class="zhint">scroll sideways through the sequence | hover a gene for its place, confidence and name | click it for its scorecard</div>
     </div>
     <div class="plate ctgplate" id="ctgPlate" hidden>
-      <div class="ctghead"><span id="ctgCount"></span><span>longest first | click a contig for its genes</span></div>
+      <div class="ctghead"><span id="ctgCount"></span><span>longest first | click a sequence for its genes</span></div>
       <div class="ctglist" id="ctgList"></div>
     </div>
     <div class="legend" id="legend"></div>
     <div class="foot">Every value is read verbatim from FINAL_ANNOTATION_WITH_CONFIDENCE.tsv. Click a gene or operon for details.</div>
   </div>
   <div class="right">
-    <div class="panel" id="panel"><div class="empty">Hover to preview, click to pin.<br><br>In <b>Gene mode</b>, each arc is a gene coloured by its confidence tier. In <b>Operon mode</b>, each operon takes its own colour and grey arcs are non-operonic; selecting an operon shows its member genes and its context scores. <b>Linear</b> lays the same genes out along the replicon, ten at a time.</div></div>
+    <div class="panel" id="panel"><div class="empty">Hover to preview, click to pin.<br><br>In <b>Gene mode</b>, each arc is a gene coloured by its confidence tier. In <b>Operon mode</b>, each operon takes its own colour and grey arcs are non-operonic; selecting an operon shows its member genes and its context scores. <b>Linear</b> lays the same genes out along each sequence, to scale or in gene order.</div></div>
   </div>
 </div>
 <div id="tip"></div>
@@ -659,15 +683,15 @@ function opColor(id){
   return OPERON_CYCLE[Math.abs(h)%OPERON_CYCLE.length];
 }
 const CX=390, CY=396, START=90;
-// A genome in more than one piece shows no contig names, ticks or positions:
-// with a draft's hundreds of contigs they piled up on each other, and even a
-// few crowd the ring. The pieces sit end to end with a small gap between.
-// Past MANY contigs the gaps share at most 60 degrees and each contig gets its
-// length's share of the rest (a fixed 4-degree gap and floor each wrapped the
-// ring round itself).
+// A genome in more than one sequence shows no sequence names, ticks or positions
+// on the ring: with hundreds of sequences they piled up on each other, and even a
+// few crowd it. The sequences sit end to end with a small gap between.
+// Past MANY sequences (a drawing limit only; it says nothing about the assembly)
+// the gaps share at most 60 degrees and each sequence gets its length's share
+// of the rest (a fixed 4-degree gap and floor each wrapped the ring round itself).
 const MANY=24;
-const DRAFT=D.contigs.length>MANY, MULTI=D.contigs.length>1;
-const GAP=DRAFT?Math.min(4,60/D.contigs.length):4, MINSPAN=DRAFT?0:4;
+const CROWDED=D.contigs.length>MANY, MULTI=D.contigs.length>1;
+const GAP=CROWDED?Math.min(4,60/D.contigs.length):4, MINSPAN=CROWDED?0:4;
 const R={bbO:352,bbI:343, fO:335,fI:306, rO:301,rI:272, tick:262};
 
 // ---- layout: each contig an arc, width ~ length, floor for tiny ones ----
@@ -684,7 +708,7 @@ D.contigs.forEach(c=>{
   const span=(spanTotal*c.len/total<MINSPAN)?MINSPAN:rest*c.len/bigLen;
   lay.push({start:cur,span}); cur-=span;
 });
-const ang=(ci,pos)=>lay[ci].start - lay[ci].span*(pos/D.contigs[ci].len);
+const ang=(ci,pos)=>lay[ci].start - lay[ci].span*(Math.min(pos,D.contigs[ci].len)/D.contigs[ci].len);
 const pol=(r,deg)=>{const a=deg*Math.PI/180;return [CX+r*Math.cos(a), CY - r*Math.sin(a)];};
 const P=(r,d)=>{const p=pol(r,d);return p[0].toFixed(1)+","+p[1].toFixed(1);};
 
@@ -711,7 +735,7 @@ const CONTIG_SHADE=["#000000","#8c8c8c"];
 order.forEach((ci,k)=>{
   annulusStrip(ci,R.bbI,R.bbO,MULTI?CONTIG_SHADE[k%2]:"#000000");
   const L=D.contigs[ci].len, step=L>3e6?1e6:5e5;
-  // Positions only along a single replicon (see MULTI above).
+  // Positions only along a single sequence (see MULTI above).
   if(!MULTI) for(let p=0;p<=L;p+=step){
     const a=ang(ci,p),[x0,y0]=pol(R.bbO,a),[x1,y1]=pol(R.bbO+8,a);
     svg.appendChild(el("line",{x1:x0,y1:y0,x2:x1,y2:y1,stroke:"#000000","stroke-width":.8}));
@@ -751,7 +775,7 @@ function pinGene(i){
 }
 // centre label
 const cInfo=el("text",{x:CX,y:CY+2,"font-size":14,fill:"#000000","text-anchor":"middle"});
-cInfo.textContent=(D.totLen/1e6).toFixed(2)+" Mb  |  "+D.genes.length.toLocaleString()+" genes"; svg.appendChild(cInfo);
+cInfo.textContent=sizeMb()+"  |  "+D.genes.length.toLocaleString()+" genes"; svg.appendChild(cInfo);
 const cInfo2=el("text",{x:CX,y:CY+22,"font-size":12.5,fill:"#000000","text-anchor":"middle"});
 svg.appendChild(cInfo2);
 
@@ -762,9 +786,11 @@ let mode="gene", selKind=null, selVal=null;
 // default), a tier (highest, high, medium, fair, low), noncoding, flagged,
 // operonic or nonoperonic. The rest stay on the ring, greyed like review
 // mode's unflagged genes, so where the chosen ones sit still reads.
+// #head=0: the page shows the genome's name itself, so the map leaves out its title.
 const HIDDEN="#ececea";
 let SHOW="all";
-function readShow(){const m=/(?:^#|&)show=([a-z]+)/.exec(location.hash);SHOW=m?m[1]:"all";}
+function readShow(){const m=/(?:^#|&)show=([a-z]+)/.exec(location.hash);SHOW=m?m[1]:"all";
+  document.body.classList.toggle("nohead",/(?:^#|&)head=0(?:&|$)/.test(location.hash));}
 function shown(g){
   switch(SHOW){
     case "all": return true;
@@ -816,6 +842,18 @@ function renderLegend(){
 // ---- contigs ----
 let VIEWNOW="circ";
 const contigGenes=D.contigs.map(()=>[]);
+// A sequence's name, with what its FASTA header calls it, when it says (plasmid, chromosome).
+function seqName(c){ return c.name+(c.kind?` (${c.kind})`:""); }
+// The genome's size: from its FASTA; without it, to each sequence's last gene, so at least that.
+function sizeMb(){ return (D.exact?"":"≥ ")+(D.totLen/1e6).toFixed(2)+" Mb"; }
+// How many sequences, and how many of them the FASTA headers call chromosomes and plasmids.
+function seqSummary(){
+  const n=D.contigs.length, k={chromosome:0,plasmid:0};
+  D.contigs.forEach(c=>{ if(c.kind) k[c.kind]++; });
+  const named=k.chromosome+k.plasmid, say=(v,w)=>v?`${v.toLocaleString()} ${w}${v>1?"s":""}`:"";
+  const parts=[say(k.chromosome,"chromosome"),say(k.plasmid,"plasmid"),named&&named<n?`${(n-named).toLocaleString()} not named`:""].filter(Boolean);
+  return `${n.toLocaleString()} sequence${n>1?"s":""}`+(named?` (by their FASTA headers: ${parts.join(", ")})`:"");
+}
 D.genes.forEach((g,i)=>contigGenes[g.ci].push(i));
 const contigRank=D.contigs.map((c,i)=>i).sort((a,b)=>D.contigs[b].len-D.contigs[a].len);
 function tierBar(list){
@@ -826,8 +864,8 @@ function tierBar(list){
 function contigCard(ci){
   const c=D.contigs[ci], list=contigGenes[ci];
   const ops=new Set(list.map(i=>D.genes[i].op).filter(Boolean)), fl=list.filter(i=>D.genes[i].rv).length;
-  let h=`<div class="ptitle">${esc(c.name)}</div><span class="ptag" style="background:#555">contig ${contigRank.indexOf(ci)+1} of ${D.contigs.length}</span>`;
-  h+=`<div class="kv"><b>length</b><span>${c.len.toLocaleString()} bp</span><b>genes</b><span>${list.length.toLocaleString()}</span>`
+  let h=`<div class="ptitle">${esc(c.name)}</div><span class="ptag" style="background:#555">sequence ${contigRank.indexOf(ci)+1} of ${D.contigs.length}</span>`+(c.kind?` <span class="ptag" style="background:#555" title="as its FASTA header names it">${c.kind}</span>`:"");
+  h+=`<div class="kv"><b>length</b><span>${c.len.toLocaleString()} bp${D.exact?"":" (to its last gene)"}</span><b>genes</b><span>${list.length.toLocaleString()}</span>`
     +`<b>operons</b><span>${ops.size.toLocaleString()}</span><b>flagged</b><span>${fl.toLocaleString()}</span></div>`;
   h+=`<div class="kv"><b>confidence tiers</b><span>${tierBar(list)}</span></div>`;
   h+=`<div class="cardhead" style="margin:8px 0"><button class="dlbtn" data-ctg-map="${ci}">Show on the map</button><button class="dlbtn" data-ctg-lin="${ci}">Linear view</button></div>`;
@@ -840,9 +878,9 @@ function showContig(ci){ selKind="contig"; selVal=ci; panel.innerHTML=contigCard
   document.querySelectorAll(".crow").forEach(r=>r.classList.toggle("on",+r.dataset.ci===ci)); }
 function renderContigList(){
   const box=document.getElementById("ctgList"); if(!box) return;
-  document.getElementById("ctgCount").textContent=`${D.contigs.length.toLocaleString()} contigs | ${D.totLen.toLocaleString()} bp`;
-  box.innerHTML=`<div class="crow" style="cursor:default;font-weight:bold"><span>contig</span><span class="cnum">length (bp)</span><span class="cnum">genes</span><span>tiers</span></div>`
-    +contigRank.map(ci=>`<div class="crow" data-ci="${ci}"><span class="cnm" title="${esc(D.contigs[ci].name)}">${esc(D.contigs[ci].name)}</span>`
+  document.getElementById("ctgCount").textContent=`${seqSummary()} | ${D.exact?"":"≥ "}${D.totLen.toLocaleString()} bp`;
+  box.innerHTML=`<div class="crow" style="cursor:default;font-weight:bold"><span>sequence</span><span class="cnum">length (bp)</span><span class="cnum">genes</span><span>tiers</span></div>`
+    +contigRank.map(ci=>`<div class="crow" data-ci="${ci}"><span class="cnm" title="${esc(seqName(D.contigs[ci]))}">${esc(seqName(D.contigs[ci]))}</span>`
       +`<span class="cnum">${D.contigs[ci].len.toLocaleString()}</span><span class="cnum">${contigGenes[ci].length}</span>${tierBar(contigGenes[ci])}</div>`).join("");
 }
 document.addEventListener("click",e=>{
@@ -853,7 +891,7 @@ document.addEventListener("click",e=>{
 });
 svg.addEventListener("mousemove",e=>{ const t=e.target.closest(".bb"); if(!t||!MULTI) return;
   const ci=+t.dataset.ci, c=D.contigs[ci];
-  tipShow(`<b>${esc(c.name)}</b><br>contig ${contigRank.indexOf(ci)+1} of ${D.contigs.length} | ${c.len.toLocaleString()} bp | ${contigGenes[ci].length} genes`,e.clientX,e.clientY); });
+  tipShow(`<b>${esc(seqName(c))}</b><br>sequence ${contigRank.indexOf(ci)+1} of ${D.contigs.length} | ${D.exact?"":"≥ "}${c.len.toLocaleString()} bp | ${contigGenes[ci].length} genes`,e.clientX,e.clientY); });
 svg.addEventListener("click",e=>{ const t=e.target.closest(".bb"); if(t&&MULTI) showContig(+t.dataset.ci); });
 
 // ---- selection / highlight ----
@@ -1293,8 +1331,8 @@ function downloadOperon(id){
   img.src='data:image/svg+xml;charset=utf-8,'+encodeURIComponent(svg);
 }
 
-// ---- linear view: the same arrows as an operon map, along the replicon ----
-// The whole replicon is scrollable, but only the genes in view are drawn, so
+// ---- linear view: the same arrows as an operon map, along the sequence ----
+// The whole sequence is scrollable, but only the genes in view are drawn, so
 // 4,000 genes cost no more than 12 polygons at a time.
 const LIN=(function(){
   const plateC=document.getElementById("circPlate"), plateL=document.getElementById("linPlate");
@@ -1307,75 +1345,150 @@ const LIN=(function(){
   const byContig=D.contigs.map(()=>[]);
   D.genes.forEach((g,i)=>byContig[g.ci].push(i));
   byContig.forEach(a=>a.sort((x,y)=>D.genes[x].s-D.genes[y].s));
+  // Each sequence's longest feature: a region that starts left of the view may still reach into it.
+  const longest=byContig.map(a=>a.reduce((m,i)=>Math.max(m,D.genes[i].e-D.genes[i].s+1),0));
   D.contigs.forEach((c,i)=>{ const o=document.createElement("option");
-    o.value=i; o.textContent=c.name+"  |  "+(c.len/1e6).toFixed(2)+" Mb ("+byContig[i].length.toLocaleString()+" genes)";
+    o.value=i; o.textContent=seqName(c)+"  |  "+(D.exact?"":"≥ ")+(c.len/1e6).toFixed(2)+" Mb ("+byContig[i].length.toLocaleString()+" genes)";
     selC.appendChild(o); });
   if(D.contigs.length<2) selC.parentElement.hidden=true;
 
   let ci=0, per=10, on=false, frame=0;
-  const TOP=58, AH=52;                         // arrow top, arrow height
+  const TOP=46, AH=30;                         // the upper track's top, arrow height
   // One line: every gene on one track, pointing its way. Two strands: + genes
   // (read 5'->3' left to right) on the upper track, - genes (5'->3' right to
   // left) on the lower one, each labelled on its outer side.
-  let two=false;
+  // To scale (the default): each gene spans its bases, so lengths, spaces and
+  // overlaps show; in gene order: each gene takes one equal slot.
+  let two=false, scaled=true;
   const LOW=TOP+AH+44;                          // the lower track's top, in two-strand view
-  const heightNow=()=>two?LOW+AH+50:210;
-  const selS=document.getElementById("linStr");
+  const RULE=28;                                // the kb ruler under a to-scale view
+  const heightNow=()=>(two?LOW+AH+40:TOP+AH+42)+(scaled?RULE:0);
+  const selS=document.getElementById("linStr"), selM=document.getElementById("linScale");
   const slot=()=>Math.max(70, scroll.clientWidth/per);
+  const width=()=>scroll.clientWidth||600;
+  /** Bases per pixel, to scale: about `per` genes of this sequence across the view (all of a short one). */
+  function bpp(){ const L=D.contigs[ci].len, n=Math.max(1,byContig[ci].length); return Math.min(per*L/n, L)/width(); }
+  /** The first gene of the sequence (by start) at or after base b. */
+  function from(b){ const a=byContig[ci]; let lo=0, hi=a.length; while(lo<hi){ const m=(lo+hi)>>1; if(D.genes[a[m]].s<b) lo=m+1; else hi=m; } return lo; }
 
-  function layout(){ spacer.style.width=(byContig[ci].length*slot())+"px"; render(); }
+  // Labels fit the space they have, measured in the map's own font.
+  const pen=document.createElement("canvas").getContext("2d"); let face="";
+  function tw(t,size){ if(!face) face=getComputedStyle(svgL).fontFamily||"serif"; pen.font=`${size}px ${face}`; return pen.measureText(t).width; }
+  /** The first text that fits in px; else, given keep, the first one cut to fit with an ellipsis,
+   *  keeping at least `keep` characters; else "". */
+  function fit(texts,px,size,keep){
+    for(const t of texts) if(tw(t,size)<=px) return t;
+    if(!keep) return "";
+    const t=texts[0]; let lo=0, hi=t.length;
+    while(lo<hi){ const m=(lo+hi+1)>>1; if(tw(t.slice(0,m)+"…",size)<=px) lo=m; else hi=m-1; }
+    return lo>=keep?t.slice(0,lo).trimEnd()+"…":"";
+  }
+
+  function layout(){
+    spacer.style.width=(scaled?D.contigs[ci].len/bpp():byContig[ci].length*slot())+"px";
+    render();
+  }
+  /** The base at the middle of the view. */
+  function centre(){
+    const W=width(), list=byContig[ci];
+    if(scaled) return (scroll.scrollLeft+W/2)*bpp();
+    if(!list.length) return 0;
+    const g=D.genes[list[Math.min(list.length-1,Math.max(0,Math.floor((scroll.scrollLeft+W/2)/slot())))]];
+    return (g.s+g.e)/2;
+  }
+  function centreOn(b){
+    const W=width();
+    scroll.scrollLeft=Math.max(0,scaled?b/bpp()-W/2:(Math.min(from(b),byContig[ci].length-1)+0.5)*slot()-W/2);
+  }
+  /** Changes how the view is drawn, keeping the same place in the middle. */
+  function redraw(change){ const b=centre(); change(); layout(); centreOn(b); render(); }
 
   function render(){
     if(!on) return;
-    const list=byContig[ci], sw=slot(), W=scroll.clientWidth||600, H=heightNow();
+    const list=byContig[ci], W=width(), H=heightNow(), L=D.contigs[ci].len;
     svgL.setAttribute("viewBox",`0 0 ${W} ${H}`); svgL.style.height=H+"px";
-    const left=scroll.scrollLeft;
-    const first=Math.max(0,Math.floor(left/sw)-1), last=Math.min(list.length-1,first+per+2);
-    let out=two
-      ? `<line x1="0" y1="${TOP+AH/2}" x2="${W}" y2="${TOP+AH/2}" stroke="#d7d7d2" stroke-width="2"/>`
-        +`<line x1="0" y1="${LOW+AH/2}" x2="${W}" y2="${LOW+AH/2}" stroke="#d7d7d2" stroke-width="2"/>`
-        +`<text x="6" y="${TOP+AH+16}" font-size="11" fill="#555">+ strand (5′→3′, left to right)</text>`
-        +`<text x="6" y="${LOW-6}" font-size="11" fill="#555">− strand (5′→3′, right to left)</text>`
-      : `<line x1="0" y1="${TOP+AH/2}" x2="${W}" y2="${TOP+AH/2}" stroke="#d7d7d2" stroke-width="2"/>`;
-    const short=(nm)=>esc(nm.length>Math.floor(sw/7)?nm.slice(0,Math.max(6,Math.floor(sw/7)-1))+"…":nm);
-    for(let k=first;k<=last;k++){
+    const left=scroll.scrollLeft, sw=slot(), bp=bpp();
+    // The genes in view: by slot, or by bases.
+    let ks=[];
+    if(scaled){
+      const b0=left*bp, b1=(left+W)*bp;
+      for(let k=from(b0-longest[ci]);k<list.length&&D.genes[list[k]].s-1<=b1;k++) if(D.genes[list[k]].e>=b0) ks.push(k);
+    } else {
+      const first=Math.max(0,Math.floor(left/sw)-1), last=Math.min(list.length-1,first+per+2);
+      for(let k=first;k<=last;k++) ks.push(k);
+    }
+    // The backbone runs to the sequence's ends.
+    const xa=scaled?Math.max(0,-left):0, xb=scaled?Math.min(W,L/bp-left):W;
+    let out=`<line x1="${xa}" y1="${TOP+AH/2}" x2="${xb}" y2="${TOP+AH/2}" stroke="#d7d7d2" stroke-width="2"/>`;
+    if(two) out+=`<line x1="${xa}" y1="${LOW+AH/2}" x2="${xb}" y2="${LOW+AH/2}" stroke="#d7d7d2" stroke-width="2"/>`
+      +`<text x="6" y="${TOP+AH+16}" font-size="11" fill="#555">+ strand (5′→3′, left to right)</text>`
+      +`<text x="6" y="${LOW-6}" font-size="11" fill="#555">− strand (5′→3′, right to left)</text>`;
+    const mark=(i,g)=>selKind==="gene"?(selVal===i?" sel":""):selKind==="operon"?(g.op===selVal?" hi":" dim"):"";
+    // Regions (prophages, repeats, CRISPR arrays) to scale: a band under the genes they span, as on the circle.
+    if(scaled) for(const k of ks){ const i=list[k], g=D.genes[i]; if(!g.rg) continue;
+      const x0=(g.s-1)/bp-left, x1=Math.max(x0+2,g.e/bp-left), y0=TOP-5, y1=(two?LOW:TOP)+AH+5;
+      out+=`<rect class="gene${mark(i,g)}" data-i="${i}" x="${x0}" y="${y0}" width="${x1-x0}" height="${y1-y0}" fill="${geneFill(g)}" stroke="rgba(0,0,0,.18)" stroke-width="0.8"></rect>`; }
+    // Each label row takes labels left to right while they do not run into the one before
+    // (genes overlapping on one line) or past the edge of the view.
+    const free={};
+    const label=(text,x,y,size,ink)=>{ if(!text) return; const w=tw(text,size), a=x-w/2;
+      if(a<0||a+w>W||(free[y]!==undefined&&a<free[y]+2)) return;
+      free[y]=a+w; out+=`<text x="${x}" y="${y}" font-size="${size}" fill="${ink}" text-anchor="middle">${esc(text)}</text>`; };
+    for(const k of ks){
       const i=list[k], g=D.genes[i];
-      const x=k*sw-left, w=sw*0.82, x0=x+sw*0.09, x1=x0+w, cx=x+sw/2;
+      if(scaled&&g.rg) continue;
+      let x0, x1;
+      if(scaled){ x0=(g.s-1)/bp-left; x1=g.e/bp-left; if(x1-x0<2){ const m=(x0+x1)/2; x0=m-1; x1=m+1; } }
+      else { x0=k*sw-left+sw*0.09; x1=x0+sw*0.82; }
+      const w=x1-x0, cx=(x0+x1)/2, room=scaled?w:sw*0.94;
       const top=two&&g.st<0?LOW:TOP;
-      const hd=Math.min(16,w*0.3), yt=top, yb=top+AH, ym=top+AH/2;
+      const hd=Math.min(AH*0.42,w*0.35), yt=top, yb=top+AH, ym=top+AH/2;
       const pts=g.st>0
         ? `${x0},${yt} ${x1-hd},${yt} ${x1},${ym} ${x1-hd},${yb} ${x0},${yb}`
         : `${x1},${yt} ${x0+hd},${yt} ${x0},${ym} ${x0+hd},${yb} ${x1},${yb}`;
-      const c=geneFill(g), nm=(g.nm||"(unnamed)");
-      // Narrow slots get the position only; wider ones the score too.
-      const kb=`${(g.s/1000).toFixed(1)}–${(g.e/1000).toFixed(1)} kb`+(sw>=150?` | ${pct(g.fin)}${g.rv?" | ⚑":""}`:"");
       // The gene or operon selected on either map stays marked here.
-      const mark=selKind==="gene"?(selVal===i?" sel":""):selKind==="operon"?(g.op===selVal?" hi":" dim"):"";
-      out+=`<polygon class="gene${mark}" data-i="${i}" points="${pts}" fill="${c}" stroke="rgba(0,0,0,.35)" stroke-width="0.8"></polygon>`;
+      out+=`<polygon class="gene${mark(i,g)}" data-i="${i}" points="${pts}" fill="${geneFill(g)}" stroke="rgba(0,0,0,.35)" stroke-width="0.8"></polygon>`;
+      const nm=g.nm||"(unnamed)", a=(g.s/1000).toFixed(1), b=(g.e/1000).toFixed(1);
+      const score=`${pct(g.fin)}${g.rv?" | ⚑":""}`;
+      // The place, shorter where the gene is narrow; the score where there is room.
+      const kb=[`${a}–${b} kb | ${score}`,`${a}–${b} kb`,`${a}–${b}`,a];
       if(!two){
-        out+=`<text x="${cx}" y="${TOP-26}" font-size="11" fill="#000" text-anchor="middle">${k+1}</text>`
-          +`<text x="${cx}" y="${TOP-10}" font-size="11.5" fill="#000" text-anchor="middle">${short(nm)}</text>`
-          +`<text x="${cx}" y="${yb+16}" font-size="10.5" fill="#444" text-anchor="middle">${(g.s/1000).toFixed(1)}–${(g.e/1000).toFixed(1)} kb</text>`
-          +`<text x="${cx}" y="${yb+31}" font-size="10.5" fill="#444" text-anchor="middle">${g.st>0?"+":"−"} | ${pct(g.fin)}${g.rv?" | ⚑":""}</text>`;
-      } else if(g.st>0){                       // upper track: labels above
-        out+=`<text x="${cx}" y="${yt-26}" font-size="11" fill="#000" text-anchor="middle">${k+1} | ${short(nm)}</text>`
-          +`<text x="${cx}" y="${yt-10}" font-size="10.5" fill="#444" text-anchor="middle">${kb}</text>`;
-      } else {                                  // lower track: labels below
-        out+=`<text x="${cx}" y="${yb+16}" font-size="10.5" fill="#444" text-anchor="middle">${kb}</text>`
-          +`<text x="${cx}" y="${yb+32}" font-size="11" fill="#000" text-anchor="middle">${k+1} | ${short(nm)}</text>`;
+        label(fit([String(k+1)],room,11),cx,TOP-22,11,"#000");
+        label(fit([nm],room,11.5,3),cx,TOP-8,11.5,"#000");
+        label(fit(kb.slice(1),room,10.5),cx,yb+14,10.5,"#444");
+        label(fit([`${g.st>0?"+":"−"} | ${score}`,g.st>0?"+":"−"],room,10.5),cx,yb+28,10.5,"#444");
+      } else {
+        // The number and at least three letters of the name, or the number alone.
+        const name=fit([`${k+1} | ${nm}`],room,11,String(k+1).length+6)||fit([String(k+1)],room,11);
+        const where=fit(kb,room,10.5);
+        if(g.st>0){ label(name,cx,yt-22,11,"#000"); label(where,cx,yt-8,10.5,"#444"); }   // upper track: labels above
+        else { label(where,cx,yb+14,10.5,"#444"); label(name,cx,yb+29,11,"#000"); }       // lower track: labels below
       }
     }
+    // To scale: a ruler in kb along the bottom, about every 110 pixels.
+    if(scaled){
+      const y=H-RULE+4, b0=left*bp, b1=Math.min(L,(left+W)*bp), raw=110*bp, p=10**Math.floor(Math.log10(raw));
+      const step=[1,2,5,10].map(m=>m*p).find(v=>v>=raw), dec=step>=1000?0:step>=100?1:step>=10?2:3;
+      out+=`<line x1="${xa}" y1="${y}" x2="${xb}" y2="${y}" stroke="#bdbdb8" stroke-width="1"/>`;
+      for(let t=Math.ceil(b0/step)*step;t<=b1;t+=step){ const x=t/bp-left, txt=`${(t/1000).toFixed(dec)} kb`, half=tw(txt,10)/2;
+        out+=`<line x1="${x}" y1="${y}" x2="${x}" y2="${y+5}" stroke="#9a9a95" stroke-width="1"/>`;
+        if(x-half>=0&&x+half<=W) out+=`<text x="${x}" y="${y+16}" font-size="10" fill="#666" text-anchor="middle">${txt}</text>`; }
+    }
     svgL.innerHTML=out;
-    const lo=list[Math.min(first+1,list.length-1)], hi=list[Math.min(last,list.length-1)];
-    posEl.textContent=`genes ${Math.min(first+2,list.length).toLocaleString()}–${(last+1).toLocaleString()} of ${list.length.toLocaleString()}`
-      +`  |  ${(D.genes[lo].s/1e6).toFixed(3)}–${(D.genes[hi].e/1e6).toFixed(3)} Mb`;
+    const genes=ks.filter(k=>!D.genes[list[k]].rg||!scaled);
+    if(!genes.length){ posEl.textContent=`no genes here  |  ${(left*bp/1e6).toFixed(3)} Mb`; return; }
+    const f=scaled?genes[0]:Math.min(genes[0]+1,list.length-1), l=genes[genes.length-1];
+    const b0=scaled?Math.max(0,left*bp):D.genes[list[f]].s, b1=scaled?Math.min(L,(left+W)*bp):D.genes[list[l]].e;
+    posEl.textContent=`genes ${(f+1).toLocaleString()}–${(l+1).toLocaleString()} of ${list.length.toLocaleString()}`
+      +`  |  ${(b0/1e6).toFixed(3)}–${(b1/1e6).toFixed(3)} Mb`;
   }
 
   scroll.addEventListener("scroll",()=>{ if(frame) return; frame=requestAnimationFrame(()=>{frame=0;render();}); });
-  addEventListener("resize",()=>{ if(on) layout(); });
+  addEventListener("resize",()=>{ if(on) redraw(()=>{}); });
   selC.addEventListener("change",()=>{ ci=+selC.value; scroll.scrollLeft=0; layout(); });
-  selN.addEventListener("change",()=>{ per=+selN.value||10; layout(); });
+  selN.addEventListener("change",()=>redraw(()=>{ per=+selN.value||10; }));
   if(selS) selS.addEventListener("change",()=>{ two=selS.value==="two"; layout(); });
+  if(selM) selM.addEventListener("change",()=>redraw(()=>{ scaled=selM.value!=="order"; }));
   svgL.addEventListener("click",e=>{ const t=e.target.closest(".gene"); if(!t) return;
     const i=+t.dataset.i, g=D.genes[i];
     if(mode==="operon"&&g.op) showOperon(g.op); else showGene(i); });
@@ -1391,12 +1504,12 @@ const LIN=(function(){
   }
   /** The linear view at the start of one contig. */
   function showContig(c){ ci=c; selC.value=String(c); scroll.scrollLeft=0; if(on) layout(); }
-  /** Bring gene *i* into view, switching replicon if it sits on another. */
+  /** Bring gene *i* into view, switching sequence if it sits on another. */
   function goto_(i){
     const g=D.genes[i]; if(!on) return;
     if(g.ci!==ci){ ci=g.ci; selC.value=String(ci); layout(); }
     const k=byContig[ci].indexOf(i); if(k<0) return;
-    scroll.scrollLeft=Math.max(0,(k-Math.floor(per/2))*slot());
+    if(scaled) centreOn((g.s+g.e)/2); else scroll.scrollLeft=Math.max(0,(k-Math.floor(per/2))*slot());
     render();
   }
   return {render, visible:()=>on, goto:goto_, show, showContig};
@@ -1407,7 +1520,6 @@ const VIEW=(function(){
   const bC=document.getElementById("vCirc"), bL=document.getElementById("vLin"), bK=document.getElementById("vCtg");
   const plateK=document.getElementById("ctgPlate");
   if(MULTI&&bK) bK.hidden=false;
-  const what=document.getElementById("linWhat"); if(what&&MULTI) what.textContent="contig";
   function set(v){
     VIEWNOW=v; tell();
     if(v==="ctg"){ LIN.show(false); document.getElementById("circPlate").hidden=true; plateK.hidden=false; renderContigList(); }
@@ -1685,9 +1797,8 @@ const ZOOM=(function(){
 
 document.getElementById("org").textContent=D.short;   // genome identifier / filename, verbatim
 document.getElementById("sub").textContent=
-  "confidence genome viewer  |  "+(D.totLen/1e6).toFixed(2)+" Mb  |  "
-  +D.genes.length.toLocaleString()+" genes  |  "+D.contigs.length.toLocaleString()
-  +(DRAFT?" contigs (draft assembly)":" replicon"+(D.contigs.length>1?"s":""))
+  "confidence genome viewer  |  "+sizeMb()+(D.exact?"":" (to the last gene of each sequence)")+"  |  "
+  +D.genes.length.toLocaleString()+" genes  |  "+seqSummary()
   +"  |  "+D.nOperons.toLocaleString()+" operons  |  "+D.nFlag.toLocaleString()+" flagged";
 readShow();
 addEventListener("hashchange",()=>{ readShow(); paint(); });

@@ -378,7 +378,7 @@ def physical_neighbors_block(fid: str, df_indexed: dict, confidence_final: dict,
     """Renders a table of up to n neighbours on each side, found by gene-number adjacency (regex on the feature id).
 
     Consecutive peg numbers (RASTtk's fig|<genome>.peg.<n>) or gene numbers on a contig
-    (Prodigal's <contig>_<n>) stand in for consecutive genes on one replicon.
+    (Prodigal's <contig>_<n>) stand in for consecutive genes on one sequence.
     """
     m = re.match(r'^(fig\|\d+\.\d+\.peg\.)(\d+)$', fid) or re.match(r'^(.+_)(\d+)$', fid)
     if not m:

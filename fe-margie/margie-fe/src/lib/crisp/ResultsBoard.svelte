@@ -3,7 +3,7 @@
 	import { untrack } from 'svelte';
 	import { goto } from '$app/navigation';
 	import { page } from '$app/state';
-	import { Bot, Check, Copy, Download, FileSpreadsheet, FolderOpen, Maximize2, Minimize2 } from 'lucide-svelte';
+	import { Bot, Check, ChevronDown, ChevronUp, Copy, Download, FileSpreadsheet, FolderOpen, Maximize2 } from 'lucide-svelte';
 	import GenomeChat from '$lib/crisp/GenomeChat.svelte';
 	import { chatGet } from '$lib/workspace/chat-api';
 	import { cubicOut } from 'svelte/easing';
@@ -76,12 +76,12 @@
 		const parts = [`${TABS.find((t) => t.id === tab)?.label ?? tab} tab`];
 		if (show !== 'all') parts.push(`showing ${SHOWS.find((x) => x.id === show)?.label.toLowerCase()} genes`);
 		if (tab === 'map' && viewerSel) {
-			const view = { circ: 'circular view', lin: 'linear view', ctg: 'contigs view' }[viewerSel.view ?? ''] ?? '';
+			const view = { circ: 'circular view', lin: 'linear view', ctg: 'sequences view' }[viewerSel.view ?? ''] ?? '';
 			if (view) parts.push(`${view}${viewerSel.mode ? `, ${viewerSel.mode} colouring` : ''}`);
 			const x = viewerSel.sel;
-			if (x?.kind === 'gene') parts.push(`gene ${x.id}${x.label ? ` (${x.label})` : ''}${x.contig ? `, contig ${x.contig}` : ''}${x.operon ? `, ${x.operon}` : ', singleton'}`);
+			if (x?.kind === 'gene') parts.push(`gene ${x.id}${x.label ? ` (${x.label})` : ''}${x.contig ? `, sequence ${x.contig}` : ''}${x.operon ? `, ${x.operon}` : ', singleton'}`);
 			else if (x?.kind === 'operon') parts.push(`operon ${x.id}${x.label ? ` (${x.label})` : ''}`);
-			else if (x?.kind === 'contig') parts.push(`contig ${x.id}${x.label ? ` (${x.label})` : ''}`);
+			else if (x?.kind === 'contig') parts.push(`sequence ${x.id}${x.label ? ` (${x.label})` : ''}`);
 		}
 		if (tab === 'figures' && summary.figures.length) {
 			const f = summary.figures.includes(figure) ? figure : summary.figures[0];
@@ -114,7 +114,7 @@
 	});
 
 	/*
-	 * Full screen: only the map and (when open) the chat, with a slim bar for the
+	 * Full screen: the tab and (when open) the chat, with a slim bar for the
 	 * name, the chat and the way out.
 	 */
 	let board = $state<HTMLElement | null>(null);
@@ -123,14 +123,9 @@
 		if (document.fullscreenElement) await document.exitFullscreen().catch(() => {});
 		else await board?.requestFullscreen().catch(() => {});
 	}
-	/** Any other tab full screen on its own: the table, figures, methods or files, and nothing else. */
-	let pane = $state<HTMLElement | null>(null);
-	let paneFull = $state(false);
-	async function togglePaneFull() {
-		if (tab === 'map') return toggleFull();
-		if (document.fullscreenElement) await document.exitFullscreen().catch(() => {});
-		else await pane?.requestFullscreen().catch(() => {});
-	}
+	/** The header folded to one line (the name, the tabs, full screen and the chat), so the tab has more room; remembered. */
+	const HEAD = 'results:header';
+	const headShut = $derived(ui.isFolded(HEAD));
 
 	/** The chat beside the report: open or not, remembered like the list. */
 	const CHAT = 'results:chat-open';
@@ -444,11 +439,10 @@
 <svelte:document
 	onfullscreenchange={() => {
 		full = !!board && document.fullscreenElement === board;
-		paneFull = !!pane && document.fullscreenElement === pane;
 	}}
 />
 
-<div class="rb" class:full bind:this={board}>
+<div class="rb" class:full class:compact={headShut} bind:this={board}>
 	<aside class="rb-side" class:shut={listShut} style="--w: {listShut ? 44 : ui.size('app:results-list', 300)}px">
 		<div class="rb-side-head">
 			<span class="rb-side-title">Genomes <b>{rows.length}</b></span>
@@ -522,6 +516,7 @@
 			<header class="rb-head">
 				<div class="rb-title">
 					<h2 id="rb-title" class="mg-mono" title={summary.genome}>{baseOf(summary.genome)}</h2>
+					{#if headShut && show !== 'all'}<span class="rb-fullnote">showing {SHOWS.find((x) => x.id === show)?.label.toLowerCase()}</span>{/if}
 					<ul class="rb-facts">
 						{#if caller}<li><span>gene caller</span>{caller}</li>{/if}
 						{#if summary.geneticCode}<li><span>genetic code</span>{summary.geneticCode}</li>{/if}
@@ -546,13 +541,20 @@
 					{/each}
 				</div>
 				<div class="rb-downloads">
-					<button type="button" class="rb-btn" title="Show this tab on the whole screen (Esc to leave)" onclick={togglePaneFull}><Maximize2 size={15} />Full screen</button>
+					<button
+						type="button"
+						class="rb-btn"
+						aria-expanded={!headShut}
+						title={headShut ? 'Show the facts, the numbers and the gene choices again' : 'Fold the facts, the numbers and the gene choices away, so the tab has more room'}
+						onclick={() => ui.toggleFold(HEAD)}>{#if headShut}<ChevronDown size={15} />Show header{:else}<ChevronUp size={15} />Hide header{/if}</button
+					>
+					<button type="button" class="rb-btn" title="Show this tab and the chat on the whole screen (Esc to leave)" onclick={toggleFull}><Maximize2 size={15} />Full screen</button>
 					<button type="button" class="rb-btn chat" aria-pressed={chatOpen} onclick={() => ui.toggleFold(CHAT, true)}><Bot size={15} />Chat with the genome</button>
 					{#if summary.final.excel}
-						<a class="rb-btn primary" href={uiBase.to(`/view?path=${encodeURIComponent(summary.final.excel)}`)}><FileSpreadsheet size={15} />Open Excel</a>
+						<a class="rb-btn primary rb-file" href={uiBase.to(`/view?path=${encodeURIComponent(summary.final.excel)}`)}><FileSpreadsheet size={15} />Open Excel</a>
 					{/if}
-					{#if summary.final.table}<a class="rb-btn" href={fileUrl(summary.final.table)} download><Download size={15} />TSV</a>{/if}
-					{#if summary.final.excel}<a class="rb-btn" href={fileUrl(summary.final.excel)} download><Download size={15} />Excel</a>{/if}
+					{#if summary.final.table}<a class="rb-btn rb-file" href={fileUrl(summary.final.table)} download><Download size={15} />TSV</a>{/if}
+					{#if summary.final.excel}<a class="rb-btn rb-file" href={fileUrl(summary.final.excel)} download><Download size={15} />Excel</a>{/if}
 				</div>
 			</header>
 
@@ -620,9 +622,9 @@
 				<figure class="rb-map">
 					{#key summary.genome}
 						<ResultsRing glyph={summary.glyph} size={212}>
-							{#if summary.glyph}<b class="rb-ring-big">{size(summary.glyph.length)}</b>{/if}
+							{#if summary.glyph}<b class="rb-ring-big" title="Read to the last gene of each sequence, so the genome is at least this long">≥ {size(summary.glyph.length)}</b>{/if}
 							<span class="rb-ring-small"><CountUp value={summary.genes} /> genes</span>
-							{#if summary.glyph && summary.glyph.contigs > 1}<span class="rb-ring-tiny">{summary.glyph.contigs} contigs</span>{/if}
+							{#if summary.glyph && summary.glyph.contigs > 1}<span class="rb-ring-tiny">{summary.glyph.contigs} sequences</span>{/if}
 						</ResultsRing>
 					{/key}
 					{#if summary.glyph}<figcaption>forward strand outside, reverse inside</figcaption>{/if}
@@ -675,15 +677,12 @@
 
 			{/if}
 
-			<div class="rb-pane" class:rb-fill={fills} class:rb-flow={!fills} bind:this={pane}>
-				{#if paneFull}
-					<button type="button" class="rb-btn rb-pane-exit" onclick={togglePaneFull}><Minimize2 size={15} />Exit full screen | Esc</button>
-				{/if}
+			<div class="rb-pane" class:rb-fill={fills} class:rb-flow={!fills}>
 				{#key tab}
 					<div class="rb-body" in:tabIn>
 						{#if tab === 'map'}
 							{#if summary.final.viewer}
-								{#if backend.cluster}
+								{#if backend.cluster && (!headShut || (summary.mapCurrent === false && !mapVersion))}
 									<p class="rb-remake">
 										<span>
 											{summary.mapCurrent === false && !mapVersion
@@ -697,7 +696,7 @@
 									</p>
 								{/if}
 								{#key mapVersion}
-								<HtmlViewer src={fileUrl(summary.final.viewer, true) + (mapVersion ? `&v=${mapVersion}` : '')} download={fileUrl(summary.final.viewer)} onfull={toggleFull} {full} hash={show === 'all' ? '' : `show=${show}`} title="Genome viewer for {summary.genome}" />
+								<HtmlViewer src={fileUrl(summary.final.viewer, true) + (mapVersion ? `&v=${mapVersion}` : '')} download={fileUrl(summary.final.viewer)} onfull={toggleFull} {full} hash={[show === 'all' ? '' : `show=${show}`, headShut || full ? 'head=0' : ''].filter(Boolean).join('&')} title="Genome viewer for {summary.genome}" />
 								{/key}
 							{:else if circular}
 								<p class="rb-fig-note">{figureNote(circular)}</p>
@@ -1515,23 +1514,44 @@
 			min-width: 960px;
 		}
 	}
-	/* One tab on the whole screen. */
-	.rb-pane:fullscreen {
-		position: relative;
+	/* Full screen: the window's height; a tall tab scrolls in it, and a viewer takes what the bar leaves. */
+	.rb.full {
 		height: 100vh;
-		/* The top strip is the exit button's, so it covers none of the tab's own controls. */
-		padding: 54px 18px 14px;
+		min-height: 0;
+	}
+	.rb.full .rb-report {
 		overflow: auto;
-		background: var(--cr-card, var(--mg-surface));
 	}
-	.rb-pane:fullscreen.rb-fill > .rb-body {
-		flex-grow: 1;
+	.rb.full .rb-fill {
+		flex: 1 1 auto;
+		height: auto;
+		min-height: 0;
 	}
-	.rb-pane-exit {
-		position: absolute;
-		top: 10px;
-		right: 14px;
-		z-index: 5;
+	/* The header folded: the name, the tabs and the buttons for full screen and the chat. */
+	.rb.compact .rb-facts,
+	.rb.compact .rb-file,
+	.rb.compact .rb-strip,
+	.rb.compact .rb-show,
+	.rb.compact .rb-hero {
+		display: none;
+	}
+	.rb.compact .rb-head {
+		padding-top: 6px;
+		padding-bottom: 6px;
+	}
+	.rb.compact .rb-title {
+		flex: 1 1 160px;
+		gap: 2px;
+	}
+	.rb.compact .rb-tabs {
+		order: 1;
+		flex: 0 1 auto;
+	}
+	.rb.compact .rb-tab {
+		height: 28px;
+	}
+	.rb.compact .rb-pane {
+		padding-top: 8px;
 	}
 	.rb-fill > .rb-body {
 		flex-grow: 1;
